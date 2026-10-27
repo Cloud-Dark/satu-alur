@@ -4,8 +4,8 @@
  * Dapat diganti dengan SDK nyata secara transparan saat publicConfig tersedia.
  */
 
-const STORAGE_KEY = 'serviceops_mock_v1'
-const OTP_STORE = 'serviceops_mock_otp'
+const STORAGE_KEY = 'satualur_mock_v1'
+const OTP_STORE = 'satualur_mock_otp'
 
 function loadState() {
   try {
@@ -41,6 +41,7 @@ const mockAuth = {
     otpData[id] = { email, code, ts: Date.now() }
     localStorage.setItem(OTP_STORE, JSON.stringify(otpData))
     console.log(`[MOCK OTP] Kode untuk ${email}: ${code}`)
+    window.dispatchEvent(new CustomEvent('mock-otp-sent', { detail: { email, code } }))
     const users = ensureTable('users')
     const isExistingUser = users.some(u => u.email === email)
     return { data: { verificationId: id, isExistingUser }, error: null }
@@ -315,7 +316,83 @@ const mockLLM = {
   }
 }
 
+/**
+ * Seed realistic demo data for teammate demonstration
+ */
+export function seedDemoData() {
+  const state = loadState()
+  if (state._seeded) return
+
+  const now = new Date()
+  const daysAgo = (d) => new Date(now.getTime() - d * 86400000).toISOString()
+
+  // --- Requests ---
+  state.requests = [
+    { id: 1001, customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
+    { id: 1002, customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
+    { id: 1003, customer_name: 'Kost exclusive 99', service_type: 'Pembersihan Kolam Renang', location: 'Depok', description: 'Perawatan rutin kolam renang bulanan, termasuk pengecekan pH dan backwash.', created_at: daysAgo(10) },
+    { id: 1004, customer_name: 'PT Sinar Abadi', service_type: 'Pest Control', location: 'Tangerang', description: 'Pengendalian hama rayap dan kecoa untuk gudang 500m2.', created_at: daysAgo(8) },
+    { id: 1005, customer_name: 'Apartemen GreenView', service_type: 'Pembersihan Kaca Gedung', location: 'Jakarta Pusat', description: 'Pembersihan kaca eksterior 12 lantai menggunakan gondola.', created_at: daysAgo(6) },
+    { id: 1006, customer_name: 'Resto Nusantara', service_type: 'Ducting & Exhaust Cleaning', location: 'Surabaya', description: 'Pembersihan ducting dan exhaust fan dapur restoran.', created_at: daysAgo(4) },
+    { id: 1007, customer_name: 'Hotel Grand Lestari', service_type: 'Deep Cleaning Kamar', location: 'Yogyakarta', description: 'Deep cleaning 50 kamar hotel setelah musim liburan.', created_at: daysAgo(2) },
+    { id: 1008, customer_name: 'Villa Bukit Asri', service_type: 'Pembersihan Taman & Kolam', location: 'Bogor', description: 'Perawatan taman landscape dan kolam ikan koi.', created_at: daysAgo(1) },
+  ]
+
+  // --- Offers ---
+  state.offers = [
+    { id: 2001, request_id: 1001, ai_proposal_json: { scope: 'Pembersihan AC split 15 unit di 3 lantai kantor.', price: 3500000, terms: 'Pembayaran 50% di muka.', notes: 'Harga termasuk sparepart filter.' }, validated_price: 3500000, validated_scope: 'Pembersihan AC split 15 unit di 3 lantai kantor.', status: 'approved', created_at: daysAgo(13) },
+    { id: 2002, request_id: 1002, ai_proposal_json: { scope: 'Cuci sofa 3 set dan karpet 2 pcs.', price: 1200000, terms: 'Pembayaran penuh setelah selesai.', notes: 'Garansi 3 hari.' }, validated_price: 1200000, validated_scope: 'Cuci sofa 3 set dan karpet 2 pcs.', status: 'approved', created_at: daysAgo(11) },
+    { id: 2003, request_id: 1003, ai_proposal_json: { scope: 'Perawatan rutin kolam renang bulanan.', price: 850000, terms: 'Langganan bulanan.', notes: 'Termasuk bahan kimia.' }, validated_price: 850000, validated_scope: 'Perawatan rutin kolam renang bulanan.', status: 'approved', created_at: daysAgo(9) },
+    { id: 2004, request_id: 1004, ai_proposal_json: { scope: 'Pest control rayap dan kecoa gudang 500m2.', price: 4200000, terms: 'Kontrak 3 bulan.', notes: 'Garansi 6 bulan.' }, validated_price: 4200000, validated_scope: 'Pest control rayap dan kecoa gudang 500m2.', status: 'approved', created_at: daysAgo(7) },
+    { id: 2005, request_id: 1005, ai_proposal_json: { scope: 'Pembersihan kaca eksterior 12 lantai.', price: 7800000, terms: 'Pembayaran 2 termin.', notes: 'Sertifikat safety disertakan.' }, validated_price: 7800000, validated_scope: 'Pembersihan kaca eksterior 12 lantai.', status: 'draft', created_at: daysAgo(5) },
+    { id: 2006, request_id: 1006, ai_proposal_json: { scope: 'Ducting dan exhaust fan cleaning.', price: 2500000, terms: 'Pembayaran penuh.', notes: 'Dikerjakan malam hari.' }, validated_price: 2500000, validated_scope: 'Ducting dan exhaust fan cleaning.', status: 'draft', created_at: daysAgo(3) },
+    { id: 2007, request_id: 1007, ai_proposal_json: { scope: 'Deep cleaning 50 kamar hotel.', price: 15000000, terms: 'Termin mingguan.', notes: 'Target 10 kamar/hari.' }, validated_price: 15000000, validated_scope: 'Deep cleaning 50 kamar hotel.', status: 'draft', created_at: daysAgo(1) },
+  ]
+
+  // --- Assignments ---
+  state.assignments = [
+    { id: 3001, offer_id: 2001, worker_name: 'Ahmad & Team', scheduled_at: daysAgo(11), status: 'done', created_at: daysAgo(12) },
+    { id: 3002, offer_id: 2002, worker_name: 'Budi Santoso', scheduled_at: daysAgo(9), status: 'done', created_at: daysAgo(10) },
+    { id: 3003, offer_id: 2003, worker_name: 'Candra Pool Service', scheduled_at: daysAgo(8), status: 'done', created_at: daysAgo(9) },
+    { id: 3004, offer_id: 2004, worker_name: 'Dedi Pest Control', scheduled_at: daysAgo(5), status: 'done', created_at: daysAgo(7) },
+    { id: 3005, offer_id: 2001, worker_name: 'Eko Maintenance', scheduled_at: daysAgo(3), status: 'assigned', created_at: daysAgo(4) },
+    { id: 3006, offer_id: 2003, worker_name: 'Fajar Pool Service', scheduled_at: daysAgo(2), status: 'assigned', created_at: daysAgo(3) },
+  ]
+
+  // --- Completions ---
+  state.completions = [
+    { id: 4001, assignment_id: 3001, notes: 'Semua AC bersih dan dingin optimal. Filter sudah diganti.', status: 'done', completed_at: daysAgo(10), created_at: daysAgo(10) },
+    { id: 4002, assignment_id: 3002, notes: 'Sofa dan karpet bersih, noda kopi hilang 95%.', status: 'done', completed_at: daysAgo(8), created_at: daysAgo(8) },
+    { id: 4003, assignment_id: 3003, notes: 'pH kolam stabil 7.2, air jernih.', status: 'done', completed_at: daysAgo(6), created_at: daysAgo(6) },
+    { id: 4004, assignment_id: 3004, notes: 'Pembasmi hama dikerjakan 2x. Rekomendasi follow up 1 bulan.', status: 'done', completed_at: daysAgo(3), created_at: daysAgo(3) },
+  ]
+
+  // --- Ledger Entries ---
+  state.ledger_entries = [
+    { id: 5001, completion_id: 4001, amount: 3500000, category: 'pendapatan', status: 'posted', posted_at: daysAgo(10), created_at: daysAgo(10) },
+    { id: 5002, completion_id: 4001, amount: 800000, category: 'biaya_tenaga', status: 'posted', posted_at: daysAgo(10), created_at: daysAgo(10) },
+    { id: 5003, completion_id: 4001, amount: 350000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(10), created_at: daysAgo(10) },
+    { id: 5004, completion_id: 4002, amount: 1200000, category: 'pendapatan', status: 'posted', posted_at: daysAgo(8), created_at: daysAgo(8) },
+    { id: 5005, completion_id: 4002, amount: 300000, category: 'biaya_tenaga', status: 'posted', posted_at: daysAgo(8), created_at: daysAgo(8) },
+    { id: 5006, completion_id: 4002, amount: 120000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(8), created_at: daysAgo(8) },
+    { id: 5007, completion_id: 4003, amount: 850000, category: 'pendapatan', status: 'posted', posted_at: daysAgo(6), created_at: daysAgo(6) },
+    { id: 5008, completion_id: 4003, amount: 200000, category: 'biaya_tenaga', status: 'posted', posted_at: daysAgo(6), created_at: daysAgo(6) },
+    { id: 5009, completion_id: 4003, amount: 180000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(6), created_at: daysAgo(6) },
+    { id: 5010, completion_id: 4004, amount: 4200000, category: 'pendapatan', status: 'posted', posted_at: daysAgo(3), created_at: daysAgo(3) },
+    { id: 5011, completion_id: 4004, amount: 1200000, category: 'biaya_tenaga', status: 'posted', posted_at: daysAgo(3), created_at: daysAgo(3) },
+    { id: 5012, completion_id: 4004, amount: 650000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(3), created_at: daysAgo(3) },
+  ]
+
+  state.users = [{ id: 'demo-user', email: 'demo@satualur.id', name: 'Demo User', created_at: daysAgo(30) }]
+  state._seeded = true
+  saveState(state)
+  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries')
+}
+
 export function createMockWorkBuddyCloud() {
+  // Auto-seed on first creation
+  seedDemoData()
+
   return {
     auth: mockAuth,
     database: mockDatabase,

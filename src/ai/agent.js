@@ -1,15 +1,13 @@
 import { getCloud } from '../cloud.js'
-
-function buildSystemPrompt(role, rules) {
-  return `Kamu adalah ${role}. ${rules} Berikan jawaban dalam Bahasa Indonesia.`
-}
+import { getAgentPrompts, getAgentParams } from '../stages/settings.js'
 
 export async function generateOffer({ request, modelId, signal, onChunk }) {
   const cloud = getCloud()
-  const systemPrompt = buildSystemPrompt(
-    'agen penawaran otomatis untuk perusahaan jasa di Indonesia',
-    'Hasilkan proposal penawaran dalam JSON dengan field: scope (string, ruang lingkup), price (number, dalam Rupiah), terms (string, syarat & ketentuan), notes (string, catatan opsional). Pastikan harga wajar dan ruang lingkup spesifik.'
-  )
+  const prompts = getAgentPrompts()
+  const params = getAgentParams()
+
+  const systemPrompt = prompts.offer || `Anda adalah agen penawaran untuk perusahaan jasa layanan di Indonesia. Buat proposal penawaran dalam JSON dengan field: scope, price, terms, notes.`
+
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: `Permintaan jasa:\n${JSON.stringify(request, null, 2)}` },
@@ -21,7 +19,8 @@ export async function generateOffer({ request, modelId, signal, onChunk }) {
       messages,
       stream: true,
       response_format: { type: 'json_object' },
-      temperature: 0.4,
+      temperature: params.temperature ?? 0.4,
+      max_tokens: params.maxTokens ?? 2000,
       signal,
     })) {
       const delta = chunk.choices[0]?.delta?.content
@@ -43,10 +42,11 @@ export async function generateOffer({ request, modelId, signal, onChunk }) {
 
 export async function explainReport({ report, modelId, signal, onChunk }) {
   const cloud = getCloud()
-  const systemPrompt = buildSystemPrompt(
-    'asisten keuangan/operasional yang menjelaskan laporan kepada pemilik usaha jasa di Indonesia',
-    'Jelaskan laporan dengan bahasa yang mudah dipahami, soroti angka penting, tren, dan rekomendasi tindakan. Gunakan format HTML sederhana (paragraf, daftar, heading).'
-  )
+  const prompts = getAgentPrompts()
+  const params = getAgentParams()
+
+  const systemPrompt = prompts.report || `Anda adalah analis laporan keuangan untuk perusahaan jasa. Jelaskan laporan dengan bahasa mudah dipahami dalam format HTML.`
+
   const messages = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: `Data laporan:\n${JSON.stringify(report, null, 2)}` },
@@ -57,7 +57,8 @@ export async function explainReport({ report, modelId, signal, onChunk }) {
       model: modelId,
       messages,
       stream: true,
-      temperature: 0.7,
+      temperature: params.temperature ?? 0.7,
+      max_tokens: params.maxTokens ?? 2000,
       signal,
     })) {
       const delta = chunk.choices[0]?.delta?.content

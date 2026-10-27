@@ -1,6 +1,6 @@
 # Database Schema
 
-Skema database untuk ServiceOps AI menggunakan PostgreSQL via WorkBuddy Cloud Service.
+Skema database untuk Satu Alur menggunakan PostgreSQL via WorkBuddy Cloud Service.
 
 ## Tables
 

@@ -3,14 +3,15 @@ import * as Components from '../ui/components.js'
 import { generateOffer } from '../ai/agent.js'
 import { validateOffer } from '../domain/rules.js'
 import { loadModels, pickDefaultModel } from '../ai/models.js'
+import { showToast, animateEntrance } from '../ui/animations.js'
 
 export async function render(container) {
   container.innerHTML = ''
 
-  const header = Components.section('Penawaran (AI)',
-    Components.el('p', {}, 'Pilih permintaan untuk menghasilkan penawaran AI. Sistem akan memvalidasi hasil sebelum disetujui.')
+  const formCard = Components.el('div', { className: 'form-card card-accent-sand' },
+    Components.el('h3', { className: 'form-title' }, '💡 Penawaran AI'),
+    Components.el('p', { className: 'form-subtitle' }, 'Pilih permintaan untuk menghasilkan penawaran AI. Sistem akan memvalidasi hasil sebelum disetujui.')
   )
-  container.appendChild(header)
 
   let models = []
   let selectedModel = null
@@ -34,30 +35,41 @@ export async function render(container) {
   }
 
   if (requests.length === 0) {
-    container.appendChild(Components.el('p', { style: 'color:var(--muted)' }, 'Belum ada permintaan. Buat permintaan di tahap sebelumnya.'))
+    container.appendChild(Components.el('p', { style: 'color:var(--text-muted);padding:20px;' }, 'Belum ada permintaan. Buat permintaan di tahap sebelumnya.'))
     return
   }
 
-  const select = Components.el('select', { name: 'request_id', style: 'width:100%;padding:8px;margin-bottom:10px;' })
+  const select = Components.el('select', { name: 'request_id' })
   select.appendChild(Components.el('option', { value: '' }, '-- Pilih permintaan --'))
   requests.forEach((r) => {
     select.appendChild(Components.el('option', { value: r.id }, `${r.customer_name} \u2014 ${r.service_type}`))
   })
 
-  const generateBtn = Components.el('button', { type: 'button' }, 'Hasilkan Penawaran AI')
+  const generateBtn = Components.el('button', { type: 'button' }, '🤖 Hasilkan Penawaran AI')
+  const stopBtn = Components.el('button', { type: 'button', className: 'btn-secondary' }, '⏹ Batal')
   const resultArea = Components.el('div', { id: 'offer-result', style: 'margin-top:16px;' })
-  const msg = Components.el('div', { className: 'message' })
+  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
 
   let abortController = null
 
   generateBtn.addEventListener('click', async () => {
     const reqId = select.value
-    if (!reqId) { msg.textContent = 'Pilih permintaan terlebih dahulu.'; return }
+    if (!reqId) {
+      msg.className = 'form-message error'
+      msg.textContent = 'Pilih permintaan terlebih dahulu.'
+      msg.style.display = 'block'
+      return
+    }
     const request = requests.find(r => r.id == reqId)
-    if (!request) { msg.textContent = 'Permintaan tidak ditemukan.'; return }
+    if (!request) {
+      msg.className = 'form-message error'
+      msg.textContent = 'Permintaan tidak ditemukan.'
+      msg.style.display = 'block'
+      return
+    }
 
-    msg.textContent = ''
-    resultArea.innerHTML = '<p style="color:var(--muted)">AI sedang menghasilkan penawaran...</p>'
+    msg.style.display = 'none'
+    resultArea.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--text-muted);padding:12px 0;"><div class="spinner"></div> AI sedang menghasilkan penawaran...</div>'
     generateBtn.disabled = true
 
     if (!selectedModel) {
@@ -68,7 +80,7 @@ export async function render(container) {
 
     abortController = new AbortController()
     let accumulated = ''
-    let preview = Components.el('pre', { style: 'background:var(--bg);padding:12px;border-radius:8px;overflow:auto;max-height:300px;' })
+    const preview = Components.el('div', { className: 'ai-stream' })
     resultArea.innerHTML = ''
     resultArea.appendChild(preview)
 
@@ -85,23 +97,41 @@ export async function render(container) {
 
       const validation = validateOffer(offerJson)
       if (!validation.valid) {
-        resultArea.appendChild(Components.el('div', { className: 'message', style: 'color:var(--danger);margin-top:10px;' },
-          Components.el('strong', {}, 'Validasi Gagal:'),
+        resultArea.appendChild(Components.el('div', { className: 'card card-accent-terracotta', style: 'margin-top:16px;' },
+          Components.el('h3', {}, '❌ Validasi Gagal'),
           Components.el('ul', {}, ...validation.errors.map(e => Components.el('li', {}, e)))
         ))
         generateBtn.disabled = false
         return
       }
 
-      resultArea.appendChild(Components.el('div', { style: 'margin-top:12px;' },
-        Components.el('h3', {}, 'Proposal Tervalidasi'),
-        Components.el('p', {}, `Ruang Lingkup: ${offerJson.scope}`),
-        Components.el('p', {}, `Harga: Rp${Number(offerJson.price).toLocaleString('id-ID')}`),
-        Components.el('p', {}, `Ketentuan: ${offerJson.terms}`),
-        Components.el('p', { style: 'color:var(--muted);font-size:0.85rem;' }, `Catatan: ${offerJson.notes || '-'}`)
-      ))
+      const validatedCard = Components.el('div', { className: 'card card-accent-olive', style: 'margin-top:16px;' },
+        Components.el('h3', {}, '✅ Proposal Tervalidasi'),
+        Components.el('div', { style: 'display:grid;gap:10px;margin-top:12px;' },
+          Components.el('div', {},
+            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Ruang Lingkup'),
+            Components.el('p', { style: 'margin:4px 0;' }, offerJson.scope)
+          ),
+          Components.el('div', {},
+            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Harga'),
+            Components.el('p', { style: 'margin:4px 0;font-size:1.2rem;font-weight:800;color:var(--primary);' },
+              `Rp${Number(offerJson.price).toLocaleString('id-ID')}`
+            )
+          ),
+          Components.el('div', {},
+            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Ketentuan'),
+            Components.el('p', { style: 'margin:4px 0;' }, offerJson.terms)
+          ),
+          Components.el('div', {},
+            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Catatan'),
+            Components.el('p', { style: 'margin:4px 0;color:var(--text-muted);' }, offerJson.notes || '-')
+          )
+        )
+      )
+      resultArea.appendChild(validatedCard)
+      animateEntrance(validatedCard)
 
-      const saveBtn = Components.el('button', { type: 'button' }, 'Simpan Penawaran')
+      const saveBtn = Components.el('button', { type: 'button', className: 'btn-success' }, '💾 Simpan Penawaran')
       saveBtn.addEventListener('click', async () => {
         try {
           const cloud = getCloud()
@@ -113,20 +143,23 @@ export async function render(container) {
             status: 'draft',
           })
           if (error) throw new Error(error.message)
-          msg.style.color = 'var(--success)'
-          msg.textContent = 'Penawaran berhasil disimpan ke database.'
+          msg.className = 'form-message success'
+          msg.textContent = '✅ Penawaran berhasil disimpan ke database.'
+          msg.style.display = 'block'
           saveBtn.disabled = true
+          showToast('Penawaran AI berhasil disimpan!', 'success')
           await loadOffers()
         } catch (err) {
-          msg.style.color = 'var(--danger)'
+          msg.className = 'form-message error'
           msg.textContent = err.message
+          msg.style.display = 'block'
         }
       })
       resultArea.appendChild(saveBtn)
 
     } catch (err) {
       if (err.name === 'AbortError') {
-        resultArea.innerHTML = '<p style="color:var(--muted)">Dibatalkan.</p>'
+        resultArea.innerHTML = '<p style="color:var(--text-muted)">Dibatalkan.</p>'
       } else {
         resultArea.innerHTML = `<p style="color:var(--danger)">Error: ${err.message}</p>`
       }
@@ -135,21 +168,35 @@ export async function render(container) {
     }
   })
 
-  const stopBtn = Components.el('button', { type: 'button', style: 'margin-left:8px;' }, 'Batal')
   stopBtn.addEventListener('click', () => abortController?.abort())
 
-  container.appendChild(Components.el('div', { className: 'card' },
-    Components.el('label', {}, 'Pilih Permintaan', select),
-    Components.el('div', {}, generateBtn, stopBtn),
+  const form = Components.el('div', {},
+    Components.el('div', { className: 'form-group' },
+      Components.el('label', {}, 'Pilih Permintaan'),
+      select,
+      Components.el('span', { className: 'field-hint' }, 'Pilih permintaan pelanggan yang akan dibuatkan penawaran.')
+    ),
+    Components.el('div', { className: 'form-actions' }, generateBtn, stopBtn),
     msg,
     resultArea
-  ))
+  )
+  formCard.appendChild(form)
+  container.appendChild(formCard)
+  animateEntrance(formCard, 100)
 
-  const listCard = Components.section('Daftar Penawaran', Components.el('div', { id: 'offer-list' }, 'Memuat...'))
+  const listCard = Components.section('📋 Daftar Penawaran',
+    Components.skeleton({ type: 'text', lines: 4 })
+  )
+  listCard.classList.add('card-accent-secondary')
   container.appendChild(listCard)
+  animateEntrance(listCard, 200)
 
   async function loadOffers() {
     const el = container.querySelector('#offer-list')
+    if (!el) return
+    el.innerHTML = ''
+    el.appendChild(Components.skeleton({ type: 'text', lines: 4 }))
+
     try {
       const cloud = getCloud()
       const { data, error } = await cloud.database.from('offers')
@@ -157,19 +204,31 @@ export async function render(container) {
         .order('created_at', { ascending: false })
       if (error) throw new Error(error.message)
       if (!data || data.length === 0) {
-        el.innerHTML = '<p style="color:var(--muted)">Belum ada penawaran.</p>'
+        el.innerHTML = '<p style="color:var(--text-muted)">Belum ada penawaran.</p>'
         return
       }
       el.innerHTML = ''
-      for (const o of data) {
+      for (let i = 0; i < data.length; i++) {
+        const o = data[i]
         const reqRes = await cloud.database.from('requests').select('customer_name,service_type').eq('id', o.request_id).maybeSingle()
         const req = reqRes.data || {}
-        el.appendChild(Components.el('div', { className: 'card', style: 'margin-bottom:10px;' },
-          Components.el('strong', {}, req.customer_name || 'Pelanggan'),
-          Components.el('span', { style: 'color:var(--muted);font-size:0.85rem;display:block;' }, `${req.service_type || '-'} \u2022 Rp${Number(o.validated_price || 0).toLocaleString('id-ID')}`),
-          Components.el('p', { style: 'margin:6px 0;font-size:0.9rem;' }, o.validated_scope || '-'),
-          Components.el('span', { style: 'font-size:0.8rem;color:var(--muted);' }, `Status: ${o.status} \u2022 ${new Date(o.created_at).toLocaleString('id-ID')}`)
-        ))
+        const card = Components.el('div', { className: 'card', style: 'margin-bottom:12px;' },
+          Components.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start;' },
+            Components.el('div', {},
+              Components.el('strong', {}, req.customer_name || 'Pelanggan'),
+              Components.el('span', { style: 'color:var(--text-muted);font-size:0.85rem;display:block;margin-top:4px;' },
+                `${req.service_type || '-'} \u2022 Rp${Number(o.validated_price || 0).toLocaleString('id-ID')}`
+              )
+            ),
+            Components.badge(o.status, o.status === 'approved' ? 'approved' : 'draft')
+          ),
+          Components.el('p', { style: 'margin:10px 0;font-size:0.9rem;color:var(--text-muted);' }, o.validated_scope || '-'),
+          Components.el('span', { style: 'font-size:0.75rem;color:var(--text-dim);' },
+            '🕐 ' + new Date(o.created_at).toLocaleString('id-ID')
+          )
+        )
+        animateEntrance(card, i * 60)
+        el.appendChild(card)
       }
     } catch (err) {
       el.innerHTML = `<p style="color:var(--danger)">Gagal memuat: ${err.message}</p>`

@@ -2,13 +2,15 @@ import { getCloud } from '../cloud.js'
 import * as Components from '../ui/components.js'
 import { explainReport } from '../ai/agent.js'
 import { loadModels, pickDefaultModel } from '../ai/models.js'
+import { showToast, animateEntrance } from '../ui/animations.js'
 
 export async function render(container) {
   container.innerHTML = ''
 
-  const header = Components.section('Laporan & Penjelasan AI',
-    Components.el('p', {}, 'AI menjelaskan laporan keuangan/operasional dalam bahasa yang mudah dipahami.')
+  const header = Components.section('\ud83d\udcc8 Laporan & Penjelasan AI',
+    Components.el('p', { style: 'color:var(--text-muted);font-size:0.9rem;' }, 'AI menjelaskan laporan keuangan/operasional dalam bahasa yang mudah dipahami.')
   )
+  header.classList.add('card-accent-sand')
   container.appendChild(header)
 
   let models = []
@@ -37,26 +39,68 @@ export async function render(container) {
     console.warn('Ledger load error:', err.message)
   }
 
+  // Stats grid
+  const statsGrid = Components.el('div', { className: 'stats-grid' },
+    Components.el('div', { className: 'stat-card olive' },
+      Components.el('div', { className: 'stat-label' }, 'Total Pendapatan'),
+      Components.el('div', { className: 'stat-value' }, `Rp${reportData.total_revenue.toLocaleString('id-ID')}`)
+    ),
+    Components.el('div', { className: 'stat-card terracotta' },
+      Components.el('div', { className: 'stat-label' }, 'Total Biaya'),
+      Components.el('div', { className: 'stat-value' }, `Rp${reportData.total_cost.toLocaleString('id-ID')}`)
+    ),
+    Components.el('div', { className: 'stat-card orange' },
+      Components.el('div', { className: 'stat-label' }, 'Laba Bersih'),
+      Components.el('div', { className: 'stat-value' }, `Rp${(reportData.total_revenue - reportData.total_cost).toLocaleString('id-ID')}`)
+    )
+  )
+  container.appendChild(statsGrid)
+  animateEntrance(statsGrid)
+
   // Summary card
-  const summaryCard = Components.el('div', { className: 'card', style: 'background:var(--bg);' },
-    Components.el('h3', {}, 'Ringkasan Keuangan'),
-    Components.el('p', {}, `Periode: ${reportData.period}`),
-    Components.el('p', {}, `Total Pendapatan: Rp${reportData.total_revenue.toLocaleString('id-ID')}`),
-    Components.el('p', {}, `Total Biaya: Rp${reportData.total_cost.toLocaleString('id-ID')}`),
-    Components.el('p', { style: 'font-weight:600;' }, `Laba Bersih: Rp${(reportData.total_revenue - reportData.total_cost).toLocaleString('id-ID')}`)
+  const summaryCard = Components.el('div', { className: 'card card-accent-brown' },
+    Components.el('h3', {}, '\ud83d\udcca Ringkasan Keuangan'),
+    Components.el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:12px;' },
+      Components.el('div', {},
+        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Periode'),
+        Components.el('p', { style: 'margin:4px 0;font-weight:600;' }, reportData.period)
+      ),
+      Components.el('div', {},
+        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Total Pendapatan'),
+        Components.el('p', { style: 'margin:4px 0;font-weight:600;color:var(--accent-olive);' }, `Rp${reportData.total_revenue.toLocaleString('id-ID')}`)
+      ),
+      Components.el('div', {},
+        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Total Biaya'),
+        Components.el('p', { style: 'margin:4px 0;font-weight:600;color:var(--accent-terracotta);' }, `Rp${reportData.total_cost.toLocaleString('id-ID')}`)
+      ),
+      Components.el('div', {},
+        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Laba Bersih'),
+        Components.el('p', { style: 'margin:4px 0;font-weight:600;color:var(--primary);' }, `Rp${(reportData.total_revenue - reportData.total_cost).toLocaleString('id-ID')}`)
+      )
+    )
   )
   container.appendChild(summaryCard)
+  animateEntrance(summaryCard, 100)
 
-  // AI explanation
-  const explainBtn = Components.el('button', { type: 'button' }, 'Jelaskan dengan AI')
+  // AI explanation form card
+  const explainCard = Components.el('div', { className: 'form-card card-accent-secondary' },
+    Components.el('h3', { className: 'form-title' }, '\ud83e\udde0 Penjelasan AI'),
+    Components.el('p', { className: 'form-subtitle' }, 'AI akan menganalisis data keuangan dan memberikan insight dalam bahasa Indonesia.')
+  )
+
+  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
   const resultArea = Components.el('div', { id: 'report-explain', style: 'margin-top:16px;' })
-  const msg = Components.el('div', { className: 'message' })
+
+  const explainBtn = Components.el('button', { type: 'button' }, '\ud83e\udd16 Jelaskan dengan AI')
+  const stopBtn = Components.el('button', { type: 'button', className: 'btn-secondary' }, '\u23f9 Batal')
+
+  const actions = Components.el('div', { className: 'form-actions', style: 'border-top:none;padding-top:0;margin-top:0;' }, explainBtn, stopBtn)
 
   let abortController = null
 
   explainBtn.addEventListener('click', async () => {
-    msg.textContent = ''
-    resultArea.innerHTML = '<p style="color:var(--muted)">AI sedang menjelaskan...</p>'
+    msg.style.display = 'none'
+    resultArea.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--text-muted);padding:12px 0;"><div class="spinner"></div> AI sedang menjelaskan...</div>'
     explainBtn.disabled = true
 
     if (!selectedModel) {
@@ -66,7 +110,7 @@ export async function render(container) {
     }
 
     abortController = new AbortController()
-    const preview = Components.el('div', { style: 'background:var(--bg);padding:12px;border-radius:8px;' })
+    const preview = Components.el('div', { className: 'ai-stream' })
     resultArea.innerHTML = ''
     resultArea.appendChild(preview)
 
@@ -80,9 +124,10 @@ export async function render(container) {
         }
       })
       preview.innerHTML = html
+      showToast('Penjelasan laporan selesai!', 'success')
     } catch (err) {
       if (err.name === 'AbortError') {
-        resultArea.innerHTML = '<p style="color:var(--muted)">Dibatalkan.</p>'
+        resultArea.innerHTML = '<p style="color:var(--text-muted)">Dibatalkan.</p>'
       } else {
         resultArea.innerHTML = `<p style="color:var(--danger)">Error: ${err.message}</p>`
       }
@@ -91,13 +136,11 @@ export async function render(container) {
     }
   })
 
-  const stopBtn = Components.el('button', { type: 'button', style: 'margin-left:8px;' }, 'Batal')
   stopBtn.addEventListener('click', () => abortController?.abort())
 
-  container.appendChild(Components.el('div', { className: 'card' },
-    Components.el('h3', {}, 'Penjelasan AI'),
-    Components.el('div', {}, explainBtn, stopBtn),
-    msg,
-    resultArea
-  ))
+  explainCard.appendChild(actions)
+  explainCard.appendChild(msg)
+  explainCard.appendChild(resultArea)
+  container.appendChild(explainCard)
+  animateEntrance(explainCard, 200)
 }

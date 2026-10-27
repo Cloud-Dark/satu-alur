@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Setup script untuk ServiceOps AI
+ * Setup script untuk Satu Alur
  * Menyalin cloud.config.example.js ke cloud.config.js jika belum ada
  */
 
@@ -13,7 +13,7 @@ const srcDir = path.join(__dirname, '..', 'src')
 const configFile = path.join(srcDir, 'cloud.config.js')
 const exampleFile = path.join(srcDir, 'cloud.config.example.js')
 
-console.log('🔧 ServiceOps AI Setup\n')
+console.log('🔧 Satu Alur Setup\n')
 
 // Check if cloud.config.js exists
 if (!fs.existsSync(configFile)) {

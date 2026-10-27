@@ -2,7 +2,7 @@
 
 ## Overview
 
-ServiceOps AI menggunakan WorkBuddy Cloud SDK untuk semua operasi backend. Tidak ada API kustom — semua komunikasi melalui SDK WorkBuddy.
+Satu Alur menggunakan WorkBuddy Cloud SDK untuk semua operasi backend. Tidak ada API kustom — semua komunikasi melalui SDK WorkBuddy.
 
 ## Authentication
 
