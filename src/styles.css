@@ -1,0 +1,62 @@
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1a1a2e;
+  --muted: #6b7280;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --danger: #dc2626;
+  --success: #16a34a;
+  --border: #e5e7eb;
+  --radius: 12px;
+  --shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115;
+    --surface: #1a1d23;
+    --text: #e5e7eb;
+    --muted: #9ca3af;
+    --primary: #3b82f6;
+    --primary-dark: #2563eb;
+    --border: #2d3139;
+    --shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif; background: var(--bg); color: var(--text); }
+#app { min-height: 100vh; }
+
+.login-container { max-width: 380px; margin: 10vh auto; padding: 24px; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
+.login-container h1 { margin: 0 0 8px; font-size: 1.5rem; }
+.login-container p { margin: 0 0 20px; color: var(--muted); }
+.login-container label { display: block; margin: 12px 0 6px; font-weight: 600; font-size: 0.9rem; }
+.login-container input,
+.login-container select,
+.login-container textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; }
+.login-container button { width: 100%; padding: 10px; margin-top: 10px; border: none; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 600; cursor: pointer; }
+.login-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+.login-container .message { margin-top: 10px; font-size: 0.9rem; color: var(--danger); }
+.otp-row { display: flex; gap: 8px; align-items: center; }
+.otp-row button { width: auto; margin-top: 0; padding: 10px 14px; }
+
+.app-header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.app-header h1 { margin: 0; font-size: 1.25rem; }
+.app-header .user { margin-left: auto; color: var(--muted); font-size: 0.9rem; }
+.app-header button { padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--text); cursor: pointer; }
+
+.stage-nav { display: flex; gap: 8px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; }
+.stage-nav button { padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.stage-nav button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.stage-container { padding: 20px; max-width: 960px; margin: 0 auto; }
+.stage-container label { display: block; margin: 12px 0 6px; font-weight: 600; font-size: 0.9rem; }
+.stage-container input,
+.stage-container select,
+.stage-container textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-family: inherit; }
+.stage-container button { padding: 10px 16px; margin-top: 10px; margin-right: 8px; border: none; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 600; cursor: pointer; }
+.stage-container button:disabled { opacity: 0.5; cursor: not-allowed; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+.card h2 { margin: 0 0 12px; font-size: 1.1rem; }
