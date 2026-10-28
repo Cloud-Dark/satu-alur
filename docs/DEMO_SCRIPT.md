@@ -341,6 +341,7 @@ jelas — ada 8 permintaan, 7 penawaran, 6 penugasan,
    - **Lokasi:** `Yogyakarta`
    - **Telepon:** `0274-5555-888`
    - **Deskripsi kebutuhan:** `Deep cleaning kamar hotel setelah musim libur Lebaran. Termasuk cuci spring bed, karpet, kaca, dan sanitasi bathroom.`
+   - **Jadwal yang diminta klien:** besok, jam 08:00
 2. Klik "Simpan permintaan"
 
 **Fitur yang di-expose:**
@@ -393,23 +394,24 @@ langsung berstatus disetujui."
 
 **Aksi:**
 1. Pilih penawaran disetujui: `Hotel Horizon Yogyakarta — Rp12.500.000`
-2. Isi:
-   - **Nama pekerja atau tim:** `Tim Alpha (Ahmad, Budi, Candra)`
-   - **Jadwal pelaksanaan:** Pilih tanggal besok, jam 08:00
-3. Klik "Tugaskan"
+2. Pastikan **Jadwal pelaksanaan** sudah terisi otomatis dari permintaan (besok, jam 08:00)
+3. Klik **Pilih rekomendasi** dengan jumlah diatur ke 3 (atau centang petugas secara manual)
+4. Tinjau ringkasan tim, lalu klik **Tugaskan**
 
 **Fitur yang di-expose:**
-- ✅ Select penawaran yang sudah disetujui
-- ✅ Input nama pekerja / tim
-- ✅ DateTime picker untuk jadwal
-- ✅ Daftar penugasan aktif dan histori
+- ✅ Pilih penawaran disetujui
+- ✅ Jadwal otomatis dari permintaan
+- ✅ Rekomendasi petugas (keahlian, bentrok jadwal)
+- ✅ Pilih banyak petugas sekaligus
+- ✅ Ringkasan tim
+- ✅ Tab Tim: manajemen petugas (tambah/ubah/nonaktifkan)
 - ✅ Toast: "Penugasan tersimpan."
 
 **Script:**
 ```
 "Penawaran sudah disetujui pelanggan. Sekarang kita tugaskan 
-tim Alpha yang terdiri dari Ahmad, Budi, dan Candra. 
-Jadwal ditetapkan besok pagi jam 8. Status penugasan menjadi 
+tim tiga petugas yang direkomendasikan sistem. Jadwal 
+sudah terisi dari permintaan klien, besok pagi jam 8. Status penugasan menjadi 
 'Ditugaskan' dan muncul di daftar penugasan aktif."
 ```
 
@@ -418,7 +420,7 @@ Jadwal ditetapkan besok pagi jam 8. Status penugasan menjadi
 **Navigasi:** Sidebar → 04 Penyelesaian
 
 **Aksi:**
-1. Pilih penugasan aktif: `Hotel Horizon Yogyakarta — Tim Alpha (Ahmad, Budi, Candra)`
+1. Pilih penugasan aktif: `Hotel Horizon Yogyakarta — <nama-nama tim>`
 2. Isi catatan hasil pekerjaan:
    > `Semua 30 kamar selesai dikerjakan. Spring bed dan karpet dicuci, kaca bersih, bathroom sanitasi complete. Quality check passed.`
 3. Klik "Tandai selesai"
@@ -431,7 +433,7 @@ Jadwal ditetapkan besok pagi jam 8. Status penugasan menjadi
 
 **Script:**
 ```
-"Pekerjaan selesai! Tim Alpha menyelesaikan 30 kamar. 
+"Pekerjaan selesai! Tim tiga petugas menyelesaikan 30 kamar. 
 Kita catat hasilnya — semua item checklist selesai, 
 quality check passed. Status otomatis berubah menjadi selesai 
 dan data siap masuk ke pembukuan."

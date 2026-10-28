@@ -19,13 +19,6 @@ function defaultSchedule() {
   return toLocalInput(d)
 }
 
-const STATUS_LABELS = {
-  available: { label: 'Tersedia', color: 'success' },
-  on_job: { label: 'Dalam Tugas', color: 'warning' },
-  off_duty: { label: 'Off Duty', color: 'muted' },
-  sick: { label: 'Sakit', color: 'danger' },
-}
-
 const TABS = [
   { value: 'assign', label: 'Tugaskan' },
   { value: 'team', label: 'Tim' },
@@ -77,8 +70,8 @@ export async function render(container, ctx = {}) {
     switch (currentTab) {
       case 'assign': renderAssign(host, ctx, flow, workers, links, reload, status, () => tabs.querySelector('[data-value="team"]').click()); break
       case 'team': renderTeam(host, { workers, assignments: flow.assignments, completions: flow.completions, links, reload, status }); break
-      case 'map': renderMap(host, flow, workers); break
-      case 'performance': renderPerformance(host, workers); break
+      case 'map': renderMap(host, { workers, assignments: flow.assignments, links }); break
+      case 'performance': renderPerformance(host, { workers, assignments: flow.assignments, completions: flow.completions, links }); break
     }
   }
   await load()
@@ -416,148 +409,69 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
 }
 
 /* ================================================================ Tab: Map */
-function renderMap(target, flow, workers) {
-  // Simple visual map using SVG representation (no external map lib needed for demo)
-  const mapBox = el('div', { style: 'background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-md);padding:20px;min-height:400px;position:relative;overflow:hidden;' })
+const STATE_LABELS = { available: 'Tersedia', on_job: 'Dalam tugas', inactive: 'Nonaktif' }
 
-  // Mock map: Jakarta area with relative coordinates
-  const mapWidth = 800
-  const mapHeight = 400
-  const bounds = { minLat: -6.6, maxLat: -6.1, minLng: 106.5, maxLng: 107.0 }
-
-  function toX(lng) { return ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * mapWidth }
-  function toY(lat) { return mapHeight - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * mapHeight }
-
-  const svg = el('svg', { viewBox: `0 0 ${mapWidth} ${mapHeight}`, style: 'width:100%;height:auto;background:#e8f4f8;border-radius:var(--radius-sm);' })
-
-  // Grid lines
+function renderMap(target, { workers, assignments, links }) {
+  const located = workers.filter((w) => Number.isFinite(w.lat) && Number.isFinite(w.lng))
+  if (!located.length) {
+    target.appendChild(C.emptyState({ title: 'Belum ada lokasi petugas', body: 'Lokasi muncul setelah integrasi peta aktif.' }))
+    return
+  }
+  // Bounds fit the located workers, padded so a single pin sits mid-map.
+  const W = 800
+  const H = 400
+  const lats = located.map((w) => w.lat)
+  const lngs = located.map((w) => w.lng)
+  const span = (v) => Math.max(...v) - Math.min(...v)
+  const padLat = Math.max(0.02, span(lats) * 0.1)
+  const padLng = Math.max(0.02, span(lngs) * 0.1)
+  const minLat = Math.min(...lats) - padLat
+  const maxLat = Math.max(...lats) + padLat
+  const minLng = Math.min(...lngs) - padLng
+  const maxLng = Math.max(...lngs) + padLng
+  // el() builds HTML-namespace nodes, so the SVG is assembled as a string (names escaped).
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  let body = ''
   for (let i = 0; i <= 5; i++) {
-    const y = (mapHeight / 5) * i
-    svg.appendChild(el('line', { x1: 0, y1: y, x2: mapWidth, y2: y, stroke: '#d0e8f0', 'stroke-width': 1 }))
-    const x = (mapWidth / 5) * i
-    svg.appendChild(el('line', { x1: x, y1: 0, x2: x, y2: mapHeight, stroke: '#d0e8f0', 'stroke-width': 1 }))
+    body += `<line class="worker-map-grid" x1="0" y1="${(H / 5) * i}" x2="${W}" y2="${(H / 5) * i}"/><line class="worker-map-grid" x1="${(W / 5) * i}" y1="0" x2="${(W / 5) * i}" y2="${H}"/>`
   }
-
-  // Workers (blue dots)
-  workers.forEach((w) => {
-    if (w.lat && w.lng) {
-      const cx = toX(w.lng)
-      const cy = toY(w.lat)
-      const g = el('g')
-      g.appendChild(el('circle', { cx, cy, r: 8, fill: w.status === 'available' ? '#27ae60' : w.status === 'on_job' ? '#e67e22' : '#95a5a6', stroke: '#fff', 'stroke-width': 2 }))
-      g.appendChild(el('text', { x: cx, y: cy - 12, 'text-anchor': 'middle', 'font-size': '10', fill: '#3d2b1f', 'font-weight': '600' }, w.name.split(' ')[0]))
-      svg.appendChild(g)
-    }
+  located.forEach((w) => {
+    const state = workerState(w, assignments, links)
+    const cx = ((w.lng - minLng) / (maxLng - minLng)) * W
+    const cy = H - ((w.lat - minLat) / (maxLat - minLat)) * H
+    body += `<circle class="worker-pin is-${state}" cx="${cx}" cy="${cy}" r="8"/><text class="worker-map-label" x="${cx}" y="${cy - 12}" text-anchor="middle">${esc(w.name.split(' ')[0])}</text>`
   })
-
-  // Jobs (red pins)
-  if (flow?.requests) {
-    flow.requests.forEach((r, i) => {
-      // Mock lat/lng based on location name hash for demo
-      const hash = r.location?.split('').reduce((a, c) => a + c.charCodeAt(0), 0) || i * 100
-      const lat = bounds.minLat + (hash % 1000) / 1000 * (bounds.maxLat - bounds.minLat)
-      const lng = bounds.minLng + ((hash * 7) % 1000) / 1000 * (bounds.maxLng - bounds.minLng)
-      const cx = toX(lng)
-      const cy = toY(lat)
-      const g = el('g')
-      g.appendChild(el('polygon', { points: `${cx},${cy - 12} ${cx - 6},${cy + 4} ${cx + 6},${cy + 4}`, fill: '#c0392b', stroke: '#fff', 'stroke-width': 2 }))
-      g.appendChild(el('text', { x: cx, y: cy + 18, 'text-anchor': 'middle', 'font-size': '9', fill: '#3d2b1f' }, r.customer_name?.slice(0, 10) || 'Job'))
-      svg.appendChild(g)
-    })
-  }
-
-  mapBox.appendChild(svg)
-
-  const legend = el('div', { style: 'display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;' },
-    el('span', { className: 'muted small', style: 'display:flex;align-items:center;gap:4px;' }, el('span', { style: 'width:10px;height:10px;border-radius:50%;background:#27ae60;display:inline-block;' }), 'Tersedia'),
-    el('span', { className: 'muted small', style: 'display:flex;align-items:center;gap:4px;' }, el('span', { style: 'width:10px;height:10px;border-radius:50%;background:#e67e22;display:inline-block;' }), 'Dalam Tugas'),
-    el('span', { className: 'muted small', style: 'display:flex;align-items:center;gap:4px;' }, el('span', { style: 'width:10px;height:10px;border-radius:50%;background:#95a5a6;display:inline-block;' }), 'Off Duty'),
-    el('span', { className: 'muted small', style: 'display:flex;align-items:center;gap:4px;' }, el('span', { style: 'width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:10px solid #c0392b;display:inline-block;' }), 'Pekerjaan'),
-  )
-
-  target.appendChild(el('div', { className: 'form-actions', style: 'margin-bottom:16px;' },
-    C.button({ label: '🗺️ Aktifkan Peta Real (Leaflet)', icon: 'map', variant: 'soft', onClick: () => showToast('Integrasi MapsEncoder APIPedia + Leaflet memerlukan API token. Masukkan di Pengaturan.', 'info') }),
-    C.button({ label: 'Refresh Posisi', icon: 'refresh', variant: 'ghost', onClick: () => showToast('Memperbarui posisi petugas...', 'info') }),
-  ))
-  target.appendChild(mapBox)
-  target.appendChild(legend)
-
-  target.appendChild(el('div', { className: 'card', style: 'margin-top:16px;padding:16px;' },
-    el('h3', { style: 'margin:0 0 8px;font-size:0.95rem;' }, '📍 Integrasi MapsEncoder APIPedia'),
-    el('p', { className: 'text-body', style: 'font-size:0.85rem;' }, 'Aktifkan peta interaktif dengan fitur:'),
-    el('ul', { style: 'font-size:0.85rem;color:var(--text);margin:8px 0;padding-left:18px;' },
-      el('li', {}, 'Geocoding alamat ke koordinat (Forward)'),
-      el('li', {}, 'Reverse geocoding koordinat ke alamat'),
-      el('li', {}, 'Hitung jarak & estimasi waktu tempuh'),
-      el('li', {}, 'Visualisasi rute harian per petugas'),
-    ),
-    el('div', { className: 'form-actions', style: 'margin-top:12px;' },
-      C.button({ label: 'Masukkan Token APIPedia', icon: 'key', variant: 'soft', size: 'sm', onClick: () => showToast('Buka Pengaturan → Integrasi untuk masukkan token APIPedia.', 'info') }),
-    ),
-  ))
+  const svg = el('div', { className: 'worker-map-wrap' })
+  svg.innerHTML = `<svg class="worker-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peta lokasi petugas">${body}</svg>`
+  const legend = el('div', { className: 'worker-map-legend' },
+    ['available', 'on_job', 'inactive'].map((k) => el('span', { className: 'muted small' }, el('i', { className: `worker-pin-dot is-${k}` }), STATE_LABELS[k])))
+  target.appendChild(C.panel({ title: 'Lokasi petugas', meta: `${located.length} dari ${workers.length} petugas punya koordinat` }, svg, legend))
 }
 
 /* ================================================================ Tab: Performance */
-function renderPerformance(target, workers) {
-  const summary = el('div', { className: 'kpis', style: 'margin-bottom:20px;' },
-    kpiCard('👷', 'Total Petugas', String(workers.length), 'Aktif', '+2 bulan ini'),
-    kpiCard('✅', 'Job Selesai', String(workers.reduce((a, w) => a + (w.completed || 0), 0)), 'Baik', 'Bulan ini'),
-    kpiCard('⏰', 'On-time Rate', `${Math.round(workers.reduce((a, w) => a + (w.onTime || 0), 0) / workers.length)}%`, 'Tinggi', '+5% vs bulan lalu'),
-    kpiCard('⭐', 'Avg Rating', String((workers.reduce((a, w) => a + (w.rating || 0), 0) / workers.length).toFixed(1)), 'Tinggi', 'Dari 5.0'),
-  )
+function renderPerformance(target, { workers, assignments, completions, links }) {
+  const activeList = workers.filter((w) => w.status === 'active')
+  const done = new Map(workers.map((w) => [w.id, completedCount(w.id, links, completions)]))
+  const total = [...done.values()].reduce((a, n) => a + n, 0)
+  const onJob = activeList.filter((w) => workerState(w, assignments, links) === 'on_job').length
+  const ranked = [...workers].sort((a, b) => done.get(b.id) - done.get(a.id) || a.name.localeCompare(b.name, 'id'))
 
-  const leaderboard = el('div', { className: 'card', style: 'margin-top:16px;' },
-    el('h3', { className: 'card-title', style: 'margin-bottom:16px;' }, '🏆 Leaderboard Bulan Ini'),
-  )
-
-  const sorted = [...workers].sort((a, b) => (b.completed || 0) - (a.completed || 0))
-  const table = el('table', { style: 'width:100%;border-collapse:collapse;font-size:0.9rem;' })
-  const thead = el('thead', {},
-    el('tr', {},
-      el('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--border);' }, '#'),
-      el('th', { style: 'text-align:left;padding:8px;border-bottom:2px solid var(--border);' }, 'Petugas'),
-      el('th', { style: 'text-align:center;padding:8px;border-bottom:2px solid var(--border);' }, 'Job'),
-      el('th', { style: 'text-align:center;padding:8px;border-bottom:2px solid var(--border);' }, 'Rating'),
-      el('th', { style: 'text-align:center;padding:8px;border-bottom:2px solid var(--border);' }, 'On-time'),
-      el('th', { style: 'text-align:right;padding:8px;border-bottom:2px solid var(--border);' }, 'Skill'),
-    ),
-  )
-  const tbody = el('tbody')
-  sorted.forEach((w, i) => {
-    tbody.appendChild(el('tr', {},
-      el('td', { style: 'padding:8px;border-bottom:1px solid var(--border);font-weight:700;' }, `#${i + 1}`),
-      el('td', { style: 'padding:8px;border-bottom:1px solid var(--border);' },
-        el('div', { style: 'display:flex;align-items:center;gap:8px;' },
-          el('div', { style: 'width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.8rem;' }, (w.avatar || w.name.split(' ').map((n) => n[0]).join('').slice(0, 2)).toUpperCase()),
-          w.name,
-        ),
-      ),
-      el('td', { style: 'padding:8px;border-bottom:1px solid var(--border);text-align:center;font-weight:700;' }, w.completed || 0),
-      el('td', { style: `padding:8px;border-bottom:1px solid var(--border);text-align:center;color:var(--warning);font-weight:700;` }, `${w.rating || 0} ★`),
-      el('td', { style: `padding:8px;border-bottom:1px solid var(--border);text-align:center;color:${(w.onTime || 0) >= 95 ? 'var(--success)' : (w.onTime || 0) >= 90 ? 'var(--warning)' : 'var(--danger)'};font-weight:700;` }, `${w.onTime || 0}%`),
-      el('td', { style: 'padding:8px;border-bottom:1px solid var(--border);text-align:right;' },
-        el('div', { style: 'display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap;' },
-          ...(w.skills || []).slice(0, 2).map((s) => C.tag(SKILL_LABELS[s] || s, 'soft')),
-        ),
-      ),
-    ))
-  })
-  table.appendChild(thead)
-  table.appendChild(tbody)
-  leaderboard.appendChild(table)
-
-  target.appendChild(summary)
-  target.appendChild(leaderboard)
-}
-
-/* ------------------------------------------------------------------ KPI */
-function kpiCard(ico, label, value, status, sub) {
-  return el('div', { className: 'kpi' },
-    el('div', { className: 'kpi-top' },
-      el('span', { className: 'kpi-ico' }, ico),
-      C.tag(status, status === 'Tinggi' || status === 'Baik' || status === 'Aktif' ? 'success' : status === 'Sedang' ? 'warning' : 'danger'),
-    ),
-    el('div', { className: 'kpi-value' }, value),
-    el('div', { className: 'kpi-sub' }, label, el('br'), el('span', { className: 'muted' }, sub)),
-  )
+  target.appendChild(el('div', { className: 'kpis' },
+    C.kpi({ label: 'Petugas aktif', value: String(activeList.length), iconName: 'users' }),
+    C.kpi({ label: 'Job selesai', value: String(total), iconName: 'check' }),
+    C.kpi({ label: 'Dalam tugas hari ini', value: String(onJob), iconName: 'clock' }),
+  ))
+  target.appendChild(C.panel({ title: 'Peringkat petugas', meta: 'Berdasarkan job selesai' },
+    ranked.length
+      ? C.dataTable({
+        caption: 'Peringkat petugas berdasarkan job selesai',
+        columns: [
+          { label: '#', render: (w) => String(ranked.indexOf(w) + 1) },
+          { label: 'Petugas', key: 'name' },
+          { label: 'Status', render: (w) => { const s = workerState(w, assignments, links); return C.tag(STATE_LABELS[s], s === 'available' ? 'ok' : s === 'on_job' ? 'warn' : 'neutral') } },
+          { label: 'Job selesai', align: 'right', render: (w) => String(done.get(w.id)) },
+        ],
+        rows: ranked,
+      })
+      : C.emptyState({ title: 'Belum ada petugas', body: 'Tambahkan petugas di tab Tim.' })))
 }

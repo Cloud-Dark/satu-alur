@@ -1470,3 +1470,16 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .worker-pick-tags { display: flex; flex-wrap: wrap; gap: var(--s-1); align-items: center; }
 .pick-recommend { display: flex; align-items: flex-end; gap: var(--s-3); flex-wrap: wrap; }
 .pick-recommend .field { width: 6rem; }
+
+/* Worker map (Peta tab) */
+.worker-map { width: 100%; height: auto; background: var(--surface-sunken); border-radius: var(--radius-sm); }
+.worker-map-grid { stroke: var(--line); stroke-width: 1; }
+.worker-map-label { font-size: 11px; font-weight: 600; fill: var(--text); }
+.worker-pin { stroke: var(--surface); stroke-width: 2; fill: var(--text-muted); }
+.worker-pin.is-available { fill: var(--success); }
+.worker-pin.is-on_job { fill: var(--warning); }
+.worker-map-legend { display: flex; gap: var(--s-4); margin-top: var(--s-3); flex-wrap: wrap; }
+.worker-map-legend span { display: inline-flex; align-items: center; gap: var(--s-1); }
+.worker-pin-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); display: inline-block; }
+.worker-pin-dot.is-available { background: var(--success); }
+.worker-pin-dot.is-on_job { background: var(--warning); }
