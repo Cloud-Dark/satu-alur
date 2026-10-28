@@ -111,7 +111,7 @@ body.scroll-lock { overflow: hidden; }
 .side .brand-link { color: var(--side-fg); }
 .side .brand-word { color: var(--side-fg); }
 .side .brand-word-thin { color: var(--side-brand-thin); }
-.side .brand-mark rect { fill: var(--side-node); stroke: var(--side-line); }
+:root:not([data-theme='dark']) .side .brand-mark rect { fill: var(--side-node); stroke: var(--side-line); }
 .side .icon-btn { color: var(--side-muted); }
 .side .icon-btn:hover { background: var(--side-hover); color: var(--side-fg); }
 .side-close { display: none; }
@@ -334,7 +334,7 @@ body.scroll-lock { overflow: hidden; }
 /* Two-column stage layout */
 .stage-grid {
   display: grid;
-  grid-template-columns: minmax(330px, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(310px, 360px) minmax(0, 1fr);
   gap: var(--s-5);
   align-items: start;
 }
@@ -524,7 +524,7 @@ body.scroll-lock { overflow: hidden; }
 .data-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.9rem; }
 .data-table th {
   text-align: left;
-  padding: 10px var(--s-4);
+  padding: 10px var(--s-3);
   font-size: 0.78rem; font-weight: 600; color: var(--text-muted);
   background: var(--surface-2);
   border-top: 1px solid var(--line);
@@ -532,7 +532,7 @@ body.scroll-lock { overflow: hidden; }
   white-space: nowrap;
 }
 .data-table td {
-  padding: 14px var(--s-4);
+  padding: 14px var(--s-3);
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
@@ -556,7 +556,7 @@ body.scroll-lock { overflow: hidden; }
 
 .cell-stack { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .cell-primary { font-weight: 600; color: var(--text); }
-.data-table td .cell-stack { min-width: 170px; }
+.data-table td .cell-stack { min-width: 130px; }
 .panel:not(.list-panel) .table-wrap { width: auto; margin: 0 calc(var(--s-6) * -1) calc(var(--s-2) * -1); }
 .cell-id { font-size: 0.72rem; font-weight: 500; color: var(--text-faint); margin-right: var(--s-2); }
 .cell-secondary { color: var(--text-muted); font-size: 0.82rem; }
@@ -697,7 +697,7 @@ body.scroll-lock { overflow: hidden; }
 .dash-grid > .panel { display: flex; flex-direction: column; }
 .dash-grid > .panel > .panel-body { flex: 1; }
 .chart-panel .panel-body { display: flex; flex-direction: column; gap: var(--s-3); }
-.chart-wrap { position: relative; flex: 1; min-height: 272px; }
+.chart-wrap { position: relative; min-height: 264px; }
 .chart-box { position: relative; }
 .chart { display: block; overflow: visible; }
 .chart .grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 5; }
@@ -907,7 +907,9 @@ body.scroll-lock { overflow: hidden; }
 :root[data-theme='dark'] .console.is-live .console-badge { color: var(--accent); }
 @keyframes badge-breathe { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 18%, transparent); } }
 .console-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-.console-title b { font-size: 0.86rem; font-weight: 700; color: var(--text); }
+.console-title b { font-size: 0.86rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+.form-panel .console-stop-label { display: none; }
+.form-panel .console-stop { padding: 0 11px; }
 .console-model { font-size: 0.74rem; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .console-status {
   padding: 3px 10px; border-radius: var(--r-pill);
@@ -1117,7 +1119,13 @@ body.scroll-lock { overflow: hidden; }
   .kpi-ico { width: 28px; height: 28px; }
   .kpi-sub { font-size: 0.74rem; }
   .kpi-sub .delta span { white-space: normal; }
-  .kpis-3 { grid-template-columns: minmax(0, 1fr); }
+  .kpis:not(.kpis-3) .kpi:last-child:nth-child(even) { grid-column: 1 / -1; }
+  .kpis-3 { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+  .kpis-3 .kpi { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--s-3); padding: var(--s-3) var(--s-4); }
+  .kpis-3 .kpi-top { min-height: 0; }
+  .kpis-3 .kpi-ico { display: none; }
+  .kpis-3 .kpi-value { margin-top: 0; grid-column: 2; grid-row: 1; }
+  .kpis-3 .kpi-sub { grid-column: 1 / -1; }
   .list-panel .kpis-3 { margin: 0 var(--s-4) var(--s-4); }
   .funnel-row { width: calc(100% + var(--s-4)); margin: 0 calc(var(--s-2) * -1); padding: 8px var(--s-2); }
   .todo-item { grid-template-columns: 34px minmax(0, 1fr); gap: var(--s-3); }

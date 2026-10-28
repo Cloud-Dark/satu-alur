@@ -394,7 +394,7 @@ export function solidText(text, colorName = 'text') {
 export function aiConsole({ model = 'AI' } = {}) {
   const status = el('span', { className: 'console-status' }, 'Siap')
   const meter = el('span', { className: 'console-meter tnum' }, '')
-  const stopBtn = el('button', { type: 'button', className: 'console-stop' }, icon('stop', { size: 14 }), el('span', {}, 'Hentikan'))
+  const stopBtn = el('button', { type: 'button', className: 'console-stop', 'aria-label': 'Hentikan AI', title: 'Hentikan' }, icon('stop', { size: 14 }), el('span', { className: 'console-stop-label' }, 'Hentikan'))
   const body = el('div', { className: 'console-body', 'aria-live': 'polite', 'aria-busy': 'false' })
   const caret = el('span', { className: 'caret', 'aria-hidden': 'true' })
   const root = el('div', { className: 'console' },

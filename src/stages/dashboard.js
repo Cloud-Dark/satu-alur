@@ -279,17 +279,15 @@ function renderChart(m, ctx) {
     }
     summary.textContent = `${range} hari terakhir: pendapatan ${C.rupiah(sumRev)}, biaya ${C.rupiah(sumCost)}, laba ${C.rupiah(sumRev - sumCost)}.`
     const width = Math.max(280, Math.round(wrap.clientWidth || 640))
-    const height = Math.max(272, Math.min(420, Math.round(wrap.clientHeight || 272)))
+    const height = width >= 560 ? 392 : 264
     wrap.replaceChildren(buildAreaChart(days, width, height, summary.textContent))
   }
 
   // Draw once attached (needs width), then follow container resizes.
   let lastW = 0
-  let lastH = 0
   const ro = new ResizeObserver((entries) => {
     const w = Math.round(entries[0].contentRect.width)
-    const h = Math.round(entries[0].contentRect.height)
-    if (w && (Math.abs(w - lastW) > 8 || Math.abs(h - lastH) > 24)) { lastW = w; lastH = h; draw() }
+    if (w && Math.abs(w - lastW) > 8) { lastW = w; draw() }
   })
   ro.observe(wrap)
   ctx.signal?.addEventListener('abort', () => ro.disconnect())
