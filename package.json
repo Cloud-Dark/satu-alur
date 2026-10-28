@@ -1,0 +1,34 @@
+{
+  "name": "satu-alur",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Satu Alur — Satu alur lengkap untuk otomasi operasi jasa dengan AI di Indonesia",
+  "author": "Your Name",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "setup": "node scripts/setup.js",
+    "lint": "echo 'Linting not configured yet'",
+    "test": "echo 'Tests not configured yet'"
+  },
+  "dependencies": {
+    "@tencent-ai/workbuddy-cloud-sdk": "dev"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "service-operations",
+    "ai",
+    "workbuddy",
+    "indonesia",
+    "business-automation",
+    "satu-alur"
+  ]
+}
