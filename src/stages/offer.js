@@ -105,7 +105,7 @@ export async function render(container, ctx = {}) {
     el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
   )
 
-  resolveModel()
+  const modelReady = resolveModel()
     .then((mdl) => { model = mdl; modelNote.textContent = mdl ? `Model: ${mdl.id}` : 'Model: tidak tersedia' })
     .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
 
@@ -180,6 +180,7 @@ export async function render(container, ctx = {}) {
       wiz.invalid([{ text: 'Pilih permintaan terlebih dahulu.', input: reqSelect.input }])
       return
     }
+    if (!model) { try { await modelReady } catch { /* reported below */ } }
     if (!model) {
       msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.')
       return

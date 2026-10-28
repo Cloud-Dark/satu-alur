@@ -223,7 +223,7 @@ export async function render(container, ctx = {}) {
     modelNotes.add(n)
     return n
   }
-  resolveModel()
+  const modelReady = resolveModel()
     .then((m) => { model = m; modelNotes.forEach((n) => { n.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' }) })
     .catch((err) => modelNotes.forEach((n) => { n.textContent = `Model: ${err.message}` }))
 
@@ -318,6 +318,10 @@ export async function render(container, ctx = {}) {
 
   async function runAI({ out, msg, btn, busyLabel, run, onDone }) {
     msg.hide()
+    if (!model) {
+      const restoreWait = C.setBusy(btn, 'Memuat model…')
+      try { await modelReady } catch { /* reported below */ } finally { restoreWait() }
+    }
     if (!model) {
       msg.show('danger', 'Model AI belum tersedia. Periksa koneksi lalu muat ulang halaman.')
       return

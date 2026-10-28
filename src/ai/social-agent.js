@@ -187,13 +187,30 @@ export function normalizeHashtags(v, max = 30) {
   return out
 }
 
+/** Moves #tags the model left inside the body into the hashtag list. */
+function splitInlineHashtags(body, tags) {
+  const found = body.match(/#[\p{L}\p{N}_]+/gu) || []
+  const clean = body
+    .replace(/(^|\s)#[\p{L}\p{N}_]+/gu, '$1')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return { body: clean || body, hashtags: normalizeHashtags([...tags, ...found]) }
+}
+
 const NORMALIZE = {
-  content: (o) => ({
-    title: str(o.title || o.judul),
-    body: str(o.body || o.content || o.caption || o.isi || o.text),
-    hashtags: normalizeHashtags(o.hashtags || o.tags),
-    notes: str(o.notes || o.catatan || o.tips),
-  }),
+  content: (o) => {
+    const { body, hashtags } = splitInlineHashtags(
+      str(o.body || o.content || o.caption || o.isi || o.text),
+      normalizeHashtags(o.hashtags || o.tags),
+    )
+    return {
+      title: str(o.title || o.judul),
+      body,
+      hashtags,
+      notes: str(o.notes || o.catatan || o.tips),
+    }
+  },
   hashtags: (o) => ({ hashtags: normalizeHashtags(o.hashtags || o.tags || o) }),
   ideas: (o) => ({
     ideas: arr(o.ideas || o.ide || o).filter((x) => x && typeof x === 'object').map((x) => ({

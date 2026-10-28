@@ -72,7 +72,7 @@ export async function render(container, ctx = {}) {
   )
 
   let model = null
-  resolveModel()
+  const modelReady = resolveModel()
     .then((m) => { model = m; modelNote.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' })
     .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
 
@@ -188,6 +188,7 @@ export async function render(container, ctx = {}) {
 
   explainBtn.addEventListener('click', async () => {
     msg.hide()
+    if (!model) { try { await modelReady } catch { /* reported below */ } }
     if (!model) { msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.'); return }
     if (!report) return
     current?.abort()
