@@ -620,6 +620,13 @@ async function handleChat(request, env) {
   }
   const rf = body.response_format;
   if (rf !== undefined && rf !== null && (typeof rf !== 'object' || Array.isArray(rf))) throw bad('response_format tidak valid.');
+  if (rf && rf.type === 'json_schema') {
+    const schema = rf.json_schema;
+    if (!schema || typeof schema !== 'object' || Array.isArray(schema) || JSON.stringify(schema).length > 8000) {
+      throw bad('json_schema tidak valid.');
+    }
+    return structuredChat(env, body.model, params, schema);
+  }
   if (rf && rf.type === 'json_object') {
     // Workers AI JSON mode does not support streaming, so steer via a system hint.
     params.messages = [{ role: 'system', content: JSON_HINT }, ...messages];
@@ -646,6 +653,46 @@ async function handleChat(request, env) {
     return sseResponse(out);
   }
   return sseResponse(translateStream(aiStream));
+}
+
+// JSON mode (schema-constrained output) cannot stream on Workers AI. Run it
+// without streaming, then replay the JSON to the client as SSE chunks so the UI
+// keeps its typing effect. Falls back to a hinted streaming call when the model
+// cannot satisfy JSON mode.
+async function structuredChat(env, model, params, schema) {
+  const { stream: _stream, ...rest } = params;
+  let text = '';
+  try {
+    const out = await env.AI.run(model, { ...rest, response_format: { type: 'json_schema', json_schema: schema } });
+    const r = out?.response;
+    text = typeof r === 'string' ? r : r && typeof r === 'object' ? JSON.stringify(r, null, 2) : '';
+  } catch (e) {
+    console.warn('JSON mode failed, falling back to hinted stream', e);
+  }
+  if (!text) {
+    let aiStream;
+    try {
+      aiStream = await env.AI.run(model, { ...params, messages: [{ role: 'system', content: JSON_HINT }, ...params.messages] });
+    } catch (e) {
+      console.error('AI.run failed', e);
+      return fail(502, 'Layanan AI tidak tersedia.');
+    }
+    if (aiStream instanceof ReadableStream) return sseResponse(translateStream(aiStream));
+    text = typeof aiStream?.response === 'string' ? aiStream.response : '';
+  }
+  const out = new ReadableStream({
+    async start(c) {
+      const STEP = 24;
+      for (let i = 0; i < text.length; i += STEP) {
+        c.enqueue(sse({ choices: [{ delta: { content: text.slice(i, i + STEP) }, finish_reason: null }] }));
+        await new Promise((r) => setTimeout(r, 12));
+      }
+      c.enqueue(sse({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
+      c.enqueue(sse('[DONE]'));
+      c.close();
+    },
+  });
+  return sseResponse(out);
 }
 
 function sseResponse(stream) {

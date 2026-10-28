@@ -94,7 +94,8 @@ export async function render(container, ctx = {}) {
     if (!r) { preview.hidden = true; return }
     preview.replaceChildren(C.defList([
       ['Layanan', r.service_type || '—'],
-      ['Lokasi', [r.location, r.phone].filter(Boolean).join(' · ') || '—'],
+      ['Lokasi', r.location || '—'],
+      ['Telepon', r.phone || '—'],
       ['Kebutuhan', r.description || '—'],
     ]))
     preview.hidden = false

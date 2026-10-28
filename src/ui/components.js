@@ -3,6 +3,7 @@
  * Everything here builds DOM nodes; untrusted text is always set with
  * textContent (strings passed as children become text nodes).
  */
+import { enhanceSelect } from './combobox.js'
 import { VALIDATOR, CONTENT_GATE, solidColor, createSkeleton } from './antislop.js'
 import { icon } from './icons.js'
 import { countUp } from './animations.js'
@@ -240,7 +241,9 @@ export function select({ label, name, id, required = false, hint, options = [], 
   const fid = id || nextId(name || 'sel')
   const input = el('select', { id: fid, name: name || fid, required, className: 'input', ...attrs })
   setOptions(input, options, value)
-  return { wrap: fieldWrap({ id: fid, label, required, hint, control: input, className: 'field-select' }), input }
+  const wrap = fieldWrap({ id: fid, label, required, hint, control: input, className: 'field-select' })
+  enhanceSelect(input)
+  return { wrap, input }
 }
 
 export function setOptions(selectEl, options, value) {
