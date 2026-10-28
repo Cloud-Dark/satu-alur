@@ -12,17 +12,19 @@
 
 - **6 Tahap Alur Jasa Lengkap**: Permintaan → Penawaran → Penugasan → Penyelesaian → Pembukuan → Laporan
 - **AI-Powered**: Penawaran otomatis dengan validasi domain, penjelasan laporan keuangan
-- **WorkBuddy Cloud Integration**: Auth, Database, Storage, dan LLM API keyless
+- **Cloudflare Integration**: Worker tunggal, database D1, Workers AI (LLM streaming), dan login email OTP
 - **AntiSlop UI Engine**: Design token enforcement, content quality gates, runtime validation
-- **Mode Prototype**: Berjalan penuh tanpa backend (data lokal di browser)
+- **Mode Mock**: Berjalan penuh tanpa backend (data lokal di browser) untuk pengembangan lokal
 - **MCP Connectors**: Siap integrasi WhatsApp (WAPilot) & Email (SMTP)
 - **Agent Skill Editor**: User bisa mengubah prompt AI sesuai kebutuhan bisnis
 
 ## Tech Stack
 
 - **Frontend**: Vite + Vanilla JavaScript (ES Modules) + AntiSlop Design System
-- **Backend**: WorkBuddy Cloud Service (Database, Auth, Storage, LLM API)
-- **AI**: WorkBuddy LLM API (keyless, streaming)
+- **Backend**: Cloudflare Worker tunggal (`worker/index.js`) yang melayani aset statis dan `/api/*`
+- **Database**: Cloudflare D1 (SQLite), database `satu-alur-db`
+- **AI**: Cloudflare Workers AI (streaming SSE)
+- **Auth**: Email OTP + sesi bearer token (mode demo OTP, belum ada provider email)
 - **Language**: Bahasa Indonesia
 
 ## Quick Start
@@ -31,7 +33,7 @@
 
 - Node.js 18+ (disarankan 22+)
 - npm atau yarn
-- Akun WorkBuddy (untuk cloud features)
+- Akun Cloudflare (hanya untuk deploy atau menjalankan Worker dengan Workers AI)
 
 ### Instalasi
 
@@ -49,33 +51,39 @@ npm run dev
 
 Aplikasi akan berjalan di `http://localhost:5173`
 
-### Mode Prototype (Tanpa Cloud)
+### Mode Mock (Tanpa Backend)
 
-Secara default aplikasi berjalan dalam mode prototype:
+Untuk pengembangan lokal tanpa Worker, jalankan dengan `VITE_USE_MOCK=true`:
+
+```bash
+VITE_USE_MOCK=true npm run dev
+```
+
 - Semua fitur 6 tahap berfungsi penuh
 - AI penawaran & laporan (simulasi streaming)
 - Data tersimpan di localStorage browser
 - Data tidak persisten antar perangkat/browser
+- Hanya untuk pengembangan lokal, bukan untuk deploy
 
-### Aktivasi WorkBuddy Cloud
+### Worker + D1 Lokal
 
-Untuk mengaktifkan backend cloud (Database, Auth, AI nyata):
+```bash
+npm run db:migrate:local   # buat tabel di D1 lokal
+npm run cf:dev             # build lalu jalankan Worker (default http://localhost:8787)
+```
 
-1. Pastikan Anda memiliki akun WorkBuddy
-2. Jalankan perintah aktivasi (via WorkBuddy AI assistant):
-   ```
-   "Aktifkan cloud Satu Alur"
-   ```
-3. Setelah aktivasi berhasil, isi file `src/cloud.config.js`:
-   ```javascript
-   export const publicConfig = {
-     resourceId: 'your-resource-id',
-     endpoint: 'https://your-app.workbuddy.link',
-     oauthRelayBaseUrl: 'https://oauth.workbuddy.link',
-     publishableKey: 'your-publishable-key',
-   }
-   ```
-4. Refresh browser — aplikasi otomatis beralih ke mode cloud
+Panduan lengkap: [docs/17_DEVELOPER_SETUP.md](docs/17_DEVELOPER_SETUP.md).
+
+### Deploy ke Cloudflare
+
+Ringkasan (langkah lengkap dan verifikasi di [docs/18_INSTALLATION.md](docs/18_INSTALLATION.md)):
+
+1. Buat database: `npx wrangler d1 create satu-alur-db`
+2. Isi `database_id` hasilnya di `wrangler.toml`
+3. Terapkan migrasi: `npm run db:migrate:remote`
+4. Deploy: `npm run deploy`
+
+Catatan: `DEMO_OTP="true"` di `wrangler.toml` membuat kode OTP dikembalikan di respons API karena belum ada provider email. Mode ini hanya untuk uji; jangan dipakai untuk produksi. Lihat [docs/10_RISK_REGISTER.md](docs/10_RISK_REGISTER.md).
 
 ## Struktur Project
 
@@ -90,10 +98,10 @@ satu-alur/
 │   ├── ai/              # AI agent (penawaran & penjelasan laporan)
 │   │   ├── agent.js
 │   │   └── models.js
-│   ├── auth/            # Authentication module
+│   ├── auth/            # Authentication module (OTP)
 │   │   └── auth.js
-│   ├── cloud.js         # Cloud SDK initialization
-│   ├── cloud.config.js  # Cloud config (user-specific)
+│   ├── cloud.js         # Pemilih backend: HTTP (Worker) atau mock
+│   ├── http-cloud.js    # Klien untuk API Worker (/api/*)
 │   ├── domain/          # Domain models & validation rules
 │   │   ├── models.js
 │   │   └── rules.js
@@ -106,7 +114,7 @@ satu-alur/
 │   │   ├── complete.js
 │   │   ├── bookkeeping.js
 │   │   ├── report.js
-│   │   └── settings.js  # MCP + Agent + Cloud config
+│   │   └── settings.js  # MCP + Agent + pengaturan cloud
 │   ├── ui/              # UI components, animations, AntiSlop engine
 │   │   ├── app.js
 │   │   ├── animations.js
@@ -114,11 +122,13 @@ satu-alur/
 │   │   └── components.js
 │   ├── main.js          # Entry point
 │   └── styles.css       # Global styles (dark theme, animations)
-├── docs/
-│   ├── DATABASE_SCHEMA.md
-│   └── API.md
+├── worker/
+│   └── index.js         # Cloudflare Worker: auth, /api/db, LLM
+├── migrations/          # Migrasi D1 (SQLite)
+├── docs/                # Dokumentasi (mulai dari docs/README.md)
 ├── scripts/
-│   └── setup.js
+│   └── setup.js         # Skrip lama (WorkBuddy), status relevansi TBD
+├── wrangler.toml        # Konfigurasi Worker, D1, Workers AI, assets
 ├── index.html
 ├── package.json
 ├── vite.config.js
@@ -127,11 +137,11 @@ satu-alur/
 
 ## Database Schema
 
-Lihat [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) untuk skema lengkap.
+Lihat [docs/20_DATABASE.md](docs/20_DATABASE.md) untuk skema D1 lengkap. Dokumen lama [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) (PostgreSQL) sudah digantikan.
 
 ## API Documentation
 
-Lihat [docs/API.md](docs/API.md) untuk dokumentasi API.
+Lihat [docs/API.md](docs/API.md) untuk dokumentasi API. Indeks seluruh dokumentasi: [docs/README.md](docs/README.md).
 
 ## Scripts
 
@@ -140,7 +150,11 @@ Lihat [docs/API.md](docs/API.md) untuk dokumentasi API.
 | `npm run dev` | Start development server |
 | `npm run build` | Build for production |
 | `npm run preview` | Preview production build |
-| `npm run setup` | Auto-setup configuration |
+| `npm run setup` | Skrip setup lama (WorkBuddy) |
+| `npm run cf:dev` | Build lalu jalankan Worker lokal (`wrangler dev`) |
+| `npm run deploy` | Build lalu deploy ke Cloudflare |
+| `npm run db:migrate:local` | Terapkan migrasi D1 ke database lokal |
+| `npm run db:migrate:remote` | Terapkan migrasi D1 ke database Cloudflare |
 
 ## Alur Penggunaan
 
@@ -176,7 +190,7 @@ Lihat [docs/API.md](docs/API.md) untuk dokumentasi API.
 ### 7. Pengaturan (Settings)
 - **MCP Connectors**: Konfigurasi WhatsApp (WAPilot) & Email (SMTP)
 - **Agent Skills**: Edit prompt AI, temperature, max tokens, model preference
-- **WorkBuddy Cloud**: Endpoint, publishableKey, OAuth relay
+- **Cloud**: Status mode (Cloudflare Worker + D1 atau mock lokal)
 
 ## Kontribusi
 

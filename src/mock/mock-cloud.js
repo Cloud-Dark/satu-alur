@@ -270,16 +270,78 @@ async function* mockStreamOffer(request) {
   }
 }
 
+const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
+const rp = (n) => idr.format(Number(n) || 0)
+const pctFmt = (n) => `${Math.abs(n).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`
+const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+/** Compares cur with prev honestly: no percentage when prev is zero. */
+function compareLine(label, cur, prev, prevLabel, { lowerIsBetter = false } = {}) {
+  if (!(prev > 0)) return `${label} ${rp(cur)}; ${esc(prevLabel)} tidak punya ${label.toLowerCase()} sebagai pembanding.`
+  const pct = ((cur - prev) / prev) * 100
+  if (pct === 0) return `${label} sama dengan ${esc(prevLabel)} (${rp(prev)}).`
+  const dir = pct > 0 ? 'naik' : 'turun'
+  const good = lowerIsBetter ? pct < 0 : pct > 0
+  return `${label} ${dir} ${pctFmt(pct)} dibanding ${esc(prevLabel)} (${rp(prev)} → ${rp(cur)})${good ? '' : ' — perlu diperhatikan'}.`
+}
+
+/** Builds the mock explanation strictly from the report payload. */
+function explainHTML(report = {}) {
+  const rev = Number(report.total_revenue) || 0
+  const cost = Number(report.total_cost) || 0
+  const profit = Number(report.net_profit ?? rev - cost) || 0
+  const margin = report.margin_pct ?? (rev > 0 ? Math.round((profit / rev) * 1000) / 10 : null)
+  const entries = Array.isArray(report.entries) ? report.entries.length : 0
+  const cats = Array.isArray(report.by_category) ? report.by_category : []
+  const costCats = cats.filter((c) => c.category !== 'pendapatan').sort((a, b) => (b.amount || 0) - (a.amount || 0))
+  const custs = Array.isArray(report.top_customers) ? report.top_customers : []
+  const prev = report.previous_period
+
+  const out = []
+  out.push(`<h3>Ringkasan ${esc(report.period || 'periode terpilih')}</h3>`)
+  if (!entries && !rev && !cost) {
+    out.push('<p>Belum ada jurnal di periode ini, jadi belum ada angka yang bisa dijelaskan.</p>')
+    return out.join('\n')
+  }
+  out.push(`<p>Dari <strong>${entries} jurnal</strong>, pendapatan tercatat <strong>${rp(rev)}</strong> dan biaya <strong>${rp(cost)}</strong>, sehingga ${profit >= 0 ? 'laba' : 'rugi'} bersih <strong>${rp(Math.abs(profit))}</strong>${margin != null ? ` dengan margin <strong>${String(margin).replace('.', ',')}%</strong>` : ''}.</p>`)
+
+  if (prev) {
+    out.push('<h3>Dibanding periode sebelumnya</h3><ul>')
+    out.push(`<li>${compareLine('Pendapatan', rev, prev.total_revenue, prev.label)}</li>`)
+    out.push(`<li>${compareLine('Biaya', cost, prev.total_cost, prev.label, { lowerIsBetter: true })}</li>`)
+    out.push(`<li>Laba bersih ${esc(prev.label)}: ${rp(prev.net_profit)}; periode ini: ${rp(profit)}.</li>`)
+    out.push('</ul>')
+  } else {
+    out.push('<p>Periode ini tidak memiliki periode pembanding, jadi tidak ada tren yang disimpulkan.</p>')
+  }
+
+  if (costCats.length || custs.length) {
+    out.push('<h3>Rincian</h3><ul>')
+    if (costCats.length) {
+      const top = costCats[0]
+      const share = rev > 0 ? ` (${pctFmt(((top.amount || 0) / rev) * 100)} dari pendapatan)` : ''
+      out.push(`<li>Komponen biaya terbesar: <strong>${esc(top.label || top.category)}</strong> ${rp(top.amount)}${share}.</li>`)
+    }
+    if (custs.length) {
+      const c = custs[0]
+      const share = rev > 0 ? ` — ${pctFmt(((c.revenue || 0) / rev) * 100)} dari pendapatan` : ''
+      out.push(`<li>Pelanggan dengan pendapatan terbesar: <strong>${esc(c.name)}</strong>${c.service ? ` (${esc(c.service)})` : ''}, ${rp(c.revenue)}${share}.</li>`)
+    }
+    out.push('</ul>')
+  }
+
+  const recs = []
+  if (rev === 0 && cost > 0) recs.push('Ada biaya tanpa pendapatan di periode ini. Pastikan pendapatan dari pekerjaan selesai sudah diposting.')
+  if (margin != null && margin < 30) recs.push(`Margin ${String(margin).replace('.', ',')}% tergolong tipis. Tinjau harga penawaran atau tekan ${costCats[0] ? esc((costCats[0].label || '').toLowerCase()) : 'biaya'}.`)
+  if (margin != null && margin >= 30) recs.push('Margin sehat. Pertahankan struktur harga dan pantau biaya per pekerjaan.')
+  if (custs.length === 1 && rev > 0) recs.push('Seluruh pendapatan berasal dari satu pelanggan. Tambah pelanggan untuk mengurangi risiko konsentrasi.')
+  if (recs.length) out.push(`<h3>Rekomendasi</h3><ul>${recs.map((r) => `<li>${r}</li>`).join('')}</ul>`)
+  out.push('<p><small>Simulasi lokal: dihitung langsung dari data laporan di atas, bukan dari model AI.</small></p>')
+  return out.join('\n')
+}
+
 async function* mockStreamExplain(report) {
-  const html = `<h3>Laporan Periode ${report.period || 'Oktober 2026'}</h3>
-<p>Total pendapatan: <strong>Rp${(report.total_revenue || 0).toLocaleString('id-ID')}</strong>.</p>
-<p>Biaya operasional: <strong>Rp${(report.total_cost || 0).toLocaleString('id-ID')}</strong>.</p>
-<p>Laba bersih: <strong>Rp${((report.total_revenue || 0) - (report.total_cost || 0)).toLocaleString('id-ID')}</strong>.</p>
-<ul>
-  <li>Pendapatan naik 12% dibanding periode sebelumnya.</li>
-  <li>Biaya tenaga kerja merupakan komponen terbesar.</li>
-  <li>Rekomendasi: pertimbangkan paket langganan untuk meningkatkan recurring revenue.</li>
-</ul>`
+  const html = explainHTML(report)
   for (let i = 0; i < html.length; i += 8) {
     await new Promise(r => setTimeout(r, 20))
     yield {
@@ -474,6 +536,14 @@ Yuk booking sekarang! Link di bio 👆
   }
 }
 
+function parseRequest(text) {
+  try { return JSON.parse(String(text).replace(/^Permintaan jasa:\s*/, '')) } catch { return { description: text } }
+}
+
+function parseReport(text) {
+  try { return JSON.parse(String(text).replace(/^Data laporan:\s*/, '')) } catch { return {} }
+}
+
 const mockLLM = {
   models: {
     async list() {
@@ -487,26 +557,25 @@ const mockLLM = {
   chat: {
     completions: {
       create({ messages, stream, response_format }) {
-        const userMsg = messages.find(m => m.role === 'user')?.content || ''
+        const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || ''
         const sysMsg = messages.find(m => m.role === 'system')?.content || ''
         const isOffer = sysMsg.includes('agen penawaran') || userMsg.includes('Permintaan jasa')
         const isReport = sysMsg.includes('analis laporan') || userMsg.includes('Data laporan')
-        const isGeneral = sysMsg.includes('Asisten AI') || sysMsg.includes('asisten AI')
-        const isAnalyst = sysMsg.includes('analis bisnis') || sysMsg.includes('database')
+        const isAnalyst = sysMsg.includes('analis bisnis')
         const isSocial = sysMsg.includes('social media') || sysMsg.includes('media sosial') || userMsg.includes('caption') || userMsg.includes('brainstorm') || userMsg.includes('hashtag') || userMsg.includes('iklan')
 
         // Choose appropriate mock response based on agent type
         if (isOffer) {
-          return mockStreamOffer(JSON.parse(userMsg.replace('Permintaan jasa:\n', '')))
+          return mockStreamOffer(parseRequest(userMsg))
         }
         if (isReport) {
-          return mockStreamExplain({})
-        }
-        if (isAnalyst) {
-          return mockStreamAnalyst(userMsg)
+          return mockStreamExplain(parseReport(userMsg))
         }
         if (isSocial) {
           return mockStreamSocial(userMsg)
+        }
+        if (isAnalyst) {
+          return mockStreamAnalyst(userMsg)
         }
         return mockStreamGeneral(userMsg)
       }
@@ -588,8 +657,11 @@ export function seedDemoData() {
 }
 
 export function createMockWorkBuddyCloud() {
-  // Auto-seed on first creation
+  // Auto-seed on first creation, then re-read: the module-level copy was
+  // loaded before seeding and would otherwise overwrite the demo data on the
+  // next persist() (e.g. when the first login stores its user).
   seedDemoData()
+  _state = loadState()
 
   return {
     auth: mockAuth,

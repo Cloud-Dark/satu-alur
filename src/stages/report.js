@@ -1,146 +1,229 @@
-import { getCloud } from '../cloud.js'
-import * as Components from '../ui/components.js'
+/** 06 — Laporan: period figures computed from the ledger + AI explanation. */
+import * as C from '../ui/components.js'
 import { explainReport } from '../ai/agent.js'
-import { loadModels, pickDefaultModel } from '../ai/models.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import { showToast } from '../ui/animations.js'
+import { resolveModel, abortable } from './offer.js'
+import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from './data.js'
 
-export async function render(container) {
-  container.innerHTML = ''
+const { el } = C
+const DAY = 86400000
 
-  const header = Components.section('\ud83d\udcc8 Laporan & Penjelasan AI',
-    Components.el('p', { style: 'color:var(--text-muted);font-size:0.9rem;' }, 'AI menjelaskan laporan keuangan/operasional dalam bahasa yang mudah dipahami.')
-  )
-  header.classList.add('card-accent-sand')
-  container.appendChild(header)
+const PERIODS = [
+  { value: '30d', label: '30 hari' },
+  { value: 'month', label: 'Bulan ini' },
+  { value: 'prev', label: 'Bulan lalu' },
+  { value: 'all', label: 'Semua' },
+]
 
-  let models = []
-  let selectedModel = null
-  try {
-    models = await loadModels()
-    selectedModel = pickDefaultModel()
-  } catch (e) {
-    console.warn('Model load error:', e.message)
+const monthName = (d) => d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+
+/** Returns { from, to, label, prev: {from,to,label}|null } as Date objects. */
+export function periodRange(kind, now = new Date(), ledger = []) {
+  const startToday = new Date(now); startToday.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(startToday.getTime() + DAY)
+  if (kind === '30d') {
+    const from = new Date(tomorrow.getTime() - 30 * DAY)
+    const pf = new Date(from.getTime() - 30 * DAY)
+    return { from, to: tomorrow, label: `${C.formatDate(from)} – ${C.formatDate(startToday)}`, prev: { from: pf, to: from, label: '30 hari sebelumnya' } }
   }
+  if (kind === 'month' || kind === 'prev') {
+    const offset = kind === 'month' ? 0 : -1
+    const from = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    const to = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1)
+    const pf = new Date(now.getFullYear(), now.getMonth() + offset - 1, 1)
+    return { from, to: kind === 'month' ? tomorrow : to, label: monthName(from), prev: { from: pf, to: from, label: monthName(pf) } }
+  }
+  const dates = ledger.map((l) => C.toDate(ledgerDate(l))).filter(Boolean).sort((a, b) => a - b)
+  const from = dates[0] || startToday
+  return { from, to: tomorrow, label: dates.length ? `${C.formatDate(from)} – ${C.formatDate(dates[dates.length - 1])}` : 'Belum ada data', prev: null }
+}
 
-  const cloud = getCloud()
+const inRange = (l, r) => { const t = C.toDate(ledgerDate(l))?.getTime(); return t != null && t >= r.from.getTime() && t < r.to.getTime() }
 
-  // Aggregate report data
-  let reportData = { total_revenue: 0, total_cost: 0, period: 'Oktober 2026', entries: [] }
+export async function render(container, ctx = {}) {
+  const navigate = ctx.navigate || (() => {})
+  let period = '30d'
+
+  const seg = C.segmented({ label: 'Periode laporan', value: period, options: PERIODS, onChange: (v) => { period = v; draw() } })
+  const periodLine = el('p', { className: 'period-line' }, C.icon('calendar', { size: 15 }), el('span', {}, 'Memuat…'))
+  const kpis = el('div', { className: 'kpis' }, [0, 1, 2, 3].map((i) => el('div', { className: `kpi ${i === 0 ? 'is-hero' : ''}`.trim() }, C.skeleton({ lines: 2 }))))
+  const catBody = el('div', {}, C.skeletonRows(4))
+  const custBody = el('div', {}, C.skeletonRows(4))
+  const catPanel = C.panel({ title: 'Rincian kategori', meta: '—', className: 'span-7' }, catBody)
+  const custPanel = C.panel({ title: 'Pelanggan teratas', meta: 'berdasarkan pendapatan', className: 'span-5' }, custBody)
+
+  const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'primary' })
+  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
+  const msg = C.message()
+  const aiOut = el('div', { className: 'report-ai-out' })
+  const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'Bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
+    el('p', { className: 'panel-lead' }, 'AI membaca angka periode terpilih, membandingkannya dengan periode sebelumnya, lalu memberi ringkasan dan rekomendasi. Angka di atas tetap menjadi acuan.'),
+    el('div', { className: 'form-actions' }, explainBtn, modelNote),
+    msg,
+    aiOut,
+  )
+
+  container.replaceChildren(
+    C.pageHeader({ num: '06', label: 'Laporan', title: 'Laporan keuangan', em: 'keuangan', description: 'Angka dihitung langsung dari buku besar. Pilih periode, lalu minta AI menjelaskannya.', actions: seg }),
+    periodLine,
+    kpis,
+    el('div', { className: 'dash-grid is-stretch' }, catPanel, custPanel),
+    aiPanel,
+  )
+
+  let model = null
+  resolveModel()
+    .then((m) => { model = m; modelNote.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' })
+    .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
+
+  let flow
   try {
-    const { data: ledger } = await cloud.database.from('ledger_entries').select('*')
-    if (ledger) {
-      reportData.entries = ledger
-      ledger.forEach(l => {
-        if (l.category === 'pendapatan') reportData.total_revenue += Number(l.amount)
-        else reportData.total_cost += Number(l.amount)
-      })
-    }
+    flow = await loadFlow()
   } catch (err) {
-    console.warn('Ledger load error:', err.message)
+    kpis.replaceChildren(C.errorState(`Gagal memuat buku besar: ${err.message}`))
+    return
+  }
+  if (ctx.signal?.aborted) return
+
+  let report = null
+
+  function draw() {
+    const r = periodRange(period, new Date(), flow.ledger)
+    const entries = flow.ledger.filter((l) => inRange(l, r))
+    const t = totals(entries)
+    const prevT = r.prev ? totals(flow.ledger.filter((l) => inRange(l, r.prev))) : null
+    const margin = t.revenue > 0 ? (t.profit / t.revenue) * 100 : null
+
+    periodLine.lastChild.textContent = `Periode ${r.label} · ${entries.length} jurnal${r.prev ? ` · pembanding: ${r.prev.label}` : ''}`
+
+    const cmp = (cur, prev, invert = false) => {
+      if (!prevT || !(prev > 0)) return { sub: prevT ? `${r.prev.label}: ${C.rupiah(prev || 0)}` : null, tone: null }
+      const pct = ((cur - prev) / prev) * 100
+      const good = invert ? pct < 0 : pct > 0
+      return { sub: `${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct).toLocaleString('id-ID', { maximumFractionDigits: 1 })}% vs ${r.prev.label}`, tone: pct === 0 ? null : good ? 'ok' : 'danger' }
+    }
+    const cRev = cmp(t.revenue, prevT?.revenue)
+    const cCost = cmp(t.cost, prevT?.cost, true)
+    const cProfit = cmp(t.profit, prevT?.profit)
+    kpis.replaceChildren(
+      C.kpi({ label: 'Laba bersih', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
+      C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue), countTo: t.revenue, format: C.rupiah, sub: cRev.sub, tone: cRev.tone }),
+      C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost), countTo: t.cost, format: C.rupiah, sub: cCost.sub, tone: cCost.tone }),
+      C.kpi({ label: 'Margin', iconName: 'activity', value: margin == null ? '—' : `${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, sub: margin == null ? 'Belum ada pendapatan' : `Biaya ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan` }),
+    )
+
+    // Categories
+    const byCat = new Map()
+    for (const l of entries) {
+      const cur = byCat.get(l.category) || { amount: 0, n: 0 }
+      cur.amount += Number(l.amount) || 0
+      cur.n += 1
+      byCat.set(l.category, cur)
+    }
+    const cats = [...byCat.entries()].map(([cat, v]) => ({ cat, ...v })).sort((a, b) => (a.cat === 'pendapatan' ? -1 : b.cat === 'pendapatan' ? 1 : b.amount - a.amount))
+    catPanel.querySelector('.panel-meta').textContent = `${cats.length} kategori`
+    const max = Math.max(1, ...cats.map((c) => c.amount))
+    catBody.replaceChildren(cats.length
+      ? C.dataTable({
+          caption: 'Rincian kategori',
+          rows: cats,
+          columns: [
+            { label: 'Kategori', render: (c) => el('span', { className: c.cat === 'pendapatan' ? 'strong' : '' }, categoryLabel(c.cat)) },
+            { label: 'Jurnal', align: 'right', render: (c) => el('span', { className: 'tnum' }, String(c.n)) },
+            { label: 'Porsi', className: 'col-bar', render: (c) => el('span', { className: `bars-track ${c.cat === 'pendapatan' ? 'is-rev' : ''}` }, el('span', { className: 'bars-fill', style: `width:${(c.amount / max) * 100}%` })) },
+            { label: 'Jumlah', align: 'right', render: (c) => el('span', { className: 'tnum' }, C.rupiah(c.amount)) },
+          ],
+        })
+      : emptyForPeriod())
+
+    // Customers
+    const byCust = new Map()
+    for (const l of entries.filter(isRevenue)) {
+      const req = flow.requestOfLedger(l)
+      const k = req ? String(req.id) : 'x'
+      const cur = byCust.get(k) || { name: customerLabel(req), service: req?.service_type, amount: 0 }
+      cur.amount += Number(l.amount) || 0
+      byCust.set(k, cur)
+    }
+    const custs = [...byCust.values()].sort((a, b) => b.amount - a.amount).slice(0, 5)
+    custBody.replaceChildren(custs.length
+      ? el('ol', { className: 'rank' }, custs.map((c, i) => el('li', { className: 'rank-row' },
+          el('span', { className: 'rank-num tnum' }, String(i + 1)),
+          C.cellStack(c.name, c.service),
+          el('span', { className: 'tnum strong' }, C.rupiah(c.amount)),
+        )))
+      : C.emptyState({ kicker: 'Kosong', title: 'Belum ada pendapatan di periode ini.' }))
+
+    report = {
+      period: r.label,
+      period_start: r.from.toISOString().slice(0, 10),
+      period_end: new Date(r.to.getTime() - 1).toISOString().slice(0, 10),
+      total_revenue: t.revenue,
+      total_cost: t.cost,
+      net_profit: t.profit,
+      margin_pct: margin == null ? null : Number(margin.toFixed(1)),
+      previous_period: prevT ? { label: r.prev.label, total_revenue: prevT.revenue, total_cost: prevT.cost, net_profit: prevT.profit } : null,
+      by_category: cats.map((c) => ({ category: c.cat, label: categoryLabel(c.cat), amount: c.amount, entries: c.n })),
+      top_customers: custs.map((c) => ({ name: c.name, service: c.service, revenue: c.amount })),
+      entries: entries.map((l) => ({ id: l.id, category: l.category, amount: Number(l.amount) || 0, posted_at: ledgerDate(l) })),
+    }
+    explainBtn.disabled = entries.length === 0
+    if (!entries.length) msg.show('info', 'Tidak ada jurnal di periode ini, jadi belum ada yang bisa dijelaskan.')
+    else msg.hide()
   }
 
-  // Stats grid
-  const statsGrid = Components.el('div', { className: 'stats-grid' },
-    Components.el('div', { className: 'stat-card olive' },
-      Components.el('div', { className: 'stat-label' }, 'Total Pendapatan'),
-      Components.el('div', { className: 'stat-value' }, `Rp${reportData.total_revenue.toLocaleString('id-ID')}`)
-    ),
-    Components.el('div', { className: 'stat-card terracotta' },
-      Components.el('div', { className: 'stat-label' }, 'Total Biaya'),
-      Components.el('div', { className: 'stat-value' }, `Rp${reportData.total_cost.toLocaleString('id-ID')}`)
-    ),
-    Components.el('div', { className: 'stat-card orange' },
-      Components.el('div', { className: 'stat-label' }, 'Laba Bersih'),
-      Components.el('div', { className: 'stat-value' }, `Rp${(reportData.total_revenue - reportData.total_cost).toLocaleString('id-ID')}`)
-    )
-  )
-  container.appendChild(statsGrid)
-  animateEntrance(statsGrid)
+  function emptyForPeriod() {
+    const box = C.emptyState({ kicker: 'Periode kosong', title: 'Tidak ada jurnal di periode ini.', body: flow.ledger.length ? 'Coba periode lain, atau posting jurnal baru.' : 'Posting jurnal di tahap 05 agar laporan terisi.' })
+    if (!flow.ledger.length) {
+      const go = C.button({ label: 'Ke pembukuan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+      go.addEventListener('click', () => navigate('bookkeeping'))
+      box.appendChild(go)
+    }
+    return box
+  }
 
-  // Summary card
-  const summaryCard = Components.el('div', { className: 'card card-accent-brown' },
-    Components.el('h3', {}, '\ud83d\udcca Ringkasan Keuangan'),
-    Components.el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:12px;' },
-      Components.el('div', {},
-        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Periode'),
-        Components.el('p', { style: 'margin:4px 0;font-weight:600;' }, reportData.period)
-      ),
-      Components.el('div', {},
-        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Total Pendapatan'),
-        Components.el('p', { style: 'margin:4px 0;font-weight:600;color:var(--accent-olive);' }, `Rp${reportData.total_revenue.toLocaleString('id-ID')}`)
-      ),
-      Components.el('div', {},
-        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Total Biaya'),
-        Components.el('p', { style: 'margin:4px 0;font-weight:600;color:var(--accent-terracotta);' }, `Rp${reportData.total_cost.toLocaleString('id-ID')}`)
-      ),
-      Components.el('div', {},
-        Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Laba Bersih'),
-        Components.el('p', { style: 'margin:4px 0;font-weight:600;color:var(--primary);' }, `Rp${(reportData.total_revenue - reportData.total_cost).toLocaleString('id-ID')}`)
-      )
-    )
-  )
-  container.appendChild(summaryCard)
-  animateEntrance(summaryCard, 100)
-
-  // AI explanation form card
-  const explainCard = Components.el('div', { className: 'form-card card-accent-secondary' },
-    Components.el('h3', { className: 'form-title' }, '\ud83e\udde0 Penjelasan AI'),
-    Components.el('p', { className: 'form-subtitle' }, 'AI akan menganalisis data keuangan dan memberikan insight dalam bahasa Indonesia.')
-  )
-
-  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
-  const resultArea = Components.el('div', { id: 'report-explain', style: 'margin-top:16px;' })
-
-  const explainBtn = Components.el('button', { type: 'button' }, '\ud83e\udd16 Jelaskan dengan AI')
-  const stopBtn = Components.el('button', { type: 'button', className: 'btn-secondary' }, '\u23f9 Batal')
-
-  const actions = Components.el('div', { className: 'form-actions', style: 'border-top:none;padding-top:0;margin-top:0;' }, explainBtn, stopBtn)
-
-  let abortController = null
+  /* ------------------------------------------------------- AI explain */
+  let current = null
+  ctx.signal?.addEventListener('abort', () => current?.abort())
 
   explainBtn.addEventListener('click', async () => {
-    msg.style.display = 'none'
-    resultArea.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--text-muted);padding:12px 0;"><div class="spinner"></div> AI sedang menjelaskan...</div>'
-    explainBtn.disabled = true
-
-    if (!selectedModel) {
-      resultArea.innerHTML = '<p style="color:var(--danger)">Model AI tidak tersedia.</p>'
-      explainBtn.disabled = false
-      return
-    }
-
-    abortController = new AbortController()
-    const preview = Components.el('div', { className: 'ai-stream' })
-    resultArea.innerHTML = ''
-    resultArea.appendChild(preview)
-
+    msg.hide()
+    if (!model) { msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.'); return }
+    if (!report) return
+    current?.abort()
+    const ac = new AbortController()
+    current = ac
+    const restore = C.setBusy(explainBtn, 'Menganalisis…')
+    const ui = C.aiConsole({ model: model.id })
+    ui.onStop(() => ac.abort())
+    ui.setStatus('Menulis…', true)
+    ui.write('')
+    aiOut.replaceChildren(ui.root)
     try {
-      const html = await explainReport({
-        report: reportData,
-        modelId: selectedModel.id,
-        signal: abortController.signal,
-        onChunk: (delta, full) => {
-          preview.innerHTML = full
-        }
-      })
-      preview.innerHTML = html
-      showToast('Penjelasan laporan selesai!', 'success')
+      const html = await abortable(explainReport({
+        report,
+        modelId: model.id,
+        signal: ac.signal,
+        onChunk: (_d, full) => { if (!ac.signal.aborted) ui.writeHTML(C.sanitizeHTML(full)) },
+      }), ac.signal)
+      ui.writeHTML(C.sanitizeHTML(html), { caretOn: false })
+      ui.setStatus('Selesai', false)
+      showToast('Penjelasan laporan selesai.', 'success')
     } catch (err) {
+      ui.done()
       if (err.name === 'AbortError') {
-        resultArea.innerHTML = '<p style="color:var(--text-muted)">Dibatalkan.</p>'
+        ui.setStatus('Dihentikan', false)
+        msg.show('info', 'Penjelasan dihentikan.')
       } else {
-        resultArea.innerHTML = `<p style="color:var(--danger)">Error: ${err.message}</p>`
+        ui.setStatus('Gagal', false)
+        msg.show('danger', err.message)
       }
     } finally {
-      explainBtn.disabled = false
+      if (current === ac) current = null
+      restore()
+      explainBtn.disabled = !report?.entries.length
     }
   })
 
-  stopBtn.addEventListener('click', () => abortController?.abort())
-
-  explainCard.appendChild(actions)
-  explainCard.appendChild(msg)
-  explainCard.appendChild(resultArea)
-  container.appendChild(explainCard)
-  animateEntrance(explainCard, 200)
+  draw()
 }

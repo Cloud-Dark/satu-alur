@@ -1,0 +1,139 @@
+/* Searchable dropdown (src/ui/combobox.js). Popover is appended to <body>. */
+.combo { position: relative; }
+.combo-native {
+  position: absolute !important;
+  inset: auto 0 0 0;
+  width: 100% !important;
+  height: 1px !important;
+  opacity: 0;
+  pointer-events: none;
+  border: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+}
+.combo-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 12px 11px 14px;
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+}
+.combo-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-trigger.is-placeholder .combo-value { color: var(--text-faint); }
+.combo-chevron { flex-shrink: 0; color: var(--text-muted); transition: transform var(--t) var(--ease); }
+.combo.is-open .combo-chevron { transform: rotate(180deg); }
+.combo.is-open .combo-trigger {
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-500) 18%, transparent);
+}
+.combo-trigger.is-invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 16%, transparent);
+}
+
+.combo-pop {
+  position: fixed;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  max-height: min(360px, 60vh);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
+  transform-origin: top center;
+  transition: opacity var(--t-fast) var(--ease), transform var(--t) var(--ease);
+  font-family: var(--font-sans);
+}
+.combo-pop.is-up { transform-origin: bottom center; transform: translateY(4px) scale(0.985); }
+.combo-pop.is-in { opacity: 1; transform: none; }
+
+.combo-search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin: 8px;
+  padding: 0 12px;
+  min-height: 40px;
+  background: var(--surface-sunken);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  color: var(--text-muted);
+  transition: border-color var(--t-fast), background var(--t-fast);
+}
+.combo-search:focus-within { border-color: var(--brand-300); background: var(--surface); }
+.combo-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  padding: 8px 0;
+}
+.combo-search-input::placeholder { color: var(--text-faint); }
+.combo-search-input:focus-visible { box-shadow: none; }
+
+.combo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 6px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.combo-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 9px 10px;
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+  line-height: 1.35;
+  cursor: pointer;
+  color: var(--text-2);
+}
+.combo-option-label { flex: 1; min-width: 0; }
+.combo-option svg { flex-shrink: 0; color: var(--brand-500); }
+.combo-option.is-active { background: var(--brand-50); color: var(--text); }
+.combo-option[aria-selected='true'] { color: var(--brand-600); font-weight: 600; }
+.combo-option[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.combo-option mark {
+  background: var(--accent-100);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.combo-empty {
+  margin: 0;
+  padding: 14px 16px 16px;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+.combo-count {
+  margin: 0;
+  padding: 7px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 0.74rem;
+  color: var(--text-faint);
+  background: var(--surface-2);
+}
+
+@media (max-width: 560px) {
+  .combo-pop { max-height: 55vh; }
+  .combo-option { padding: 11px 10px; }
+}

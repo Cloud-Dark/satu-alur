@@ -1,239 +1,317 @@
+/** 02 — Penawaran: AI drafts an offer, domain rules validate, human saves. */
 import { getCloud } from '../cloud.js'
-import * as Components from '../ui/components.js'
+import * as C from '../ui/components.js'
 import { generateOffer } from '../ai/agent.js'
-import { validateOffer } from '../domain/rules.js'
-import { loadModels, pickDefaultModel } from '../ai/models.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import { validateOffer, OfferRules } from '../domain/rules.js'
+import { loadModels } from '../ai/models.js'
+import { getAgentParams } from './settings.js'
+import { showToast } from '../ui/animations.js'
+import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 
-export async function render(container) {
-  container.innerHTML = ''
+const { el, icon } = C
 
-  const formCard = Components.el('div', { className: 'form-card card-accent-sand' },
-    Components.el('h3', { className: 'form-title' }, '💡 Penawaran AI'),
-    Components.el('p', { className: 'form-subtitle' }, 'Pilih permintaan untuk menghasilkan penawaran AI. Sistem akan memvalidasi hasil sebelum disetujui.')
+/** Picks the preferred model from settings, falling back to the first one. */
+export async function resolveModel() {
+  const models = await loadModels()
+  const pref = getAgentParams().modelPreference
+  return models.find((m) => m.id === pref) || models[0] || null
+}
+
+/** Rejects with an AbortError as soon as `signal` aborts. */
+export function abortable(promise, signal) {
+  if (!signal) return promise
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      const fire = () => reject(new DOMException('Dibatalkan', 'AbortError'))
+      if (signal.aborted) fire()
+      else signal.addEventListener('abort', fire, { once: true })
+    }),
+  ])
+}
+
+export async function render(container, ctx = {}) {
+  const navigate = ctx.navigate || (() => {})
+  const params = ctx.params || {}
+
+  const reqSelect = C.select({ label: 'Permintaan', name: 'request_id', required: true, hint: 'Permintaan tanpa penawaran ditampilkan lebih dulu.', options: [{ value: '', label: 'Memuat…' }] })
+  const preview = el('div', { className: 'req-preview', hidden: true })
+  const genBtn = C.button({ label: 'Hasilkan penawaran', icon: 'sparkles', variant: 'primary' })
+  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
+  const msg = C.message()
+  const resultArea = el('div', { className: 'offer-result' })
+
+  const genPanel = C.panel({ title: 'Susun penawaran', meta: 'Dibantu AI', raised: true, className: 'form-panel' },
+    el('div', { className: 'form' },
+      reqSelect.wrap,
+      preview,
+      el('div', { className: 'form-actions' }, genBtn, modelNote),
+      msg,
+    ),
+    resultArea,
   )
 
-  let models = []
-  let selectedModel = null
-  try {
-    models = await loadModels()
-    selectedModel = pickDefaultModel()
-  } catch (e) {
-    console.warn('Model load error:', e.message)
-  }
+  const listBody = el('div', {}, C.skeletonRows(5))
+  const listPanel = C.panel({ title: 'Daftar penawaran', meta: 'memuat…', className: 'list-panel' }, listBody)
 
-  let requests = []
-  try {
-    const cloud = getCloud()
-    const { data } = await cloud.database.from('requests')
-      .select('*')
-      .order('created_at', { ascending: false })
-    requests = data || []
-  } catch (err) {
-    container.appendChild(Components.el('p', { style: 'color:var(--danger)' }, 'Gagal memuat permintaan: ' + err.message))
-    return
-  }
+  container.replaceChildren(
+    C.pageHeader({ num: '02', label: 'Penawaran', title: 'Penawaran AI', em: 'AI', description: 'AI menyusun ruang lingkup dan harga. Aturan domain memeriksa hasilnya sebelum Anda menyimpan.' }),
+    el('div', { className: 'stage-grid' }, genPanel, listPanel),
+  )
 
-  if (requests.length === 0) {
-    container.appendChild(Components.el('p', { style: 'color:var(--text-muted);padding:20px;' }, 'Belum ada permintaan. Buat permintaan di tahap sebelumnya.'))
-    return
-  }
+  let model = null
+  let flow = null
+  let current = null // AbortController for the active generation
+  ctx.signal?.addEventListener('abort', () => current?.abort())
 
-  const select = Components.el('select', { name: 'request_id' })
-  select.appendChild(Components.el('option', { value: '' }, '-- Pilih permintaan --'))
-  requests.forEach((r) => {
-    select.appendChild(Components.el('option', { value: r.id }, `${r.customer_name} \u2014 ${r.service_type}`))
-  })
+  resolveModel()
+    .then((mdl) => { model = mdl; modelNote.textContent = mdl ? `Model: ${mdl.id}` : 'Model: tidak tersedia' })
+    .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
 
-  const generateBtn = Components.el('button', { type: 'button' }, '🤖 Hasilkan Penawaran AI')
-  const stopBtn = Components.el('button', { type: 'button', className: 'btn-secondary' }, '⏹ Batal')
-  const resultArea = Components.el('div', { id: 'offer-result', style: 'margin-top:16px;' })
-  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
-
-  let abortController = null
-
-  generateBtn.addEventListener('click', async () => {
-    const reqId = select.value
-    if (!reqId) {
-      msg.className = 'form-message error'
-      msg.textContent = 'Pilih permintaan terlebih dahulu.'
-      msg.style.display = 'block'
-      return
+  /* ---------------------------------------------------------- Options */
+  function fillRequests() {
+    const fresh = flow.requestsWithoutOffer()
+    const offered = flow.requests.filter((r) => flow.offersOf(r.id).length > 0)
+    const opts = [{ value: '', label: flow.requests.length ? 'Pilih permintaan' : 'Belum ada permintaan' }]
+    fresh.forEach((r) => opts.push({ value: r.id, label: `${customerLabel(r)} — ${r.service_type || 'layanan'}` }))
+    offered.forEach((r) => opts.push({ value: r.id, label: `${customerLabel(r)} — ${r.service_type || 'layanan'} (sudah ditawarkan)` }))
+    const keep = reqSelect.input.value || (params.requestId != null ? String(params.requestId) : '')
+    C.setOptions(reqSelect.input, opts, keep)
+    if (!flow.requests.length) {
+      genBtn.disabled = true
+      msg.show('info', 'Belum ada permintaan. Buat permintaan di tahap 01 terlebih dahulu.')
+      const go = C.button({ label: 'Ke permintaan', iconRight: 'arrowRight', size: 'sm' })
+      go.addEventListener('click', () => navigate('request'))
+      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
+    } else {
+      genBtn.disabled = false
     }
-    const request = requests.find(r => r.id == reqId)
+    showPreview()
+  }
+
+  function showPreview() {
+    const r = flow?.request(reqSelect.input.value)
+    if (!r) { preview.hidden = true; return }
+    preview.replaceChildren(C.defList([
+      ['Layanan', r.service_type || '—'],
+      ['Lokasi', r.location || '—'],
+      ['Telepon', r.phone || '—'],
+      ['Kebutuhan', r.description || '—'],
+    ]))
+    preview.hidden = false
+  }
+  reqSelect.input.addEventListener('change', () => { msg.hide(); showPreview() })
+
+  /* -------------------------------------------------------- Generate */
+  genBtn.addEventListener('click', async () => {
+    msg.hide()
+    const request = flow?.request(reqSelect.input.value)
     if (!request) {
-      msg.className = 'form-message error'
-      msg.textContent = 'Permintaan tidak ditemukan.'
-      msg.style.display = 'block'
+      msg.show('danger', 'Pilih permintaan terlebih dahulu.')
+      reqSelect.input.focus()
+      return
+    }
+    if (!model) {
+      msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.')
       return
     }
 
-    msg.style.display = 'none'
-    resultArea.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--text-muted);padding:12px 0;"><div class="spinner"></div> AI sedang menghasilkan penawaran...</div>'
-    generateBtn.disabled = true
-
-    if (!selectedModel) {
-      resultArea.innerHTML = '<p style="color:var(--danger)">Model AI tidak tersedia.</p>'
-      generateBtn.disabled = false
-      return
-    }
-
-    abortController = new AbortController()
-    let accumulated = ''
-    const preview = Components.el('div', { className: 'ai-stream' })
-    resultArea.innerHTML = ''
-    resultArea.appendChild(preview)
+    current?.abort()
+    const ac = new AbortController()
+    current = ac
+    const restore = C.setBusy(genBtn, 'Menyusun…')
+    const consoleUI = C.aiConsole({ model: model.id })
+    consoleUI.onStop(() => ac.abort())
+    consoleUI.setStatus('Menulis…', true)
+    consoleUI.write('')
+    resultArea.replaceChildren(consoleUI.root)
 
     try {
-      const offerJson = await generateOffer({
+      const offerJson = await abortable(generateOffer({
         request,
-        modelId: selectedModel.id,
-        signal: abortController.signal,
-        onChunk: (delta, full) => {
-          accumulated = full
-          preview.textContent = full
-        }
-      })
-
-      const validation = validateOffer(offerJson)
-      if (!validation.valid) {
-        resultArea.appendChild(Components.el('div', { className: 'card card-accent-terracotta', style: 'margin-top:16px;' },
-          Components.el('h3', {}, '❌ Validasi Gagal'),
-          Components.el('ul', {}, ...validation.errors.map(e => Components.el('li', {}, e)))
-        ))
-        generateBtn.disabled = false
-        return
-      }
-
-      const validatedCard = Components.el('div', { className: 'card card-accent-olive', style: 'margin-top:16px;' },
-        Components.el('h3', {}, '✅ Proposal Tervalidasi'),
-        Components.el('div', { style: 'display:grid;gap:10px;margin-top:12px;' },
-          Components.el('div', {},
-            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Ruang Lingkup'),
-            Components.el('p', { style: 'margin:4px 0;' }, offerJson.scope)
-          ),
-          Components.el('div', {},
-            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Harga'),
-            Components.el('p', { style: 'margin:4px 0;font-size:1.2rem;font-weight:800;color:var(--primary);' },
-              `Rp${Number(offerJson.price).toLocaleString('id-ID')}`
-            )
-          ),
-          Components.el('div', {},
-            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Ketentuan'),
-            Components.el('p', { style: 'margin:4px 0;' }, offerJson.terms)
-          ),
-          Components.el('div', {},
-            Components.el('span', { style: 'color:var(--text-muted);font-size:0.8rem;' }, 'Catatan'),
-            Components.el('p', { style: 'margin:4px 0;color:var(--text-muted);' }, offerJson.notes || '-')
-          )
-        )
-      )
-      resultArea.appendChild(validatedCard)
-      animateEntrance(validatedCard)
-
-      const saveBtn = Components.el('button', { type: 'button', className: 'btn-success' }, '💾 Simpan Penawaran')
-      saveBtn.addEventListener('click', async () => {
-        try {
-          const cloud = getCloud()
-          const { error } = await cloud.database.from('offers').insert({
-            request_id: request.id,
-            ai_proposal_json: offerJson,
-            validated_price: offerJson.price,
-            validated_scope: offerJson.scope,
-            status: 'draft',
-          })
-          if (error) throw new Error(error.message)
-          msg.className = 'form-message success'
-          msg.textContent = '✅ Penawaran berhasil disimpan ke database.'
-          msg.style.display = 'block'
-          saveBtn.disabled = true
-          showToast('Penawaran AI berhasil disimpan!', 'success')
-          await loadOffers()
-        } catch (err) {
-          msg.className = 'form-message error'
-          msg.textContent = err.message
-          msg.style.display = 'block'
-        }
-      })
-      resultArea.appendChild(saveBtn)
-
+        modelId: model.id,
+        signal: ac.signal,
+        onChunk: (_delta, full) => { if (!ac.signal.aborted) consoleUI.write(full) },
+      }), ac.signal)
+      consoleUI.done()
+      consoleUI.setStatus('Selesai', false)
+      resultArea.appendChild(renderProposal(request, offerJson))
     } catch (err) {
+      consoleUI.done()
       if (err.name === 'AbortError') {
-        resultArea.innerHTML = '<p style="color:var(--text-muted)">Dibatalkan.</p>'
+        consoleUI.setStatus('Dihentikan', false)
+        msg.show('info', 'Pembuatan penawaran dihentikan. Tidak ada yang disimpan.')
       } else {
-        resultArea.innerHTML = `<p style="color:var(--danger)">Error: ${err.message}</p>`
+        consoleUI.setStatus('Gagal', false)
+        msg.show('danger', err.message)
       }
     } finally {
-      generateBtn.disabled = false
+      if (current === ac) current = null
+      restore()
     }
   })
 
-  stopBtn.addEventListener('click', () => abortController?.abort())
+  /* ------------------------------------------------------- Proposal */
+  function renderProposal(request, offerJson) {
+    const box = el('div', { className: 'proposal' })
+    const priceField = C.field({
+      label: 'Harga final (Rp)', name: 'validated_price', type: 'number', required: true,
+      value: String(Math.round(Number(offerJson?.price) || 0)),
+      hint: `Boleh disesuaikan. Rentang valid ${C.rupiah(OfferRules.minPrice)} – ${C.rupiah(OfferRules.maxPrice)}.`,
+      attrs: { min: String(OfferRules.minPrice), max: String(OfferRules.maxPrice), step: '1000', inputmode: 'numeric' },
+    })
+    const checks = el('ul', { className: 'checks' })
+    const saveBtn = C.button({ label: 'Simpan penawaran', icon: 'save', variant: 'primary' })
+    const saveMsg = C.message()
 
-  const form = Components.el('div', {},
-    Components.el('div', { className: 'form-group' },
-      Components.el('label', {}, 'Pilih Permintaan'),
-      select,
-      Components.el('span', { className: 'field-hint' }, 'Pilih permintaan pelanggan yang akan dibuatkan penawaran.')
-    ),
-    Components.el('div', { className: 'form-actions' }, generateBtn, stopBtn),
-    msg,
-    resultArea
-  )
-  formCard.appendChild(form)
-  container.appendChild(formCard)
-  animateEntrance(formCard, 100)
+    const candidate = () => ({ ...offerJson, price: Number(priceField.input.value) })
+    const RULES = [
+      { label: `Harga ${C.rupiahCompact(OfferRules.minPrice)} – ${C.rupiahCompact(OfferRules.maxPrice)}`, test: (o) => { const p = Number(o.price); return !Number.isNaN(p) && p >= OfferRules.minPrice && p <= OfferRules.maxPrice } },
+      { label: 'Ruang lingkup minimal 10 karakter', test: (o) => String(o.scope || '').trim().length >= 10 },
+      { label: 'Ketentuan minimal 10 karakter', test: (o) => String(o.terms || '').trim().length >= 10 },
+    ]
+    const syncChecks = () => {
+      const o = candidate()
+      checks.replaceChildren(...RULES.map((r) => {
+        const ok = r.test(o)
+        return el('li', { className: ok ? 'is-ok' : 'is-bad' }, icon(ok ? 'check' : 'x', { size: 14 }), r.label)
+      }))
+      const v = validateOffer(o)
+      saveBtn.disabled = !v.valid
+      return v
+    }
+    priceField.input.addEventListener('input', syncChecks)
 
-  const listCard = Components.section('📋 Daftar Penawaran',
-    Components.skeleton({ type: 'text', lines: 4 })
-  )
-  listCard.classList.add('card-accent-secondary')
-  container.appendChild(listCard)
-  animateEntrance(listCard, 200)
+    box.append(
+      el('div', { className: 'proposal-head' },
+        el('span', { className: 'tag tag-accent' }, icon('sparkles', { size: 14 }), 'Usulan AI'),
+        el('span', { className: 'proposal-for' }, `${customerLabel(request)} — ${request.service_type || 'layanan'}`),
+      ),
+      C.defList([
+        ['Ruang lingkup', offerJson?.scope || '—'],
+        ['Harga usulan AI', el('span', { className: 'tnum strong' }, C.rupiah(offerJson?.price))],
+        ['Ketentuan', offerJson?.terms || '—'],
+        ['Catatan', offerJson?.notes || '—'],
+      ]),
+      el('div', { className: 'proposal-validate' },
+        el('span', { className: 'proposal-label' }, icon('shield', { size: 15 }), 'Aturan domain'),
+        checks,
+      ),
+      priceField.wrap,
+      el('div', { className: 'form-actions' }, saveBtn),
+      saveMsg,
+    )
+    syncChecks()
 
-  async function loadOffers() {
-    const el = container.querySelector('#offer-list')
-    if (!el) return
-    el.innerHTML = ''
-    el.appendChild(Components.skeleton({ type: 'text', lines: 4 }))
+    saveBtn.addEventListener('click', async () => {
+      saveMsg.hide()
+      const o = candidate()
+      const v = syncChecks()
+      if (!v.valid) { saveMsg.show('danger', 'Penawaran belum lolos validasi.', v.errors); return }
+      const restore = C.setBusy(saveBtn, 'Menyimpan…')
+      try {
+        const { data, error } = await getCloud().database.from('offers').insert({
+          request_id: request.id,
+          ai_proposal_json: offerJson,
+          validated_price: o.price,
+          validated_scope: o.scope,
+          status: 'approved',
+        })
+        if (error) throw new Error(error.message)
+        const row = Array.isArray(data) ? data[0] : data
+        restore()
+        saveBtn.disabled = true
+        priceField.input.disabled = true
+        saveMsg.show('ok', `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`)
+        const next = C.button({ label: 'Tugaskan pekerja', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+        next.addEventListener('click', () => navigate('assign', { offerId: row?.id }))
+        saveMsg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
+        showToast('Penawaran disimpan.', 'success')
+        notifyDataChanged()
+        await loadList()
+      } catch (err) {
+        restore()
+        saveMsg.show('danger', `Gagal menyimpan: ${err.message}`)
+      }
+    })
+    return box
+  }
 
+  /* ------------------------------------------------------------ List */
+  async function approve(o, btnEl) {
+    const proposal = typeof o.ai_proposal_json === 'object' && o.ai_proposal_json ? o.ai_proposal_json : {}
+    const candidate = { ...proposal, price: o.validated_price, scope: o.validated_scope || proposal.scope }
+    const v = validateOffer(candidate)
+    if (!v.valid) {
+      msg.show('danger', `Penawaran #${o.id} tidak lolos validasi.`, v.errors)
+      return
+    }
+    const restore = C.setBusy(btnEl, 'Menyetujui…')
     try {
-      const cloud = getCloud()
-      const { data, error } = await cloud.database.from('offers')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const { error } = await getCloud().database.from('offers').update({ status: 'approved' }).eq('id', o.id)
       if (error) throw new Error(error.message)
-      if (!data || data.length === 0) {
-        el.innerHTML = '<p style="color:var(--text-muted)">Belum ada penawaran.</p>'
-        return
-      }
-      el.innerHTML = ''
-      for (let i = 0; i < data.length; i++) {
-        const o = data[i]
-        const reqRes = await cloud.database.from('requests').select('customer_name,service_type').eq('id', o.request_id).maybeSingle()
-        const req = reqRes.data || {}
-        const card = Components.el('div', { className: 'card', style: 'margin-bottom:12px;' },
-          Components.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start;' },
-            Components.el('div', {},
-              Components.el('strong', {}, req.customer_name || 'Pelanggan'),
-              Components.el('span', { style: 'color:var(--text-muted);font-size:0.85rem;display:block;margin-top:4px;' },
-                `${req.service_type || '-'} \u2022 Rp${Number(o.validated_price || 0).toLocaleString('id-ID')}`
-              )
-            ),
-            Components.badge(o.status, o.status === 'approved' ? 'approved' : 'draft')
-          ),
-          Components.el('p', { style: 'margin:10px 0;font-size:0.9rem;color:var(--text-muted);' }, o.validated_scope || '-'),
-          Components.el('span', { style: 'font-size:0.75rem;color:var(--text-dim);' },
-            '🕐 ' + new Date(o.created_at).toLocaleString('id-ID')
-          )
-        )
-        animateEntrance(card, i * 60)
-        el.appendChild(card)
-      }
+      showToast('Penawaran disetujui.', 'success')
+      notifyDataChanged()
+      await loadList()
     } catch (err) {
-      el.innerHTML = `<p style="color:var(--danger)">Gagal memuat: ${err.message}</p>`
+      restore()
+      msg.show('danger', `Gagal menyetujui: ${err.message}`)
     }
   }
 
-  await loadOffers()
+  async function loadList() {
+    try {
+      flow = await loadFlow()
+    } catch (err) {
+      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      return
+    }
+    if (ctx.signal?.aborted) return
+    fillRequests()
+    listPanel.querySelector('.panel-meta').textContent = `${flow.offers.length} baris · ${flow.offers.filter((o) => o.status === 'approved').length} disetujui`
+    if (!flow.offers.length) {
+      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada penawaran.', body: 'Pilih permintaan lalu hasilkan penawaran dengan AI.' }))
+      return
+    }
+    listBody.replaceChildren(C.dataTable({
+      caption: 'Daftar penawaran',
+      rows: flow.offers,
+      rowAttrs: (o) => ({ className: params.offerId != null && String(params.offerId) === String(o.id) ? 'is-focus' : undefined, dataset: { id: String(o.id) } }),
+      columns: [
+        {
+          label: 'Pelanggan',
+          render: (o) => {
+            const r = flow.requestOfOffer(o)
+            const stack = C.cellStack(customerLabel(r), r?.service_type)
+            if (o.validated_scope) stack.appendChild(el('span', { className: 'cell-note', title: o.validated_scope }, o.validated_scope))
+            return stack
+          },
+        },
+        { label: 'Harga', align: 'right', render: (o) => el('span', { className: 'tnum' }, C.rupiah(o.validated_price)) },
+        { label: 'Status', render: (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn')) },
+        { label: 'Dibuat', className: 'col-date', render: (o) => el('time', { className: 'tnum', datetime: o.created_at, title: C.formatDateTime(o.created_at) }, C.formatDate(o.created_at)) },
+        {
+          label: 'Aksi',
+          className: 'col-action',
+          render: (o) => {
+            if (o.status !== 'approved') {
+              const b = C.button({ label: 'Setujui', icon: 'check', size: 'sm', variant: 'primary' })
+              b.addEventListener('click', () => approve(o, b))
+              return b
+            }
+            if (!flow.assignmentsOf(o.id).length) {
+              const b = C.button({ label: 'Tugaskan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+              b.addEventListener('click', () => navigate('assign', { offerId: o.id }))
+              return b
+            }
+            return el('span', { className: 'muted small' }, 'Ditugaskan')
+          },
+        },
+      ],
+    }))
+    const focusRow = listBody.querySelector('tr.is-focus')
+    if (focusRow) focusRow.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }
+
+  await loadList()
 }

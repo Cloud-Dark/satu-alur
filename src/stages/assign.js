@@ -1,153 +1,178 @@
+/** 03 — Penugasan: assign an approved offer to a worker with a schedule. */
 import { getCloud } from '../cloud.js'
-import * as Components from '../ui/components.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import * as C from '../ui/components.js'
+import { showToast } from '../ui/animations.js'
+import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 
-export async function render(container) {
-  container.innerHTML = ''
+const { el } = C
 
-  const formCard = Components.el('div', { className: 'form-card card-accent-brown' },
-    Components.el('h3', { className: 'form-title' }, '👷 Penugasan Tenaga Pelaksana'),
-    Components.el('p', { className: 'form-subtitle' }, 'Pilih penawaran yang sudah disetujui untuk ditugaskan kepada pekerja.')
+function toLocalInput(d) {
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
+function defaultSchedule() {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(9, 0, 0, 0)
+  return toLocalInput(d)
+}
+
+export async function render(container, ctx = {}) {
+  const navigate = ctx.navigate || (() => {})
+  const params = ctx.params || {}
+
+  const offerSel = C.select({ label: 'Penawaran disetujui', name: 'offer_id', required: true, hint: 'Penawaran yang belum ditugaskan tampil lebih dulu.', options: [{ value: '', label: 'Memuat…' }] })
+  const preview = el('div', { className: 'req-preview', hidden: true })
+  const worker = C.field({ label: 'Nama pekerja atau tim', name: 'worker_name', required: true, placeholder: 'Ahmad & Tim', attrs: { maxlength: '120', autocomplete: 'off' } })
+  const when = C.field({ label: 'Jadwal pelaksanaan', name: 'scheduled_at', type: 'datetime-local', required: true, value: defaultSchedule(), hint: 'Waktu lokal perangkat Anda.' })
+  const submit = C.button({ label: 'Tugaskan', icon: 'users', variant: 'primary', type: 'submit' })
+  const msg = C.message()
+
+  const form = el('form', { className: 'form' },
+    offerSel.wrap, preview,
+    el('div', { className: 'form-row' }, worker.wrap, when.wrap),
+    el('div', { className: 'form-actions' }, submit),
+    msg,
+  )
+  form.noValidate = true
+
+  const listBody = el('div', {}, C.skeletonRows(5))
+  const listPanel = C.panel({ title: 'Daftar penugasan', meta: 'memuat…', className: 'list-panel' }, listBody)
+
+  container.replaceChildren(
+    C.pageHeader({ num: '03', label: 'Penugasan', title: 'Penugasan pelaksana', em: 'pelaksana', description: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.' }),
+    el('div', { className: 'stage-grid' },
+      C.panel({ title: 'Tugaskan pekerja', meta: 'Jadwal & pelaksana', raised: true, className: 'form-panel' }, form),
+      listPanel,
+    ),
   )
 
-  let offers = []
-  try {
-    const cloud = getCloud()
-    const { data } = await cloud.database.from('offers')
-      .select('*')
-      .eq('status', 'approved')
-      .order('created_at', { ascending: false })
-    offers = data || []
-  } catch (err) {
-    container.appendChild(Components.el('p', { style: 'color:var(--danger)' }, 'Gagal memuat: ' + err.message))
-    return
+  let flow = null
+
+  function fillOffers() {
+    const approved = flow.offers.filter((o) => o.status === 'approved')
+    const free = approved.filter((o) => !flow.assignmentsOf(o.id).length)
+    const taken = approved.filter((o) => flow.assignmentsOf(o.id).length)
+    const label = (o) => { const r = flow.requestOfOffer(o); return `${customerLabel(r)} — ${C.rupiah(o.validated_price)}` }
+    const opts = [{ value: '', label: approved.length ? 'Pilih penawaran' : 'Belum ada penawaran disetujui' }]
+    free.forEach((o) => opts.push({ value: o.id, label: label(o) }))
+    taken.forEach((o) => opts.push({ value: o.id, label: `${label(o)} (sudah ditugaskan)` }))
+    const keep = offerSel.input.value || (params.offerId != null ? String(params.offerId) : '')
+    C.setOptions(offerSel.input, opts, keep)
+    submit.disabled = !approved.length
+    if (!approved.length) {
+      msg.show('info', 'Belum ada penawaran yang disetujui. Simpan penawaran di tahap 02 terlebih dahulu.')
+      const go = C.button({ label: 'Ke penawaran', iconRight: 'arrowRight', size: 'sm' })
+      go.addEventListener('click', () => navigate('offer'))
+      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
+    }
+    showPreview()
   }
 
-  if (offers.length === 0) {
-    container.appendChild(Components.el('p', { style: 'color:var(--text-muted);padding:20px;' }, 'Tidak ada penawaran yang disetujui. Setujui penawaran di tahap sebelumnya.'))
-    return
+  function showPreview() {
+    const o = flow?.offer(offerSel.input.value)
+    if (!o) { preview.hidden = true; return }
+    const r = flow.requestOfOffer(o)
+    preview.replaceChildren(C.defList([
+      ['Pelanggan', `${customerLabel(r)}${r?.location ? ` · ${r.location}` : ''}`],
+      ['Lingkup', o.validated_scope || '—'],
+      ['Nilai', el('span', { className: 'tnum strong' }, C.rupiah(o.validated_price))],
+    ]))
+    preview.hidden = false
   }
+  offerSel.input.addEventListener('change', () => { msg.hide(); showPreview() })
 
-  const cloud = getCloud()
-  const offerSelect = Components.el('select', { name: 'offer_id' })
-  offerSelect.appendChild(Components.el('option', { value: '' }, '-- Pilih penawaran --'))
-  for (const o of offers) {
-    const reqRes = await cloud.database.from('requests').select('customer_name,service_type').eq('id', o.request_id).maybeSingle()
-    const req = reqRes.data || {}
-    offerSelect.appendChild(Components.el('option', { value: o.id }, `${req.customer_name || 'Pelanggan'} \u2014 ${req.service_type || '-'}`))
-  }
-
-  const workerInput = Components.el('input', { type: 'text', placeholder: 'Nama pekerja', required: true })
-  const dateInput = Components.el('input', { type: 'datetime-local', required: true })
-  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
-
-  const assignBtn = Components.el('button', { type: 'button' }, '📌 Tugaskan')
-  assignBtn.addEventListener('click', async () => {
-    msg.style.display = 'none'
-    if (!offerSelect.value) {
-      msg.className = 'form-message error'
-      msg.textContent = 'Pilih penawaran.'
-      msg.style.display = 'block'
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    msg.hide()
+    const errors = []
+    const offer = flow?.offer(offerSel.input.value)
+    const name = worker.input.value.trim()
+    const date = when.input.value ? new Date(when.input.value) : null
+    if (!offer) errors.push('Pilih penawaran.')
+    if (!name) errors.push('Isi nama pekerja atau tim.')
+    if (!date || Number.isNaN(date.getTime())) errors.push('Isi jadwal pelaksanaan yang valid.')
+    if (errors.length) {
+      msg.show('danger', 'Periksa kembali isian berikut.', errors)
+      ;(!offer ? offerSel.input : !name ? worker.input : when.input).focus()
       return
     }
-    if (!workerInput.value.trim()) {
-      msg.className = 'form-message error'
-      msg.textContent = 'Isi nama pekerja.'
-      msg.style.display = 'block'
-      return
-    }
+    const restore = C.setBusy(submit, 'Menyimpan…')
     try {
-      const { error } = await cloud.database.from('assignments').insert({
-        offer_id: Number(offerSelect.value),
-        worker_name: workerInput.value.trim(),
-        scheduled_at: new Date(dateInput.value).toISOString(),
+      const { data, error } = await getCloud().database.from('assignments').insert({
+        offer_id: Number(offer.id),
+        worker_name: name,
+        scheduled_at: date.toISOString(),
         status: 'assigned',
       })
       if (error) throw new Error(error.message)
-      msg.className = 'form-message success'
-      msg.textContent = '✅ Penugasan berhasil disimpan.'
-      msg.style.display = 'block'
-      workerInput.value = ''
-      showToast('Penugasan berhasil dibuat!', 'success')
+      const row = Array.isArray(data) ? data[0] : data
+      worker.input.value = ''
+      offerSel.input.value = ''
+      when.input.value = defaultSchedule()
+      const past = date.getTime() < Date.now()
+      msg.show('ok', `${name} ditugaskan untuk ${customerLabel(flow.requestOfOffer(offer))}, ${C.formatDateTime(date)}.${past ? ' Catatan: jadwal ini sudah lewat.' : ''}`)
+      const next = C.button({ label: 'Tandai selesai nanti', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+      next.addEventListener('click', () => navigate('complete', { assignmentId: row?.id }))
+      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
+      showToast('Penugasan tersimpan.', 'success')
+      notifyDataChanged()
       await loadList()
     } catch (err) {
-      msg.className = 'form-message error'
-      msg.textContent = err.message
-      msg.style.display = 'block'
+      msg.show('danger', `Gagal menyimpan: ${err.message}`)
+    } finally {
+      restore()
     }
   })
 
-  const form = Components.el('div', {},
-    Components.el('div', { className: 'form-group' },
-      Components.el('label', {}, 'Penawaran', Components.el('span', { className: 'required' }, '*')),
-      offerSelect,
-      Components.el('span', { className: 'field-hint' }, 'Hanya penawaran dengan status disetujui yang muncul di daftar.')
-    ),
-    Components.el('div', { className: 'form-row' },
-      Components.el('div', { className: 'form-group' },
-        Components.el('label', {}, 'Nama Pekerja', Components.el('span', { className: 'required' }, '*')),
-        workerInput
-      ),
-      Components.el('div', { className: 'form-group' },
-        Components.el('label', {}, 'Jadwal Pelaksanaan', Components.el('span', { className: 'required' }, '*')),
-        dateInput
-      )
-    ),
-    Components.el('div', { className: 'form-actions' }, assignBtn),
-    msg
-  )
-  formCard.appendChild(form)
-  container.appendChild(formCard)
-  animateEntrance(formCard, 100)
-
-  const listCard = Components.section('📋 Daftar Penugasan',
-    Components.el('div', { id: 'assign-list' }, Components.el('div', { className: 'spinner' }))
-  )
-  listCard.classList.add('card-accent-orange')
-  container.appendChild(listCard)
-  animateEntrance(listCard, 200)
-
   async function loadList() {
-    const el = container.querySelector('#assign-list')
     try {
-      const { data, error } = await cloud.database.from('assignments')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
-      if (!data || data.length === 0) {
-        el.innerHTML = '<p style="color:var(--text-muted)">Belum ada penugasan.</p>'
-        return
-      }
-      el.innerHTML = ''
-      for (let i = 0; i < data.length; i++) {
-        const a = data[i]
-        const offerRes = await cloud.database.from('offers').select('request_id').eq('id', a.offer_id).maybeSingle()
-        const reqId = offerRes.data?.request_id
-        const reqRes = reqId ? await cloud.database.from('requests').select('customer_name,service_type').eq('id', reqId).maybeSingle() : { data: null }
-        const req = reqRes.data || {}
-        const card = Components.el('div', { className: 'card', style: 'margin-bottom:12px;' },
-          Components.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start;' },
-            Components.el('div', {},
-              Components.el('strong', {}, req.customer_name || 'Pelanggan'),
-              Components.el('span', { style: 'color:var(--text-muted);font-size:0.85rem;display:block;margin-top:4px;' },
-                `${req.service_type || '-'} \u2022 ${a.worker_name}`
-              )
-            ),
-            Components.el('span', { className: `badge badge-${a.status}` }, a.status.toUpperCase())
-          ),
-          Components.el('p', { style: 'margin:10px 0;font-size:0.9rem;color:var(--text-muted);' },
-            `📅 Jadwal: ${new Date(a.scheduled_at).toLocaleString('id-ID')}`
-          ),
-          Components.el('span', { style: 'font-size:0.75rem;color:var(--text-dim);' },
-            '🕐 ' + new Date(a.created_at).toLocaleString('id-ID')
-          )
-        )
-        animateEntrance(card, i * 60)
-        el.appendChild(card)
-      }
+      flow = await loadFlow()
     } catch (err) {
-      el.innerHTML = `<p style="color:var(--danger)">Gagal memuat: ${err.message}</p>`
+      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      return
     }
+    if (ctx.signal?.aborted) return
+    fillOffers()
+    const active = flow.activeAssignments().length
+    listPanel.querySelector('.panel-meta').textContent = `${flow.assignments.length} baris · ${active} aktif`
+    if (!flow.assignments.length) {
+      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada penugasan.', body: 'Pilih penawaran yang disetujui dan tentukan pelaksananya.' }))
+      return
+    }
+    const now = Date.now()
+    listBody.replaceChildren(C.dataTable({
+      caption: 'Daftar penugasan',
+      rows: flow.assignments,
+      columns: [
+        { label: 'Pelanggan', render: (a) => { const r = flow.requestOfAssignment(a); return C.cellStack(customerLabel(r), r?.service_type) } },
+        {
+          label: 'Pelaksana · jadwal',
+          render: (a) => el('div', { className: 'cell-stack' },
+            el('span', { className: 'cell-primary' }, a.worker_name || '—'),
+            el('time', { className: 'cell-secondary tnum', datetime: a.scheduled_at || '' }, C.formatDateTime(a.scheduled_at)),
+          ),
+        },
+        {
+          label: 'Status',
+          render: (a) => {
+            if (a.status === 'done' || flow.completionsOf(a.id).length) return C.tag('Selesai', 'ok')
+            const sched = C.toDate(a.scheduled_at)
+            return sched && sched.getTime() < now ? C.tag('Lewat jadwal', 'warn') : C.tag('Ditugaskan', 'brand')
+          },
+        },
+        {
+          label: 'Aksi',
+          className: 'col-action',
+          render: (a) => {
+            if (a.status === 'done' || flow.completionsOf(a.id).length) return el('span', { className: 'muted nil' }, '—')
+            const b = C.button({ label: 'Tandai selesai', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+            b.addEventListener('click', () => navigate('complete', { assignmentId: a.id }))
+            return b
+          },
+        },
+      ],
+    }))
   }
 
   await loadList()

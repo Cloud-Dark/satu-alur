@@ -1,200 +1,172 @@
+/** 05 — Pembukuan: post revenue and cost entries per completed job. */
 import { getCloud } from '../cloud.js'
-import * as Components from '../ui/components.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import * as C from '../ui/components.js'
+import { showToast } from '../ui/animations.js'
+import { loadFlow, notifyDataChanged, customerLabel, LEDGER_CATEGORIES, categoryLabel, isRevenue, ledgerDate, totals } from './data.js'
 
-export async function render(container) {
-  container.innerHTML = ''
+const { el } = C
 
-  let completions = []
-  try {
-    const cloud = getCloud()
-    const { data } = await cloud.database.from('completions')
-      .select('*')
-      .eq('status', 'done')
-      .order('created_at', { ascending: false })
-    completions = data || []
-  } catch (err) {
-    container.appendChild(Components.el('p', { style: 'color:var(--danger)' }, 'Gagal memuat: ' + err.message))
-    return
-  }
+export async function render(container, ctx = {}) {
+  const navigate = ctx.navigate || (() => {})
+  const params = ctx.params || {}
 
-  if (completions.length === 0) {
-    container.appendChild(Components.el('p', { style: 'color:var(--text-muted);padding:20px;' }, 'Tidak ada pekerjaan selesai. Selesaikan pekerjaan di tahap sebelumnya.'))
-    return
-  }
+  const complSel = C.select({ label: 'Pekerjaan selesai', name: 'completion_id', required: true, hint: 'Satu pekerjaan boleh punya beberapa jurnal: pendapatan dan biaya-biayanya.', options: [{ value: '', label: 'Memuat…' }] })
+  const category = C.select({ label: 'Kategori', name: 'category', required: true, options: [{ value: '', label: 'Pilih kategori' }, ...LEDGER_CATEGORIES] })
+  const amount = C.field({ label: 'Jumlah (Rp)', name: 'amount', type: 'number', required: true, placeholder: '1500000', attrs: { min: '1', step: '1', inputmode: 'numeric' } })
+  const fillBtn = el('button', { type: 'button', className: 'link-btn', hidden: true }, '')
+  amount.wrap.appendChild(fillBtn)
+  const submit = C.button({ label: 'Posting jurnal', icon: 'ledger', variant: 'primary', type: 'submit' })
+  const msg = C.message()
 
-  const cloud = getCloud()
+  const form = el('form', { className: 'form' },
+    complSel.wrap,
+    el('div', { className: 'form-row' }, category.wrap, amount.wrap),
+    el('div', { className: 'form-actions' }, submit),
+    msg,
+  )
+  form.noValidate = true
 
-  // Build select options
-  const selectOptions = [{ value: '', label: '-- Pilih penyelesaian --' }]
-  for (const c of completions) {
-    const assignRes = await cloud.database.from('assignments').select('offer_id').eq('id', c.assignment_id).maybeSingle()
-    const offerRes = assignRes.data?.offer_id ? await cloud.database.from('offers').select('request_id,validated_price').eq('id', assignRes.data.offer_id).maybeSingle() : { data: null }
-    const reqRes = offerRes.data?.request_id ? await cloud.database.from('requests').select('customer_name').eq('id', offerRes.data.request_id).maybeSingle() : { data: null }
-    const label = `${reqRes.data?.customer_name || 'Pelanggan'} \u2014 Rp${Number(offerRes.data?.validated_price || 0).toLocaleString('id-ID')}`
-    selectOptions.push({ value: String(c.id), label })
-  }
+  const summary = el('div', { className: 'kpis kpis-3' })
+  const listBody = el('div', {}, C.skeletonRows(6))
+  const listPanel = C.panel({ title: 'Buku besar', meta: 'memuat…', className: 'list-panel' }, summary, listBody)
 
-  const formCard = Components.el('div', { className: 'form-card card-accent-sand' },
-    Components.el('h3', { className: 'form-title' }, '\ud83d\udcca Posting Jurnal Keuangan'),
-    Components.el('p', { className: 'form-subtitle' }, 'Catat transaksi keuangan dari setiap penyelesaian pekerjaan ke buku besar.')
+  container.replaceChildren(
+    C.pageHeader({ num: '05', label: 'Pembukuan', title: 'Pembukuan & saldo', em: 'saldo', description: 'Catat pendapatan dan biaya dari setiap pekerjaan selesai. Saldo dihitung berjalan dari jurnal tertua.' }),
+    el('div', { className: 'stage-grid' },
+      C.panel({ title: 'Posting jurnal', meta: 'Pendapatan atau biaya', raised: true, className: 'form-panel' }, form),
+      listPanel,
+    ),
   )
 
-  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
+  let flow = null
 
-  const postBtn = Components.el('button', { type: 'button' }, '\ud83d\udccc Posting Jurnal')
+  const offerPrice = (c) => Number(flow?.offerOfCompletion(c)?.validated_price) || 0
 
-  const compSelect = Components.selectField({
-    label: 'Penyelesaian',
-    id: 'completion_id',
-    required: true,
-    options: selectOptions,
+  function syncFill() {
+    const c = flow?.completion(complSel.input.value)
+    const price = c ? offerPrice(c) : 0
+    if (c && price && category.input.value === 'pendapatan') {
+      fillBtn.textContent = `Isi nilai penawaran ${C.rupiah(price)}`
+      fillBtn.hidden = false
+    } else {
+      fillBtn.hidden = true
+    }
+  }
+  fillBtn.addEventListener('click', () => {
+    const c = flow?.completion(complSel.input.value)
+    if (c) { amount.input.value = String(offerPrice(c)); amount.input.focus() }
+  })
+  complSel.input.addEventListener('change', () => { msg.hide(); syncFill() })
+  category.input.addEventListener('change', () => {
+    syncFill()
+    if (category.input.value === 'pendapatan' && !amount.input.value) {
+      const c = flow?.completion(complSel.input.value)
+      if (c && offerPrice(c)) amount.input.value = String(offerPrice(c))
+    }
   })
 
-  const amountGroup = Components.inputField({
-    label: 'Jumlah (Rp)',
-    type: 'number',
-    id: 'ledger_amount',
-    placeholder: 'Contoh: 1500000',
-    required: true,
-  })
+  function fillCompletions() {
+    const all = [...flow.completions]
+    const unbooked = all.filter((c) => !flow.ledgerOf(c.id).length)
+    const booked = all.filter((c) => flow.ledgerOf(c.id).length)
+    const label = (c) => `${customerLabel(flow.requestOfCompletion(c))} — ${C.rupiah(offerPrice(c))}`
+    const opts = [{ value: '', label: all.length ? 'Pilih pekerjaan' : 'Belum ada pekerjaan selesai' }]
+    unbooked.forEach((c) => opts.push({ value: c.id, label: label(c) }))
+    booked.forEach((c) => opts.push({ value: c.id, label: `${label(c)} (${flow.ledgerOf(c.id).length} jurnal)` }))
+    const keep = complSel.input.value || (params.completionId != null ? String(params.completionId) : '')
+    C.setOptions(complSel.input, opts, keep)
+    submit.disabled = !all.length
+    if (!all.length) {
+      msg.show('info', 'Belum ada pekerjaan selesai. Tandai pekerjaan selesai di tahap 04 terlebih dahulu.')
+      const go = C.button({ label: 'Ke penyelesaian', iconRight: 'arrowRight', size: 'sm' })
+      go.addEventListener('click', () => navigate('complete'))
+      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
+    }
+    syncFill()
+  }
 
-  const categoryGroup = Components.selectField({
-    label: 'Kategori',
-    id: 'ledger_category',
-    required: true,
-    options: [
-      { value: '', label: '-- Pilih kategori --' },
-      { value: 'pendapatan', label: 'Pendapatan' },
-      { value: 'biaya_tenaga', label: 'Biaya Tenaga Kerja' },
-      { value: 'biaya_bahan', label: 'Biaya Bahan / Material' },
-      { value: 'biaya_transport', label: 'Biaya Transportasi' },
-      { value: 'biaya_lain', label: 'Biaya Lain-lain' },
-    ],
-  })
-
-  const form = Components.el('form', { id: 'ledger-form' },
-    compSelect,
-    amountGroup,
-    categoryGroup,
-    Components.el('div', { className: 'form-actions' }, postBtn),
-    msg
-  )
-
-  formCard.appendChild(form)
-
-  const listCard = Components.section('\ud83d\udccb Daftar Jurnal',
-    Components.el('div', { id: 'ledger-list' }, Components.skeleton({ type: 'text', lines: 4 }))
-  )
-  listCard.classList.add('card-accent-brown')
-
-  container.appendChild(formCard)
-  container.appendChild(listCard)
-
-  animateEntrance(formCard, 0)
-  animateEntrance(listCard, 100)
-
-  postBtn.addEventListener('click', async () => {
-    msg.style.display = 'none'
-    const compEl = form.querySelector('#completion_id')
-    const amountEl = form.querySelector('#ledger_amount')
-    const catEl = form.querySelector('#ledger_category')
-
-    if (!compEl.value) { msg.className = 'form-message error'; msg.textContent = 'Pilih penyelesaian.'; msg.style.display = 'block'; return }
-    if (!amountEl.value) { msg.className = 'form-message error'; msg.textContent = 'Isi jumlah.'; msg.style.display = 'block'; return }
-    if (!catEl.value) { msg.className = 'form-message error'; msg.textContent = 'Pilih kategori.'; msg.style.display = 'block'; return }
-
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    msg.hide()
+    const c = flow?.completion(complSel.input.value)
+    const amt = Number(amount.input.value)
+    const errors = []
+    if (!c) errors.push('Pilih pekerjaan selesai.')
+    if (!category.input.value) errors.push('Pilih kategori.')
+    if (!amount.input.value || !Number.isFinite(amt) || amt <= 0) errors.push('Jumlah harus angka lebih dari nol.')
+    if (errors.length) {
+      msg.show('danger', 'Periksa kembali isian berikut.', errors)
+      ;(!c ? complSel.input : !category.input.value ? category.input : amount.input).focus()
+      return
+    }
+    const restore = C.setBusy(submit, 'Memposting…')
     try {
-      const { error } = await cloud.database.from('ledger_entries').insert({
-        completion_id: Number(compEl.value),
-        amount: Number(amountEl.value),
-        category: catEl.value,
+      const { error } = await getCloud().database.from('ledger_entries').insert({
+        completion_id: Number(c.id),
+        amount: Math.round(amt),
+        category: category.input.value,
         status: 'posted',
         posted_at: new Date().toISOString(),
       })
       if (error) throw new Error(error.message)
-      msg.className = 'form-message success'
-      msg.textContent = '\u2705 Jurnal berhasil diposting.'
-      msg.style.display = 'block'
-      amountEl.value = ''
-      catEl.value = ''
-      showToast('Jurnal berhasil diposting!', 'success')
-      await loadList()
+      const catText = categoryLabel(category.input.value)
+      msg.show('ok', `${catText} ${C.rupiah(amt)} untuk ${customerLabel(flow.requestOfCompletion(c))} diposting.`)
+      amount.input.value = ''
+      category.input.value = ''
+      showToast('Jurnal diposting.', 'success')
+      notifyDataChanged()
+      await loadList({ keepMessage: true })
     } catch (err) {
-      msg.className = 'form-message error'
-      msg.textContent = err.message
-      msg.style.display = 'block'
+      msg.show('danger', `Gagal memposting: ${err.message}`)
+    } finally {
+      restore()
     }
   })
 
-  async function loadList() {
-    const el = container.querySelector('#ledger-list')
-    if (!el) return
-    el.innerHTML = ''
-    el.appendChild(Components.skeleton({ type: 'text', lines: 4 }))
-
+  async function loadList({ keepMessage = false } = {}) {
     try {
-      const { data, error } = await cloud.database.from('ledger_entries')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
-      if (!data || data.length === 0) {
-        el.innerHTML = '<p style="color:var(--text-muted)">Belum ada jurnal.</p>'
-        return
-      }
-      el.innerHTML = ''
-      let totalPendapatan = 0
-      let totalBiaya = 0
-
-      data.forEach(l => {
-        if (l.category === 'pendapatan') totalPendapatan += Number(l.amount)
-        else totalBiaya += Number(l.amount)
-      })
-      const laba = totalPendapatan - totalBiaya
-
-      // Stats grid
-      const statsGrid = Components.el('div', { className: 'stats-grid' },
-        Components.statCard({
-          label: 'Total Pendapatan',
-          value: `Rp${totalPendapatan.toLocaleString('id-ID')}`,
-          variant: 'olive',
-        }),
-        Components.statCard({
-          label: 'Total Biaya',
-          value: `Rp${totalBiaya.toLocaleString('id-ID')}`,
-          variant: 'terracotta',
-        }),
-        Components.statCard({
-          label: 'Laba / Rugi',
-          value: `Rp${laba.toLocaleString('id-ID')}`,
-          variant: 'orange',
-          delta: laba >= 0 ? '\ud83d\udcc8 Profit' : '\ud83d\udcc9 Loss',
-          deltaType: laba >= 0 ? 'positive' : 'negative',
-        })
-      )
-      el.appendChild(statsGrid)
-      animateEntrance(statsGrid)
-
-      // Ledger items
-      data.forEach((l, i) => {
-        const isIncome = l.category === 'pendapatan'
-        const card = Components.el('div', { className: 'card', style: 'margin-bottom:10px;' },
-          Components.el('div', { style: 'display:flex;justify-content:space-between;align-items:center;' },
-            Components.el('div', {},
-              Components.el('strong', { style: 'font-size:1.1rem;' }, `Rp${Number(l.amount).toLocaleString('id-ID')}`),
-              Components.el('span', { style: 'color:var(--text-muted);font-size:0.85rem;display:block;margin-top:4px;' },
-                `${l.category} \u2022 ${new Date(l.posted_at).toLocaleString('id-ID')}`
-              )
-            ),
-            Components.badge(isIncome ? 'PENDAPATAN' : 'BIAYA', isIncome ? 'approved' : 'rejected')
-          )
-        )
-        animateEntrance(card, 100 + i * 50)
-        el.appendChild(card)
-      })
+      flow = await loadFlow()
     } catch (err) {
-      el.innerHTML = `<p style="color:var(--danger)">Gagal memuat: ${err.message}</p>`
+      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      return
     }
+    if (ctx.signal?.aborted) return
+    const saved = keepMessage && !msg.hidden ? { cls: msg.className, nodes: Array.from(msg.childNodes) } : null
+    fillCompletions()
+    if (saved) { msg.className = saved.cls; msg.replaceChildren(...saved.nodes); msg.hidden = false }
+
+    const t = totals(flow.ledger)
+    summary.replaceChildren(
+      C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue) }),
+      C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost) }),
+      C.kpi({ label: t.profit >= 0 ? 'Laba' : 'Rugi', iconName: 'sprout', value: C.rupiah(t.profit), sub: t.revenue > 0 ? `Margin ${((t.profit / t.revenue) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : 'Margin —', tone: t.revenue > 0 ? (t.profit >= 0 ? 'ok' : 'danger') : null }),
+    )
+    listPanel.querySelector('.panel-meta').textContent = `${flow.ledger.length} jurnal`
+
+    if (!flow.ledger.length) {
+      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Buku besar masih kosong.', body: 'Jurnal pertama akan muncul di sini beserta saldo berjalan.' }))
+      return
+    }
+    // Running balance, oldest first; displayed newest first.
+    const asc = [...flow.ledger].sort((a, b) => (C.toDate(ledgerDate(a)) || 0) - (C.toDate(ledgerDate(b)) || 0) || (Number(a.id) - Number(b.id)))
+    let bal = 0
+    const balance = new Map()
+    for (const l of asc) {
+      bal += isRevenue(l) ? Number(l.amount) || 0 : -(Number(l.amount) || 0)
+      balance.set(l, bal)
+    }
+    const rows = asc.reverse()
+    listBody.replaceChildren(C.dataTable({
+      caption: 'Buku besar',
+      rows,
+      columns: [
+        { label: 'Tanggal', className: 'col-date', render: (l) => el('time', { className: 'tnum', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
+        { label: 'Keterangan', render: (l) => C.cellStack(customerLabel(flow.requestOfLedger(l)), categoryLabel(l.category)) },
+        { label: 'Masuk', align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, `+${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
+        { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, `−${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
+        { label: 'Saldo', align: 'right', render: (l) => { const b = balance.get(l); return el('span', { className: `tnum strong ${b < 0 ? 'amt-neg' : ''}` }, C.rupiah(b)) } },
+      ],
+    }))
   }
 
   await loadList()
