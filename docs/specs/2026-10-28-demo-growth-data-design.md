@@ -13,7 +13,7 @@ Rancangan data demo yang mensimulasikan pertumbuhan 9 usaha jasa di Indonesia se
 | Item | Nilai |
 |------|-------|
 | Generator | `scripts/seed-demo.mjs` (Node ESM, tanpa dependency, PRNG ber-seed, deterministik) |
-| Output | `seeds/demo.sql` (±10,6 MB, 415 `INSERT`), `seeds/demo-summary.json` |
+| Output | Penuh: `seeds/demo.sql` (±10,6 MB, 415 `INSERT`), `seeds/demo-summary.json`. Lean: `seeds/demo-lean.part{1..3}of3.sql`, `seeds/demo-lean-summary.json` (§7.1). |
 | Jendela data | 12 bulan, bulan terakhir = bulan `--end` (default Oktober 2026) |
 | Batas "hari ini" (as-of) | Default `2026-10-28 17:00 WIB`. Tidak ada baris yang lebih baru dari as-of. |
 | Volume | 9 akun, ±39.200 baris (requests 5.582 · offers 5.493 · assignments 4.900 · completions 4.792 · ledger 18.316 · reports 99) |
@@ -251,6 +251,29 @@ npx wrangler d1 execute satu-alur-db --local --file seeds/demo.sql
 # 3) Produksi: hanya oleh lead, dengan --remote
 ```
 
+### 7.1 Anggaran tulis D1 (`--lean`, `--split`, `--only`)
+
+D1 Free membatasi 100.000 *rows written* per hari, termasuk entri indeks, untuk insert maupun delete. Setelah migrasi 0004, satu baris domain = 2 writes dan satu `users` = 3 writes. Skrip membaca indeks dari `migrations/`, mencetak estimasi tiap usaha (insert + hapus data lama), dan memberi peringatan keras bila total > 90.000. Data lama dibaca dari `--existing-counts` (output `wrangler --json`, `demo-summary.json` lama, atau objek per akun). Bila tidak ada, skrip mengasumsikan seed penuh sebelumnya.
+
+| Mode | Baris | Writes (DB kosong) | Writes (mengganti seed penuh) |
+|------|-------|--------------------|-------------------------------|
+| Penuh | 39.182 | 78.400 | 156.764 |
+| `--lean` | 17.504 | 35.044 | 113.408 → `--split 3` = 3 × ±38 ribu |
+
+Perubahan pada mode lean:
+
+| Aspek | Penuh | Lean |
+|-------|-------|------|
+| Jurnal per pekerjaan | 2–5 baris | 2 baris: pendapatan + 1 biaya gabungan (kategori = komponen terbesar) |
+| Overhead | 4–7 baris/bulan | 1 baris/bulan; total biaya bulanan tetap sama |
+| Laundry walk-in | Rekap harian per outlet | Rekap mingguan per outlet |
+| Enterprise | Work order satuan | Work order kecil ditagih sebagai "Rekap work order bulanan" per klien; proyek ×1,8 lebih besar dan ×0,5 lebih jarang; kontrak ×1,6 lebih besar |
+| Job per bulan | Enterprise 29–107 | Enterprise 6–34 |
+
+Untuk 5 usaha yang katalognya tidak diubah lean (ac, cleaning, listrik, pest, dinding), pendapatan dan biaya bulanan **identik** dengan mode penuh. Seluruh band tetap lolos dan sudah dihitung ulang dengan SQL di lokal.
+
+`--split N` membagi usaha (utuh) ke N file. Tiap file menghapus dan mengisi ulang hanya akun-akunnya sendiri. Terapkan satu file per hari UTC; resep lengkapnya di [seeds/README.md](../../seeds/README.md#free-tier-lean--split).
+
 Skrip mengembalikan exit code 2 bila ada usaha di luar band. Untuk demo di tanggal lain, buat ulang dengan `--end` dan `--asof` yang sesuai. Contoh: `--end 2026-11-30 --asof 2026-11-20`. Tanpa itu, KPI "7 hari terakhir" kosong karena data berhenti di as-of. Detail keamanan re-run, akun yang sudah pernah login, dan efek `AUTOINCREMENT` ada di [seeds/README.md](../../seeds/README.md).
 
 ## 8. Verifikasi (lokal, 2026-10-28)
@@ -269,7 +292,7 @@ Skrip mengembalikan exit code 2 bila ada usaha di luar band. Untuk demo di tangg
 
 ## 9. Batasan dan catatan
 
-1. **Batas 1.000 baris per tabel di aplikasi.** `loadFlow()` memanggil `select` tanpa paginasi, dan worker membatasi `MAX_LIMIT = 1000`. 8 dari 9 akun punya lebih dari 1.000 jurnal. Akibatnya:
+1. **[Sudah diperbaiki di aplikasi dengan keyset paging, 5.000 baris/halaman.]** Batas 1.000 baris per tabel. Sebelumnya `loadFlow()` memanggil `select` tanpa paginasi, dan worker membatasi `MAX_LIMIT = 1000`. 8 dari 9 akun punya lebih dari 1.000 jurnal. Akibatnya:
    - KPI total di Ringkasan hanya mencakup ±1.000 jurnal terbaru.
    - Penyelesaian lama tampil sebagai "Posting jurnal" di "Perlu tindakan", karena jurnalnya tidak ikut termuat.
 

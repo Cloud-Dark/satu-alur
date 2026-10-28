@@ -9,7 +9,13 @@
  *
  *   node scripts/seed-demo.mjs [--months 12] [--end 2026-10-31]
  *        [--asof 2026-10-28T17:00:00+07:00 | --asof now] [--seed 20261028]
- *        [--out seeds/demo.sql] [--summary seeds/demo-summary.json] [--only ac,fm] [--quiet]
+ *        [--out seeds/demo.sql] [--summary seeds/demo-summary.json] [--only demo-ac,demo-rs] [--quiet]
+ *        [--lean] [--split N] [--existing-counts seeds/existing.json] [--budget 90000] [--per-file 45000]
+ *
+ * --lean    : hemat tulis D1 (≤ ±18 rb baris): biaya per job digabung jadi 1 baris, overhead 1 baris/bulan,
+ *             rekap kiloan mingguan, work order enterprise direkap bulanan, kontrak lebih besar.
+ * --split N : bagi usaha (utuh) ke N file SQL (target ≤ --per-file writes per file) untuk diterapkan per hari.
+ * Setiap run mencetak estimasi D1 "rows written" (insert + hapus data lama) dan memperingatkan bila > --budget.
  *
  * Asumsi, rumus, dan kalender musiman: docs/specs/2026-10-28-demo-growth-data-design.md
  * Tanpa dependency (Node >= 18, ESM).

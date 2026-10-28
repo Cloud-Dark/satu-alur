@@ -126,7 +126,7 @@ Ditemukan saat menerapkan data demo. Perlu ditangani pemilik `src/`/`worker/`.
 
 | # | Masalah | Dampak pada saran AI | Usulan |
 |---|---------|----------------------|--------|
-| A1 | `loadFlow()` tidak berpaginasi; worker `MAX_LIMIT = 1000` | Ringkasan dan "Semua" hanya mencakup ±1.000 baris terbaru per tabel. Penyelesaian lama tampil "belum dibukukan" (demo-fm: 339 di UI vs 3 di DB). AI yang membaca data UI akan salah. | Paginasi `range()` di `fetchTable`, atau endpoint agregat bulanan di server. |
+| A1 | **Sudah diperbaiki (keyset paging).** Sebelumnya `loadFlow()` tidak berpaginasi; worker `MAX_LIMIT = 1000` | Ringkasan dan "Semua" hanya mencakup ±1.000 baris terbaru per tabel. Penyelesaian lama tampil "belum dibukukan" (demo-fm: 339 di UI vs 3 di DB). AI yang membaca data UI akan salah. | Paginasi `range()` di `fetchTable`, atau endpoint agregat bulanan di server. |
 | A2 | `draftOffers()` menganggap `rejected` sebagai draf | Antrean "Perlu tindakan" dan badge Penawaran membengkak (demo-fm 112). Konversi salah dibaca. | Kecualikan `rejected`; tambah layar setujui/tolak (FR-012). |
 | A3 | Laporan membandingkan hanya dengan 1 periode | Tren 1–2% tidak terlihat. | Kirim 12 bulan terakhir + indeks musiman ke prompt penjelasan/penasihat. |
 | A4 | "Pelanggan teratas" dikelompokkan per permintaan | Pelanggan berulang dan kontrak terpecah. | Kelompokkan per pelanggan (M1). |
