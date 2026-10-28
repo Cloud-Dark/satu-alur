@@ -67,11 +67,11 @@ export function createParticleBackground(container) {
 
 export function animateEntrance(element, delay = 0) {
   element.style.opacity = '0'
-  element.style.transform = 'translateY(12px) scale(0.99)'
-  element.style.transition = 'opacity 0.4s ease, transform 0.4s ease'
+  element.style.transform = 'translateY(10px)'
+  element.style.transition = 'opacity 0.5s cubic-bezier(0.16,1,0.3,1), transform 0.5s cubic-bezier(0.16,1,0.3,1)'
   setTimeout(() => {
     element.style.opacity = '1'
-    element.style.transform = 'translateY(0) scale(1)'
+    element.style.transform = 'none'
   }, delay)
 }
 
@@ -79,24 +79,30 @@ export function pulseEffect(element) {
   element.style.animation = 'pulse-glow 2s infinite'
 }
 
-export function showToast(message, type = 'info', duration = 3000) {
+export function showToast(message, type = 'info', duration = 3200) {
   if (!message || message.length < 3) {
     console.warn('[AntiSlop] Toast message terlalu pendek:', message)
     return
   }
 
-  const toast = document.createElement('div')
-  toast.className = `toast toast-${type}`
-  toast.textContent = message
-  document.body.appendChild(toast)
+  let stack = document.querySelector('.toast-stack')
+  if (!stack) {
+    stack = document.createElement('div')
+    stack.className = 'toast-stack'
+    stack.setAttribute('role', 'status')
+    stack.setAttribute('aria-live', 'polite')
+    document.body.appendChild(stack)
+  }
 
-  requestAnimationFrame(() => {
-    toast.classList.add('show')
-  })
+  const toast = document.createElement('div')
+  toast.className = `toast ${type}`
+  toast.textContent = message
+  stack.appendChild(toast)
 
   setTimeout(() => {
-    toast.classList.remove('show')
-    setTimeout(() => toast.remove(), 300)
+    toast.classList.add('leaving')
+    toast.addEventListener('animationend', () => toast.remove(), { once: true })
+    setTimeout(() => toast.remove(), 600)
   }, duration)
 }
 

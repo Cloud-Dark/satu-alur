@@ -32,5 +32,8 @@
     "business-automation",
     "satu-alur",
     "cloudflare"
-  ]
+  ],
+  "dependencies": {
+    "three": "^0.170.0"
+  }
 }
