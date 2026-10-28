@@ -6,6 +6,7 @@ import { logoLink } from './brand.js'
 import { themeToggleButton } from './theme.js'
 import { icon } from './icons.js'
 import { el, button } from './components.js'
+import { animateView } from './animations.js'
 import { isUsingMockCloud } from '../cloud.js'
 import { loadFlow } from '../stages/data.js'
 
@@ -20,7 +21,7 @@ import * as StageSettings from '../stages/settings.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
-    action: { label: 'Permintaan baru', icon: 'plus', to: 'request', signal: true } },
+    action: { label: 'Permintaan baru', icon: 'plus', to: 'request', primary: true } },
   { key: 'request', num: '01', label: 'Permintaan', icon: 'inbox', module: StageRequest,
     action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
   { key: 'offer', num: '02', label: 'Penawaran', icon: 'sparkles', module: StageOffer,
@@ -73,17 +74,21 @@ export function renderShell(root, ctx) {
   const navCounts = new Map()
 
   const navItem = (s) => {
-    const count = el('span', { className: 'flow-count mono tnum', hidden: true })
+    const count = el('span', { className: 'flow-count tnum', hidden: true })
+    const isStage = s.key !== 'dashboard'
     const b = el('button', {
       type: 'button',
-      className: 'flow-item',
+      className: `flow-item ${isStage ? 'is-stage' : ''}`.trim(),
       dataset: { stage: s.key },
-      title: `${s.num} ${s.label}`,
+      title: isStage ? `Tahap ${s.num} · ${s.label}` : s.label,
     },
-      el('span', { className: 'flow-num mono' }, s.num),
-      el('span', { className: 'flow-ico' }, icon(s.icon)),
-      el('span', { className: 'flow-label' }, s.label),
+      el('span', { className: 'flow-node', 'aria-hidden': 'true' }, icon(s.icon, { size: 16 })),
+      el('span', { className: 'flow-label' },
+        el('span', { className: 'flow-name' }, s.label),
+        isStage ? el('span', { className: 'flow-step tnum' }, `Tahap ${s.num}`) : null,
+      ),
       count,
+      el('span', { className: 'flow-dot', 'aria-hidden': 'true' }),
     )
     b.addEventListener('click', () => show(s.key, {}, { focus: true }))
     navButtons.set(s.key, b)
@@ -99,8 +104,8 @@ export function renderShell(root, ctx) {
   }, icon('x'))
 
   const modeBadge = el('div', { className: `mode-badge ${isMock ? 'is-demo' : 'is-live'}` },
-    el('span', { className: 'mode-dot' }),
-    el('span', { className: 'mode-text mono' }, isMock ? 'Mode Demo' : 'Cloudflare D1'),
+    el('span', { className: 'pulse-dot mode-dot', 'aria-hidden': 'true' }),
+    el('span', { className: 'mode-text' }, isMock ? 'Mode demo · data lokal' : 'Terhubung · Cloudflare D1'),
   )
   modeBadge.title = isMock ? 'Data tersimpan lokal di browser ini' : 'Terhubung ke Cloudflare Worker + D1'
 
@@ -117,20 +122,19 @@ export function renderShell(root, ctx) {
   const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': 'Navigasi alur' },
     el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
     el('nav', { className: 'side-nav', 'aria-label': 'Tahap alur' },
-      el('div', { className: 'side-label' },
-        el('span', { className: 'mono' }, 'ALUR'),
-        el('span', { className: 'side-label-rule' }),
-      ),
       el('ol', { className: 'flow-list flow-list-top' }, navItem(dash)),
-      el('div', { className: 'side-sub mono' }, 'Tahap 01–06'),
+      el('div', { className: 'side-label' }, el('span', {}, 'Alur kerja'), el('span', { className: 'side-label-count tnum' }, '6 tahap')),
       el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
     ),
     el('div', { className: 'side-foot' },
       settingsBtn,
       modeBadge,
       el('div', { className: 'side-user' },
-        el('span', { className: 'avatar avatar-sm mono', 'aria-hidden': 'true' }, initials(user)),
-        el('span', { className: 'side-user-email', title: user.email || '' }, user.email || user.name || 'Pengguna'),
+        el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials(user)),
+        el('span', { className: 'side-user-text' },
+          el('span', { className: 'side-user-name' }, (user.name && user.name.trim()) || 'Pengguna'),
+          el('span', { className: 'side-user-email', title: user.email || '' }, user.email || ''),
+        ),
         signOutBtn,
       ),
     ),
@@ -143,14 +147,14 @@ export function renderShell(root, ctx) {
   const menuBtn = el('button', {
     type: 'button', className: 'icon-btn topbar-menu', 'aria-label': 'Buka menu', 'aria-controls': 'app-sidebar', 'aria-expanded': 'false',
   }, icon('menu'))
-  const crumbNum = el('span', { className: 'crumb-kicker mono' })
+  const crumbNum = el('span', { className: 'crumb-pre' })
   const crumbTitle = el('span', { className: 'crumb-title' })
   const actionSlot = el('div', { className: 'topbar-action' })
-  const avatar = el('span', { className: 'avatar mono', title: user.email || '', 'aria-label': `Masuk sebagai ${user.email || 'pengguna'}` }, initials(user))
+  const avatar = el('span', { className: 'avatar', role: 'img', title: user.email || '', 'aria-label': `Masuk sebagai ${user.email || 'pengguna'}` }, initials(user))
 
   const topbar = el('header', { className: 'topbar' },
     menuBtn,
-    el('div', { className: 'crumb' }, crumbNum, crumbTitle),
+    el('div', { className: 'crumb' }, crumbNum, el('span', { className: 'crumb-sep', 'aria-hidden': 'true' }, icon('chevronRight', { size: 14 })), crumbTitle),
     el('div', { className: 'topbar-right' }, themeToggleButton(), actionSlot, avatar),
   )
 
@@ -165,15 +169,15 @@ export function renderShell(root, ctx) {
   },
     el('div', { className: 'drawer-head' },
       el('div', {},
-        el('span', { className: 'kicker no-rule' }, 'Konfigurasi'),
-        el('h2', { id: 'drawer-title', className: 'drawer-title' }, 'Pengaturan'),
+        el('span', { className: 'drawer-pre' }, 'Konfigurasi ruang kerja'),
+        el('h2', { id: 'drawer-title', className: 'drawer-title display' }, 'Peng', el('em', {}, 'aturan')),
       ),
       drawerClose,
     ),
     drawerBody,
     el('div', { className: 'drawer-foot' },
       el('span', { className: 'drawer-foot-note' }, icon('save', { size: 14 }), 'Perubahan tersimpan otomatis di browser ini.'),
-      button({ label: 'Selesai', variant: 'ink', size: 'sm', onClick: () => closeSettings() }),
+      button({ label: 'Selesai', variant: 'primary', size: 'sm', onClick: () => closeSettings() }),
     ),
   )
   const drawerScrim = el('div', { className: 'scrim scrim-drawer', hidden: true })
@@ -308,12 +312,12 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    crumbNum.textContent = `ALUR / ${stage.num}`
+    crumbNum.textContent = stage.key === 'dashboard' ? 'Satu Alur' : `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
     const a = stage.action
     const b = button({
       label: a.label, icon: a.icon, iconRight: a.iconRight, size: 'sm',
-      variant: a.signal ? 'signal' : '', className: 'topbar-cta',
+      variant: a.primary ? 'primary' : 'soft', className: 'topbar-cta',
       onClick: () => show(a.to, {}, { focus: true }),
     })
     b.setAttribute('aria-label', a.label)
@@ -351,7 +355,9 @@ export function renderShell(root, ctx) {
       openSettings,
     }
     try {
-      await stage.module.render(view, stageCtx)
+      const done = stage.module.render(view, stageCtx)
+      animateView(view)
+      await done
     } catch (err) {
       if (signal.aborted) return
       console.error(err)

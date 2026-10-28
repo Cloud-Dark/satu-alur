@@ -1,83 +1,113 @@
 /**
- * "Living UI" terminal mock: streams a sample AI offer line by line, then
- * loops. Purely a demo — runs only while on screen; reduced motion renders
- * every line statically. Returns a cleanup function.
+ * Living AI demo for the landing page: a calm chat-style card in which the
+ * offer agent "streams" a sample proposal, validates it and hands it back
+ * for approval — then loops. Purely illustrative.
+ *
+ * The full layout is built up front (with invisible placeholders) so the card
+ * never changes height while it streams. Runs only while on screen and the
+ * tab is visible; reduced motion shows the finished state statically.
+ *
+ * mountAgentDemo(body, demo) -> cleanup
  */
 import { prefersReducedMotion } from '../ui/reveal.js'
+import { iconHTML } from '../ui/icons.js'
 
-const PREFIX = { cmd: '$', dim: '›', code: ' ', ok: '', done: '→' }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
-function lineEl(line) {
-  const row = document.createElement('div')
-  row.className = `lp-term-line is-${line.t}`
-  if (line.t === 'ok') {
-    const tag = document.createElement('span')
-    tag.className = 'lp-term-ok'
-    tag.textContent = 'OK'
-    row.append(tag)
-  } else {
-    const p = document.createElement('span')
-    p.className = 'lp-term-prefix'
-    p.textContent = PREFIX[line.t] ?? ''
-    row.append(p)
-  }
-  const text = document.createElement('span')
-  text.className = 'lp-term-text'
-  row.append(text)
-  return { row, text }
+function build(body, demo) {
+  body.innerHTML = `
+    <div class="lp-chat-msg lp-chat-user" data-step>
+      <span class="lp-chat-who">Permintaan masuk</span>
+      <p class="lp-chat-bubble">${esc(demo.request)}</p>
+    </div>
+    <div class="lp-chat-msg lp-chat-ai" data-step>
+      <span class="lp-chat-who"><span class="lp-chat-avatar">${iconHTML('sparkles', { size: 14, stroke: 2 })}</span>Agen penawaran</span>
+      <div class="lp-chat-card">
+        <span class="lp-chat-typing" data-typing aria-hidden="true"><i></i><i></i><i></i></span>
+        <dl class="lp-offer">
+          ${demo.fields.map((f) => `
+            <div class="lp-offer-row${f.key === 'price' ? ' is-price' : ''}" data-step>
+              <dt>${esc(f.label)}</dt>
+              <dd><span class="lp-type"><span class="lp-type-ghost">${esc(f.value)}</span><span class="lp-type-live" data-type="${esc(f.value)}"></span></span></dd>
+            </div>`).join('')}
+        </dl>
+        <ul class="lp-checks">
+          ${demo.checks.map((c) => `<li data-step><span class="lp-check-ic">${iconHTML('check', { size: 12, stroke: 3 })}</span>${esc(c)}</li>`).join('')}
+        </ul>
+        <div class="lp-chat-status" data-step>
+          <span class="lp-chat-status-dot" aria-hidden="true"></span>${esc(demo.status)}
+          <span class="lp-chat-actions" aria-hidden="true"><span>Ubah</span><span class="is-primary">Setujui</span></span>
+        </div>
+      </div>
+    </div>`
 }
 
-export function mountTerminal(body, lines) {
-  if (!body) return () => {}
+export function mountAgentDemo(body, demo) {
+  if (!body || !demo) return () => {}
+  build(body, demo)
+
+  const steps = [...body.querySelectorAll('[data-step]')]
+  const typing = body.querySelector('[data-typing]')
+  const showAll = () => {
+    steps.forEach((s) => s.classList.add('is-shown'))
+    body.querySelectorAll('[data-type]').forEach((el) => { el.textContent = el.dataset.type })
+    body.classList.add('is-done')
+  }
 
   if (prefersReducedMotion()) {
-    lines.forEach((l) => {
-      const { row, text } = lineEl(l)
-      text.textContent = l.s
-      body.append(row)
-    })
+    showAll()
     return () => {}
   }
 
   let timer = 0
   let running = false
   let visible = false
-  let li = 0
-  let ci = 0
-  let current = null
-  const caret = document.createElement('span')
-  caret.className = 'lp-term-caret'
+  // Start on the finished proposal (never an empty card), hold, then replay.
+  showAll()
+  let queue = [
+    () => 2400,
+    () => { body.classList.add('is-fading'); return 420 },
+    () => { body.classList.remove('is-fading'); reset(); return 300 },
+  ]
 
-  const schedule = (fn, ms) => { timer = window.setTimeout(fn, ms) }
+  function reset() {
+    steps.forEach((s) => s.classList.remove('is-shown'))
+    body.querySelectorAll('[data-type]').forEach((el) => { el.textContent = '' })
+    typing.classList.remove('is-on')
+    body.classList.remove('is-done')
+  }
+
+  // A tiny script of timed actions; each returns the delay before the next.
+  function script() {
+    const q = []
+    steps.forEach((el) => {
+      const live = el.querySelector('[data-type]')
+      if (el.classList.contains('lp-chat-ai')) {
+        q.push(() => { el.classList.add('is-shown'); typing.classList.add('is-on'); return 1100 })
+        q.push(() => { typing.classList.remove('is-on'); return 120 })
+        return
+      }
+      q.push(() => { el.classList.add('is-shown'); return live ? 160 : el.classList.contains('lp-chat-user') ? 900 : 420 })
+      if (live) {
+        const text = live.dataset.type
+        for (let i = 1; i <= text.length; i += 2) {
+          q.push(() => { live.textContent = text.slice(0, i); return 22 })
+        }
+        q.push(() => { live.textContent = text; return 260 })
+      }
+    })
+    q.push(() => { body.classList.add('is-done'); return 4200 })
+    q.push(() => { body.classList.add('is-fading'); return 420 })
+    q.push(() => { body.classList.remove('is-fading'); reset(); return 500 })
+    return q
+  }
 
   function step() {
     if (!visible || document.hidden) { running = false; return }
     running = true
-    if (li >= lines.length) {
-      schedule(() => {
-        body.replaceChildren()
-        li = 0; ci = 0; current = null
-        step()
-      }, 3600)
-      return
-    }
-    const line = lines[li]
-    if (!current) {
-      current = lineEl(line)
-      body.append(current.row)
-      current.text.after(caret)
-    }
-    const typed = line.t === 'cmd' || line.t === 'code'
-    if (typed && ci < line.s.length) {
-      ci = Math.min(line.s.length, ci + (line.t === 'code' ? 2 : 1))
-      current.text.textContent = line.s.slice(0, ci)
-      schedule(step, line.t === 'cmd' ? 42 : 14)
-      return
-    }
-    current.text.textContent = line.s
-    li += 1; ci = 0; current = null
-    const pause = line.t === 'cmd' ? 520 : line.t === 'dim' ? 380 : line.t === 'ok' ? 300 : 70
-    schedule(step, pause)
+    if (!queue.length) queue = script()
+    const delay = queue.shift()()
+    timer = window.setTimeout(step, delay)
   }
 
   const resume = () => {
@@ -85,8 +115,9 @@ export function mountTerminal(body, lines) {
   }
   const io = new IntersectionObserver(([e]) => {
     visible = e.isIntersecting
+    if (!visible) { window.clearTimeout(timer); running = false }
     resume()
-  }, { threshold: 0.2 })
+  }, { threshold: 0.25 })
   io.observe(body)
   document.addEventListener('visibilitychange', resume)
 

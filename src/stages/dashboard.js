@@ -10,13 +10,14 @@ const { el, icon } = C
 const DAY = 86400000
 
 const STEPS = [
-  { key: 'request', num: '01', label: 'Permintaan', desc: 'Catat kebutuhan pelanggan.' },
-  { key: 'offer', num: '02', label: 'Penawaran', desc: 'AI menyusun, aturan memvalidasi.' },
-  { key: 'assign', num: '03', label: 'Penugasan', desc: 'Jadwalkan tenaga pelaksana.' },
-  { key: 'complete', num: '04', label: 'Penyelesaian', desc: 'Catat hasil pekerjaan.' },
-  { key: 'bookkeeping', num: '05', label: 'Pembukuan', desc: 'Posting pendapatan dan biaya.' },
-  { key: 'report', num: '06', label: 'Laporan', desc: 'AI menjelaskan angka Anda.' },
+  { key: 'request', num: '01', label: 'Permintaan', icon: 'inbox', desc: 'Catat kebutuhan pelanggan.' },
+  { key: 'offer', num: '02', label: 'Penawaran', icon: 'sparkles', desc: 'AI menyusun, aturan memvalidasi.' },
+  { key: 'assign', num: '03', label: 'Penugasan', icon: 'users', desc: 'Jadwalkan tenaga pelaksana.' },
+  { key: 'complete', num: '04', label: 'Penyelesaian', icon: 'checkCircle', desc: 'Catat hasil pekerjaan.' },
+  { key: 'bookkeeping', num: '05', label: 'Pembukuan', icon: 'ledger', desc: 'Posting pendapatan dan biaya.' },
+  { key: 'report', num: '06', label: 'Laporan', icon: 'chart', desc: 'AI menjelaskan angka Anda.' },
 ]
+const STEP_ICON = Object.fromEntries(STEPS.map((st) => [st.num, st.icon]))
 
 function greeting(d = new Date()) {
   const h = d.getHours()
@@ -48,7 +49,7 @@ function deltaText(cur, prev) {
   if (prev > 0) {
     const pct = ((cur - prev) / prev) * 100
     const sign = pct > 0 ? '+' : pct < 0 ? '−' : '±'
-    return { pct, text: `${sign}${Math.abs(pct).toLocaleString('id-ID', { maximumFractionDigits: 1 })}% vs 7 hari sebelumnya` }
+    return { pct, value: `${sign}${Math.abs(pct).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, text: 'vs 7 hari sebelumnya' }
   }
   return null
 }
@@ -58,18 +59,20 @@ export async function render(container, ctx = {}) {
   const now = new Date()
 
   /* ---------------------------------------------------------- Header */
-  const syncLine = el('span', { className: 'live-line mono' },
-    el('span', { className: 'live-dot', 'aria-hidden': 'true' }),
+  const syncLine = el('span', { className: 'sync-line' },
+    el('span', { className: 'pulse-dot', 'aria-hidden': 'true' }),
     el('span', {}, `${ctx.isMock ? 'Mode demo · data lokal' : 'Cloudflare D1'} · memuat…`),
   )
   const refreshBtn = C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost' })
-  const head = el('header', { className: 'dash-head' },
-    el('div', { className: 'dash-head-text' },
-      el('span', { className: 'kicker' }, `00 — ${now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`),
-      el('h1', { className: 'page-title', tabindex: '-1' }, `${greeting(now)}${displayName(ctx.user) ? `, ${displayName(ctx.user)}` : ''}.`),
-      syncLine,
+  const name = displayName(ctx.user)
+  const head = el('header', { className: 'page-head dash-head' },
+    el('div', { className: 'page-head-text' },
+      el('span', { className: 'date-pill' }, icon('calendar', { size: 14 }), now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
+      el('h1', { className: 'page-title display', tabindex: '-1' },
+        `${greeting(now)}${name ? ', ' : ''}`, name ? el('em', {}, name) : null, '.'),
+      el('p', { className: 'page-desc' }, 'Ringkasan alur kerja dan keuangan Anda, dihitung langsung dari data.'),
     ),
-    el('div', { className: 'dash-head-actions' }, refreshBtn),
+    el('div', { className: 'page-head-actions' }, syncLine, refreshBtn),
   )
 
   const body = el('div', { className: 'dash-body' })
@@ -77,10 +80,10 @@ export async function render(container, ctx = {}) {
   refreshBtn.addEventListener('click', () => render(container, ctx))
 
   body.replaceChildren(
-    el('div', { className: 'kpis is-loading' }, [0, 1, 2, 3].map(() => el('div', { className: 'kpi' }, C.skeleton({ lines: 2 })))),
+    el('div', { className: 'kpis is-loading' }, [0, 1, 2, 3].map((i) => el('div', { className: `kpi ${i === 0 ? 'is-hero' : ''}`.trim() }, C.skeleton({ lines: 2 })))),
     el('div', { className: 'dash-grid' },
-      C.panel({ title: 'Memuat alur', className: 'span-7' }, C.skeletonRows(5)),
-      C.panel({ title: 'Perlu tindakan', className: 'span-5' }, C.skeletonRows(4)),
+      C.panel({ title: 'Pendapatan vs biaya', className: 'span-8' }, C.skeletonRows(5)),
+      C.panel({ title: 'Alur kerja', className: 'span-4' }, C.skeletonRows(4)),
     ),
   )
 
@@ -103,18 +106,21 @@ export async function render(container, ctx = {}) {
   if (isEmpty) {
     sections.push(renderOnboarding(navigate))
   } else {
-    sections.push(renderPipeline(m, navigate))
     sections.push(el('div', { className: 'dash-grid' },
       renderChart(m, ctx),
-      renderActions(m, navigate),
+      renderPipeline(m, navigate),
     ))
     sections.push(el('div', { className: 'dash-grid' },
+      renderActions(m, navigate),
       renderActivity(m),
-      el('div', { className: 'span-5 dash-stack' }, renderStatusMix(m), renderComposition(m)),
+    ))
+    sections.push(el('div', { className: 'dash-grid' },
+      renderStatusMix(m),
+      renderComposition(m),
     ))
   }
   body.replaceChildren(...sections)
-  staggerChildren(body, { step: 60 })
+  staggerChildren(body, { step: 80 })
 }
 
 /* ================================================================ KPIs */
@@ -131,7 +137,13 @@ function renderKpis(m, now) {
       const up = d.pct > 0
       const good = invert ? !up : up
       const tone = d.pct === 0 ? null : good ? 'ok' : 'danger'
-      return { node: el('span', { className: 'delta' }, icon(up ? 'trendingUp' : d.pct < 0 ? 'trendingDown' : 'minus', { size: 14 }), d.text), tone }
+      return {
+        node: [
+          el('span', { className: 'delta' }, icon(up ? 'trendingUp' : d.pct < 0 ? 'trendingDown' : 'minus', { size: 14 }), el('span', { className: 'tnum' }, d.value)),
+          el('span', { className: 'delta-note' }, d.text),
+        ],
+        tone,
+      }
     }
     if (cur[key] > 0) return { node: `${C.rupiahCompact(cur[key])} dalam 7 hari terakhir`, tone: null }
     if (!m.ledger.length) return { node: 'Belum ada jurnal', tone: null }
@@ -145,18 +157,26 @@ function renderKpis(m, now) {
   const doneAssign = m.assignments.filter((a) => a.status === 'done' || m.completionsOf(a.id).length > 0).length
   const rate = m.assignments.length ? Math.round((doneAssign / m.assignments.length) * 100) : null
 
+  const pct = (n) => `${Math.round(n)}%`
   return el('div', { className: 'kpis', role: 'group', 'aria-label': 'Indikator utama' },
-    C.kpi({ label: 'Pendapatan', value: C.rupiah(all.revenue), delta: rev.node, tone: rev.tone }),
-    C.kpi({ label: 'Biaya', value: C.rupiah(all.cost), delta: cost.node, tone: cost.tone }),
     C.kpi({
       label: 'Laba bersih',
+      hero: true,
+      iconName: 'sprout',
       value: C.rupiah(all.profit),
+      countTo: all.profit,
+      format: C.rupiah,
       sub: margin == null ? 'Margin — (belum ada pendapatan)' : `Margin ${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`,
       tone: margin == null ? null : all.profit >= 0 ? 'ok' : 'danger',
     }),
+    C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(all.revenue), countTo: all.revenue, format: C.rupiah, delta: rev.node, tone: rev.tone }),
+    C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(all.cost), countTo: all.cost, format: C.rupiah, delta: cost.node, tone: cost.tone }),
     C.kpi({
       label: 'Tingkat penyelesaian',
+      iconName: 'checkCircle',
       value: rate == null ? '—' : `${rate}%`,
+      countTo: rate == null ? undefined : rate,
+      format: pct,
       sub: m.assignments.length ? `${doneAssign} dari ${m.assignments.length} penugasan selesai` : 'Belum ada penugasan',
     }),
   )
@@ -180,24 +200,26 @@ function renderPipeline(m, navigate) {
     { ...STEPS[5], count: months.size, sub: months.size === 1 ? 'periode bulanan' : 'periode bulanan', reach: reached(['booked']), unit: 'periode' },
   ]
 
-  const list = el('ol', { className: 'pipeline' }, cells.map((c) => {
+  const list = el('ol', { className: 'funnel' }, cells.map((c, i) => {
     const pct = reqTotal ? Math.round((c.reach / reqTotal) * 100) : 0
-    const b = el('button', { type: 'button', className: 'pipe-cell', 'aria-label': `${c.num} ${c.label}: ${c.count}. ${pct}% permintaan mencapai tahap ini. Buka tahap.` },
-      el('span', { className: 'pipe-top' },
-        el('span', { className: 'pipe-num mono' }, c.num),
-        el('span', { className: 'pipe-label' }, c.label),
-        icon('arrowUpRight', { size: 14, className: 'pipe-go' }),
+    const b = el('button', { type: 'button', className: 'funnel-row', 'aria-label': `${c.num} ${c.label}: ${c.count}. ${pct}% permintaan mencapai tahap ini. Buka tahap.` },
+      el('span', { className: 'funnel-top' },
+        el('span', { className: 'funnel-num tnum' }, c.num),
+        el('span', { className: 'funnel-label' }, c.label),
+        el('span', { className: 'funnel-count tnum' }, C.number(c.count)),
       ),
-      el('span', { className: 'pipe-count tnum' }, C.number(c.count)),
-      el('span', { className: 'pipe-sub' }, c.sub),
-      el('span', { className: 'pipe-bar', 'aria-hidden': 'true' }, el('span', { className: 'pipe-fill', style: `width:${pct}%` })),
-      el('span', { className: 'pipe-pct mono tnum' }, `${pct}% permintaan`),
+      el('span', { className: 'funnel-track', 'aria-hidden': 'true' },
+        el('span', { className: `funnel-fill f-${i + 1}`, style: `--w:${Math.max(pct, 2)}%` })),
+      el('span', { className: 'funnel-meta' },
+        el('span', {}, c.sub),
+        el('span', { className: 'funnel-pct tnum' }, `${pct}%`),
+      ),
     )
     b.addEventListener('click', () => navigate(c.key))
     return el('li', {}, b)
   }))
 
-  return C.panel({ title: 'Alur kerja', meta: `${reqTotal} permintaan · konversi per tahap`, className: 'pipeline-panel' }, list)
+  return C.panel({ title: 'Alur kerja', meta: `${reqTotal} permintaan · konversi per tahap`, className: 'span-4 funnel-panel' }, list)
 }
 
 /* =============================================================== Chart */
@@ -206,17 +228,18 @@ function renderChart(m, ctx) {
   let range = 30
   const wrap = el('div', { className: 'chart-wrap' })
   const summary = el('p', { className: 'chart-summary' })
-  const legend = el('div', { className: 'chart-legend mono' },
+  const legend = el('div', { className: 'chart-legend' },
     el('span', {}, el('i', { className: 'lg lg-rev' }), 'Pendapatan'),
     el('span', {}, el('i', { className: 'lg lg-cost' }), 'Biaya'),
+    el('span', { className: 'chart-legend-note' }, 'akumulasi harian'),
   )
   const seg = C.segmented({
     label: 'Rentang grafik',
     value: '30',
-    options: [{ value: '14', label: '14H' }, { value: '30', label: '30H' }],
+    options: [{ value: '14', label: '14 hari' }, { value: '30', label: '30 hari' }],
     onChange: (v) => { range = Number(v); draw() },
   })
-  const p = C.panel({ title: 'Pendapatan vs biaya', className: 'span-7 chart-panel', actions: seg }, legend, wrap, summary)
+  const p = C.panel({ title: 'Pendapatan vs biaya', className: 'span-8 chart-panel', actions: seg }, legend, wrap, summary)
 
   function series() {
     const end = startOfDay(Date.now())
@@ -234,6 +257,9 @@ function renderChart(m, ctx) {
       if (isRevenue(l)) days[i].rev += Number(l.amount) || 0
       else days[i].cost += Number(l.amount) || 0
     }
+    let cr = 0
+    let cc = 0
+    for (const d of days) { cr += d.rev; cc += d.cost; d.cumRev = cr; d.cumCost = cc }
     return days
   }
 
@@ -246,20 +272,24 @@ function renderChart(m, ctx) {
         kicker: `${range} hari terakhir`,
         title: 'Belum ada jurnal di rentang ini.',
         body: 'Posting pendapatan dan biaya di tahap Pembukuan agar grafik terisi.',
+        iconName: 'chart',
       }))
       summary.textContent = ''
       return
     }
     summary.textContent = `${range} hari terakhir: pendapatan ${C.rupiah(sumRev)}, biaya ${C.rupiah(sumCost)}, laba ${C.rupiah(sumRev - sumCost)}.`
     const width = Math.max(280, Math.round(wrap.clientWidth || 640))
-    wrap.replaceChildren(buildBarChart(days, width, summary.textContent))
+    const height = Math.max(272, Math.min(420, Math.round(wrap.clientHeight || 272)))
+    wrap.replaceChildren(buildAreaChart(days, width, height, summary.textContent))
   }
 
   // Draw once attached (needs width), then follow container resizes.
   let lastW = 0
+  let lastH = 0
   const ro = new ResizeObserver((entries) => {
     const w = Math.round(entries[0].contentRect.width)
-    if (w && Math.abs(w - lastW) > 8) { lastW = w; draw() }
+    const h = Math.round(entries[0].contentRect.height)
+    if (w && (Math.abs(w - lastW) > 8 || Math.abs(h - lastH) > 24)) { lastW = w; lastH = h; draw() }
   })
   ro.observe(wrap)
   ctx.signal?.addEventListener('abort', () => ro.disconnect())
@@ -285,22 +315,56 @@ function niceScale(v) {
   return { max: step * ticks, step, ticks }
 }
 
-function buildBarChart(days, width, label) {
-  const height = 268
-  const mg = { t: 12, r: 8, b: 30, l: 62 }
+/**
+ * Smooth path through points using monotone cubic interpolation
+ * (Fritsch–Carlson): no overshoot, so a cumulative series never dips.
+ */
+function smoothPath(pts) {
+  const n = pts.length
+  if (n < 2) return pts.length ? `M${pts[0][0]},${pts[0][1]}` : ''
+  const dx = []
+  const slope = []
+  for (let i = 0; i < n - 1; i++) {
+    dx.push(pts[i + 1][0] - pts[i][0])
+    slope.push((pts[i + 1][1] - pts[i][1]) / dx[i])
+  }
+  const t = [slope[0]]
+  for (let i = 1; i < n - 1; i++) t.push(slope[i - 1] * slope[i] <= 0 ? 0 : (slope[i - 1] + slope[i]) / 2)
+  t.push(slope[n - 2])
+  for (let i = 0; i < n - 1; i++) {
+    if (slope[i] === 0) { t[i] = 0; t[i + 1] = 0; continue }
+    const a = t[i] / slope[i]
+    const b = t[i + 1] / slope[i]
+    const h = a * a + b * b
+    if (h > 9) { const k = 3 / Math.sqrt(h); t[i] = k * a * slope[i]; t[i + 1] = k * b * slope[i] }
+  }
+  const f = (v) => Math.round(v * 10) / 10
+  let d = `M${f(pts[0][0])},${f(pts[0][1])}`
+  for (let i = 0; i < n - 1; i++) {
+    const h = dx[i] / 3
+    d += ` C${f(pts[i][0] + h)},${f(pts[i][1] + t[i] * h)} ${f(pts[i + 1][0] - h)},${f(pts[i + 1][1] - t[i + 1] * h)} ${f(pts[i + 1][0])},${f(pts[i + 1][1])}`
+  }
+  return d
+}
+
+let chartSeq = 0
+function buildAreaChart(days, width, height, label) {
+  const narrow = width < 480
+  const mg = { t: 16, r: narrow ? 10 : 16, b: 30, l: narrow ? 48 : 60 }
   const iw = width - mg.l - mg.r
   const ih = height - mg.t - mg.b
-  const scale = niceScale(Math.max(...days.map((d) => Math.max(d.rev, d.cost))))
+  const scale = niceScale(Math.max(...days.map((d) => Math.max(d.cumRev, d.cumCost))))
   const max = scale.max
   const y = (v) => mg.t + ih - (v / max) * ih
-  const gw = iw / days.length
-  const bw = Math.max(2, Math.min(14, (gw * 0.72) / 2))
+  const step = days.length > 1 ? iw / (days.length - 1) : iw
+  const x = (i) => mg.l + i * step
+  const gid = `chart-fill-${++chartSeq}`
 
   const svg = s('svg', { width, height, viewBox: `0 0 ${width} ${height}`, class: 'chart', role: 'img', 'aria-label': label })
   svg.appendChild(s('defs', {},
-    s('pattern', { id: 'hatch', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' },
-      s('rect', { width: 4, height: 4, class: 'hatch-bg' }),
-      s('line', { x1: 0, y1: 0, x2: 0, y2: 4, class: 'hatch-line' })),
+    s('linearGradient', { id: gid, x1: 0, y1: 0, x2: 0, y2: 1 },
+      s('stop', { offset: '0%', class: 'fill-stop-a' }),
+      s('stop', { offset: '100%', class: 'fill-stop-b' })),
   ))
 
   // Grid + y labels
@@ -308,49 +372,63 @@ function buildBarChart(days, width, label) {
     const v = scale.step * i
     const yy = Math.round(y(v)) + 0.5
     svg.appendChild(s('line', { x1: mg.l, x2: width - mg.r, y1: yy, y2: yy, class: i === 0 ? 'axis' : 'grid' }))
-    svg.appendChild(s('text', { x: mg.l - 8, y: yy + 3.5, class: 'tick', 'text-anchor': 'end' }, i === 0 ? '0' : C.rupiahCompact(v)))
+    svg.appendChild(s('text', { x: mg.l - 10, y: yy + 4, class: 'tick', 'text-anchor': 'end' }, i === 0 ? '0' : C.rupiahCompact(v)))
   }
 
-  const hover = s('rect', { class: 'hover-col', x: 0, y: mg.t, width: gw, height: ih, visibility: 'hidden' })
-  svg.appendChild(hover)
-
-  const every = Math.max(days.length <= 14 ? 2 : 5, Math.ceil(64 / gw))
+  // X labels
+  const every = Math.max(days.length <= 14 ? 2 : 5, Math.ceil(70 / step))
   days.forEach((d, i) => {
-    const gx = mg.l + i * gw
-    const cx = gx + gw / 2
-    if (d.rev > 0) svg.appendChild(s('rect', { x: cx - bw - 0.5, y: y(d.rev), width: bw, height: Math.max(1, mg.t + ih - y(d.rev)), class: 'bar-rev' }))
-    if (d.cost > 0) svg.appendChild(s('rect', { x: cx + 0.5, y: y(d.cost), width: bw, height: Math.max(1, mg.t + ih - y(d.cost)), class: 'bar-cost' }))
     const isLast = i === days.length - 1
-    if ((days.length - 1 - i) % every === 0) {
-      svg.appendChild(s('text', { x: cx, y: height - 10, class: `tick ${isLast ? 'tick-strong' : ''}`, 'text-anchor': isLast ? 'end' : 'middle', dx: isLast ? gw / 2 : 0 },
-        isLast ? 'HARI INI' : d.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }).toUpperCase()))
-    }
+    if ((days.length - 1 - i) % every !== 0) return
+    svg.appendChild(s('text', { x: x(i), y: height - 8, class: `tick ${isLast ? 'tick-strong' : ''}`, 'text-anchor': isLast ? 'end' : 'middle' },
+      isLast ? 'Hari ini' : d.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })))
   })
+
+  const revPts = days.map((d, i) => [x(i), y(d.cumRev)])
+  const costPts = days.map((d, i) => [x(i), y(d.cumCost)])
+  const revLine = smoothPath(revPts)
+  const base = Math.round(y(0))
+  svg.appendChild(s('path', { d: `${revLine} L${x(days.length - 1)},${base} L${x(0)},${base} Z`, class: 'area-rev', fill: `url(#${gid})` }))
+  svg.appendChild(s('path', { d: smoothPath(costPts), class: 'line-cost', pathLength: 1 }))
+  svg.appendChild(s('path', { d: revLine, class: 'line-rev', pathLength: 1 }))
+  const lastI = days.length - 1
+  svg.appendChild(s('circle', { cx: x(lastI), cy: y(days[lastI].cumRev), r: 4.5, class: 'end-dot end-rev' }))
+
+  // Hover guide + markers
+  const guide = s('line', { class: 'guide', x1: 0, x2: 0, y1: mg.t, y2: mg.t + ih, visibility: 'hidden' })
+  const dotRev = s('circle', { r: 5, class: 'hover-dot dot-rev', visibility: 'hidden' })
+  const dotCost = s('circle', { r: 4.5, class: 'hover-dot dot-cost', visibility: 'hidden' })
+  svg.append(guide, dotCost, dotRev)
 
   // Tooltip
   const tip = el('div', { className: 'chart-tip', hidden: true })
-  const hit = s('rect', { x: mg.l, y: mg.t, width: iw, height: ih, class: 'hit' })
+  const hit = s('rect', { x: mg.l - step / 2, y: mg.t, width: iw + step, height: ih, class: 'hit' })
   svg.appendChild(hit)
+  const show = (vis) => [guide, dotRev, dotCost].forEach((n) => n.setAttribute('visibility', vis))
   const move = (e) => {
     const rect = svg.getBoundingClientRect()
     const px = e.clientX - rect.left
-    const i = Math.min(days.length - 1, Math.max(0, Math.floor((px - mg.l) / gw)))
+    const i = Math.min(days.length - 1, Math.max(0, Math.round((px - mg.l) / step)))
     const d = days[i]
-    hover.setAttribute('x', mg.l + i * gw)
-    hover.setAttribute('visibility', 'visible')
+    const cx = x(i)
+    guide.setAttribute('x1', cx); guide.setAttribute('x2', cx)
+    dotRev.setAttribute('cx', cx); dotRev.setAttribute('cy', y(d.cumRev))
+    dotCost.setAttribute('cx', cx); dotCost.setAttribute('cy', y(d.cumCost))
+    show('visible')
     tip.replaceChildren(
-      el('span', { className: 'tip-date mono' }, d.date.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' })),
+      el('span', { className: 'tip-date' }, d.date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })),
       el('span', { className: 'tip-row' }, el('i', { className: 'lg lg-rev' }), 'Pendapatan', el('b', { className: 'tnum' }, C.rupiah(d.rev))),
       el('span', { className: 'tip-row' }, el('i', { className: 'lg lg-cost' }), 'Biaya', el('b', { className: 'tnum' }, C.rupiah(d.cost))),
-      el('span', { className: 'tip-row tip-total' }, 'Laba', el('b', { className: 'tnum' }, C.rupiah(d.rev - d.cost))),
+      el('span', { className: 'tip-row tip-total' }, 'Laba hari ini', el('b', { className: 'tnum' }, C.rupiah(d.rev - d.cost))),
+      el('span', { className: 'tip-row tip-cum' }, 'Akumulasi laba', el('b', { className: 'tnum' }, C.rupiah(d.cumRev - d.cumCost))),
     )
     tip.hidden = false
-    const tx = mg.l + i * gw + gw / 2
-    const left = Math.min(Math.max(tx - 90, 0), width - 180)
-    tip.style.left = `${left}px`
+    const tw = 212
+    const left = cx + 16 + tw > width ? cx - 16 - tw : cx + 16
+    tip.style.left = `${Math.max(0, left)}px`
   }
   hit.addEventListener('pointermove', move)
-  hit.addEventListener('pointerleave', () => { tip.hidden = true; hover.setAttribute('visibility', 'hidden') })
+  hit.addEventListener('pointerleave', () => { tip.hidden = true; show('hidden') })
 
   // Screen reader data table
   const table = el('table', { className: 'sr-only' },
@@ -377,14 +455,14 @@ function renderActions(m, navigate) {
 
   for (const c of m.completionsWithoutLedger()) {
     const r = m.requestOfCompletion(c)
-    items.push({ rank: 1, type: '05 Pembukuan', title: `Posting jurnal: ${cust(r)}`, meta: `Selesai ${C.relativeTime(c.completed_at || c.created_at)}`, to: 'bookkeeping', params: { completionId: c.id }, cta: 'Posting' })
+    items.push({ rank: 1, num: '05', type: 'Pembukuan', title: `Posting jurnal: ${cust(r)}`, meta: `Selesai ${C.relativeTime(c.completed_at || c.created_at)}`, to: 'bookkeeping', params: { completionId: c.id }, cta: 'Posting' })
   }
   for (const a of m.activeAssignments()) {
     const r = m.requestOfAssignment(a)
     const sched = C.toDate(a.scheduled_at)
     const overdue = sched && sched.getTime() < now
     items.push({
-      rank: overdue ? 0 : 2, type: '04 Penyelesaian', title: `Konfirmasi selesai: ${cust(r)}`,
+      rank: overdue ? 0 : 2, num: '04', type: 'Penyelesaian', title: `Konfirmasi selesai: ${cust(r)}`,
       meta: `${a.worker_name || 'Tanpa nama'} · jadwal ${C.formatDate(a.scheduled_at)}`,
       flag: overdue ? overdueLabel(now - sched.getTime()) : null,
       to: 'complete', params: { assignmentId: a.id }, cta: 'Tandai',
@@ -392,14 +470,14 @@ function renderActions(m, navigate) {
   }
   for (const o of m.approvedWithoutAssignment()) {
     const r = m.requestOfOffer(o)
-    items.push({ rank: 3, type: '03 Penugasan', title: `Tugaskan pekerja: ${cust(r)}`, meta: `${C.rupiah(o.validated_price)} · disetujui ${C.relativeTime(o.created_at)}`, to: 'assign', params: { offerId: o.id }, cta: 'Tugaskan' })
+    items.push({ rank: 3, num: '03', type: 'Penugasan', title: `Tugaskan pekerja: ${cust(r)}`, meta: `${C.rupiah(o.validated_price)} · disetujui ${C.relativeTime(o.created_at)}`, to: 'assign', params: { offerId: o.id }, cta: 'Tugaskan' })
   }
   for (const o of m.draftOffers()) {
     const r = m.requestOfOffer(o)
-    items.push({ rank: 4, type: '02 Persetujuan', title: `Tinjau penawaran draf: ${cust(r)}`, meta: `${C.rupiah(o.validated_price)} · dibuat ${C.relativeTime(o.created_at)}`, to: 'offer', params: { offerId: o.id }, cta: 'Tinjau' })
+    items.push({ rank: 4, num: '02', type: 'Persetujuan', title: `Tinjau penawaran draf: ${cust(r)}`, meta: `${C.rupiah(o.validated_price)} · dibuat ${C.relativeTime(o.created_at)}`, to: 'offer', params: { offerId: o.id }, cta: 'Tinjau' })
   }
   for (const r of m.requestsWithoutOffer()) {
-    items.push({ rank: 5, type: '02 Penawaran', title: `Buat penawaran: ${cust(r)}`, meta: `${r.service_type || 'Layanan'} · masuk ${C.relativeTime(r.created_at)}`, to: 'offer', params: { requestId: r.id }, cta: 'Buat' })
+    items.push({ rank: 5, num: '02', type: 'Penawaran', title: `Buat penawaran: ${cust(r)}`, meta: `${r.service_type || 'Layanan'} · masuk ${C.relativeTime(r.created_at)}`, to: 'offer', params: { requestId: r.id }, cta: 'Buat' })
   }
   items.sort((a, b) => a.rank - b.rank)
 
@@ -407,24 +485,25 @@ function renderActions(m, navigate) {
   const shown = items.slice(0, LIMIT)
   const content = items.length
     ? el('ol', { className: 'todo' }, shown.map((it) => {
-        const b = C.button({ label: it.cta, iconRight: 'arrowRight', size: 'sm', className: 'todo-btn' })
+        const b = C.button({ label: it.cta, iconRight: 'arrowRight', size: 'sm', variant: 'soft', className: 'todo-btn' })
         b.setAttribute('aria-label', `${it.cta}: ${it.title}`)
         b.addEventListener('click', () => navigate(it.to, it.params))
-        return el('li', { className: 'todo-item' },
+        return el('li', { className: `todo-item ${it.flag ? 'is-overdue' : ''}`.trim() },
+          el('span', { className: 'todo-ico', 'aria-hidden': 'true' }, icon(STEP_ICON[it.num] || 'circleDot', { size: 16 })),
           el('div', { className: 'todo-text' },
-            el('span', { className: 'todo-type mono' }, it.type, it.flag ? el('span', { className: 'tag tag-warn' }, it.flag) : null),
+            el('span', { className: 'todo-type' }, el('span', { className: 'tnum' }, `Tahap ${it.num}`), ` · ${it.type}`, it.flag ? C.tag(it.flag, 'warn') : null),
             el('span', { className: 'todo-title' }, it.title),
             el('span', { className: 'todo-meta' }, it.meta),
           ),
           b,
         )
       }))
-    : C.emptyState({ kicker: 'Antrian bersih', title: 'Tidak ada yang menunggu.', body: 'Semua permintaan sudah diproses sampai pembukuan.' })
+    : C.emptyState({ kicker: 'Antrian bersih', title: 'Tidak ada yang menunggu.', body: 'Semua permintaan sudah diproses sampai pembukuan.', iconName: 'checkCircle' })
 
   return C.panel({
     title: 'Perlu tindakan',
     meta: items.length ? `${items.length} item${items.length > LIMIT ? ` · ${LIMIT} teratas` : ''}` : 'kosong',
-    className: 'span-5 todo-panel',
+    className: 'span-7 todo-panel',
   }, content)
 }
 
@@ -453,14 +532,14 @@ function renderActivity(m) {
 
   const list = el('ol', { className: 'feed' }, recent.map((e) =>
     el('li', { className: 'feed-item' },
-      el('time', { className: 'feed-time mono', datetime: C.toDate(e.at).toISOString(), title: C.formatDateTime(e.at) }, C.relativeTime(e.at)),
-      el('span', { className: 'feed-node', 'aria-hidden': 'true' }),
+      el('span', { className: 'feed-node', 'aria-hidden': 'true' }, icon(STEP_ICON[e.num] || 'circleDot', { size: 14 })),
       el('div', { className: 'feed-text' },
-        el('span', { className: 'feed-title' }, el('span', { className: 'mono feed-num' }, e.num), e.title),
+        el('span', { className: 'feed-title' }, e.title),
         el('span', { className: 'feed-desc' }, e.text),
       ),
+      el('time', { className: 'feed-time', datetime: C.toDate(e.at).toISOString(), title: C.formatDateTime(e.at) }, C.relativeTime(e.at)),
     )))
-  return C.panel({ title: 'Aktivitas terbaru', meta: `${recent.length} dari ${ev.length} peristiwa`, className: 'span-7' }, list)
+  return C.panel({ title: 'Aktivitas terbaru', meta: `${recent.length} dari ${ev.length} peristiwa`, className: 'span-5 feed-panel' }, list)
 }
 
 /* ========================================================= Composition */
@@ -480,13 +559,13 @@ function renderComposition(m) {
             el('span', { className: 'bars-val tnum' }, C.rupiah(amt)),
             el('span', { className: 'bars-track', 'aria-hidden': 'true' }, el('span', { className: 'bars-fill', style: `width:${(amt / max) * 100}%` })),
           ))),
-        el('p', { className: 'bars-foot mono' }, t.revenue > 0
+        el('p', { className: 'bars-foot' }, t.revenue > 0
           ? `Biaya = ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan`
           : 'Belum ada pendapatan tercatat'),
       )
-    : C.emptyState({ kicker: 'Pembukuan', title: 'Belum ada jurnal.', body: 'Komposisi muncul setelah jurnal pertama diposting.' })
+    : C.emptyState({ kicker: 'Pembukuan', title: 'Belum ada jurnal.', body: 'Komposisi muncul setelah jurnal pertama diposting.', iconName: 'ledger' })
 
-  return C.panel({ title: 'Komposisi buku besar', meta: `${m.ledger.length} jurnal` }, content)
+  return C.panel({ title: 'Komposisi buku besar', meta: `${m.ledger.length} jurnal`, className: 'span-7' }, content)
 }
 
 /* ========================================================== Status mix */
@@ -507,7 +586,7 @@ function renderStatusMix(m) {
       el('span', {}, label),
       el('b', { className: 'tnum' }, String(counts.get(k))),
     )))
-  return C.panel({ title: 'Posisi permintaan', meta: `${m.requests.length} permintaan` },
+  return C.panel({ title: 'Posisi permintaan', meta: `${m.requests.length} permintaan`, className: 'span-5' },
     m.requests.length ? el('div', {}, strip, legend) : C.emptyState({ kicker: 'Kosong', title: 'Belum ada permintaan.' }),
     el('p', { className: 'sr-only' }, ORDER.map(([k, label]) => `${label}: ${counts.get(k)}`).join(', ') + ` dari ${total}.`),
   )
@@ -516,20 +595,23 @@ function renderStatusMix(m) {
 /* ========================================================== Onboarding */
 
 function renderOnboarding(navigate) {
-  const cta = C.button({ label: 'Buat permintaan pertama', icon: 'plus', variant: 'ink', size: 'lg' })
+  const cta = C.button({ label: 'Buat permintaan pertama', icon: 'plus', variant: 'primary', size: 'lg' })
   cta.addEventListener('click', () => navigate('request'))
   return el('section', { className: 'onboard' },
     el('div', { className: 'onboard-intro' },
-      el('span', { className: 'kicker' }, 'Akun baru'),
-      el('h2', { className: 'onboard-title' }, 'Alur Anda masih kosong.'),
+      el('span', { className: 'tag tag-accent' }, icon('sprout', { size: 14 }), 'Akun baru'),
+      el('h2', { className: 'onboard-title display' }, 'Alur Anda masih ', el('em', {}, 'kosong'), '.'),
       el('p', { className: 'onboard-body' }, 'Semua angka di halaman ini dihitung dari data Anda sendiri. Mulai dengan satu permintaan pelanggan, lalu bawa sampai ke laporan. Setiap tahap membuka tahap berikutnya.'),
       cta,
     ),
     el('ol', { className: 'onboard-steps' }, STEPS.map((st, i) =>
       el('li', { className: `onboard-step ${i === 0 ? 'is-next' : ''}` },
-        el('span', { className: 'mono onboard-num' }, st.num),
-        el('span', { className: 'onboard-label' }, st.label),
-        el('span', { className: 'onboard-desc' }, st.desc),
+        el('span', { className: 'onboard-node', 'aria-hidden': 'true' }, icon(st.icon, { size: 16 })),
+        el('span', { className: 'onboard-text' },
+          el('span', { className: 'onboard-label' }, el('span', { className: 'onboard-num tnum' }, st.num), st.label),
+          el('span', { className: 'onboard-desc' }, st.desc),
+        ),
+        i === 0 ? el('span', { className: 'onboard-next' }, 'Mulai di sini') : null,
       ))),
   )
 }

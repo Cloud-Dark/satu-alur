@@ -1,13 +1,22 @@
 /**
  * Landing page copy (Bahasa Indonesia). Product facts follow README.md and
  * docs/01_PRD.md — no invented customers, metrics, or testimonials.
+ * Any number shown in a product preview is illustrative and labelled "Contoh".
  */
 
 export const NAV = [
-  { id: 'alur', label: 'Alur' },
+  { id: 'alur', label: 'Alur kerja' },
   { id: 'fitur-ai', label: 'Fitur AI' },
+  { id: 'ide-besar', label: 'Roadmap' },
   { id: 'harga', label: 'Harga' },
   { id: 'faq', label: 'FAQ' },
+]
+
+/** Honest, verifiable facts shown under the hero CTAs. */
+export const HERO_POINTS = [
+  'Masuk cukup dengan email (OTP)',
+  'Penawaran AI selalu divalidasi',
+  'Data di Cloudflare D1',
 ]
 
 export const STAGES = [
@@ -43,9 +52,19 @@ export const STAGES = [
   },
 ]
 
+/** Capability ticker: plain capability pills (no logos, no customer names). */
 export const TICKER = [
-  '01 Permintaan', '02 Penawaran AI', '03 Penugasan', '04 Penyelesaian', '05 Pembukuan', '06 Laporan AI',
-  'Validasi aturan domain', 'Streaming Workers AI', 'Agent Skill Editor', 'Login email OTP', 'Data di Cloudflare D1',
+  { icon: 'inbox', label: 'Permintaan terpusat' },
+  { icon: 'sparkles', label: 'Penawaran AI' },
+  { icon: 'shield', label: 'Validasi aturan domain' },
+  { icon: 'users', label: 'Penugasan & jadwal' },
+  { icon: 'checkCircle', label: 'Catatan penyelesaian' },
+  { icon: 'ledger', label: 'Jurnal & laba/rugi' },
+  { icon: 'chart', label: 'Laporan dijelaskan AI' },
+  { icon: 'zap', label: 'Streaming Workers AI' },
+  { icon: 'bot', label: 'Agent Skill Editor' },
+  { icon: 'mail', label: 'Login email OTP' },
+  { icon: 'layers', label: 'Data di Cloudflare D1' },
 ]
 
 export const FEATURES = [
@@ -120,20 +139,23 @@ export const FAQS = [
   },
 ]
 
-/** Demo AI offer stream for the terminal mock. Uses the real offer schema
- *  (scope, price, terms) and the real validation rules in domain/rules.js. */
-export const TERMINAL_LINES = [
-  { t: 'cmd', s: 'satu-alur penawaran --permintaan contoh-01' },
-  { t: 'dim', s: 'memuat permintaan: "Servis AC split 2 unit, Jakarta Selatan"' },
-  { t: 'dim', s: 'agen penawaran aktif · Workers AI · streaming' },
-  { t: 'code', s: '{' },
-  { t: 'code', s: '  "scope": "Cuci dan cek freon 2 unit AC split 1 PK",' },
-  { t: 'code', s: '  "price": 450000,' },
-  { t: 'code', s: '  "terms": "DP 30%, pelunasan setelah selesai. Garansi 7 hari.",' },
-  { t: 'code', s: '  "duration_hours": 3' },
-  { t: 'code', s: '}' },
-  { t: 'ok', s: 'harga dalam rentang Rp10.000 – Rp1.000.000.000' },
-  { t: 'ok', s: 'ruang lingkup ≥ 10 karakter' },
-  { t: 'ok', s: 'ketentuan ≥ 10 karakter' },
-  { t: 'done', s: 'status: draft → menunggu persetujuan' },
-]
+/**
+ * Streaming demo for the AI offer agent. Uses the real offer schema
+ * (scope, price, terms, duration) and the real validation rules in
+ * domain/rules.js. Illustrative only — not customer data.
+ */
+export const AGENT_DEMO = {
+  request: 'Servis AC split 2 unit, Jakarta Selatan. Bisa minggu ini?',
+  fields: [
+    { key: 'scope', label: 'Ruang lingkup', value: 'Cuci dan cek freon 2 unit AC split 1 PK' },
+    { key: 'price', label: 'Harga', value: 'Rp450.000' },
+    { key: 'terms', label: 'Ketentuan', value: 'DP 30%, pelunasan setelah selesai. Garansi 7 hari.' },
+    { key: 'duration', label: 'Durasi', value: '± 3 jam' },
+  ],
+  checks: [
+    'Harga dalam rentang Rp10.000 – Rp1.000.000.000',
+    'Ruang lingkup minimal 10 karakter',
+    'Ketentuan minimal 10 karakter',
+  ],
+  status: 'Draf · menunggu persetujuan Anda',
+}

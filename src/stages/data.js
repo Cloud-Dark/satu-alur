@@ -86,8 +86,8 @@ export function buildModel({ requests = [], offers = [], assignments = [], compl
     const posted = compls.some((c) => m.ledgerOf(c.id).length > 0)
     if (posted) return { key: 'booked', label: 'Terbukukan', tone: 'ok' }
     if (compls.length) return { key: 'done', label: 'Selesai', tone: 'ok' }
-    if (assigns.length) return { key: 'assigned', label: 'Ditugaskan', tone: 'ink' }
-    if (offs.some((o) => o.status === 'approved')) return { key: 'offered', label: 'Ditawarkan', tone: 'ink' }
+    if (assigns.length) return { key: 'assigned', label: 'Ditugaskan', tone: 'brand' }
+    if (offs.some((o) => o.status === 'approved')) return { key: 'offered', label: 'Ditawarkan', tone: 'brand' }
     return { key: 'draft', label: 'Draf penawaran', tone: 'warn' }
   }
 

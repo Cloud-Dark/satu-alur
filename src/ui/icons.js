@@ -57,6 +57,8 @@ const PATHS = {
   pencil: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
   flag: '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>',
   minus: '<path d="M5 12h14"/>',
+  sprout: '<path d="M12 21v-8"/><path d="M12 13c0-4.4 3.1-7.5 8-7.5 0 4.4-3.1 7.5-8 7.5z"/><path d="M12 15.5C12 12.2 9.6 10 5 10c0 3.3 2.4 5.5 7 5.5z"/>',
+  circleDot: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/>',
   receipt: '<path d="M5 2h14v20l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
 }
 

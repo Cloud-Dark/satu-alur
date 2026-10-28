@@ -25,7 +25,7 @@ export async function render(container, ctx = {}) {
   const preview = el('div', { className: 'req-preview', hidden: true })
   const worker = C.field({ label: 'Nama pekerja atau tim', name: 'worker_name', required: true, placeholder: 'Ahmad & Tim', attrs: { maxlength: '120', autocomplete: 'off' } })
   const when = C.field({ label: 'Jadwal pelaksanaan', name: 'scheduled_at', type: 'datetime-local', required: true, value: defaultSchedule(), hint: 'Waktu lokal perangkat Anda.' })
-  const submit = C.button({ label: 'Tugaskan', icon: 'users', variant: 'signal', type: 'submit' })
+  const submit = C.button({ label: 'Tugaskan', icon: 'users', variant: 'primary', type: 'submit' })
   const msg = C.message()
 
   const form = el('form', { className: 'form' },
@@ -40,9 +40,9 @@ export async function render(container, ctx = {}) {
   const listPanel = C.panel({ title: 'Daftar penugasan', meta: 'memuat…', className: 'list-panel' }, listBody)
 
   container.replaceChildren(
-    C.pageHeader({ num: '03', label: 'Penugasan', title: 'Penugasan pelaksana', description: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.' }),
+    C.pageHeader({ num: '03', label: 'Penugasan', title: 'Penugasan pelaksana', em: 'pelaksana', description: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.' }),
     el('div', { className: 'stage-grid' },
-      C.panel({ title: 'Tugaskan pekerja', meta: 'Tahap 03', raised: true, className: 'form-panel' }, form),
+      C.panel({ title: 'Tugaskan pekerja', meta: 'Jadwal & pelaksana', raised: true, className: 'form-panel' }, form),
       listPanel,
     ),
   )
@@ -112,7 +112,7 @@ export async function render(container, ctx = {}) {
       when.input.value = defaultSchedule()
       const past = date.getTime() < Date.now()
       msg.show('ok', `${name} ditugaskan untuk ${customerLabel(flow.requestOfOffer(offer))}, ${C.formatDateTime(date)}.${past ? ' Catatan: jadwal ini sudah lewat.' : ''}`)
-      const next = C.button({ label: 'Tandai selesai nanti', iconRight: 'arrowRight', size: 'sm' })
+      const next = C.button({ label: 'Tandai selesai nanti', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       next.addEventListener('click', () => navigate('complete', { assignmentId: row?.id }))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
       showToast('Penugasan tersimpan.', 'success')
@@ -150,7 +150,7 @@ export async function render(container, ctx = {}) {
           label: 'Pelaksana · jadwal',
           render: (a) => el('div', { className: 'cell-stack' },
             el('span', { className: 'cell-primary' }, a.worker_name || '—'),
-            el('time', { className: 'cell-secondary mono', datetime: a.scheduled_at || '' }, C.formatDateTime(a.scheduled_at)),
+            el('time', { className: 'cell-secondary tnum', datetime: a.scheduled_at || '' }, C.formatDateTime(a.scheduled_at)),
           ),
         },
         {
@@ -158,15 +158,15 @@ export async function render(container, ctx = {}) {
           render: (a) => {
             if (a.status === 'done' || flow.completionsOf(a.id).length) return C.tag('Selesai', 'ok')
             const sched = C.toDate(a.scheduled_at)
-            return sched && sched.getTime() < now ? C.tag('Lewat jadwal', 'warn') : C.tag('Ditugaskan', 'ink')
+            return sched && sched.getTime() < now ? C.tag('Lewat jadwal', 'warn') : C.tag('Ditugaskan', 'brand')
           },
         },
         {
           label: 'Aksi',
           className: 'col-action',
           render: (a) => {
-            if (a.status === 'done' || flow.completionsOf(a.id).length) return el('span', { className: 'muted mono nil' }, '—')
-            const b = C.button({ label: 'Tandai selesai', iconRight: 'arrowRight', size: 'sm' })
+            if (a.status === 'done' || flow.completionsOf(a.id).length) return el('span', { className: 'muted nil' }, '—')
+            const b = C.button({ label: 'Tandai selesai', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
             b.addEventListener('click', () => navigate('complete', { assignmentId: a.id }))
             return b
           },

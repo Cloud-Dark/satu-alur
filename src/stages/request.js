@@ -15,7 +15,7 @@ export async function render(container, ctx = {}) {
   const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
   const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
   const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
-  const submit = C.button({ label: 'Simpan permintaan', icon: 'save', variant: 'signal', type: 'submit' })
+  const submit = C.button({ label: 'Simpan permintaan', icon: 'save', variant: 'primary', type: 'submit' })
   const msg = C.message()
 
   const form = el('form', { className: 'form', noValidate: '' },
@@ -29,12 +29,13 @@ export async function render(container, ctx = {}) {
 
   const listBody = el('div', {}, C.skeletonRows(5))
   const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari permintaan' })
-  const listPanel = C.panel({ title: 'Daftar permintaan', meta: 'memuat…', actions: search, className: 'list-panel' }, listBody)
+  const searchBox = el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search)
+  const listPanel = C.panel({ title: 'Daftar permintaan', meta: 'memuat…', actions: searchBox, className: 'list-panel' }, listBody)
 
   container.replaceChildren(
-    C.pageHeader({ num: '01', label: 'Permintaan', title: 'Permintaan masuk', description: 'Catat kebutuhan pelanggan. Status setiap permintaan mengikuti seberapa jauh ia sudah bergerak di alur.' }),
+    C.pageHeader({ num: '01', label: 'Permintaan', title: 'Permintaan masuk', em: 'masuk', description: 'Catat kebutuhan pelanggan. Status setiap permintaan mengikuti seberapa jauh ia sudah bergerak di alur.' }),
     el('div', { className: 'stage-grid' },
-      C.panel({ title: 'Permintaan baru', meta: 'Tahap 01', raised: true, className: 'form-panel' }, form),
+      C.panel({ title: 'Permintaan baru', meta: 'Isi data pelanggan', raised: true, className: 'form-panel' }, form),
       listPanel,
     ),
   )
@@ -66,7 +67,7 @@ export async function render(container, ctx = {}) {
       form.reset()
       msg.show('ok', `Permintaan ${data.customer_name} tersimpan. Lanjutkan dengan membuat penawaran.`)
       if (row?.id != null) {
-        const next = C.button({ label: 'Buat penawaran', iconRight: 'arrowRight', size: 'sm', variant: 'ink' })
+        const next = C.button({ label: 'Buat penawaran', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
         next.addEventListener('click', () => navigate('offer', { requestId: row.id }))
         msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
       }
@@ -113,20 +114,20 @@ export async function render(container, ctx = {}) {
           label: 'Pelanggan',
           render: (r) => {
             const stack = C.cellStack(customerLabel(r), [r.service_type, r.location].filter(Boolean).join(' · '))
-            stack.querySelector('.cell-primary').prepend(el('span', { className: 'cell-id mono' }, `#${r.id}`))
+            stack.querySelector('.cell-primary').prepend(el('span', { className: 'cell-id tnum' }, `#${r.id}`))
             if (r.description) stack.appendChild(el('span', { className: 'cell-note', title: r.description }, r.description))
-            if (r.phone) stack.appendChild(el('span', { className: 'cell-secondary mono' }, r.phone))
+            if (r.phone) stack.appendChild(el('span', { className: 'cell-secondary tnum' }, r.phone))
             return stack
           },
         },
         { label: 'Status', render: (r) => { const s = model.requestStage(r); return C.tag(s.label, s.tone) } },
-        { label: 'Masuk', className: 'col-date', render: (r) => el('time', { className: 'mono', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, C.formatDate(r.created_at)) },
+        { label: 'Masuk', className: 'col-date', render: (r) => el('time', { className: 'tnum', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, C.formatDate(r.created_at)) },
         {
           label: 'Aksi',
           className: 'col-action',
           render: (r) => {
-            if (model.offersOf(r.id).length) return el('span', { className: 'muted mono nil' }, '—')
-            const b = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm' })
+            if (model.offersOf(r.id).length) return el('span', { className: 'muted nil' }, '—')
+            const b = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
             b.setAttribute('aria-label', `Buat penawaran untuk ${customerLabel(r)}`)
             b.addEventListener('click', () => navigate('offer', { requestId: r.id }))
             return b

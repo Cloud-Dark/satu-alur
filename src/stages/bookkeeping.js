@@ -13,9 +13,9 @@ export async function render(container, ctx = {}) {
   const complSel = C.select({ label: 'Pekerjaan selesai', name: 'completion_id', required: true, hint: 'Satu pekerjaan boleh punya beberapa jurnal: pendapatan dan biaya-biayanya.', options: [{ value: '', label: 'Memuat…' }] })
   const category = C.select({ label: 'Kategori', name: 'category', required: true, options: [{ value: '', label: 'Pilih kategori' }, ...LEDGER_CATEGORIES] })
   const amount = C.field({ label: 'Jumlah (Rp)', name: 'amount', type: 'number', required: true, placeholder: '1500000', attrs: { min: '1', step: '1', inputmode: 'numeric' } })
-  const fillBtn = el('button', { type: 'button', className: 'link-btn mono', hidden: true }, '')
+  const fillBtn = el('button', { type: 'button', className: 'link-btn', hidden: true }, '')
   amount.wrap.appendChild(fillBtn)
-  const submit = C.button({ label: 'Posting jurnal', icon: 'ledger', variant: 'signal', type: 'submit' })
+  const submit = C.button({ label: 'Posting jurnal', icon: 'ledger', variant: 'primary', type: 'submit' })
   const msg = C.message()
 
   const form = el('form', { className: 'form' },
@@ -31,9 +31,9 @@ export async function render(container, ctx = {}) {
   const listPanel = C.panel({ title: 'Buku besar', meta: 'memuat…', className: 'list-panel' }, summary, listBody)
 
   container.replaceChildren(
-    C.pageHeader({ num: '05', label: 'Pembukuan', title: 'Pembukuan', description: 'Catat pendapatan dan biaya dari setiap pekerjaan selesai. Saldo dihitung berjalan dari jurnal tertua.' }),
+    C.pageHeader({ num: '05', label: 'Pembukuan', title: 'Pembukuan & saldo', em: 'saldo', description: 'Catat pendapatan dan biaya dari setiap pekerjaan selesai. Saldo dihitung berjalan dari jurnal tertua.' }),
     el('div', { className: 'stage-grid' },
-      C.panel({ title: 'Posting jurnal', meta: 'Tahap 05', raised: true, className: 'form-panel' }, form),
+      C.panel({ title: 'Posting jurnal', meta: 'Pendapatan atau biaya', raised: true, className: 'form-panel' }, form),
       listPanel,
     ),
   )
@@ -137,9 +137,9 @@ export async function render(container, ctx = {}) {
 
     const t = totals(flow.ledger)
     summary.replaceChildren(
-      C.kpi({ label: 'Pendapatan', value: C.rupiah(t.revenue) }),
-      C.kpi({ label: 'Biaya', value: C.rupiah(t.cost) }),
-      C.kpi({ label: t.profit >= 0 ? 'Laba' : 'Rugi', value: C.rupiah(t.profit), sub: t.revenue > 0 ? `Margin ${((t.profit / t.revenue) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : 'Margin —', tone: t.revenue > 0 ? (t.profit >= 0 ? 'ok' : 'danger') : null }),
+      C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue) }),
+      C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost) }),
+      C.kpi({ label: t.profit >= 0 ? 'Laba' : 'Rugi', iconName: 'sprout', value: C.rupiah(t.profit), sub: t.revenue > 0 ? `Margin ${((t.profit / t.revenue) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : 'Margin —', tone: t.revenue > 0 ? (t.profit >= 0 ? 'ok' : 'danger') : null }),
     )
     listPanel.querySelector('.panel-meta').textContent = `${flow.ledger.length} jurnal`
 
@@ -160,10 +160,10 @@ export async function render(container, ctx = {}) {
       caption: 'Buku besar',
       rows,
       columns: [
-        { label: 'Tanggal', className: 'col-date', render: (l) => el('time', { className: 'mono', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
+        { label: 'Tanggal', className: 'col-date', render: (l) => el('time', { className: 'tnum', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
         { label: 'Keterangan', render: (l) => C.cellStack(customerLabel(flow.requestOfLedger(l)), categoryLabel(l.category)) },
-        { label: 'Masuk', align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, C.rupiah(l.amount)) : el('span', { className: 'muted nil' }, '—')) },
-        { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, C.rupiah(l.amount)) : el('span', { className: 'muted nil' }, '—')) },
+        { label: 'Masuk', align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, `+${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
+        { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, `−${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
         { label: 'Saldo', align: 'right', render: (l) => { const b = balance.get(l); return el('span', { className: `tnum strong ${b < 0 ? 'amt-neg' : ''}` }, C.rupiah(b)) } },
       ],
     }))

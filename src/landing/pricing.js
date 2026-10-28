@@ -3,7 +3,9 @@
  *
  * DRAFT — semua harga, batas transaksi, jumlah pengguna, dan fitur per paket
  * di bawah ini masih sementara dan menunggu keputusan skema bisnis.
- * Ubah nilai di sini saja; landing page merender tabel harga dari config ini.
+ * Ubah nilai di sini saja; landing page merender kartu harga dari config ini.
+ *
+ * cta.variant: 'primary' | 'accent' | 'soft' (kelas tombol design system v2).
  */
 
 export const PRICING_NOTE = 'Harga draf — dapat berubah.'
@@ -25,7 +27,7 @@ export const PRICING_TIERS = [
       'AI penawaran & laporan dasar',
       'Validasi aturan domain',
     ],
-    cta: { label: 'Mulai gratis', href: '#/masuk', variant: 'default' },
+    cta: { label: 'Mulai gratis', href: '#/masuk', variant: 'soft' },
   },
   {
     id: 'ukm',
@@ -34,7 +36,7 @@ export const PRICING_TIERS = [
     price: 'Rp349rb',
     period: 'per bulan',
     recommended: true,
-    badge: 'Direkomendasikan',
+    badge: 'Rekomendasi',
     limits: [
       { label: 'Transaksi', value: 'Hingga 1.000 / bulan' },
       { label: 'Pengguna', value: '10 pengguna' },
@@ -45,7 +47,7 @@ export const PRICING_TIERS = [
       'Konektor WhatsApp & email',
       'Dukungan prioritas',
     ],
-    cta: { label: 'Pilih UKM', href: '#/masuk', variant: 'signal' },
+    cta: { label: 'Pilih UKM', href: '#/masuk', variant: 'accent' },
   },
   {
     id: 'enterprise',
@@ -64,6 +66,6 @@ export const PRICING_TIERS = [
       'SLA & pendampingan implementasi',
     ],
     // Kontak penjualan belum tersedia: href null dirender sebagai placeholder.
-    cta: { label: 'Hubungi kami', href: null, variant: 'ink' },
+    cta: { label: 'Hubungi kami', href: null, variant: 'primary' },
   },
 ]

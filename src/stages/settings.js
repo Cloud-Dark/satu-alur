@@ -123,7 +123,7 @@ function setSection({ num, title, desc, toggle }, ...children) {
   return el('section', { className: 'set-section' },
     el('div', { className: 'set-head' },
       el('div', {},
-        el('span', { className: 'kicker no-rule' }, num),
+        el('span', { className: 'set-num' }, num),
         el('h3', { className: 'set-title' }, title),
         desc ? el('p', { className: 'set-desc' }, desc) : null,
       ),
@@ -146,7 +146,7 @@ function textField(label, id, value, type, onChange, hint = '') {
 }
 
 function rangeField({ label, id, value, min, max, step, hint, onChange }) {
-  const out = el('output', { className: 'range-out mono tnum', htmlFor: id }, String(value))
+  const out = el('output', { className: 'range-out tnum', htmlFor: id }, String(value))
   const input = el('input', { id, type: 'range', className: 'range', min: String(min), max: String(max), step: String(step), value: String(value) })
   input.addEventListener('input', () => { out.textContent = input.value; onChange(input.value) })
   return el('div', { className: 'field' },
@@ -217,7 +217,7 @@ function renderAgentTab(container, redraw) {
   const save = () => saveSettings(STORAGE_KEYS.agent, settings)
 
   const promptBlock = (num, title, desc, key, defKey, id) => {
-    const ta = C.textarea({ label: 'Prompt sistem', id, rows: 12, value: settings[key], attrs: { spellcheck: 'false', className: 'input input-mono' } })
+    const ta = C.textarea({ label: 'Prompt sistem', id, rows: 12, value: settings[key], attrs: { spellcheck: 'false', className: 'input input-code' } })
     ta.input.addEventListener('input', () => { settings[key] = ta.input.value; save() })
     const isDefault = settings[key] === DEFAULT_AGENT_PROMPTS[defKey]
     return setSection({ num, title, desc },
@@ -227,7 +227,7 @@ function renderAgentTab(container, redraw) {
           label: 'Kembalikan default', icon: 'refresh', size: 'sm', variant: 'ghost', disabled: isDefault,
           onClick: () => { settings[key] = DEFAULT_AGENT_PROMPTS[defKey]; save(); redraw(); showToast('Prompt dikembalikan ke default.', 'info') },
         }),
-        el('span', { className: 'field-hint mono' }, `${settings[key].length} karakter`),
+        el('span', { className: 'field-hint tnum' }, `${settings[key].length} karakter`),
       ),
     )
   }
@@ -258,9 +258,9 @@ function renderCloudTab(container) {
   container.append(
     setSection({ num: 'Cloud · 01', title: 'Infrastruktur', desc: 'Satu Alur berjalan di Cloudflare Workers + D1. Data dan AI diakses lewat API same-origin (/api), tanpa konfigurasi tambahan di browser.' },
       el('div', { className: `cloud-status ${mock ? 'is-demo' : 'is-live'}` },
-        el('span', { className: 'mode-dot' }),
+        el('span', { className: 'pulse-dot mode-dot', 'aria-hidden': 'true' }),
         el('div', {},
-          el('span', { className: 'kicker no-rule' }, 'Mode aktif'),
+          el('span', { className: 'set-num' }, 'Mode aktif'),
           el('p', { className: 'cloud-mode' }, mock ? 'Mock lokal — data disimpan di browser ini' : 'Cloudflare Worker + D1'),
         ),
       ),

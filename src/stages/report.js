@@ -45,18 +45,18 @@ export async function render(container, ctx = {}) {
   let period = '30d'
 
   const seg = C.segmented({ label: 'Periode laporan', value: period, options: PERIODS, onChange: (v) => { period = v; draw() } })
-  const periodLine = el('p', { className: 'period-line mono' }, 'Memuat…')
-  const kpis = el('div', { className: 'kpis' }, [0, 1, 2, 3].map(() => el('div', { className: 'kpi' }, C.skeleton({ lines: 2 }))))
+  const periodLine = el('p', { className: 'period-line' }, C.icon('calendar', { size: 15 }), el('span', {}, 'Memuat…'))
+  const kpis = el('div', { className: 'kpis' }, [0, 1, 2, 3].map((i) => el('div', { className: `kpi ${i === 0 ? 'is-hero' : ''}`.trim() }, C.skeleton({ lines: 2 }))))
   const catBody = el('div', {}, C.skeletonRows(4))
   const custBody = el('div', {}, C.skeletonRows(4))
   const catPanel = C.panel({ title: 'Rincian kategori', meta: '—', className: 'span-7' }, catBody)
   const custPanel = C.panel({ title: 'Pelanggan teratas', meta: 'berdasarkan pendapatan', className: 'span-5' }, custBody)
 
-  const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'signal' })
-  const modelNote = el('span', { className: 'field-hint mono model-note' }, 'Model: memuat…')
+  const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'primary' })
+  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
   const msg = C.message()
   const aiOut = el('div', { className: 'report-ai-out' })
-  const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
+  const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'Bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
     el('p', { className: 'panel-lead' }, 'AI membaca angka periode terpilih, membandingkannya dengan periode sebelumnya, lalu memberi ringkasan dan rekomendasi. Angka di atas tetap menjadi acuan.'),
     el('div', { className: 'form-actions' }, explainBtn, modelNote),
     msg,
@@ -64,7 +64,7 @@ export async function render(container, ctx = {}) {
   )
 
   container.replaceChildren(
-    C.pageHeader({ num: '06', label: 'Laporan', title: 'Laporan keuangan', description: 'Angka dihitung langsung dari buku besar. Pilih periode, lalu minta AI menjelaskannya.', actions: seg }),
+    C.pageHeader({ num: '06', label: 'Laporan', title: 'Laporan keuangan', em: 'keuangan', description: 'Angka dihitung langsung dari buku besar. Pilih periode, lalu minta AI menjelaskannya.', actions: seg }),
     periodLine,
     kpis,
     el('div', { className: 'dash-grid is-stretch' }, catPanel, custPanel),
@@ -94,7 +94,7 @@ export async function render(container, ctx = {}) {
     const prevT = r.prev ? totals(flow.ledger.filter((l) => inRange(l, r.prev))) : null
     const margin = t.revenue > 0 ? (t.profit / t.revenue) * 100 : null
 
-    periodLine.textContent = `Periode: ${r.label} · ${entries.length} jurnal${r.prev ? ` · pembanding: ${r.prev.label}` : ''}`
+    periodLine.lastChild.textContent = `Periode ${r.label} · ${entries.length} jurnal${r.prev ? ` · pembanding: ${r.prev.label}` : ''}`
 
     const cmp = (cur, prev, invert = false) => {
       if (!prevT || !(prev > 0)) return { sub: prevT ? `${r.prev.label}: ${C.rupiah(prev || 0)}` : null, tone: null }
@@ -106,10 +106,10 @@ export async function render(container, ctx = {}) {
     const cCost = cmp(t.cost, prevT?.cost, true)
     const cProfit = cmp(t.profit, prevT?.profit)
     kpis.replaceChildren(
-      C.kpi({ label: 'Pendapatan', value: C.rupiah(t.revenue), sub: cRev.sub, tone: cRev.tone }),
-      C.kpi({ label: 'Biaya', value: C.rupiah(t.cost), sub: cCost.sub, tone: cCost.tone }),
-      C.kpi({ label: 'Laba bersih', value: C.rupiah(t.profit), sub: cProfit.sub, tone: cProfit.tone }),
-      C.kpi({ label: 'Margin', value: margin == null ? '—' : `${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, sub: margin == null ? 'Belum ada pendapatan' : `Biaya ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan` }),
+      C.kpi({ label: 'Laba bersih', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
+      C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue), countTo: t.revenue, format: C.rupiah, sub: cRev.sub, tone: cRev.tone }),
+      C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost), countTo: t.cost, format: C.rupiah, sub: cCost.sub, tone: cCost.tone }),
+      C.kpi({ label: 'Margin', iconName: 'activity', value: margin == null ? '—' : `${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, sub: margin == null ? 'Belum ada pendapatan' : `Biaya ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan` }),
     )
 
     // Categories
@@ -129,7 +129,7 @@ export async function render(container, ctx = {}) {
           rows: cats,
           columns: [
             { label: 'Kategori', render: (c) => el('span', { className: c.cat === 'pendapatan' ? 'strong' : '' }, categoryLabel(c.cat)) },
-            { label: 'Jurnal', align: 'right', render: (c) => el('span', { className: 'tnum mono' }, String(c.n)) },
+            { label: 'Jurnal', align: 'right', render: (c) => el('span', { className: 'tnum' }, String(c.n)) },
             { label: 'Porsi', className: 'col-bar', render: (c) => el('span', { className: `bars-track ${c.cat === 'pendapatan' ? 'is-rev' : ''}` }, el('span', { className: 'bars-fill', style: `width:${(c.amount / max) * 100}%` })) },
             { label: 'Jumlah', align: 'right', render: (c) => el('span', { className: 'tnum' }, C.rupiah(c.amount)) },
           ],
@@ -148,7 +148,7 @@ export async function render(container, ctx = {}) {
     const custs = [...byCust.values()].sort((a, b) => b.amount - a.amount).slice(0, 5)
     custBody.replaceChildren(custs.length
       ? el('ol', { className: 'rank' }, custs.map((c, i) => el('li', { className: 'rank-row' },
-          el('span', { className: 'rank-num mono' }, String(i + 1).padStart(2, '0')),
+          el('span', { className: 'rank-num tnum' }, String(i + 1)),
           C.cellStack(c.name, c.service),
           el('span', { className: 'tnum strong' }, C.rupiah(c.amount)),
         )))
@@ -175,7 +175,7 @@ export async function render(container, ctx = {}) {
   function emptyForPeriod() {
     const box = C.emptyState({ kicker: 'Periode kosong', title: 'Tidak ada jurnal di periode ini.', body: flow.ledger.length ? 'Coba periode lain, atau posting jurnal baru.' : 'Posting jurnal di tahap 05 agar laporan terisi.' })
     if (!flow.ledger.length) {
-      const go = C.button({ label: 'Ke pembukuan', iconRight: 'arrowRight', size: 'sm' })
+      const go = C.button({ label: 'Ke pembukuan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
       go.addEventListener('click', () => navigate('bookkeeping'))
       box.appendChild(go)
     }
@@ -196,7 +196,7 @@ export async function render(container, ctx = {}) {
     const restore = C.setBusy(explainBtn, 'Menganalisis…')
     const ui = C.aiConsole({ model: model.id })
     ui.onStop(() => ac.abort())
-    ui.setStatus('STREAMING', true)
+    ui.setStatus('Menulis…', true)
     ui.write('')
     aiOut.replaceChildren(ui.root)
     try {
@@ -207,15 +207,15 @@ export async function render(container, ctx = {}) {
         onChunk: (_d, full) => { if (!ac.signal.aborted) ui.writeHTML(C.sanitizeHTML(full)) },
       }), ac.signal)
       ui.writeHTML(C.sanitizeHTML(html), { caretOn: false })
-      ui.setStatus('SELESAI', false)
+      ui.setStatus('Selesai', false)
       showToast('Penjelasan laporan selesai.', 'success')
     } catch (err) {
       ui.done()
       if (err.name === 'AbortError') {
-        ui.setStatus('DIHENTIKAN', false)
+        ui.setStatus('Dihentikan', false)
         msg.show('info', 'Penjelasan dihentikan.')
       } else {
-        ui.setStatus('GAGAL', false)
+        ui.setStatus('Gagal', false)
         msg.show('danger', err.message)
       }
     } finally {

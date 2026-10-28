@@ -13,7 +13,7 @@ export async function render(container, ctx = {}) {
   const assignSel = C.select({ label: 'Penugasan aktif', name: 'assignment_id', required: true, options: [{ value: '', label: 'Memuat…' }] })
   const preview = el('div', { className: 'req-preview', hidden: true })
   const notes = C.textarea({ label: 'Catatan hasil pekerjaan', name: 'notes', rows: 5, placeholder: 'Kondisi akhir, kendala, saran perawatan…', hint: 'Catatan ini ikut tersimpan di riwayat dan membantu laporan.', attrs: { maxlength: '2000' } })
-  const submit = C.button({ label: 'Tandai selesai', icon: 'checkCircle', variant: 'signal', type: 'submit' })
+  const submit = C.button({ label: 'Tandai selesai', icon: 'checkCircle', variant: 'primary', type: 'submit' })
   const msg = C.message()
 
   const form = el('form', { className: 'form' },
@@ -27,9 +27,9 @@ export async function render(container, ctx = {}) {
   const listPanel = C.panel({ title: 'Riwayat penyelesaian', meta: 'memuat…', className: 'list-panel' }, listBody)
 
   container.replaceChildren(
-    C.pageHeader({ num: '04', label: 'Penyelesaian', title: 'Penyelesaian pekerjaan', description: 'Tutup penugasan yang sudah dikerjakan. Pekerjaan selesai siap dibukukan di tahap 05.' }),
+    C.pageHeader({ num: '04', label: 'Penyelesaian', title: 'Penyelesaian pekerjaan', em: 'pekerjaan', description: 'Tutup penugasan yang sudah dikerjakan. Pekerjaan selesai siap dibukukan di tahap 05.' }),
     el('div', { className: 'stage-grid' },
-      C.panel({ title: 'Konfirmasi selesai', meta: 'Tahap 04', raised: true, className: 'form-panel' }, form),
+      C.panel({ title: 'Konfirmasi selesai', meta: 'Catat hasil', raised: true, className: 'form-panel' }, form),
       listPanel,
     ),
   )
@@ -97,7 +97,7 @@ export async function render(container, ctx = {}) {
       const row = Array.isArray(data) ? data[0] : data
       notes.input.value = ''
       msg.show('ok', `Pekerjaan untuk ${customerLabel(flow.requestOfAssignment(a))} ditandai selesai. Siap dibukukan.`)
-      const next = C.button({ label: 'Posting jurnal', iconRight: 'arrowRight', size: 'sm' })
+      const next = C.button({ label: 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       next.addEventListener('click', () => navigate('bookkeeping', { completionId: row?.id }))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
       showToast('Pekerjaan ditandai selesai.', 'success')
@@ -137,13 +137,13 @@ export async function render(container, ctx = {}) {
       columns: [
         { label: 'Pelanggan', render: (c) => { const r = flow.requestOfCompletion(c); const a = flow.assignmentOfCompletion(c); return C.cellStack(customerLabel(r), a?.worker_name) } },
         { label: 'Catatan', className: 'col-wide', render: (c) => el('span', { className: 'cell-note', title: c.notes || '' }, c.notes || '—') },
-        { label: 'Selesai', className: 'col-date', render: (c) => el('time', { className: 'mono', datetime: c.completed_at || '', title: C.formatDateTime(c.completed_at) }, C.formatDate(c.completed_at || c.created_at)) },
+        { label: 'Selesai', className: 'col-date', render: (c) => el('time', { className: 'tnum', datetime: c.completed_at || '', title: C.formatDateTime(c.completed_at) }, C.formatDate(c.completed_at || c.created_at)) },
         {
           label: 'Pembukuan',
           className: 'col-action',
           render: (c) => {
             if (flow.ledgerOf(c.id).length) return C.tag('Terbukukan', 'ok')
-            const b = C.button({ label: 'Posting', iconRight: 'arrowRight', size: 'sm' })
+            const b = C.button({ label: 'Posting', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
             b.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
             return b
           },

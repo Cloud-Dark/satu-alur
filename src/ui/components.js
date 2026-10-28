@@ -1,10 +1,11 @@
 /**
- * Component factory for the Satu Alur application ("operator's desk").
+ * Component factory for the Satu Alur application (design system v2 "Tumbuh").
  * Everything here builds DOM nodes; untrusted text is always set with
  * textContent (strings passed as children become text nodes).
  */
 import { VALIDATOR, CONTENT_GATE, solidColor, createSkeleton } from './antislop.js'
 import { icon } from './icons.js'
+import { countUp } from './animations.js'
 
 export { icon }
 
@@ -87,25 +88,46 @@ export function relativeTime(v, now = Date.now()) {
 
 /* ------------------------------------------------------------ Structure */
 
-/** Page header: kicker number + title + one-line description. */
-export function pageHeader({ num, label, title, description, actions }) {
+/**
+ * Serif display title where `em` (a word or phrase inside `title`) is set in
+ * italic — the v2 signature for headings.
+ */
+export function displayTitle(title, em) {
+  const t = String(title ?? '')
+  const i = em ? t.indexOf(em) : -1
+  if (i < 0) return [t]
+  return [t.slice(0, i), el('em', {}, em), t.slice(i + em.length)].filter((x) => x !== '')
+}
+
+/** Step indicator pill: six dots with the current stage filled. */
+export function stepPill(num, label, total = 6) {
+  const n = Number(num) || 0
+  return el('span', { className: 'step-pill', 'aria-label': `Tahap ${n} dari ${total}: ${label}` },
+    el('span', { className: 'step-dots', 'aria-hidden': 'true' },
+      Array.from({ length: total }, (_, i) => el('i', { className: i + 1 < n ? 'is-past' : i + 1 === n ? 'is-now' : '' }))),
+    el('span', { className: 'step-text', 'aria-hidden': 'true' }, `Tahap ${String(n).padStart(2, '0')}`, el('b', {}, label)),
+  )
+}
+
+/** Page header: step pill + serif title (+ italic keyword) + description. */
+export function pageHeader({ num, label, title, em, description, actions }) {
   return el('header', { className: 'page-head' },
     el('div', { className: 'page-head-text' },
-      el('span', { className: 'kicker' }, `${num} — ${label}`),
-      el('h1', { className: 'page-title', tabindex: '-1' }, title),
+      num ? stepPill(num, label) : null,
+      el('h1', { className: 'page-title display', tabindex: '-1' }, displayTitle(title, em)),
       description ? el('p', { className: 'page-desc' }, description) : null,
     ),
     actions ? el('div', { className: 'page-head-actions' }, actions) : null,
   )
 }
 
-/** Bordered panel with an optional header row. */
+/** Rounded surface panel with an optional header row. */
 export function panel({ title, meta, raised = false, className = '', actions, id } = {}, ...children) {
   const head = title
     ? el('div', { className: 'panel-head' },
         el('div', { className: 'panel-head-text' },
           el('h2', { className: 'panel-title' }, title),
-          meta ? el('span', { className: 'panel-meta mono' }, meta) : null,
+          meta ? el('span', { className: 'panel-meta' }, meta) : null,
         ),
         actions ? el('div', { className: 'panel-actions' }, actions) : null,
       )
@@ -143,7 +165,7 @@ export function skeletonRows(rows = 4) {
 /* --------------------------------------------------------------- Buttons */
 
 /**
- * button({label, icon, variant: 'signal'|'ink'|'ghost'|'danger'|'', size: 'sm'|'lg', ...attrs})
+ * button({label, icon, variant: 'primary'|'accent'|'soft'|'ghost'|'danger'|'', size: 'sm'|'lg', ...attrs})
  */
 export function button({ label, icon: iconName, iconRight, variant = '', size = '', type = 'button', className = '', ...attrs } = {}) {
   if (label) CONTENT_GATE.buttonLabel(label)
@@ -151,7 +173,7 @@ export function button({ label, icon: iconName, iconRight, variant = '', size = 
   const b = el('button', { type, className: cls, ...attrs },
     iconName ? icon(iconName) : null,
     label ? el('span', { className: 'btn-label' }, label) : null,
-    iconRight ? icon(iconRight) : null,
+    iconRight ? icon(iconRight, { className: 'icon-trailing' }) : null,
   )
   return b
 }
@@ -192,7 +214,7 @@ function fieldWrap({ id, label, required, hint, control, className = '' }) {
   return el('div', { className: `field ${className}`.trim() },
     el('label', { className: 'field-label', htmlFor: id },
       el('span', {}, label),
-      required ? el('span', { className: 'field-req mono' }, 'wajib') : null,
+      required ? el('span', { className: 'field-req' }, 'Wajib') : null,
     ),
     control,
     hint ? el('span', { className: 'field-hint', id: hintId }, hint) : null,
@@ -266,9 +288,9 @@ export function message() {
   return box
 }
 
-/** Status tag: tone = ok | warn | danger | neutral | ink | live */
+/** Status pill: tone = ok | warn | danger | neutral | brand | live (accent) */
 export function tag(text, tone = 'neutral') {
-  return el('span', { className: `tag tag-${tone}` }, String(text).toUpperCase())
+  return el('span', { className: `tag status status-${tone}` }, el('i', { className: 'status-dot', 'aria-hidden': 'true' }), String(text))
 }
 
 /** Legacy badge API mapped to tags. */
@@ -277,9 +299,10 @@ export function badge(text, variant = 'draft') {
   return tag(text, map[variant] || 'neutral')
 }
 
-export function emptyState({ kicker = 'Kosong', title, body, action }) {
+export function emptyState({ kicker = 'Kosong', title, body, action, iconName = 'sprout' }) {
   return el('div', { className: 'empty' },
-    el('span', { className: 'kicker no-rule' }, kicker),
+    el('span', { className: 'empty-ico', 'aria-hidden': 'true' }, icon(iconName, { size: 20 })),
+    el('span', { className: 'empty-label' }, kicker),
     el('p', { className: 'empty-title' }, title),
     body ? el('p', { className: 'empty-body' }, body) : null,
     action || null,
@@ -293,7 +316,7 @@ export function errorState(text) {
 /* ------------------------------------------------------------------ Data */
 
 /**
- * Ledger-style table.
+ * Data table (rounded container, hairline rows).
  * columns: [{ key, label, align?: 'right', className?, render?(row) -> Node|string }]
  */
 export function dataTable({ columns, rows, caption, rowAttrs }) {
@@ -308,7 +331,7 @@ export function dataTable({ columns, rows, caption, rowAttrs }) {
       }, v == null || v === '' ? el('span', { className: 'muted nil' }, '—') : v)
     }))))
   return el('div', { className: 'table-wrap' },
-    el('table', { className: 'ledger' }, caption ? el('caption', { className: 'sr-only' }, caption) : null, thead, tbody))
+    el('table', { className: 'data-table' }, caption ? el('caption', { className: 'sr-only' }, caption) : null, thead, tbody))
 }
 
 /** Two-line cell: strong primary + muted secondary. */
@@ -321,16 +344,33 @@ export function cellStack(primary, secondary) {
 
 /** Definition list from [[label, value], ...] */
 export function defList(pairs) {
-  return el('dl', { className: 'deflist' }, pairs.map(([k, v]) => [el('dt', { className: 'kicker no-rule' }, k), el('dd', {}, v)]))
+  return el('dl', { className: 'deflist' }, pairs.map(([k, v]) => [el('dt', {}, k), el('dd', {}, v)]))
 }
 
-/** KPI cell for bordered KPI strips. */
-export function kpi({ label, value, sub, delta, tone }) {
-  return el('div', { className: 'kpi' },
-    el('span', { className: 'kpi-label kicker no-rule' }, label),
-    el('span', { className: 'kpi-value tnum' }, value),
-    delta || sub ? el('span', { className: `kpi-sub ${tone ? `tone-${tone}` : ''}`.trim() }, delta || sub) : null,
+/**
+ * KPI card. `hero` renders the brand-green feature card. When `countTo` is a
+ * number the value counts up to it (formatted with `format`).
+ */
+export function kpi({ label, value, sub, delta, tone, hero = false, iconName, countTo, format, className = '' }) {
+  const valueEl = el('span', { className: `kpi-value tnum ${hero ? 'display' : ''}`.trim() }, value)
+  if (typeof countTo === 'number' && Number.isFinite(countTo)) countUp(valueEl, countTo, format || ((n) => number(Math.round(n))))
+  const subContent = delta || sub
+  return el('div', { className: `kpi ${hero ? 'is-hero' : ''} ${className}`.trim() },
+    hero ? heroArt() : null,
+    el('div', { className: 'kpi-top' },
+      el('span', { className: 'kpi-label' }, label),
+      iconName ? el('span', { className: 'kpi-ico', 'aria-hidden': 'true' }, icon(iconName, { size: 16 })) : null,
+    ),
+    valueEl,
+    subContent ? el('span', { className: `kpi-sub ${tone ? `tone-${tone}` : ''}`.trim() }, subContent) : null,
   )
+}
+
+/** Decorative flowing line for the hero KPI card. */
+function heroArt() {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = '<svg class="kpi-art" viewBox="0 0 320 160" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path class="kpi-art-a" d="M-10 130 C 60 128, 90 70, 160 78 S 260 40, 330 14"/><path class="kpi-art-b" d="M-10 150 C 70 150, 120 104, 190 106 S 280 76, 330 60"/><circle class="kpi-art-seed" cx="292" cy="30" r="5"/></svg>'
+  return tpl.content.firstElementChild
 }
 
 /** Legacy stat card API mapped to KPI cell. */
@@ -338,30 +378,32 @@ export function statCard({ label, value, delta }) {
   return kpi({ label, value, sub: delta })
 }
 
-export function solidText(text, colorName = 'ink') {
+export function solidText(text, colorName = 'text') {
   const span = el('span', {}, text)
-  try { span.style.color = solidColor(colorName) } catch { span.style.color = 'var(--ink)' }
+  try { span.style.color = solidColor(colorName) } catch { span.style.color = 'var(--text)' }
   span.style.fontWeight = '800'
   return span
 }
 
-/* -------------------------------------------------------------- AI console */
+/* -------------------------------------------------------------- AI panel */
 
 /**
- * Console-like panel for streaming AI output.
+ * Soft card for streaming AI output.
  * Returns { root, body, setStatus(text, live), write(text), writeHTML(html), done(), onStop(fn) }
  */
 export function aiConsole({ model = 'AI' } = {}) {
-  const status = el('span', { className: 'console-status' }, 'SIAP')
-  const dot = el('span', { className: 'console-dot' })
+  const status = el('span', { className: 'console-status' }, 'Siap')
   const meter = el('span', { className: 'console-meter tnum' }, '')
   const stopBtn = el('button', { type: 'button', className: 'console-stop' }, icon('stop', { size: 14 }), el('span', {}, 'Hentikan'))
   const body = el('div', { className: 'console-body', 'aria-live': 'polite', 'aria-busy': 'false' })
   const caret = el('span', { className: 'caret', 'aria-hidden': 'true' })
   const root = el('div', { className: 'console' },
     el('div', { className: 'console-head' },
-      dot,
-      el('span', { className: 'console-title' }, icon('terminal', { size: 14 }), `AI / ${model}`),
+      el('span', { className: 'console-badge', 'aria-hidden': 'true' }, icon('sparkles', { size: 16 })),
+      el('span', { className: 'console-title' },
+        el('b', {}, 'Asisten AI'),
+        el('span', { className: 'console-model' }, model),
+      ),
       status,
       meter,
       stopBtn,
@@ -381,21 +423,23 @@ export function aiConsole({ model = 'AI' } = {}) {
     },
     write(text) {
       body.classList.remove('is-prose')
+      body.classList.add('is-code')
       body.textContent = text
       body.appendChild(caret)
-      meter.textContent = `${number(text.length)} kar`
+      meter.textContent = text.length ? `${number(text.length)} karakter` : ''
       body.scrollTop = body.scrollHeight
     },
     writeHTML(html, { caretOn = true } = {}) {
+      body.classList.remove('is-code')
       body.classList.add('is-prose')
       body.innerHTML = html
-      if (caretOn) body.appendChild(caret)
-      meter.textContent = `${number(body.textContent.length)} kar`
+      if (caretOn) (body.lastElementChild || body).appendChild(caret)
+      meter.textContent = `${number(body.textContent.length)} karakter`
     },
     done() { caret.remove() },
     onStop(fn) { stopHandler = fn },
   }
-  api.setStatus('SIAP', false)
+  api.setStatus('Siap', false)
   return api
 }
 

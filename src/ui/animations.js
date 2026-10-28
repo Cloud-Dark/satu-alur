@@ -3,30 +3,66 @@
  * and reads colours from tokens.css (no raw hex here).
  */
 
-const reducedMotion = () =>
+const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)' // mirrors --ease in tokens.css
+
+export const reducedMotion = () =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
 /** Fades/lifts an element in. Safe to call on detached nodes. */
-export function animateEntrance(element, delay = 0) {
-  if (!element || reducedMotion()) return
+export function animateEntrance(element, delay = 0, { distance = 14, duration = 560 } = {}) {
+  if (!element || reducedMotion() || typeof element.animate !== 'function') return
   element.animate(
     [
-      { opacity: 0, transform: 'translateY(8px)' },
+      { opacity: 0, transform: `translateY(${distance}px)` },
       { opacity: 1, transform: 'none' },
     ],
-    { duration: 420, delay, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'backwards' },
+    { duration, delay, easing: EASE, fill: 'backwards' },
   )
 }
 
 /** Staggers the direct children of `parent`. */
-export function staggerChildren(parent, { step = 40, start = 0, max = 12 } = {}) {
+export function staggerChildren(parent, { step = 50, start = 0, max = 12 } = {}) {
   if (!parent) return
   Array.from(parent.children).slice(0, max).forEach((child, i) => animateEntrance(child, start + i * step))
 }
 
+/**
+ * Page-change entrance: header first, then each panel of a two-column stage
+ * grid, in reading order.
+ */
+export function animateView(view) {
+  if (!view || reducedMotion()) return
+  const items = []
+  for (const child of view.children) {
+    if (child.classList.contains('stage-grid') || child.classList.contains('dash-body')) items.push(...child.children)
+    else items.push(child)
+  }
+  items.slice(0, 10).forEach((n, i) => animateEntrance(n, i * 70))
+}
+
+/**
+ * Counts a number up inside `element`, formatting each frame with `format`.
+ * Lands exactly on `to`. Reduced motion: writes the final value immediately.
+ */
+export function countUp(element, to, format = (n) => String(Math.round(n)), { duration = 900, from = 0 } = {}) {
+  if (!element) return
+  const target = Number(to) || 0
+  if (reducedMotion() || target === from) { element.textContent = format(target); return }
+  element.textContent = format(from)
+  let start = null
+  const ease = (t) => 1 - Math.pow(1 - t, 3)
+  const tick = (now) => {
+    if (start == null) start = now
+    const t = Math.min(1, (now - start) / duration)
+    element.textContent = format(t === 1 ? target : from + (target - from) * ease(t))
+    if (t < 1) requestAnimationFrame(tick)
+  }
+  requestAnimationFrame(tick)
+}
+
 export function pulseEffect(element) {
   if (!element || reducedMotion()) return
-  element.animate([{ opacity: 1 }, { opacity: 0.4 }, { opacity: 1 }], { duration: 900, iterations: 2 })
+  element.animate([{ opacity: 1 }, { opacity: 0.45 }, { opacity: 1 }], { duration: 900, iterations: 2, easing: EASE })
 }
 
 /**
@@ -75,8 +111,8 @@ export function typewriterEffect(element, text, speed = 30) {
 }
 
 /**
- * Kept for backwards compatibility. The editorial design has no particle
- * backdrop, so this is a no-op that returns a cleanup function.
+ * Kept for backwards compatibility. The app has no particle backdrop, so
+ * this is a no-op that returns a cleanup function.
  */
 export function createParticleBackground() {
   return () => {}

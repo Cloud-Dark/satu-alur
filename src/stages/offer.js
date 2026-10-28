@@ -36,12 +36,12 @@ export async function render(container, ctx = {}) {
 
   const reqSelect = C.select({ label: 'Permintaan', name: 'request_id', required: true, hint: 'Permintaan tanpa penawaran ditampilkan lebih dulu.', options: [{ value: '', label: 'Memuat…' }] })
   const preview = el('div', { className: 'req-preview', hidden: true })
-  const genBtn = C.button({ label: 'Hasilkan penawaran', icon: 'sparkles', variant: 'signal' })
-  const modelNote = el('span', { className: 'field-hint mono model-note' }, 'Model: memuat…')
+  const genBtn = C.button({ label: 'Hasilkan penawaran', icon: 'sparkles', variant: 'primary' })
+  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
   const msg = C.message()
   const resultArea = el('div', { className: 'offer-result' })
 
-  const genPanel = C.panel({ title: 'Penawaran AI', meta: 'Tahap 02', raised: true, className: 'form-panel' },
+  const genPanel = C.panel({ title: 'Susun penawaran', meta: 'Dibantu AI', raised: true, className: 'form-panel' },
     el('div', { className: 'form' },
       reqSelect.wrap,
       preview,
@@ -55,7 +55,7 @@ export async function render(container, ctx = {}) {
   const listPanel = C.panel({ title: 'Daftar penawaran', meta: 'memuat…', className: 'list-panel' }, listBody)
 
   container.replaceChildren(
-    C.pageHeader({ num: '02', label: 'Penawaran', title: 'Penawaran AI', description: 'AI menyusun ruang lingkup dan harga. Aturan domain memeriksa hasilnya sebelum Anda menyimpan.' }),
+    C.pageHeader({ num: '02', label: 'Penawaran', title: 'Penawaran AI', em: 'AI', description: 'AI menyusun ruang lingkup dan harga. Aturan domain memeriksa hasilnya sebelum Anda menyimpan.' }),
     el('div', { className: 'stage-grid' }, genPanel, listPanel),
   )
 
@@ -121,7 +121,7 @@ export async function render(container, ctx = {}) {
     const restore = C.setBusy(genBtn, 'Menyusun…')
     const consoleUI = C.aiConsole({ model: model.id })
     consoleUI.onStop(() => ac.abort())
-    consoleUI.setStatus('STREAMING', true)
+    consoleUI.setStatus('Menulis…', true)
     consoleUI.write('')
     resultArea.replaceChildren(consoleUI.root)
 
@@ -133,15 +133,15 @@ export async function render(container, ctx = {}) {
         onChunk: (_delta, full) => { if (!ac.signal.aborted) consoleUI.write(full) },
       }), ac.signal)
       consoleUI.done()
-      consoleUI.setStatus('SELESAI', false)
+      consoleUI.setStatus('Selesai', false)
       resultArea.appendChild(renderProposal(request, offerJson))
     } catch (err) {
       consoleUI.done()
       if (err.name === 'AbortError') {
-        consoleUI.setStatus('DIHENTIKAN', false)
+        consoleUI.setStatus('Dihentikan', false)
         msg.show('info', 'Pembuatan penawaran dihentikan. Tidak ada yang disimpan.')
       } else {
-        consoleUI.setStatus('GAGAL', false)
+        consoleUI.setStatus('Gagal', false)
         msg.show('danger', err.message)
       }
     } finally {
@@ -160,7 +160,7 @@ export async function render(container, ctx = {}) {
       attrs: { min: String(OfferRules.minPrice), max: String(OfferRules.maxPrice), step: '1000', inputmode: 'numeric' },
     })
     const checks = el('ul', { className: 'checks' })
-    const saveBtn = C.button({ label: 'Simpan penawaran', icon: 'save', variant: 'ink' })
+    const saveBtn = C.button({ label: 'Simpan penawaran', icon: 'save', variant: 'primary' })
     const saveMsg = C.message()
 
     const candidate = () => ({ ...offerJson, price: Number(priceField.input.value) })
@@ -183,7 +183,7 @@ export async function render(container, ctx = {}) {
 
     box.append(
       el('div', { className: 'proposal-head' },
-        el('span', { className: 'kicker no-rule' }, 'Usulan AI'),
+        el('span', { className: 'tag tag-accent' }, icon('sparkles', { size: 14 }), 'Usulan AI'),
         el('span', { className: 'proposal-for' }, `${customerLabel(request)} — ${request.service_type || 'layanan'}`),
       ),
       C.defList([
@@ -193,7 +193,7 @@ export async function render(container, ctx = {}) {
         ['Catatan', offerJson?.notes || '—'],
       ]),
       el('div', { className: 'proposal-validate' },
-        el('span', { className: 'kicker no-rule' }, 'Aturan domain'),
+        el('span', { className: 'proposal-label' }, icon('shield', { size: 15 }), 'Aturan domain'),
         checks,
       ),
       priceField.wrap,
@@ -222,7 +222,7 @@ export async function render(container, ctx = {}) {
         saveBtn.disabled = true
         priceField.input.disabled = true
         saveMsg.show('ok', `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`)
-        const next = C.button({ label: 'Tugaskan pekerja', iconRight: 'arrowRight', size: 'sm' })
+        const next = C.button({ label: 'Tugaskan pekerja', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
         next.addEventListener('click', () => navigate('assign', { offerId: row?.id }))
         saveMsg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
         showToast('Penawaran disimpan.', 'success')
@@ -288,22 +288,22 @@ export async function render(container, ctx = {}) {
         },
         { label: 'Harga', align: 'right', render: (o) => el('span', { className: 'tnum' }, C.rupiah(o.validated_price)) },
         { label: 'Status', render: (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn')) },
-        { label: 'Dibuat', className: 'col-date', render: (o) => el('time', { className: 'mono', datetime: o.created_at, title: C.formatDateTime(o.created_at) }, C.formatDate(o.created_at)) },
+        { label: 'Dibuat', className: 'col-date', render: (o) => el('time', { className: 'tnum', datetime: o.created_at, title: C.formatDateTime(o.created_at) }, C.formatDate(o.created_at)) },
         {
           label: 'Aksi',
           className: 'col-action',
           render: (o) => {
             if (o.status !== 'approved') {
-              const b = C.button({ label: 'Setujui', icon: 'check', size: 'sm' })
+              const b = C.button({ label: 'Setujui', icon: 'check', size: 'sm', variant: 'primary' })
               b.addEventListener('click', () => approve(o, b))
               return b
             }
             if (!flow.assignmentsOf(o.id).length) {
-              const b = C.button({ label: 'Tugaskan', iconRight: 'arrowRight', size: 'sm' })
+              const b = C.button({ label: 'Tugaskan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
               b.addEventListener('click', () => navigate('assign', { offerId: o.id }))
               return b
             }
-            return el('span', { className: 'muted mono' }, 'Ditugaskan')
+            return el('span', { className: 'muted small' }, 'Ditugaskan')
           },
         },
       ],

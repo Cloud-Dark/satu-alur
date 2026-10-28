@@ -1,43 +1,50 @@
 /**
  * AntiSlop — small UI quality guard for Satu Alur.
  *
- * Colours, type and spacing live in src/styles/tokens.css. TOKENS mirrors
+ * Colours, type and spacing live in src/styles/tokens.css (v2 "Tumbuh"). TOKENS mirrors
  * them as CSS variable references so JS never carries raw hex values and
  * both themes keep working.
  */
 
 export const TOKENS = Object.freeze({
   colors: {
-    paper: 'var(--paper)',
-    paper2: 'var(--paper-2)',
-    card: 'var(--card)',
-    sunken: 'var(--sunken)',
-    ink: 'var(--ink)',
-    ink2: 'var(--ink-2)',
-    muted: 'var(--muted)',
-    faint: 'var(--faint)',
-    rule: 'var(--rule)',
-    signal: 'var(--signal)',
-    ok: 'var(--ok)',
-    warn: 'var(--warn)',
+    bg: 'var(--bg)',
+    bg2: 'var(--bg-2)',
+    surface: 'var(--surface)',
+    surface2: 'var(--surface-2)',
+    sunken: 'var(--surface-sunken)',
+    text: 'var(--text)',
+    text2: 'var(--text-2)',
+    muted: 'var(--text-muted)',
+    faint: 'var(--text-faint)',
+    line: 'var(--line)',
+    lineStrong: 'var(--line-strong)',
+    brand: 'var(--brand)',
+    brand600: 'var(--brand-600)',
+    brand500: 'var(--brand-500)',
+    brand300: 'var(--brand-300)',
+    brand100: 'var(--brand-100)',
+    brand50: 'var(--brand-50)',
+    accent: 'var(--accent)',
+    accent600: 'var(--accent-600)',
+    accent100: 'var(--accent-100)',
+    success: 'var(--success)',
+    warning: 'var(--warning)',
     danger: 'var(--danger)',
-    // Legacy aliases (older callers asked for these names)
-    primary: 'var(--ink)',
-    text: 'var(--ink)',
-    textMuted: 'var(--muted)',
-    success: 'var(--ok)',
-    warning: 'var(--warn)',
-    accent: {},
+    info: 'var(--info)',
+    // Aliases older callers asked for
+    primary: 'var(--brand)',
+    textMuted: 'var(--text-muted)',
   },
   spacing: { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, '2xl': 48, '3xl': 64 },
-  radius: { sm: 4, md: 6 },
+  radius: { xs: 'var(--r-xs)', sm: 'var(--r-sm)', md: 'var(--r-md)', lg: 'var(--r-lg)', xl: 'var(--r-xl)', pill: 'var(--r-pill)' },
   font: {
     display: 'var(--font-display)',
-    sans: 'var(--font-body)',
-    mono: 'var(--font-mono)',
+    sans: 'var(--font-sans)',
     weights: { normal: 400, medium: 500, semibold: 600, bold: 700, extrabold: 800 },
   },
-  shadows: { sm: 'var(--shadow-sm)', md: 'var(--shadow)', lg: 'var(--shadow-lg)' },
+  shadows: { xs: 'var(--shadow-xs)', sm: 'var(--shadow-sm)', md: 'var(--shadow-md)', lg: 'var(--shadow-lg)' },
+  motion: { ease: 'var(--ease)', fast: 'var(--t-fast)', base: 'var(--t)', slow: 'var(--t-slow)' },
 })
 
 /** Returns a CSS variable reference for a named token colour. */
