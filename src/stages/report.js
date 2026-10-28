@@ -106,7 +106,7 @@ export async function render(container, ctx = {}) {
     const cCost = cmp(t.cost, prevT?.cost, true)
     const cProfit = cmp(t.profit, prevT?.profit)
     kpis.replaceChildren(
-      C.kpi({ label: 'Laba bersih', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
+      C.kpi({ label: 'Laba sebelum pajak', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
       C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue), countTo: t.revenue, format: C.rupiah, sub: cRev.sub, tone: cRev.tone }),
       C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost), countTo: t.cost, format: C.rupiah, sub: cCost.sub, tone: cCost.tone }),
       C.kpi({ label: 'Margin', iconName: 'activity', value: margin == null ? '—' : `${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, sub: margin == null ? 'Belum ada pendapatan' : `Biaya ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan` }),

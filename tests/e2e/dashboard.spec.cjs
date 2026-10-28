@@ -10,7 +10,7 @@ module.exports = async function dashboard(t) {
   await loginLive(p, t.base)
   t.check(/Mode demo · data lokal/.test(await p.textContent('.sync-line')), 'sync line says "Mode demo · data lokal"')
   t.check(await p.locator('.kpis .kpi').count() === 4, 'four KPI cards')
-  t.check(rp(await kpiValue(p, 'Laba bersih')) === 'Rp5.950.000', 'Laba bersih = Rp5.950.000', await kpiValue(p, 'Laba bersih'))
+  t.check(rp(await kpiValue(p, 'Laba sebelum pajak')) === 'Rp5.950.000', 'Laba sebelum pajak = Rp5.950.000', await kpiValue(p, 'Laba sebelum pajak'))
   t.check(rp(await kpiValue(p, 'Pendapatan')) === 'Rp9.750.000', 'Pendapatan = Rp9.750.000', await kpiValue(p, 'Pendapatan'))
   t.check(rp(await kpiValue(p, 'Biaya')) === 'Rp3.800.000', 'Biaya = Rp3.800.000', await kpiValue(p, 'Biaya'))
   t.check(norm(await kpiValue(p, 'Tingkat penyelesaian')) === '67%', 'Tingkat penyelesaian = 67% (4 of 6)', await kpiValue(p, 'Tingkat penyelesaian'))

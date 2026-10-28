@@ -103,7 +103,7 @@ Kriteria penerimaan:
 Sumber: `src/stages/report.js`.
 
 Kriteria penerimaan:
-- Ringkasan (periode, total pendapatan, total biaya, laba bersih) dihitung dari `ledger_entries` milik pengguna.
+- Ringkasan (periode, total pendapatan, total biaya, laba sebelum pajak (pendapatan − biaya tercatat; belum termasuk PPh)) dihitung dari `ledger_entries` milik pengguna.
 - Tombol "Jelaskan dengan AI" memanggil `POST /api/llm/chat` (streaming); keluaran HTML ditampilkan bertahap.
 - Tombol Batal menghentikan stream.
 - Penyimpanan laporan ke tabel `reports`: belum dilakukan UI (_TBD_).
