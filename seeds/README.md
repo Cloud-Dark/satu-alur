@@ -2,17 +2,19 @@
 
 > **Peringatan kuota D1 (paket gratis):** paket Free membatasi **100.000 baris tulis per hari**, dihitung termasuk entri indeks. Sebelum migrasi 0004, `demo.sql` penuh menulis ±112.000 baris. Akibatnya kuota harian habis dan semua penyimpanan, termasuk login, gagal sampai 00.00 UTC. Di akun Free pakai **mode lean dan file terpisah**: lihat [Free tier](#free-tier-lean--split).
 
+> **Jangan re-seed produksi sekarang.** Kuota tulis D1 produksi sedang ketat. Revisi data (lapisan makro, 2026-10-28) baru diverifikasi di D1 **lokal**. Jangan jalankan perintah `--remote` di berkas ini sampai lead memutuskan jadwalnya.
+
 > Status: Draft
-> Terakhir diperbarui: 2026-10-28
+> Terakhir diperbarui: 2026-10-28 (revisi lapisan makro)
 > Pemilik: _TBD_
 
-Berisi **data demo DUMMY** untuk D1. Semua pelanggan, telepon, alamat, pekerja, dan angka di sini **fiktif**. Data ini tidak mewakili pelanggan nyata. Rancangan dan asumsinya ada di [docs/specs/2026-10-28-demo-growth-data-design.md](../docs/specs/2026-10-28-demo-growth-data-design.md).
+Berisi **data demo DUMMY** untuk D1. Semua pelanggan, telepon, alamat, pekerja, dan angka di sini **fiktif**. Data ini tidak mewakili pelanggan nyata. Rancangan dan asumsinya ada di [docs/specs/2026-10-28-demo-growth-data-design.md](../docs/specs/2026-10-28-demo-growth-data-design.md). Tabel angka hasil (pertumbuhan nominal vs riil, CV, margin sebelum/setelah pajak, headcount) dibuat otomatis di [docs/specs/generated/](../docs/specs/generated/demo-economic-summary.md).
 
 | File | Isi |
 |------|-----|
-| `demo.sql` | Mode penuh: 9 akun demo dan seluruh data alurnya (39.182 baris, ±10,6 MB). Ditujukan untuk lokal atau akun Workers Paid. |
-| `demo-summary.json` | Ringkasan mode penuh per usaha: pendapatan/biaya/laba bulanan, tren, margin, jumlah baris, estimasi tulis. |
-| `demo-lean.part1of3.sql` … `part3of3.sql` | Mode `--lean` dibagi 3 file (17.504 baris total). Masing-masing ±37–38 ribu writes bila mengganti seed penuh. Terapkan **satu file per hari** di akun Free. |
+| `demo.sql` | Mode penuh: 9 akun demo dan seluruh data alurnya (34.822 baris, ±9,6 MB). Ditujukan untuk lokal atau akun Workers Paid. |
+| `demo-summary.json` | Ringkasan mode penuh per usaha: asumsi `macro`, pendapatan/biaya/laba bulanan, tren nominal vs volume riil, CV, struktur biaya, laba sebelum pajak dan estimasi setelah pajak, headcount, jumlah baris, estimasi tulis. **Sumber tabel dokumen.** |
+| `demo-lean.part1of3.sql` … `part3of3.sql` | Mode `--lean` dibagi 3 file (17.763 baris total). Masing-masing ±34–36 ribu writes bila mengganti seed penuh. Terapkan **satu file per hari** di akun Free. |
 | `demo-lean-summary.json` | Ringkasan mode lean, termasuk `write_estimate`. |
 
 ## Akun demo
@@ -40,7 +42,17 @@ node scripts/seed-demo.mjs --months 12 --end 2026-10-31 --out seeds/demo.sql
 # opsi: --asof 2026-11-20 | --asof now   (batas "hari ini" data; default 2026-10-28 17:00 WIB)
 #       --seed 20261028  --only demo-ac,demo-rs  --summary none  --quiet
 #       --lean  --split N  --existing-counts seeds/existing.json  --budget 90000  --per-file 45000
+#       --report md [--report-out docs/specs/generated/demo-economic-summary.md]
+
+# Lean (yang diterapkan ke D1) + laporannya:
+node scripts/seed-demo.mjs --lean --split 3 --out seeds/demo-lean.sql --summary seeds/demo-lean-summary.json \
+  --report md --report-out docs/specs/generated/demo-economic-summary-lean.md
+
+# Render ulang laporan dari JSON yang ada, tanpa simulasi:
+node scripts/seed-demo.mjs --report md --from-summary seeds/demo-summary.json
 ```
+
+Berkas di `docs/specs/generated/` jangan diedit manual: angka di sana dirender dari objek ringkasan yang sama dengan JSON. Asumsi makro (PDB riil, IHK, UMK, pajak) ada di blok `MACRO` generator dan semuanya **asumsi perencanaan** yang harus dicek ke BPS, SK Gubernur, dan regulasi pajak.
 
 Output deterministik: seed dan argumen yang sama menghasilkan file yang identik byte per byte. Untuk demo di tanggal lain, buat ulang dengan `--asof` hari demo supaya KPI "7 hari terakhir" dan antrean "Perlu tindakan" tetap segar.
 
@@ -49,9 +61,11 @@ Output deterministik: seed dan argumen yang sama menghasilkan file yang identik 
 ```bash
 npx wrangler d1 migrations apply satu-alur-db --local   # bila skema belum ada
 npx wrangler d1 execute satu-alur-db --local --file seeds/demo.sql
+# atau versi lean (sama dengan yang akan dipakai di produksi):
+npx wrangler d1 execute satu-alur-db --local --file seeds/demo-lean.part1of3.sql   # lalu part2of3, part3of3
 ```
 
-Produksi (`--remote`) hanya dijalankan oleh lead.
+Produksi (`--remote`) hanya dijalankan oleh lead, dan **saat ini ditunda** (lihat peringatan di atas).
 
 - **Aman dijalankan ulang.** File ini menghapus dulu seluruh baris domain milik 9 akun demo (anak dulu, termasuk `reports`, `social_*`, `ai_messages`), lalu mengisi ulang.
 - Bila email demo sudah pernah login sebelum seed (sehingga punya UUID acak), baris dan sesi milik UUID lama ikut dihapus, lalu user dibuat ulang dengan UUID tetap. Akibatnya sesi login akun demo itu ikut keluar.
@@ -64,18 +78,20 @@ D1 Free: **100.000 rows written per hari**, reset 00.00 UTC. Setiap baris yang d
 
 | Skenario (9 akun, default) | Baris insert | Writes insert | Writes hapus data lama | **Total** |
 |----------------------------|--------------|---------------|------------------------|-----------|
-| Penuh, DB kosong | 39.182 | 78.400 | 0 | **78.400** |
-| Penuh, mengganti seed penuh | 39.182 | 78.400 | 78.364 | **156.764** |
-| Lean, DB kosong | 17.504 | 35.044 | 0 | **35.044** |
-| Lean, mengganti seed penuh | 17.504 | 35.044 | 78.364 | **113.408**, jadi 3 file × ±38 ribu |
+| Penuh, DB kosong | 34.822 | 69.680 | 0 | **69.680** |
+| Penuh, mengganti seed penuh | 34.822 | 69.680 | 69.644 | **139.324** |
+| Lean, DB kosong | 17.763 | 35.562 | 0 | **35.562** |
+| Lean, mengganti seed penuh | 17.763 | 35.562 | 69.644 | **105.206**, jadi 3 file × ±34–36 ribu |
+
+"Mengganti seed penuh" mengasumsikan seed penuh **revisi ini** sudah ada. Jumlah baris lama di produksi bisa berbeda (seed versi lama atau lean), jadi selalu hitung dulu dengan `--existing-counts` (langkah 1).
 
 Yang diringkas mode `--lean`:
 
-- Biaya per pekerjaan digabung jadi satu baris (kategori = komponen terbesar). Overhead digabung jadi satu baris per bulan. Total biaya bulanan tidak berubah.
+- Biaya per pekerjaan digabung jadi satu baris (kategori = komponen terbesar). Overhead, gaji tetap, dan THR digabung jadi satu baris per bulan. Total biaya bulanan tidak berubah.
 - Laundry walk-in dicatat sebagai rekap mingguan.
 - Work order kecil enterprise ditagih sebagai rekap bulanan per klien, ditambah lebih sedikit proyek yang lebih besar dan kontrak yang lebih besar.
 
-Sembilan usaha, 12 bulan, dan seluruh band pertumbuhan/margin tetap dicek.
+Sembilan usaha, 12 bulan, dan seluruh band (tren nominal, margin sebelum pajak, CV sole/UKM, batas peredaran PPh Final) tetap dicek.
 
 Langkah:
 

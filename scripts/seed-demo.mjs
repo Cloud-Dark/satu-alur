@@ -11,11 +11,16 @@
  *        [--asof 2026-10-28T17:00:00+07:00 | --asof now] [--seed 20261028]
  *        [--out seeds/demo.sql] [--summary seeds/demo-summary.json] [--only demo-ac,demo-rs] [--quiet]
  *        [--lean] [--split N] [--existing-counts seeds/existing.json] [--budget 90000] [--per-file 45000]
+ *        [--report md] [--report-out docs/specs/generated/demo-economic-summary.md] [--from-summary seeds/demo-summary.json]
  *
  * --lean    : hemat tulis D1 (≤ ±18 rb baris): biaya per job digabung jadi 1 baris, overhead 1 baris/bulan,
  *             rekap kiloan mingguan, work order enterprise direkap bulanan, kontrak lebih besar.
  * --split N : bagi usaha (utuh) ke N file SQL (target ≤ --per-file writes per file) untuk diterapkan per hari.
  * Setiap run mencetak estimasi D1 "rows written" (insert + hapus data lama) dan memperingatkan bila > --budget.
+ * --report md : tulis ringkasan ekonomi Markdown dari objek ringkasan JSON yang sama (satu sumber kebenaran).
+ *               Dengan --from-summary FILE, MD dibuat dari JSON yang sudah ada tanpa simulasi ulang.
+ *
+ * Lapisan makro (riil vs nominal, inflasi, UMK, pajak) ada di blok MACRO: semua nilainya ASUMSI PERENCANAAN.
  *
  * Asumsi, rumus, dan kalender musiman: docs/specs/2026-10-28-demo-growth-data-design.md
  * Tanpa dependency (Node >= 18, ESM).
@@ -31,7 +36,7 @@ const MIN = 60000
 /* ================================================================== CLI */
 
 function parseArgs(argv) {
-  const a = { months: 12, end: '2026-10-31', asof: null, seed: 20261028, out: 'seeds/demo.sql', summary: 'seeds/demo-summary.json', only: null, quiet: false, lean: false, split: 1, existing: null, budget: 90000, perFile: 45000 }
+  const a = { months: 12, end: '2026-10-31', asof: null, seed: 20261028, out: 'seeds/demo.sql', summary: 'seeds/demo-summary.json', only: null, quiet: false, lean: false, split: 1, existing: null, budget: 90000, perFile: 45000, report: null, reportOut: 'docs/specs/generated/demo-economic-summary.md', fromSummary: null }
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]
     const v = () => {
@@ -52,8 +57,11 @@ function parseArgs(argv) {
     else if (k === '--budget') a.budget = Number(v())
     else if (k === '--per-file') a.perFile = Number(v())
     else if (k === '--quiet') a.quiet = true
+    else if (k === '--report') a.report = v()
+    else if (k === '--report-out') a.reportOut = v()
+    else if (k === '--from-summary') a.fromSummary = v()
     else if (k === '-h' || k === '--help') {
-      console.log('Pemakaian: node scripts/seed-demo.mjs [--lean] [--months 12] [--end YYYY-MM-DD] [--asof ISO|now] [--seed N] [--out file.sql] [--summary file.json|none]\n  [--only demo-ac,demo-rs] [--split N] [--existing-counts seeds/existing.json] [--budget 90000] [--per-file 45000] [--quiet]')
+      console.log('Pemakaian: node scripts/seed-demo.mjs [--lean] [--months 12] [--end YYYY-MM-DD] [--asof ISO|now] [--seed N] [--out file.sql] [--summary file.json|none]\n  [--only demo-ac,demo-rs] [--split N] [--existing-counts seeds/existing.json] [--budget 90000] [--per-file 45000] [--quiet]\n  [--report md] [--report-out file.md] [--from-summary seeds/demo-summary.json]')
       process.exit(0)
     } else throw new Error(`Argumen tidak dikenal: ${k}`)
   }
@@ -61,6 +69,8 @@ function parseArgs(argv) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(a.end)) throw new Error('--end harus YYYY-MM-DD')
   if (!Number.isFinite(a.seed)) throw new Error('--seed harus angka')
   if (!Number.isInteger(a.split) || a.split < 1 || a.split > 9) throw new Error('--split harus 1..9')
+  if (a.report != null && a.report !== 'md') throw new Error('--report hanya mendukung "md"')
+  if (a.fromSummary && a.report !== 'md') throw new Error('--from-summary dipakai bersama --report md')
   return a
 }
 
@@ -147,40 +157,85 @@ const SCALE = {
     dow: [1.15, 0.9, 0.9, 0.9, 0.95, 0.85, 1.35], holiday: 0.5, peak: 1.2, lull: 0.6, ramadan: 0.97, pre: 1.4, leb: 0.12, post: 0.75,
     leadDays: [[0, 30], [1, 40], [2, 20], [3, 10]], quoteH: [0.2, 3], durH: null, entryLate: 0.08, entryLateDays: [1, 3],
     postLag: [[0, 60], [1, 27], [2, 6], [4, 4], [7, 3]], hours: [8, 18.5], loss: 0.1, noOffer: 0.12, repeat: 0.35,
-    round: 5000, transportLine: 0.95, sigma: 0.025, gDraw: [0.012, 0.018], band: [0.01, 0.02], decisionDays: [1, 6],
+    round: 5000, transportLine: 0.95, sigma: 0.04, gDraw: [0.012, 0.018], band: [0.01, 0.02], decisionDays: [1, 6], labour: 'perJob', cvBand: [0.05, 0.2],
   },
   ukm: {
     dow: [0.35, 1.05, 1.05, 1.05, 1.05, 1.0, 0.85], holiday: 0.2, peak: 1.25, lull: 0.5, ramadan: 1.0, pre: 1.35, leb: 0.1, post: 0.7,
     leadDays: [[1, 15], [2, 25], [3, 25], [5, 20], [8, 15]], quoteH: [18, 72], entryLate: 0.08, entryLateDays: [1, 4],
     postLag: [[0, 30], [1, 30], [2, 20], [3, 10], [5, 7], [9, 3]], hours: [7.5, 16.5], loss: 0.16, noOffer: 0.1, repeat: 0.45,
-    round: 50000, transportLine: 0.85, sigma: 0.025, gDraw: [0.012, 0.018], band: [0.01, 0.02], decisionDays: [2, 10],
+    round: 50000, transportLine: 0.85, sigma: 0.035, gDraw: [0.012, 0.018], band: [0.01, 0.02], decisionDays: [2, 10], labour: 'payroll', cvBand: [0.05, 0.2],
   },
   enterprise: {
     dow: [0.15, 1.1, 1.1, 1.1, 1.1, 1.05, 0.5], holiday: 0.1, peak: 1.2, lull: 0.45, ramadan: 1.0, pre: 1.12, leb: 0.1, post: 0.8,
     leadDays: [[4, 20], [7, 30], [10, 25], [14, 15], [21, 10]], quoteH: [36, 150], entryLate: 0.1, entryLateDays: [1, 5],
     postLag: [[1, 20], [2, 25], [3, 20], [5, 20], [8, 15]], hours: [7, 17], loss: 0.22, noOffer: 0.08, repeat: 0.7,
-    round: 100000, transportLine: 0.6, sigma: 0.025, gDraw: [0.06, 0.09], band: [0.05, 0.1], decisionDays: [5, 21],
+    round: 100000, transportLine: 0.6, sigma: 0.025, gDraw: [0.06, 0.09], band: [0.05, 0.1], decisionDays: [5, 21], labour: 'payroll', cvBand: null,
   },
 }
 
-/* ====================================================== Profil wilayah */
-// Asumsi demo (bukan data BPS): nasional ~5%/th, menengah ~6-7%/th, cepat ~8-10%/th.
-const R = (key, name, profile, growth, tz, code, areas, extra = {}) => ({ key, name, profile, growth, tz, code, areas, w: 1, open: -99, ...extra })
+/* ======================================================= Lapisan makro */
+// SEMUA angka di blok ini adalah ASUMSI PERENCANAAN untuk data demo, BUKAN angka resmi.
+// Sumber yang harus dicek sebelum dipakai di luar demo:
+//   - PDB riil nasional & PDRB riil provinsi: Berita Resmi Statistik (BRS) BPS, bps.go.id (rilis triwulanan).
+//   - Inflasi IHK nasional & provinsi: BRS Inflasi BPS (rilis bulanan).
+//   - UMK/UMP: SK Gubernur masing-masing provinsi (diumumkan menjelang 1 Januari).
+//   - Pajak: PP 55/2022 (PPh Final UMKM) dan UU 7/2021 (HPP) jo. Pasal 31E UU PPh; cek ke konsultan pajak.
+// Pertumbuhan PDB/PDRB adalah angka RIIL; pendapatan di buku besar NOMINAL:
+//   nominal ≈ (1 + riil) × (1 + inflasi) − 1
+const MACRO = {
+  year0: 2025, // tahun acuan nilai UMK di REG (jendela data mulai Nov 2025)
+  realGdp: 0.05, // pertumbuhan PDB riil nasional ±5,0%/th (asumsi; cek BRS PDB BPS)
+  cpi: 0.028, // inflasi IHK ±2,5–3,0%/th, dipakai 2,8% (asumsi; sasaran inflasi 2,5±1%; cek BRS Inflasi BPS)
+  // Kenaikan tarif jasa: ditetapkan tiap Januari (rentang per skala), plus penyesuaian pertengahan tahun sesekali.
+  servicePriceJan: { sole: [0.03, 0.05], ukm: [0.03, 0.05], enterprise: [0.04, 0.06] }, // asumsi: IHK + 0,5–2 poin
+  servicePriceMid: { p: 0.35, month: 6, pct: [0.01, 0.02] }, // Juli, ±35% usaha menyesuaikan tarif lagi (asumsi)
+  contractEsc: [0.03, 0.05], // eskalasi Januari kontrak non-UMK (pest, laundry, cleaning, FM cabang) (asumsi)
+  umkStep: 0.065, // kenaikan UMK tiap 1 Januari ±6,5% (asumsi; cek SK Gubernur)
+  allIn: 1.25, // biaya tenaga all-in ≈ 1,25 × UMK, rincian di allInParts (asumsi)
+  allInParts: { bpjs: 0.115, thr: 1 / 12, other: 0.052 }, // BPJS TK+Kes porsi pemberi kerja ±10–11,5%; THR 1 bln/th; seragam, APD, uang makan ±5%
+  materials: 0.04, // inflasi bahan/material/chemical ±4%/th, naik bertahap per bulan (asumsi)
+  fuel: 0.03, // BBM & biaya transport ±3%/th, bertahap (asumsi)
+  rentStep: 0.05, // sewa naik ±5% saat perpanjangan tiap Januari (asumsi)
+  softwareStep: 0.03, // langganan aplikasi/internet: ikut IHK (asumsi)
+  overtime: 1.3, // kelebihan beban di atas kapasitas: campuran lembur (1,5–2× upah per jam) dan tenaga harian (±1× tanpa tunjangan) ≈ 1,3× (asumsi)
+  tax: {
+    // PPh Final UMKM 0,5% dari peredaran bruto (PP 55/2022, perubahan PP 23/2018). Asumsi yang wajib diverifikasi:
+    pphFinal: 0.005,
+    turnoverCap: 4.8e9, // berlaku bila peredaran bruto ≤ Rp4,8 M setahun
+    individualExempt: 500e6, // WP orang pribadi: Rp500 jt pertama peredaran bruto setahun tidak dikenai PPh Final
+    timeLimit: 'WP OP 7 tahun pajak, CV/firma/koperasi 4 tahun, PT 3 tahun sejak terdaftar (diasumsikan masih dalam batas)',
+    corporate: 0.22, // enterprise (PT): PPh Badan 22% atas laba fiskal (UU HPP); hanya perkiraan di ringkasan & dokumen
+    corp31eGross: 50e9, // fasilitas Pasal 31E: peredaran ≤ Rp50 M → diskon 50% tarif atas porsi PKP dari Rp4,8 M peredaran
+    corp31eSlice: 4.8e9,
+  },
+}
+// Profil wilayah (PDRB riil, asumsi). 4–6%/th wajar untuk sebagian besar wilayah; 8–10% hanya untuk wilayah "boom"
+// (hilirisasi nikel Sulawesi/Maluku Utara, Kalimantan Timur/IKN). Angka aktual provinsi tambang bisa jauh berbeda: cek BRS PDRB.
+const PROFILES = {
+  nasional: { label: 'Nasional (metro Jawa–Sumatra)', real: [0.045, 0.055] },
+  menengah: { label: 'Menengah (pariwisata, industri)', real: [0.055, 0.06] },
+  cepat: { label: 'Boom (nikel, IKN)', real: [0.08, 0.1] },
+}
+const nominalOf = (real, cpi = MACRO.cpi) => (1 + real) * (1 + cpi) - 1
+// umk: UMK/UMP tahun acuan (MACRO.year0) dalam rupiah, DIBULATKAN dan PERKIRAAN (verifikasi ke SK Gubernur).
+const R = (key, name, profile, real, tz, code, umk, areas, extra = {}) => ({ key, name, profile, real, cpi: MACRO.cpi, nominal: nominalOf(real), umk, tz, code, areas, w: 1, open: -99, ...extra })
 const REG = {
-  JKT: R('JKT', 'DKI Jakarta', 'nasional', 0.05, 7, '021', ['Kuningan, Jakarta Selatan', 'Sudirman, Jakarta Pusat', 'TB Simatupang, Jakarta Selatan', 'Kelapa Gading, Jakarta Utara', 'Puri Kembangan, Jakarta Barat', 'Pulogadung, Jakarta Timur', 'Gambir, Jakarta Pusat', 'Mampang Prapatan, Jakarta Selatan']),
-  BDT: R('BDT', 'Bodetabek', 'nasional', 0.052, 7, '021', ['BSD, Tangerang Selatan', 'Cikarang, Kab. Bekasi', 'Karawaci, Tangerang', 'Cibubur, Depok', 'Sentul, Kab. Bogor', 'Bekasi Selatan, Kota Bekasi']),
-  BKS: R('BKS', 'Kota/Kab. Bekasi', 'nasional', 0.052, 7, '021', ['Jatiasih, Kota Bekasi', 'Rawalumbu, Kota Bekasi', 'Bekasi Timur, Kota Bekasi', 'Bekasi Barat, Kota Bekasi', 'Medan Satria, Kota Bekasi', 'Pondok Gede, Kota Bekasi', 'Mustika Jaya, Kota Bekasi', 'Tambun Selatan, Kab. Bekasi', 'Cikarang Utara, Kab. Bekasi']),
-  BDG: R('BDG', 'Bandung Raya', 'nasional', 0.05, 7, '022', ['Dago, Kota Bandung', 'Buahbatu, Kota Bandung', 'Antapani, Kota Bandung', 'Sukajadi, Kota Bandung', 'Cicendo, Kota Bandung', 'Lengkong, Kota Bandung', 'Cimahi', 'Dayeuhkolot, Kab. Bandung']),
-  SBY: R('SBY', 'Surabaya', 'nasional', 0.05, 7, '031', ['Gubeng, Surabaya', 'Rungkut, Surabaya', 'Wonokromo, Surabaya', 'Tegalsari, Surabaya', 'Sukolilo, Surabaya', 'Wiyung, Surabaya', 'Mulyorejo, Surabaya', 'Genteng, Surabaya', 'Tandes, Surabaya']),
-  SDA: R('SDA', 'Sidoarjo–Gresik', 'nasional', 0.052, 7, '031', ['Waru, Sidoarjo', 'Buduran, Sidoarjo', 'Candi, Sidoarjo', 'Kebomas, Gresik', 'Manyar, Gresik']),
-  MLG: R('MLG', 'Malang', 'nasional', 0.05, 7, '0341', ['Klojen, Kota Malang', 'Lowokwaru, Kota Malang', 'Blimbing, Kota Malang']),
-  SMG: R('SMG', 'Semarang', 'nasional', 0.05, 7, '024', ['Simpang Lima, Semarang', 'Tembalang, Semarang', 'Candisari, Semarang']),
-  MDN: R('MDN', 'Medan', 'nasional', 0.049, 7, '061', ['Medan Baru', 'Medan Petisah', 'Medan Johor', 'Medan Sunggal', 'Medan Helvetia', 'Medan Tembung', 'Medan Selayang', 'Medan Amplas']),
-  DPS: R('DPS', 'Denpasar–Badung', 'menengah', 0.065, 8, '0361', ['Denpasar Selatan', 'Kuta, Badung', 'Denpasar Barat']),
-  BTM: R('BTM', 'Batam', 'menengah', 0.065, 7, '0778', ['Batam Center', 'Nagoya, Batam', 'Muka Kuning, Batam']),
-  MKS: R('MKS', 'Makassar', 'cepat', 0.08, 8, '0411', ['Panakkukang, Makassar', 'Tamalanrea, Makassar', 'Rappocini, Makassar', 'Manggala, Makassar', 'Biringkanaya, Makassar', 'Tamalate, Makassar', 'Somba Opu, Gowa']),
-  BPN: R('BPN', 'Balikpapan & koridor IKN', 'cepat', 0.09, 8, '0542', ['Balikpapan Kota', 'Balikpapan Selatan', 'Balikpapan Utara', 'Kariangau, Balikpapan', 'Penajam, PPU', 'Sepaku, PPU']),
-  MRW: R('MRW', 'Morowali–Kendari', 'cepat', 0.1, 8, '0401', ['Bahodopi, Morowali', 'Kendari', 'Konawe']),
+  JKT: R('JKT', 'DKI Jakarta', 'nasional', 0.05, 7, '021', 5.4e6, ['Kuningan, Jakarta Selatan', 'Sudirman, Jakarta Pusat', 'TB Simatupang, Jakarta Selatan', 'Kelapa Gading, Jakarta Utara', 'Puri Kembangan, Jakarta Barat', 'Pulogadung, Jakarta Timur', 'Gambir, Jakarta Pusat', 'Mampang Prapatan, Jakarta Selatan']),
+  BDT: R('BDT', 'Bodetabek', 'nasional', 0.052, 7, '021', 5.1e6, ['BSD, Tangerang Selatan', 'Cikarang, Kab. Bekasi', 'Karawaci, Tangerang', 'Cibubur, Depok', 'Sentul, Kab. Bogor', 'Bekasi Selatan, Kota Bekasi']),
+  BKS: R('BKS', 'Kota/Kab. Bekasi', 'nasional', 0.052, 7, '021', 5.6e6, ['Jatiasih, Kota Bekasi', 'Rawalumbu, Kota Bekasi', 'Bekasi Timur, Kota Bekasi', 'Bekasi Barat, Kota Bekasi', 'Medan Satria, Kota Bekasi', 'Pondok Gede, Kota Bekasi', 'Mustika Jaya, Kota Bekasi', 'Tambun Selatan, Kab. Bekasi', 'Cikarang Utara, Kab. Bekasi']),
+  BDG: R('BDG', 'Bandung Raya', 'nasional', 0.05, 7, '022', 4.5e6, ['Dago, Kota Bandung', 'Buahbatu, Kota Bandung', 'Antapani, Kota Bandung', 'Sukajadi, Kota Bandung', 'Cicendo, Kota Bandung', 'Lengkong, Kota Bandung', 'Cimahi', 'Dayeuhkolot, Kab. Bandung']),
+  SBY: R('SBY', 'Surabaya', 'nasional', 0.05, 7, '031', 5.0e6, ['Gubeng, Surabaya', 'Rungkut, Surabaya', 'Wonokromo, Surabaya', 'Tegalsari, Surabaya', 'Sukolilo, Surabaya', 'Wiyung, Surabaya', 'Mulyorejo, Surabaya', 'Genteng, Surabaya', 'Tandes, Surabaya']),
+  SDA: R('SDA', 'Sidoarjo–Gresik', 'nasional', 0.052, 7, '031', 4.9e6, ['Waru, Sidoarjo', 'Buduran, Sidoarjo', 'Candi, Sidoarjo', 'Kebomas, Gresik', 'Manyar, Gresik']),
+  MLG: R('MLG', 'Malang', 'nasional', 0.05, 7, '0341', 3.5e6, ['Klojen, Kota Malang', 'Lowokwaru, Kota Malang', 'Blimbing, Kota Malang']),
+  SMG: R('SMG', 'Semarang', 'nasional', 0.05, 7, '024', 3.5e6, ['Simpang Lima, Semarang', 'Tembalang, Semarang', 'Candisari, Semarang']),
+  MDN: R('MDN', 'Medan', 'nasional', 0.048, 7, '061', 3.9e6, ['Medan Baru', 'Medan Petisah', 'Medan Johor', 'Medan Sunggal', 'Medan Helvetia', 'Medan Tembung', 'Medan Selayang', 'Medan Amplas']),
+  DPS: R('DPS', 'Denpasar–Badung', 'menengah', 0.055, 8, '0361', 3.4e6, ['Denpasar Selatan', 'Kuta, Badung', 'Denpasar Barat']),
+  BTM: R('BTM', 'Batam', 'menengah', 0.06, 7, '0778', 5.0e6, ['Batam Center', 'Nagoya, Batam', 'Muka Kuning, Batam']),
+  MKS: R('MKS', 'Makassar', 'menengah', 0.056, 8, '0411', 3.9e6, ['Panakkukang, Makassar', 'Tamalanrea, Makassar', 'Rappocini, Makassar', 'Manggala, Makassar', 'Biringkanaya, Makassar', 'Tamalate, Makassar', 'Somba Opu, Gowa']),
+  BPN: R('BPN', 'Balikpapan & koridor IKN', 'cepat', 0.085, 8, '0542', 3.8e6, ['Balikpapan Kota', 'Balikpapan Selatan', 'Balikpapan Utara', 'Kariangau, Balikpapan', 'Penajam, PPU', 'Sepaku, PPU']),
+  MRW: R('MRW', 'Morowali–Kendari', 'cepat', 0.1, 8, '0401', 3.7e6, ['Bahodopi, Morowali', 'Kendari', 'Konawe']),
+  // Tersedia sebagai profil boom ketiga; belum dipakai usaha demo mana pun.
+  MLU: R('MLU', 'Maluku Utara (Halmahera–Ternate)', 'cepat', 0.09, 9, '0921', 3.4e6, ['Ternate Tengah', 'Weda, Halmahera Tengah', 'Obi, Halmahera Selatan']),
 }
 const region = (key, extra = {}) => ({ ...REG[key], ...extra })
 
@@ -232,6 +287,17 @@ function applyLean(biz) {
   return b
 }
 
+/* ------------------------------------------------------ Biaya overhead */
+// kind: 'fixed' = biaya tetap bulanan (naik hanya lewat indeks: sewa/IHK/UMK tiap Januari, BBM bertahap);
+//       'step'  = semi-tetap, naik bertingkat mengikuti pemicu (jumlah pekerja, cabang);
+//       'var'   = variabel, sebanding volume riil (listrik/gas laundry, BBM armada, asuransi kontrak).
+// amt(c) menerima c = { r, i, m, I(nama), rev, real, heads, branches, umk, staffUnits }.
+const OH = (label, cat, day, kind, amt) => ({ label, cat, day, kind, amt })
+/** Anggaran promosi tetap, dinaikkan di bulan kampanye (0-based). */
+const promo = (m, months, mul = 1.4) => (months.includes(m) ? mul : 1)
+/** Staf tetap non-lapangan UKM: [jumlah, kelipatan UMK]. */
+const staffUnits = (list) => list.reduce((s, [n, mult]) => s + Math.max(0, n) * mult, 0)
+
 const BUSINESSES = [
   /* ------------------------------------------------------------ 1. AC */
   {
@@ -239,7 +305,8 @@ const BUSINESSES = [
     regions: [region('BKS')], base: 17.5e6, margin: [0.25, 0.35],
     moy: [0.84, 0.86, 0.95, 1.0, 1.05, 1.03, 1.0, 1.06, 1.12, 1.14, 0.98, 0.96],
     custMix: { individu: 74, umkm: 21, korporat: 5 },
-    workers: { owner: 'Budi Santoso', helpers: [['Budi Santoso & Andi (helper)', -99], ['Rizky Pratama (teknisi)', 7]], helperP: 0.75 },
+    // Helper harian dibayar per job; jumlah helper aktif mengikuti volume (maks. jobsPerHelper job/bulan per helper).
+    workers: { owner: 'Budi Santoso', helpers: [{ n: 'Andi', label: 'Budi Santoso & Andi (helper)' }, { n: 'Rizky', label: 'Rizky Pratama (teknisi)' }, { n: 'Fikri', label: 'Budi Santoso & Fikri (helper)' }], helperP: 0.75, jobsPerHelper: 32, minHelpers: 1 },
     labourLineP: 0.75, transportAbs: [18000, 45000],
     services: [
       { name: 'Cuci AC', w: 48, q: [[1, 22], [2, 34], [3, 22], [4, 12], [5, 6], [6, 4]], unit: 'unit', price: [75000, 90000], min: 150000, dur: [1, 3], cost: { tenaga: [0.28, 0.36], bahan: [0.06, 0.1] }, rain: 0.85,
@@ -274,14 +341,14 @@ const BUSINESSES = [
         done: ['Semua unit selesai, laporan kondisi dikirim via WhatsApp.', 'Selesai, 1 unit perlu isi freon (penawaran terpisah).'] },
     ],
     overheads: [
-      { label: 'Pulsa & kuota internet', cat: 'biaya_lain', day: 5, amt: () => 150000 },
-      { label: 'Iklan marketplace / Facebook', cat: 'biaya_lain', day: 12, amt: (c) => c.r.uni(250000, 650000) },
-      { label: 'Penyusutan & servis alat (pompa vakum, manifold)', cat: 'biaya_lain', day: 26, amt: (c) => c.r.uni(250000, 450000) },
-      { label: 'BBM motor operasional (di luar job)', cat: 'biaya_transport', day: 27, amt: (c) => c.r.uni(150000, 300000) },
-      { label: 'Cicilan & servis motor box', cat: 'biaya_transport', day: 8, amt: () => 850000 },
-      { label: 'Sewa gudang kecil (stok freon & pipa)', cat: 'biaya_lain', day: 2, amt: () => 600000 },
+      OH('Pulsa, kuota & aplikasi pembukuan', 'biaya_lain', 5, 'fixed', (c) => 210000 * c.I('soft')),
+      OH('Iklan marketplace / Facebook (anggaran tetap)', 'biaya_lain', 12, 'fixed', (c) => 420000 * c.I('cpi') * promo(c.m, [1, 2, 7, 8, 9]) * c.r.uni(0.9, 1.1)),
+      OH('Penyusutan & servis alat (pompa vakum, manifold)', 'biaya_lain', 26, 'fixed', (c) => 350000 * c.r.uni(0.85, 1.15)),
+      OH('BBM motor operasional (di luar job)', 'biaya_transport', 27, 'fixed', (c) => 220000 * c.I('fuel') * c.r.uni(0.85, 1.15)),
+      OH('Cicilan & servis motor box', 'biaya_transport', 8, 'fixed', () => 850000),
+      OH('Sewa gudang kecil (stok freon & pipa)', 'biaya_lain', 2, 'fixed', (c) => 600000 * c.I('rent')),
     ],
-    thr: { kind: 'fixed', amount: 1250000, label: 'THR helper' },
+    thr: { kind: 'perHelper', amount: 650000, label: 'THR helper' },
   },
   /* ------------------------------------------------------- 2. Cleaning */
   {
@@ -289,7 +356,7 @@ const BUSINESSES = [
     regions: [region('MKS')], base: 14.5e6, margin: [0.25, 0.35],
     moy: [0.92, 0.95, 1.0, 1.0, 0.98, 1.04, 1.06, 1.0, 0.98, 1.0, 0.98, 1.02],
     custMix: { individu: 70, kos: 22, umkm: 8 },
-    workers: { owner: 'Rina Kusuma', helpers: [['Rina & Wati', -99], ['Rina & Sukma', -99], ['Wati & Sukma', 4]], helperP: 0.9 },
+    workers: { owner: 'Rina Kusuma', short: 'Rina', pairs: true, helpers: [{ n: 'Wati' }, { n: 'Sukma' }, { n: 'Dewi' }, { n: 'Nurul' }], helperP: 0.9, jobsPerHelper: 17, minHelpers: 2 },
     labourLineP: 0.9, transportAbs: [15000, 40000],
     contract: { share: 0.18, churn: 0.04, services: [
       { name: 'Langganan bersih kos mingguan', w: 60, types: ['kos'], q: [[6, 20], [8, 30], [10, 30], [12, 20]], unit: 'kamar', price: [95000, 130000], cost: { tenaga: [0.44, 0.5], bahan: [0.06, 0.09] },
@@ -303,7 +370,7 @@ const BUSINESSES = [
         desc: (v) => `Bersih rumah ${v.q} jam, ${v.issue}. Rumah ${v.pick(['tipe 36', 'tipe 45', '2 lantai', 'tipe 54'])}.`,
         scope: (v) => `General cleaning ${v.q} jam: sapu-pel seluruh ruangan, lap debu, dapur, dan kamar mandi.`,
         done: ['Selesai sesuai jam, pelanggan puas.', 'Selesai, kamar mandi berkerak perlu deep cleaning lain kali.'] },
-      { name: 'Deep cleaning rumah', w: 22, q: [[1, 100]], unit: 'rumah', price: [450000, 1400000], dur: [5, 9], cost: { tenaga: [0.4, 0.46], bahan: [0.09, 0.13] },
+      { name: 'Deep cleaning rumah', w: 22, q: [[1, 100]], unit: 'rumah', price: [450000, 1400000], dur: [5, 9], cost: { tenaga: [0.4, 0.46], bahan: [0.07, 0.1] },
         issues: ['menjelang Lebaran', 'mau ditempati penyewa baru', 'habis banjir kecil', 'rumah baru pindah'],
         desc: (v) => `Deep cleaning rumah (${v.issue}). ${v.pick(['3 kamar tidur, 2 kamar mandi.', '2 kamar tidur, 1 kamar mandi.', 'Rumah 2 lantai.'])}`,
         scope: () => 'Deep cleaning menyeluruh: kerak kamar mandi, dapur & kitchen set, jendela, plafon, dan lantai.',
@@ -313,7 +380,7 @@ const BUSINESSES = [
         desc: (v) => `Bersihkan ${v.q} kamar kos karena ${v.issue}.`,
         scope: (v) => `Pembersihan ${v.q} kamar kos (lantai, kamar mandi dalam, jendela, kasur divakum).`,
         done: ['Semua kamar siap huni.', 'Selesai, 1 kamar ada jamur dinding (disarankan cat ulang).'] },
-      { name: 'Cuci sofa & kasur', w: 12, q: [[1, 40], [2, 40], [3, 20]], unit: 'item', price: [150000, 280000], dur: [2, 4], cost: { tenaga: [0.34, 0.4], bahan: [0.12, 0.16] }, rain: 0.8,
+      { name: 'Cuci sofa & kasur', w: 12, q: [[1, 40], [2, 40], [3, 20]], unit: 'item', price: [150000, 280000], dur: [2, 4], cost: { tenaga: [0.38, 0.44], bahan: [0.08, 0.1] }, rain: 0.8,
         issues: ['noda tumpahan', 'tungau/alergi', 'bau apek'],
         desc: (v) => `Cuci ${v.q} item (sofa/kasur): ${v.issue}.`,
         scope: (v) => `Cuci ${v.q} item sofa/kasur dengan mesin ekstraksi dan sanitasi anti-tungau.`,
@@ -325,13 +392,13 @@ const BUSINESSES = [
         done: ['Rumah kosong sudah bersih, siap serah terima.'] },
     ],
     overheads: [
-      { label: 'Pulsa & kuota internet', cat: 'biaya_lain', day: 5, amt: () => 120000 },
-      { label: 'Iklan Instagram/TikTok', cat: 'biaya_lain', day: 10, amt: (c) => c.r.uni(200000, 500000) },
-      { label: 'Perlengkapan (mop, vakum, lap) penyusutan', cat: 'biaya_lain', day: 25, amt: (c) => c.r.uni(250000, 450000) },
-      { label: 'Cicilan motor & BBM antar-jemput helper', cat: 'biaya_transport', day: 8, amt: () => 950000 },
-      { label: 'Seragam & BPJS Ketenagakerjaan helper', cat: 'biaya_lain', day: 15, amt: () => 350000 },
+      OH('Pulsa, kuota & aplikasi pembukuan', 'biaya_lain', 5, 'fixed', (c) => 180000 * c.I('soft')),
+      OH('Iklan Instagram/TikTok (anggaran tetap)', 'biaya_lain', 10, 'fixed', (c) => 330000 * c.I('cpi') * promo(c.m, [1, 2, 5, 6]) * c.r.uni(0.9, 1.1)),
+      OH('Perlengkapan (mop, vakum, lap) penyusutan', 'biaya_lain', 25, 'fixed', (c) => 350000 * c.r.uni(0.85, 1.15)),
+      OH('Cicilan motor & BBM antar-jemput helper', 'biaya_transport', 8, 'fixed', (c) => 700000 + 250000 * c.I('fuel')),
+      OH('Seragam & BPJS Ketenagakerjaan helper', 'biaya_lain', 15, 'step', (c) => 120000 * c.heads * c.I('umk')),
     ],
-    thr: { kind: 'fixed', amount: 1500000, label: 'THR 2 helper' },
+    thr: { kind: 'perHelper', amount: 750000, label: 'THR helper' },
   },
   /* -------------------------------------------------------- 3. Listrik */
   {
@@ -339,7 +406,7 @@ const BUSINESSES = [
     regions: [region('MDN')], base: 16e6, margin: [0.25, 0.35],
     moy: [1.08, 1.06, 1.02, 0.98, 0.96, 0.97, 0.98, 0.96, 0.98, 1.0, 1.04, 1.05],
     custMix: { individu: 70, umkm: 24, korporat: 6 },
-    workers: { owner: 'Hendra Siregar', helpers: [['Hendra Siregar & Bonar (helper)', -99]], helperP: 0.7 },
+    workers: { owner: 'Hendra Siregar', helpers: [{ n: 'Bonar', label: 'Hendra Siregar & Bonar (helper)' }, { n: 'Daniel', label: 'Hendra Siregar & Daniel (helper)' }], helperP: 0.7, jobsPerHelper: 20, minHelpers: 1 },
     labourLineP: 0.7, transportAbs: [20000, 50000],
     services: [
       { name: 'Perbaikan korsleting', w: 30, q: [[1, 100]], unit: 'titik', price: [150000, 600000], dur: [1, 3], cost: { tenaga: [0.16, 0.22], bahan: [0.28, 0.36] }, rain: 1.35,
@@ -374,12 +441,13 @@ const BUSINESSES = [
         done: ['Ada kebocoran arus di jalur AC, rekomendasi ganti kabel.', 'Instalasi aman, beban perlu dibagi ulang.'] },
     ],
     overheads: [
-      { label: 'Pulsa & kuota internet', cat: 'biaya_lain', day: 5, amt: () => 150000 },
-      { label: 'Iklan Google Maps / Facebook', cat: 'biaya_lain', day: 12, amt: (c) => c.r.uni(200000, 500000) },
-      { label: 'Kalibrasi & penyusutan tang ampere, tester', cat: 'biaya_lain', day: 26, amt: (c) => c.r.uni(150000, 300000) },
-      { label: 'Cicilan & servis motor', cat: 'biaya_transport', day: 8, amt: () => 800000 },
+      OH('Pulsa, kuota & aplikasi pembukuan', 'biaya_lain', 5, 'fixed', (c) => 210000 * c.I('soft')),
+      OH('Iklan Google Maps / Facebook (anggaran tetap)', 'biaya_lain', 12, 'fixed', (c) => 350000 * c.I('cpi') * promo(c.m, [10, 11, 0]) * c.r.uni(0.9, 1.1)),
+      OH('Kalibrasi & penyusutan tang ampere, tester', 'biaya_lain', 26, 'fixed', (c) => 220000 * c.r.uni(0.85, 1.15)),
+      OH('Cicilan & servis motor', 'biaya_transport', 8, 'fixed', () => 800000),
+      OH('Sewa kios kecil (stok kabel & MCB)', 'biaya_lain', 2, 'fixed', (c) => 400000 * c.I('rent')),
     ],
-    thr: { kind: 'fixed', amount: 1000000, label: 'THR helper' },
+    thr: { kind: 'perHelper', amount: 900000, label: 'THR helper' },
   },
   /* -------------------------------------------------------- 4. Pest */
   {
@@ -387,7 +455,9 @@ const BUSINESSES = [
     regions: [region('SBY', { w: 0.8 }), region('SDA', { w: 0.2 })], base: 172e6, margin: [0.15, 0.25],
     moy: [1.08, 1.1, 1.06, 1.0, 0.95, 0.92, 0.9, 0.92, 0.95, 1.0, 1.04, 1.06],
     custMix: { individu: 30, umkm: 35, korporat: 30, instansi: 5 },
-    workers: { roster: ['Agus Salim', 'Siti Aminah', 'Joko Purnomo', 'Rahmat Hidayat', 'Dedi Kurniawan', 'Eko Prasetyo', 'Wahyu Nugroho', 'Teguh Santoso', 'Fajar Ramadhan', 'Imam Syafii', 'Bayu Saputra', 'Yusuf Maulana', 'Heru Susanto', 'Andre Wijaya', 'Gilang Permana'], revPerWorker: 17e6, min: 8, max: 15, team: 'Tim {lead} ({n} orang)' },
+    // Teknisi tetap digaji bulanan (UMK × all-in); jumlahnya mengikuti beban kerja riil (utilisasi ≤ util), puncak musiman dibayar lembur.
+    workers: { roster: ['Agus Salim', 'Siti Aminah', 'Joko Purnomo', 'Rahmat Hidayat', 'Dedi Kurniawan', 'Eko Prasetyo', 'Wahyu Nugroho', 'Teguh Santoso', 'Fajar Ramadhan', 'Imam Syafii', 'Bayu Saputra', 'Yusuf Maulana', 'Heru Susanto', 'Andre Wijaya', 'Gilang Permana', 'Rizal Effendi', 'Hamzah Fauzi', 'Galih Pratama', 'Sutrisno', 'Ilham Nasution'], util: 0.9, min: 6, team: 'Tim {lead} ({n} orang)' },
+    staff: (heads) => [[1, 1.0], [Math.ceil(heads / 12), 1.4]], // admin + supervisor per 12 teknisi
     contract: { share: 0.45, churn: 0.02, services: [
       { name: 'Kontrak pest control bulanan', w: 100, types: ['umkm', 'korporat', 'instansi'], q: [[2, 60], [4, 40]], unit: 'kunjungan', price: [900000, 3500000], cost: { tenaga: [0.3, 0.36], bahan: [0.18, 0.24] },
         scope: (v) => `Pengendalian hama terpadu ${v.q} kunjungan/bulan (kecoa, tikus, semut, lalat) termasuk pemasangan & monitoring bait station.`,
@@ -426,13 +496,14 @@ const BUSINESSES = [
         done: ['Disinfeksi selesai, ruangan bisa dipakai setelah 2 jam.'] },
     ],
     overheads: [
-      { label: 'Gaji admin, supervisor & BPJS', cat: 'biaya_tenaga', day: 25, amt: (c) => 14e6 * c.r.uni(0.98, 1.02) * Math.pow(1.004, c.i) },
-      { label: 'Sewa kantor & gudang bahan', cat: 'biaya_lain', day: 3, amt: () => 6.5e6 },
-      { label: 'Izin, sertifikasi & APD', cat: 'biaya_lain', day: 15, amt: (c) => c.r.uni(1.5e6, 3e6) },
-      { label: 'Marketing (Google Ads, katalog)', cat: 'biaya_lain', day: 10, amt: (c) => c.trend * c.r.uni(0.015, 0.025) },
-      { label: 'BBM & servis kendaraan operasional', cat: 'biaya_transport', day: 27, amt: (c) => c.trend * c.r.uni(0.012, 0.018) },
+      OH('Gaji admin & supervisor (UMK × all-in)', 'biaya_tenaga', 25, 'step', (c) => c.staffUnits * c.umk * c.allInMonthly),
+      OH('Sewa kantor & gudang bahan', 'biaya_lain', 3, 'fixed', (c) => 6.5e6 * c.I('rent')),
+      OH('Izin, sertifikasi & APD teknisi', 'biaya_lain', 15, 'step', (c) => (1.1e6 + 95000 * c.heads) * c.I('cpi') * c.r.uni(0.9, 1.1)),
+      OH('Aplikasi, internet & telepon kantor', 'biaya_lain', 5, 'fixed', (c) => 750000 * c.I('soft')),
+      OH('Marketing (Google Ads, katalog; anggaran tetap)', 'biaya_lain', 10, 'fixed', (c) => 3.2e6 * c.I('cpi') * promo(c.m, [9, 10, 11]) * c.r.uni(0.9, 1.1)),
+      OH('BBM & servis kendaraan operasional', 'biaya_transport', 27, 'var', (c) => c.real * c.r.uni(0.012, 0.016) * c.I('fuel')),
     ],
-    thr: { kind: 'perWorker', amount: 4.6e6, label: 'THR teknisi' },
+    thr: { kind: 'umk', label: 'THR karyawan (1 bulan UMK)' },
   },
   /* ------------------------------------------------------- 5. Laundry */
   {
@@ -440,17 +511,18 @@ const BUSINESSES = [
     regions: [region('BDG')], base: 158e6, margin: [0.15, 0.25],
     moy: [0.94, 1.0, 1.04, 0.98, 1.0, 1.06, 1.06, 0.98, 0.96, 0.98, 1.0, 1.08],
     custMix: { individu: 22, umkm: 18, korporat: 14, hotel: 20, resto: 14, salon: 8, klinik: 4 },
-    workers: { roster: ['Neneng Suryani', 'Asep Saepudin', 'Euis Rahmawati', 'Dadang Hermawan', 'Yayan Sopyan', 'Lilis Andriani', 'Ujang Kurnia', 'Cucu Lestari', 'Iwan Setiawan', 'Rika Nuraeni', 'Ade Permana', 'Dewi Kartika', 'Ujang Ramdani', 'Tati Rohayati', 'Rudi Gunawan'], revPerWorker: 16.5e6, min: 8, max: 15, team: 'Shift {lead} ({n} orang)' },
+    workers: { roster: ['Neneng Suryani', 'Asep Saepudin', 'Euis Rahmawati', 'Dadang Hermawan', 'Yayan Sopyan', 'Lilis Andriani', 'Ujang Kurnia', 'Cucu Lestari', 'Iwan Setiawan', 'Rika Nuraeni', 'Ade Permana', 'Dewi Kartika', 'Ujang Ramdani', 'Tati Rohayati', 'Rudi Gunawan', 'Yani Mulyani', 'Dede Supriatna', 'Enok Kurniasih', 'Cecep Hidayat', 'Wawan Setiadi'], util: 0.9, min: 6, team: 'Shift {lead} ({n} orang)' },
+    staff: (heads) => [[1, 1.0], [2, 1.0]], // admin + 2 kurir antar-jemput
     contract: { share: 0.42, churn: 0.02, services: [
-      { name: 'Kontrak laundry linen hotel/restoran', w: 75, types: ['hotel', 'resto'], q: [[800, 30], [1500, 40], [2500, 30]], unit: 'kg', price: [8500, 11000], cost: { tenaga: [0.28, 0.34], bahan: [0.13, 0.17] },
+      { name: 'Kontrak laundry linen hotel/restoran', w: 75, types: ['hotel', 'resto'], q: [[800, 30], [1500, 40], [2500, 30]], unit: 'kg', price: [8500, 11000], cost: { tenaga: [0.28, 0.34], bahan: [0.09, 0.12] },
         scope: (v) => `Laundry linen (sprei, handuk, taplak, seragam) estimasi ${v.q} kg/bulan, antar-jemput harian, SLA 24 jam.`,
         done: ['Rekap bulanan sesuai berita acara timbang. 3 item noda permanen dilaporkan.', 'Semua pengiriman tepat SLA, 1 keluhan handuk kurang wangi ditangani.'] },
-      { name: 'Kontrak laundry klinik/salon', w: 25, types: ['salon', 'klinik'], q: [[200, 40], [400, 40], [700, 20]], unit: 'kg', price: [11000, 14000], cost: { tenaga: [0.28, 0.34], bahan: [0.15, 0.19] },
+      { name: 'Kontrak laundry klinik/salon', w: 25, types: ['salon', 'klinik'], q: [[200, 40], [400, 40], [700, 20]], unit: 'kg', price: [11000, 14000], cost: { tenaga: [0.28, 0.34], bahan: [0.1, 0.13] },
         scope: (v) => `Laundry handuk dan linen klinik/salon ±${v.q} kg/bulan, pemisahan linen infeksius, antar-jemput 3x seminggu.`,
         done: ['Rekap bulanan lengkap, linen infeksius diproses terpisah.'] },
     ] },
     services: [
-      { name: 'Rekap laundry kiloan harian', w: 140, fixed: 'outlet', q: [[1, 100]], unit: 'hari', price: [1100000, 2600000], dur: [9, 12], cost: { tenaga: [0.28, 0.34], bahan: [0.12, 0.16] }, rain: 1.2,
+      { name: 'Rekap laundry kiloan harian', w: 140, fixed: 'outlet', q: [[1, 100]], unit: 'hari', price: [1100000, 2600000], dur: [9, 12], cost: { tenaga: [0.28, 0.34], bahan: [0.08, 0.11] }, rain: 1.2,
         desc: (v) => `Rekap kasir kiloan & satuan walk-in ${v.customer.replace('Pelanggan walk-in — ', '')} hari ini: ${v.r.int(25, 70)} nota, ±${v.r.int(120, 300)} kg.`,
         scope: () => 'Rekap penjualan layanan kiloan, satuan, dan express pelanggan walk-in selama satu hari kerja outlet.',
         done: ['Kas harian ditutup, sesuai laporan kasir.', 'Kas ditutup; 1 klaim baju luntur dikompensasi.', 'Kas ditutup, 3 order express selesai < 6 jam.'] },
@@ -478,14 +550,15 @@ const BUSINESSES = [
       done: ['Rekap mingguan ditutup, sesuai 7 laporan kas harian.', 'Rekap ditutup; 2 klaim baju luntur dikompensasi.'],
     })) },
     overheads: [
-      { label: 'Gaji admin, kurir & BPJS', cat: 'biaya_tenaga', day: 25, amt: (c) => 11e6 * c.r.uni(0.98, 1.02) },
-      { label: 'Sewa 3 outlet & workshop', cat: 'biaya_lain', day: 3, amt: () => 11.5e6 },
-      { label: 'Listrik, gas LPG pengering & air', cat: 'biaya_lain', day: 20, amt: (c) => c.trend * c.r.uni(0.07, 0.085) },
-      { label: 'Penyusutan & servis mesin cuci/dryer', cat: 'biaya_lain', day: 26, amt: (c) => c.r.uni(3e6, 4.5e6) },
-      { label: 'Promosi (Instagram, GoFood/ShopeeFood mitra)', cat: 'biaya_lain', day: 10, amt: (c) => c.trend * c.r.uni(0.01, 0.02) },
-      { label: 'BBM armada antar-jemput', cat: 'biaya_transport', day: 27, amt: (c) => c.trend * c.r.uni(0.02, 0.03) },
+      OH('Gaji admin & kurir (UMK × all-in)', 'biaya_tenaga', 25, 'step', (c) => c.staffUnits * c.umk * c.allInMonthly),
+      OH('Sewa 3 outlet & workshop', 'biaya_lain', 3, 'fixed', (c) => 11.5e6 * c.I('rent')),
+      OH('Listrik, gas LPG pengering & air', 'biaya_lain', 20, 'var', (c) => c.real * c.r.uni(0.065, 0.075) * c.I('fuel')),
+      OH('Penyusutan & servis mesin cuci/dryer', 'biaya_lain', 26, 'fixed', (c) => 3.6e6 * c.r.uni(0.85, 1.15)),
+      OH('Aplikasi kasir, internet & telepon', 'biaya_lain', 5, 'fixed', (c) => 900000 * c.I('soft')),
+      OH('Promosi (Instagram, mitra GoFood/ShopeeFood; anggaran tetap)', 'biaya_lain', 10, 'fixed', (c) => 2.2e6 * c.I('cpi') * promo(c.m, [1, 2, 5]) * c.r.uni(0.9, 1.1)),
+      OH('BBM armada antar-jemput', 'biaya_transport', 27, 'var', (c) => c.real * c.r.uni(0.018, 0.024) * c.I('fuel')),
     ],
-    thr: { kind: 'perWorker', amount: 4.1e6, label: 'THR karyawan' },
+    thr: { kind: 'umk', label: 'THR karyawan (1 bulan UMK)' },
   },
   /* -------------------------------------------------------- 6. Dinding */
   {
@@ -493,14 +566,15 @@ const BUSINESSES = [
     regions: [region('BPN')], base: 185e6, margin: [0.15, 0.25],
     moy: [0.84, 0.86, 1.02, 0.98, 1.04, 1.08, 1.1, 1.12, 1.1, 1.06, 0.92, 0.88],
     custMix: { individu: 45, umkm: 20, korporat: 30, instansi: 5 },
-    workers: { roster: ['Syamsul Bahri', 'La Ode Rahman', 'Andi Baso', 'Ruslan Effendi', 'Jumadi', 'Muh. Arsyad', 'Kadir Daeng', 'Samsuddin', 'Haris Munandar', 'Paulus Tandi', 'Yohanis Toding', 'Rahmat Saleh', 'Akbar Pratama', 'Fadli Hasan', 'Irwan Syah'], revPerWorker: 18e6, min: 8, max: 15, team: 'Tim {lead} ({n} orang)' },
+    workers: { roster: ['Syamsul Bahri', 'La Ode Rahman', 'Andi Baso', 'Ruslan Effendi', 'Jumadi', 'Muh. Arsyad', 'Kadir Daeng', 'Samsuddin', 'Haris Munandar', 'Paulus Tandi', 'Yohanis Toding', 'Rahmat Saleh', 'Akbar Pratama', 'Fadli Hasan', 'Irwan Syah', 'Baharuddin', 'Markus Pasang', 'Syahrul Gunawan', 'Taufik Hidayat', 'Udin Saprudin', 'Zainal Abidin', 'Yakobus Rante'], util: 0.9, min: 6, team: 'Tim {lead} ({n} orang)' },
+    staff: (heads) => [[1, 1.0], [1, 1.5], [Math.ceil(heads / 12) - 1, 1.3]], // admin, estimator, mandor tambahan per 12 tukang
     services: [
-      { name: 'Pengecatan interior', w: 30, q: [[80, 30], [150, 35], [300, 25], [600, 10]], unit: 'm²', price: [28000, 42000], min: 1500000, dur: [16, 72], cost: { tenaga: [0.22, 0.28], bahan: [0.32, 0.38] },
+      { name: 'Pengecatan interior', w: 30, q: [[80, 30], [150, 35], [300, 25], [600, 10]], unit: 'm²', price: [28000, 42000], min: 1500000, dur: [16, 72], cost: { tenaga: [0.22, 0.28], bahan: [0.31, 0.37] },
         issues: ['menjelang Lebaran', 'rumah baru dibeli', 'kantor rebranding warna', 'dinding kusam dan berjamur'],
         desc: (v) => `Cat ulang interior ±${v.q} m² (${v.issue}). Warna ${v.pick(['putih tulang', 'abu muda', 'krem', 'sesuai brand'])}.`,
         scope: (v) => `Pengecatan interior ±${v.q} m²: pengamplasan, plamir titik retak, 1 lapis sealer, 2 lapis cat akhir.`,
         done: ['Selesai 2 lapis, sisa cat diserahkan ke pemilik.', 'Ada rembesan di 1 dinding, disarankan waterproofing.'] },
-      { name: 'Pengecatan eksterior', w: 18, q: [[100, 35], [250, 40], [500, 25]], unit: 'm²', price: [38000, 55000], min: 3000000, dur: [24, 120], cost: { tenaga: [0.24, 0.3], bahan: [0.32, 0.38] }, tags: ['outdoor'],
+      { name: 'Pengecatan eksterior', w: 18, q: [[100, 35], [250, 40], [500, 25]], unit: 'm²', price: [38000, 55000], min: 3000000, dur: [24, 120], cost: { tenaga: [0.24, 0.3], bahan: [0.31, 0.37] }, tags: ['outdoor'],
         issues: ['cat mengelupas kena hujan', 'fasad ruko baru', 'gedung sekolah'],
         desc: (v) => `Cat eksterior ±${v.q} m²: ${v.issue}. Butuh scaffolding.`,
         scope: (v) => `Pengecatan eksterior ±${v.q} m² dengan cat weatherproof, termasuk scaffolding dan pembersihan jamur.`,
@@ -522,13 +596,14 @@ const BUSINESSES = [
         done: ['Perbaikan selesai, warna disamakan.'] },
     ],
     overheads: [
-      { label: 'Gaji admin, estimator & BPJS', cat: 'biaya_tenaga', day: 25, amt: (c) => 13e6 * c.r.uni(0.98, 1.02) * Math.pow(1.005, c.i) },
-      { label: 'Sewa workshop & gudang material', cat: 'biaya_lain', day: 3, amt: () => 7e6 },
-      { label: 'Sewa/penyusutan scaffolding & alat semprot', cat: 'biaya_lain', day: 18, amt: (c) => c.r.uni(3e6, 5e6) },
-      { label: 'Marketing (Instagram, kerja sama toko cat)', cat: 'biaya_lain', day: 10, amt: (c) => c.trend * c.r.uni(0.012, 0.02) },
-      { label: 'BBM pikap & mobil survei', cat: 'biaya_transport', day: 27, amt: (c) => c.trend * c.r.uni(0.012, 0.018) },
+      OH('Gaji admin, estimator & mandor (UMK × all-in)', 'biaya_tenaga', 25, 'step', (c) => c.staffUnits * c.umk * c.allInMonthly),
+      OH('Sewa workshop & gudang material', 'biaya_lain', 3, 'fixed', (c) => 7e6 * c.I('rent')),
+      OH('Sewa/penyusutan scaffolding & alat semprot', 'biaya_lain', 18, 'fixed', (c) => 3.3e6 * c.r.uni(0.85, 1.15)),
+      OH('Aplikasi, internet & telepon kantor', 'biaya_lain', 5, 'fixed', (c) => 650000 * c.I('soft')),
+      OH('Marketing (Instagram, kerja sama toko cat; anggaran tetap)', 'biaya_lain', 10, 'fixed', (c) => 2.8e6 * c.I('cpi') * promo(c.m, [1, 2, 5, 6]) * c.r.uni(0.9, 1.1)),
+      OH('BBM pikap & mobil survei', 'biaya_transport', 27, 'var', (c) => c.real * c.r.uni(0.012, 0.016) * c.I('fuel')),
     ],
-    thr: { kind: 'perWorker', amount: 4.4e6, label: 'THR tukang tetap' },
+    thr: { kind: 'umk', label: 'THR tukang & staf (1 bulan UMK)' },
   },
   /* ---------------------------------------------------------- 7. Mall */
   {
@@ -538,54 +613,54 @@ const BUSINESSES = [
     lean: { contractQMul: 1.6, services: (list) => leanEnterprise(list, 'Work order perbaikan ringan tenant/area publik') },
     moy: [0.9, 0.95, 1.06, 1.0, 0.98, 1.04, 1.04, 0.98, 0.98, 1.0, 1.0, 1.12],
     custMix: { mall: 100 },
-    workers: { teamPerRev: 140e6 },
+    workers: { util: 0.9, teamSize: 6 },
     contract: { share: 0.62, churn: 0.008, services: [
-      { name: 'Kontrak kebersihan mal (bulanan)', w: 60, types: ['mall'], q: [[18, 30], [28, 40], [45, 30]], unit: 'petugas', price: [6.2e6, 7.4e6], cost: { tenaga: [0.6, 0.64], bahan: [0.09, 0.11] },
+      { name: 'Kontrak kebersihan mal (bulanan)', w: 60, types: ['mall'], q: [[18, 30], [28, 40], [45, 30]], unit: 'petugas', priceUmk: [1.9, 2.05], fte: 1, skill: 1.0, price: [6.2e6, 7.4e6], cost: { tenaga: [0.6, 0.66], bahan: [0.06, 0.08] },
         scope: (v) => `Jasa kebersihan mal 3 shift, ${v.q} petugas termasuk supervisor, chemical, dan peralatan; laporan SLA bulanan.`,
         done: ['BAST bulan ini ditandatangani building manager. Skor SLA 96%.', 'BAST terbit; 2 komplain toilet lantai 3 ditutup < 2 jam.', 'Skor audit kebersihan 94%, tambahan petugas akhir pekan disetujui.'] },
-      { name: 'Kontrak maintenance MEP mal (bulanan)', w: 40, types: ['mall'], q: [[5, 40], [8, 40], [12, 20]], unit: 'teknisi', price: [8.5e6, 10.5e6], cost: { tenaga: [0.52, 0.58], bahan: [0.15, 0.19] },
+      { name: 'Kontrak maintenance MEP mal (bulanan)', w: 40, types: ['mall'], q: [[5, 40], [8, 40], [12, 20]], unit: 'teknisi', priceUmk: [2.6, 2.85], fte: 1, skill: 1.4, price: [8.5e6, 10.5e6], cost: { tenaga: [0.6, 0.66], bahan: [0.08, 0.11] },
         scope: (v) => `Preventive & corrective maintenance MEP (chiller, AHU, eskalator koordinasi vendor, plumbing, genset), ${v.q} teknisi on-site.`,
         done: ['PM chiller & AHU sesuai jadwal; 14 work order corrective ditutup.', 'BAST terbit; downtime eskalator 0,5%, di bawah batas SLA.'] },
     ] },
     services: [
-      { name: 'Work order perbaikan ringan tenant/area publik', w: 45, types: ['mall'], q: [[1, 100]], unit: 'work order', price: [1.5e6, 6e6], dur: [2, 8], cost: { tenaga: [0.34, 0.4], bahan: [0.3, 0.36] },
+      { name: 'Work order perbaikan ringan tenant/area publik', w: 45, types: ['mall'], q: [[1, 100]], unit: 'work order', price: [1.5e6, 6e6], dur: [2, 8], cost: { tenaga: [0.3, 0.36], bahan: [0.3, 0.36] },
         issues: ['pintu toilet macet', 'lampu koridor parkir mati', 'kran wastafel bocor', 'plafon area tenant rembes', 'handle eskalator kotor dan lengket'],
         desc: (v) => `Work order area publik/tenant: ${v.issue}.`,
         scope: () => 'Perbaikan ringan di luar lingkup kontrak bulanan, dikerjakan di luar jam ramai pengunjung.',
         done: ['Selesai, foto before-after diunggah ke tiket.', 'Perbaikan selesai < SLA 24 jam.'] },
-      { name: 'Deep cleaning area food court', w: 22, types: ['mall'], q: [[1, 100]], unit: 'area', price: [6e6, 22e6], dur: [6, 14], cost: { tenaga: [0.42, 0.5], bahan: [0.16, 0.22] },
+      { name: 'Deep cleaning area food court', w: 22, types: ['mall'], q: [[1, 100]], unit: 'area', price: [6e6, 22e6], dur: [6, 14], cost: { tenaga: [0.38, 0.46], bahan: [0.16, 0.22] },
         issues: ['temuan audit higiene', 'persiapan grand opening tenant', 'lantai licin berminyak'],
         desc: (v) => `Work order deep cleaning food court: ${v.issue}. Dikerjakan malam setelah mal tutup.`,
         scope: () => 'Deep cleaning food court (degreasing lantai, grease trap koordinasi, dinding & kursi) malam hari.',
         done: ['Selesai 2 malam, foto before-after terlampir.', 'Grease trap dikuras, bau hilang.'] },
-      { name: 'Pembersihan fasad & kaca atrium', w: 14, types: ['mall'], q: [[1, 100]], unit: 'gedung', price: [18e6, 70e6], dur: [24, 96], cost: { tenaga: [0.46, 0.52], bahan: [0.08, 0.12] }, tags: ['outdoor'],
+      { name: 'Pembersihan fasad & kaca atrium', w: 14, types: ['mall'], q: [[1, 100]], unit: 'gedung', price: [18e6, 70e6], dur: [24, 96], cost: { tenaga: [0.42, 0.48], bahan: [0.08, 0.12] }, tags: ['outdoor'],
         issues: ['jadwal semesteran', 'menjelang dekorasi Lebaran', 'menjelang dekorasi Natal & Tahun Baru'],
         desc: (v) => `Pembersihan fasad/kaca atrium dengan gondola/rope access: ${v.issue}.`,
         scope: () => 'Pembersihan fasad dan kaca atrium dengan gondola/rope access bersertifikat K3, termasuk izin kerja ketinggian.',
         done: ['Selesai, 1 hari tertunda angin kencang.', 'Fasad bersih, laporan K3 nihil insiden.'] },
-      { name: 'Event cleaning (pameran/konser)', w: 20, types: ['mall'], q: [[1, 100]], unit: 'event', price: [5e6, 25e6], dur: [12, 72], cost: { tenaga: [0.5, 0.56], bahan: [0.1, 0.14] },
+      { name: 'Event cleaning (pameran/konser)', w: 20, types: ['mall'], q: [[1, 100]], unit: 'event', price: [5e6, 25e6], dur: [12, 72], cost: { tenaga: [0.46, 0.52], bahan: [0.1, 0.14] },
         issues: ['pameran otomotif di atrium', 'konser akhir pekan', 'bazar Ramadan', 'midnight sale'],
         desc: (v) => `Tambahan petugas kebersihan untuk ${v.issue}.`,
         scope: () => 'Tambahan tim kebersihan selama event (persiapan, berjalan, pasca-event) sesuai rundown.',
         done: ['Event selesai, area kembali normal sebelum mal buka.', 'Sampah event 3,2 ton diangkut.'] },
-      { name: 'Perbaikan MEP non-rutin', w: 26, types: ['mall'], q: [[1, 100]], unit: 'work order', price: [4e6, 35e6], dur: [4, 48], cost: { tenaga: [0.3, 0.36], bahan: [0.32, 0.4] },
+      { name: 'Perbaikan MEP non-rutin', w: 26, types: ['mall'], q: [[1, 100]], unit: 'work order', price: [4e6, 35e6], dur: [4, 48], cost: { tenaga: [0.26, 0.32], bahan: [0.32, 0.4] },
         issues: ['pompa transfer air bersih rusak', 'AHU lantai 2 bunyi kasar', 'panel lampu parkir trip', 'pipa toilet bocor ke tenant bawah'],
         desc: (v) => `Work order corrective: ${v.issue}.`,
         scope: () => 'Perbaikan corrective di luar lingkup PM kontrak, termasuk penggantian sparepart sesuai persetujuan building manager.',
         done: ['Sparepart diganti, unit normal. Garansi 3 bulan.', 'Perbaikan selesai, rekomendasi peremajaan unit tahun depan.'] },
-      { name: 'Pest control & sanitasi tenant F&B', w: 18, types: ['mall'], q: [[1, 100]], unit: 'paket', price: [4e6, 14e6], dur: [4, 12], cost: { tenaga: [0.3, 0.36], bahan: [0.22, 0.28] }, rain: 1.2,
+      { name: 'Pest control & sanitasi tenant F&B', w: 18, types: ['mall'], q: [[1, 100]], unit: 'paket', price: [4e6, 14e6], dur: [4, 12], cost: { tenaga: [0.26, 0.32], bahan: [0.22, 0.28] }, rain: 1.2,
         issues: ['temuan tikus di loading dock', 'kecoa di area tenant F&B', 'persyaratan sertifikasi halal tenant'],
         desc: (v) => `Pest control tambahan: ${v.issue}.`,
         scope: () => 'Pest control dan sanitasi area tenant F&B dan loading dock, laporan untuk QA mal.',
         done: ['Treatment selesai, monitoring 2 minggu.', 'Laporan diserahkan ke tim QA mal.'] },
     ],
     overheads: [
-      { label: 'Gaji & tunjangan staf kantor pusat', cat: 'biaya_tenaga', day: 25, amt: (c) => 85e6 * Math.pow(1.01, c.i) },
-      { label: 'Sewa kantor pusat & cabang', cat: 'biaya_lain', day: 3, amt: (c) => 35e6 + 15e6 * c.branches },
-      { label: 'Asuransi, K3 & sertifikasi', cat: 'biaya_lain', day: 15, amt: (c) => c.trend * c.r.uni(0.012, 0.016) },
-      { label: 'IT, sistem absensi & admin', cat: 'biaya_lain', day: 20, amt: (c) => c.trend * c.r.uni(0.008, 0.012) },
-      { label: 'Marketing & biaya tender', cat: 'biaya_lain', day: 10, amt: (c) => c.trend * c.r.uni(0.012, 0.02) },
-      { label: 'Kendaraan operasional & perjalanan dinas', cat: 'biaya_transport', day: 27, amt: (c) => c.trend * c.r.uni(0.01, 0.015) },
+      OH('Gaji & tunjangan staf kantor pusat (inti + HR/payroll per 60 petugas)', 'biaya_tenaga', 25, 'step', (c) => (60e6 + Math.ceil(c.heads / 60) * 2.2 * c.umkHq * MACRO.allIn) * c.I('umk')),
+      OH('Sewa kantor pusat & cabang', 'biaya_lain', 3, 'step', (c) => (35e6 + 9e6 * c.branches) * c.I('rent')),
+      OH('Asuransi, K3 & sertifikasi', 'biaya_lain', 15, 'var', (c) => c.rev * c.r.uni(0.008, 0.011)),
+      OH('IT, sistem absensi & admin (lisensi per petugas)', 'biaya_lain', 20, 'step', (c) => (12e6 + 45000 * c.heads) * c.I('soft')),
+      OH('Marketing & biaya tender', 'biaya_lain', 10, 'step', (c) => (22e6 + 4e6 * c.branches) * c.I('cpi') * c.r.uni(0.9, 1.1)),
+      OH('Kendaraan operasional & perjalanan dinas', 'biaya_transport', 27, 'var', (c) => c.real * c.r.uni(0.008, 0.011) * c.I('fuel')),
     ],
     thr: { kind: 'accrued' },
   },
@@ -597,12 +672,12 @@ const BUSINESSES = [
     lean: { contractQMul: 1.6, services: (list) => leanEnterprise(list, 'Work order perbaikan ringan kantor') },
     moy: [0.86, 0.93, 0.98, 0.97, 1.0, 1.02, 1.0, 1.0, 1.02, 1.04, 1.04, 1.1],
     custMix: { kantor: 100 },
-    workers: { teamPerRev: 150e6 },
+    workers: { util: 0.9, teamSize: 6 },
     contract: { share: 0.6, churn: 0.008, services: [
-      { name: 'Kontrak facility management gedung (bulanan)', w: 55, types: ['kantor'], q: [[15, 30], [30, 40], [60, 30]], unit: 'personel', price: [6.8e6, 8.2e6], cost: { tenaga: [0.6, 0.64], bahan: [0.08, 0.1] },
+      { name: 'Kontrak facility management gedung (bulanan)', w: 55, types: ['kantor'], q: [[15, 30], [30, 40], [60, 30]], unit: 'personel', priceUmk: [1.9, 2.05], fte: 1, skill: 1.05, price: [6.8e6, 8.2e6], cost: { tenaga: [0.62, 0.68], bahan: [0.06, 0.08] },
         scope: (v) => `Integrated FM (cleaning, office boy, teknisi gedung, resepsionis) ${v.q} personel, termasuk supervisor dan laporan KPI bulanan.`,
         done: ['BAST & laporan KPI bulanan diserahkan ke GA. Kehadiran personel 99,1%.', 'BAST terbit; 1 personel diganti atas permintaan klien.', 'Skor kepuasan GA 4,5/5; 21 tiket helpdesk ditutup.'] },
-      { name: 'Kontrak perawatan kantor cabang (bulanan)', w: 45, types: ['kantor'], q: [[4, 40], [8, 40], [15, 20]], unit: 'kantor cabang', price: [7.5e6, 11e6], cost: { tenaga: [0.5, 0.56], bahan: [0.14, 0.18] },
+      { name: 'Kontrak perawatan kantor cabang (bulanan)', w: 45, types: ['kantor'], q: [[4, 40], [8, 40], [15, 20]], unit: 'kantor cabang', fte: 0.45, skill: 1.3, price: [7.5e6, 11e6], cost: { tenaga: [0.4, 0.46], bahan: [0.13, 0.16] },
         scope: (v) => `Perawatan rutin ${v.q} kantor cabang (AC, genset, UPS, plumbing, kebersihan ringan) sesuai jadwal PM dan SLA respon 4 jam.`,
         done: ['PM semua cabang sesuai jadwal; 2 cabang butuh penggantian kompresor (penawaran terpisah).', 'BAST terbit, SLA respon rata-rata 2,6 jam.'] },
     ] },
@@ -639,12 +714,12 @@ const BUSINESSES = [
         done: ['Taman ditata ulang, rencana perawatan bulanan diusulkan.'] },
     ],
     overheads: [
-      { label: 'Gaji & tunjangan staf kantor pusat', cat: 'biaya_tenaga', day: 25, amt: (c) => 95e6 * Math.pow(1.01, c.i) },
-      { label: 'Sewa kantor pusat & cabang', cat: 'biaya_lain', day: 3, amt: (c) => 40e6 + 14e6 * c.branches },
-      { label: 'Asuransi, K3 & sertifikasi ISO', cat: 'biaya_lain', day: 15, amt: (c) => c.trend * c.r.uni(0.012, 0.016) },
-      { label: 'IT, helpdesk & admin', cat: 'biaya_lain', day: 20, amt: (c) => c.trend * c.r.uni(0.008, 0.012) },
-      { label: 'Marketing & biaya tender (e-procurement)', cat: 'biaya_lain', day: 10, amt: (c) => c.trend * c.r.uni(0.012, 0.02) },
-      { label: 'Kendaraan operasional & perjalanan dinas', cat: 'biaya_transport', day: 27, amt: (c) => c.trend * c.r.uni(0.01, 0.015) },
+      OH('Gaji & tunjangan staf kantor pusat (inti + HR/payroll per 60 personel)', 'biaya_tenaga', 25, 'step', (c) => (68e6 + Math.ceil(c.heads / 60) * 2.2 * c.umkHq * MACRO.allIn) * c.I('umk')),
+      OH('Sewa kantor pusat & cabang', 'biaya_lain', 3, 'step', (c) => (40e6 + 9e6 * c.branches) * c.I('rent')),
+      OH('Asuransi, K3 & sertifikasi ISO', 'biaya_lain', 15, 'var', (c) => c.rev * c.r.uni(0.008, 0.011)),
+      OH('IT, helpdesk & admin (lisensi per personel)', 'biaya_lain', 20, 'step', (c) => (14e6 + 45000 * c.heads) * c.I('soft')),
+      OH('Marketing & biaya tender (e-procurement)', 'biaya_lain', 10, 'step', (c) => (24e6 + 4e6 * c.branches) * c.I('cpi') * c.r.uni(0.9, 1.1)),
+      OH('Kendaraan operasional & perjalanan dinas', 'biaya_transport', 27, 'var', (c) => c.real * c.r.uni(0.008, 0.011) * c.I('fuel')),
     ],
     thr: { kind: 'accrued' },
   },
@@ -656,56 +731,56 @@ const BUSINESSES = [
     lean: { contractQMul: 1.6, services: (list) => leanEnterprise(list, 'Work order kebersihan tambahan', { recapPrice: [30e6, 120e6] }) },
     moy: [1.06, 1.06, 1.02, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 1.0, 1.0, 1.0],
     custMix: { rs: 70, klinik: 30 },
-    workers: { teamPerRev: 130e6 },
+    workers: { util: 0.9, teamSize: 6 },
     contract: { share: 0.66, churn: 0.006, services: [
-      { name: 'Kontrak housekeeping rumah sakit (bulanan)', w: 65, types: ['rs'], q: [[18, 30], [30, 40], [50, 30]], unit: 'petugas', price: [6.6e6, 7.8e6], cost: { tenaga: [0.57, 0.61], bahan: [0.15, 0.19] },
+      { name: 'Kontrak housekeeping rumah sakit (bulanan)', w: 65, types: ['rs'], q: [[18, 30], [30, 40], [50, 30]], unit: 'petugas', priceUmk: [2.0, 2.15], fte: 1, skill: 1.05, price: [6.6e6, 7.8e6], cost: { tenaga: [0.6, 0.66], bahan: [0.1, 0.13] },
         scope: (v) => `Housekeeping RS 24 jam ${v.q} petugas (ruang rawat, IGD, OK, ICU), standar PPI, chemical & APD termasuk, laporan SLA dan audit kebersihan.`,
         done: ['BAST ditandatangani; skor audit PPI 95%.', 'BAST terbit; respon pembersihan IGD rata-rata 9 menit (SLA 15).', 'Audit PPI 92%: temuan di ruang isolasi sudah ditindaklanjuti.'] },
-      { name: 'Kontrak housekeeping klinik bersalin/lab (bulanan)', w: 35, types: ['klinik'], q: [[4, 40], [6, 40], [10, 20]], unit: 'petugas', price: [6.4e6, 7.6e6], cost: { tenaga: [0.55, 0.59], bahan: [0.16, 0.2] },
+      { name: 'Kontrak housekeeping klinik bersalin/lab (bulanan)', w: 35, types: ['klinik'], q: [[4, 40], [6, 40], [10, 20]], unit: 'petugas', priceUmk: [2.0, 2.15], fte: 1, skill: 1.05, price: [6.4e6, 7.6e6], cost: { tenaga: [0.6, 0.66], bahan: [0.11, 0.14] },
         scope: (v) => `Housekeeping klinik/lab ${v.q} petugas, termasuk penanganan tumpahan biologis dan pemisahan limbah sesuai SOP.`,
         done: ['BAST terbit; nihil insiden tumpahan biologis.', 'Laporan bulanan & checklist ruang tindakan diserahkan.'] },
     ] },
     sla: { p: 0.06, pct: [0.01, 0.03], label: 'Potongan SLA' },
     services: [
-      { name: 'Work order kebersihan tambahan', w: 40, types: ['rs', 'klinik'], q: [[1, 100]], unit: 'work order', price: [1.5e6, 5e6], dur: [2, 8], cost: { tenaga: [0.42, 0.48], bahan: [0.2, 0.26] },
+      { name: 'Work order kebersihan tambahan', w: 40, types: ['rs', 'klinik'], q: [[1, 100]], unit: 'work order', price: [1.5e6, 5e6], dur: [2, 8], cost: { tenaga: [0.38, 0.44], bahan: [0.2, 0.26] },
         issues: ['tumpahan cairan tubuh di koridor', 'tambahan petugas untuk visitasi akreditasi', 'pembersihan gudang farmasi', 'pembersihan ruang jenazah pasca-renovasi'],
         desc: (v) => `Permintaan tambahan: ${v.issue}.`,
         scope: () => 'Pekerjaan kebersihan tambahan di luar kontrak bulanan, mengikuti SOP PPI fasilitas.',
         done: ['Selesai sesuai SOP, checklist ditandatangani kepala ruangan.', 'Selesai < 1 jam setelah panggilan.'] },
-      { name: 'Terminal cleaning & disinfeksi ruang isolasi', w: 30, types: ['rs', 'klinik'], q: [[1, 100]], unit: 'paket', price: [3.5e6, 16e6], dur: [3, 12], cost: { tenaga: [0.36, 0.42], bahan: [0.24, 0.3] }, rain: 1.2,
+      { name: 'Terminal cleaning & disinfeksi ruang isolasi', w: 30, types: ['rs', 'klinik'], q: [[1, 100]], unit: 'paket', price: [3.5e6, 16e6], dur: [3, 12], cost: { tenaga: [0.32, 0.38], bahan: [0.24, 0.3] }, rain: 1.2,
         issues: ['pasien infeksius pulang', 'lonjakan pasien DBD', 'persiapan akreditasi'],
         desc: (v) => `Permintaan terminal cleaning: ${v.issue}.`,
         scope: () => 'Terminal cleaning dan disinfeksi (UV/hidrogen peroksida) ruang isolasi sesuai SOP PPI, berita acara dan swab test.',
         done: ['Swab test pasca-disinfeksi negatif.', 'Selesai, ruang dirilis ke perawat jaga.'] },
-      { name: 'Pembersihan pasca renovasi ruang OK/ICU', w: 16, types: ['rs'], q: [[1, 100]], unit: 'area', price: [12e6, 55e6], dur: [16, 72], cost: { tenaga: [0.42, 0.48], bahan: [0.2, 0.26] },
+      { name: 'Pembersihan pasca renovasi ruang OK/ICU', w: 16, types: ['rs'], q: [[1, 100]], unit: 'area', price: [12e6, 55e6], dur: [16, 72], cost: { tenaga: [0.38, 0.44], bahan: [0.2, 0.26] },
         issues: ['renovasi ruang operasi', 'pembukaan ICU baru', 'perluasan IGD'],
         desc: (v) => `Pembersihan pasca konstruksi: ${v.issue}. Harus lolos uji partikel.`,
         scope: () => 'Pembersihan pasca konstruksi standar ruang steril, termasuk HEPA vacuum dan koordinasi uji partikel.',
         done: ['Uji partikel lolos, ruang siap dioperasikan.', 'Selesai, 1 putaran ulang di koridor steril.'] },
-      { name: 'Perawatan lantai vinyl/epoxy', w: 22, types: ['rs', 'klinik'], q: [[300, 40], [800, 40], [2000, 20]], unit: 'm²', price: [14000, 26000], min: 4e6, dur: [8, 48], cost: { tenaga: [0.4, 0.46], bahan: [0.2, 0.26] },
+      { name: 'Perawatan lantai vinyl/epoxy', w: 22, types: ['rs', 'klinik'], q: [[300, 40], [800, 40], [2000, 20]], unit: 'm²', price: [14000, 26000], min: 4e6, dur: [8, 48], cost: { tenaga: [0.36, 0.42], bahan: [0.2, 0.26] },
         issues: ['lantai kusam di koridor', 'jadwal stripping & coating tahunan', 'persiapan akreditasi'],
         desc: (v) => `Perawatan lantai ±${v.q} m²: ${v.issue}.`,
         scope: (v) => `Stripping, coating, dan buffing lantai vinyl ±${v.q} m², dikerjakan bertahap per bangsal.`,
         done: ['Selesai bertahap 3 malam tanpa ganggu layanan.'] },
-      { name: 'Pest control fasilitas kesehatan', w: 16, types: ['rs', 'klinik'], q: [[1, 100]], unit: 'paket', price: [4e6, 15e6], dur: [4, 12], cost: { tenaga: [0.3, 0.36], bahan: [0.24, 0.3] }, rain: 1.25,
+      { name: 'Pest control fasilitas kesehatan', w: 16, types: ['rs', 'klinik'], q: [[1, 100]], unit: 'paket', price: [4e6, 15e6], dur: [4, 12], cost: { tenaga: [0.26, 0.32], bahan: [0.24, 0.3] }, rain: 1.25,
         issues: ['temuan kecoa di instalasi gizi', 'nyamuk di bangsal', 'persyaratan akreditasi'],
         desc: (v) => `Pest control: ${v.issue}.`,
         scope: () => 'Pest control dengan bahan aman fasilitas kesehatan, jadwal di luar jam kunjungan, laporan untuk komite PPI.',
         done: ['Treatment selesai, laporan diserahkan ke komite PPI.'] },
-      { name: 'Linen & tirai bed tambahan', w: 16, types: ['rs', 'klinik'], q: [[100, 40], [300, 40], [600, 20]], unit: 'pcs', price: [18000, 30000], min: 3e6, dur: [24, 72], cost: { tenaga: [0.34, 0.4], bahan: [0.18, 0.24] },
+      { name: 'Linen & tirai bed tambahan', w: 16, types: ['rs', 'klinik'], q: [[100, 40], [300, 40], [600, 20]], unit: 'pcs', price: [18000, 30000], min: 3e6, dur: [24, 72], cost: { tenaga: [0.3, 0.36], bahan: [0.18, 0.24] },
         issues: ['penggantian tirai bed semesteran', 'lonjakan pasien', 'persiapan akreditasi'],
         desc: (v) => `Pencucian/penggantian ${v.q} pcs tirai & linen: ${v.issue}.`,
         scope: (v) => `Pencucian dan pemasangan ulang ${v.q} pcs tirai bed/linen dengan proses disinfeksi termal.`,
         done: ['Tirai terpasang kembali, label tanggal cuci ditempel.'] },
     ],
     overheads: [
-      { label: 'Gaji & tunjangan staf kantor pusat', cat: 'biaya_tenaga', day: 25, amt: (c) => 75e6 * Math.pow(1.01, c.i) },
-      { label: 'Sewa kantor pusat & cabang', cat: 'biaya_lain', day: 3, amt: (c) => 30e6 + 12e6 * c.branches },
-      { label: 'Pelatihan PPI, vaksinasi & MCU petugas', cat: 'biaya_lain', day: 15, amt: (c) => c.trend * c.r.uni(0.01, 0.014) },
-      { label: 'Asuransi, K3 & sertifikasi', cat: 'biaya_lain', day: 18, amt: (c) => c.trend * c.r.uni(0.008, 0.012) },
-      { label: 'IT, absensi & admin', cat: 'biaya_lain', day: 20, amt: (c) => c.trend * c.r.uni(0.006, 0.01) },
-      { label: 'Marketing & biaya tender', cat: 'biaya_lain', day: 10, amt: (c) => c.trend * c.r.uni(0.01, 0.016) },
-      { label: 'Kendaraan operasional & perjalanan dinas', cat: 'biaya_transport', day: 27, amt: (c) => c.trend * c.r.uni(0.008, 0.012) },
+      OH('Gaji & tunjangan staf kantor pusat (inti + HR/payroll per 60 petugas)', 'biaya_tenaga', 25, 'step', (c) => (55e6 + Math.ceil(c.heads / 60) * 2.2 * c.umkHq * MACRO.allIn) * c.I('umk')),
+      OH('Sewa kantor pusat & cabang', 'biaya_lain', 3, 'step', (c) => (30e6 + 8e6 * c.branches) * c.I('rent')),
+      OH('Pelatihan PPI, vaksinasi & MCU petugas', 'biaya_lain', 15, 'step', (c) => 150000 * c.heads * c.I('cpi') * c.r.uni(0.9, 1.1)),
+      OH('Asuransi, K3 & sertifikasi', 'biaya_lain', 18, 'var', (c) => c.rev * c.r.uni(0.006, 0.009)),
+      OH('IT, absensi & admin (lisensi per petugas)', 'biaya_lain', 20, 'step', (c) => (10e6 + 45000 * c.heads) * c.I('soft')),
+      OH('Marketing & biaya tender', 'biaya_lain', 10, 'step', (c) => (18e6 + 3.5e6 * c.branches) * c.I('cpi') * c.r.uni(0.9, 1.1)),
+      OH('Kendaraan operasional & perjalanan dinas', 'biaya_transport', 27, 'var', (c) => c.real * c.r.uni(0.007, 0.01) * c.I('fuel')),
     ],
     thr: { kind: 'accrued' },
   },
@@ -818,7 +893,159 @@ function mergeCosts(parts, ref = parts[0]) {
     total += p.amount
   }
   const category = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  return { ...ref, amount: total, category, _parts: Object.fromEntries(byCat) }
+  // _ck: rincian kategori × jenis biaya (var/fixed/step) agar analisis tetap akurat setelah digabung
+  const ck = {}
+  for (const p of parts) for (const [k, v] of Object.entries(p._ck || { [`${p.category}|${p._kind || 'var'}`]: p.amount })) ck[k] = (ck[k] || 0) + v
+  return { ...ref, amount: total, category, _parts: Object.fromEntries(byCat), _ck: ck }
+}
+
+/** Rata-rata rentang [lo, hi]. */
+const mid = (x) => (x[0] + x[1]) / 2
+
+/**
+ * Indeks makro per bulan, relatif terhadap bulan pertama jendela (i = 0 → 1,0):
+ *  P = tarif jasa (naik tiap Januari + penyesuaian pertengahan tahun sesekali), W = UMK (naik tiap Januari),
+ *  rent = sewa (Januari), soft = langganan aplikasi (Januari), cpi/mat/fuel = naik bertahap per bulan.
+ */
+function buildIndices(months, steps) {
+  const byI = new Map(months.map((mo) => [mo.i, mo]))
+  const NAMES = ['P', 'W', 'rent', 'soft', 'cpi', 'mat', 'fuel']
+  const stepOf = (mo) => ({
+    P: (mo.m === 0 ? 1 + steps.priceJan : 1) * (mo.m === MACRO.servicePriceMid.month ? 1 + steps.midAdj : 1),
+    W: mo.m === 0 ? 1 + MACRO.umkStep : 1,
+    rent: mo.m === 0 ? 1 + MACRO.rentStep : 1,
+    soft: mo.m === 0 ? 1 + MACRO.softwareStep : 1,
+    cpi: Math.pow(1 + MACRO.cpi, 1 / 12),
+    mat: Math.pow(1 + MACRO.materials, 1 / 12),
+    fuel: Math.pow(1 + MACRO.fuel, 1 / 12),
+  })
+  const out = new Map([[0, Object.fromEntries(NAMES.map((n) => [n, 1]))]])
+  const is = months.map((m) => m.i)
+  const lo = Math.min(...is)
+  const hi = Math.max(...is)
+  for (let i = 1; i <= hi; i++) {
+    const st = stepOf(byI.get(i))
+    out.set(i, Object.fromEntries(NAMES.map((n) => [n, out.get(i - 1)[n] * st[n]])))
+  }
+  for (let i = -1; i >= lo; i--) {
+    const st = stepOf(byI.get(i + 1))
+    out.set(i, Object.fromEntries(NAMES.map((n) => [n, out.get(i + 1)[n] / st[n]])))
+  }
+  const year0 = byI.get(0).y
+  return {
+    I: (name, i) => {
+      const v = out.get(Math.max(lo, Math.min(hi, i)))[name === 'umk' ? 'W' : name]
+      if (v == null) throw new Error(`Indeks tidak dikenal: ${name}`)
+      return v
+    },
+    /** UMK nominal wilayah di bulan i (nilai REG = tahun MACRO.year0). */
+    umkAt: (rg, i) => rg.umk * Math.pow(1 + MACRO.umkStep, (byI.get(Math.max(lo, Math.min(hi, i))).y - MACRO.year0)),
+    year0,
+  }
+}
+
+/**
+ * Kapasitas & headcount berbasis utilisasi.
+ *  - sole: helper aktif = ceil(rata-rata 3 bln job × peluang pakai helper / jobsPerHelper), lengket (tidak turun karena 1 bulan sepi).
+ *  - payroll (UKM/enterprise): FTE kontrak per-petugas = q × fte (ditempatkan penuh); FTE lain = beban kerja riil
+ *    (pendapatan riil × porsi tenaga ÷ biaya all-in UMK dasar). Pekerja tetap = ceil(FTE rata-rata 3 bln ÷ util);
+ *    kelebihan beban bulan puncak di atas kapasitas dibayar lembur/harian.
+ */
+function computeLabour(biz, jobs, months, idx, g = 0) {
+  const sc = SCALE[biz.scale]
+  const is = months.map((m) => m.i).sort((a, b) => a - b)
+  const w = biz.workers
+  if (sc.labour === 'perJob') {
+    const load = new Map(is.map((i) => [i, 0]))
+    for (const j of jobs) load.set(j.i, (load.get(j.i) || 0) + (j.kind === 'contract' ? 4 : 1))
+    const helpers = new Map()
+    let h = null
+    for (const i of is) {
+      const win = is.filter((k) => k <= i && k > i - 3).map((k) => load.get(k))
+      const need = Math.min(w.helpers.length, Math.max(w.minHelpers || 0, Math.ceil((win.reduce((a, b) => a + b, 0) / win.length) * w.helperP / w.jobsPerHelper)))
+      if (h == null || need > h) h = need
+      else if (need < h - 1) h -= 1
+      helpers.set(i, h)
+    }
+    return {
+      mode: 'perJob',
+      helpers: (i) => helpers.get(i) ?? helpers.get(is[is.length - 1]),
+      heads: (i) => 1 + (helpers.get(i) ?? 0),
+      fte: (i) => load.get(i) || 0,
+      series: is.map((i) => ({ i, heads: 1 + helpers.get(i), helpers: helpers.get(i), jobs: load.get(i), util: Math.min(1.5, ((load.get(i) || 0) * w.helperP) / Math.max(1, helpers.get(i) * w.jobsPerHelper)) })),
+    }
+  }
+  const multi = biz.scale === 'enterprise'
+  const keyOf = (j) => (multi ? j.rg.key : '_')
+  const rgOfKey = (k) => (multi ? biz.regions.find((x) => x.key === k) : biz.regions[0])
+  const base = new Map() // key|i -> { a, c, sw }
+  for (const j of jobs) {
+    const k = `${keyOf(j)}|${j.i}`
+    const b = base.get(k) || { a: 0, c: 0, swA: 0, swC: 0 }
+    const skill = j.svc.skill || 1
+    if (j.svc.fte) {
+      const f = j.q * j.svc.fte
+      b.c += f
+      b.swC += f * skill
+    } else {
+      const umk0 = (multi ? j.rg : biz.regions[0]).umk
+      const f = ((j.price / j.px) * mid(j.svc.cost.tenaga)) / (umk0 * MACRO.allIn * skill)
+      b.a += f
+      b.swA += f * skill
+    }
+    base.set(k, b)
+  }
+  const keys = multi ? biz.regions.map((x) => x.key) : ['_']
+  const get = (k, i) => base.get(`${k}|${i}`) || { a: 0, c: 0, swA: 0, swC: 0 }
+  // Pekerja ad-hoc dikelola sebagai satu pool (UKM: satu lokasi; enterprise: tim mobile lintas wilayah),
+  // dialokasikan ke wilayah sebanding beban ad-hoc-nya. Petugas kontrak ditempatkan penuh per wilayah.
+  const poolA = new Map(is.map((i) => [i, keys.reduce((s, k) => s + get(k, i).a, 0)]))
+  const hAt = new Map()
+  let hA = null
+  for (const i of is) {
+    const win = is.filter((x) => x <= i && x > i - 3).map((x) => poolA.get(x))
+    const avg = win.reduce((s, x) => s + x, 0) / win.length
+    // Pekerja tetap mengikuti beban rata-rata 3 bulan (diproyeksikan 1 bulan ke depan dengan rencana pertumbuhan g)
+    // ÷ utilisasi sasaran; beban di atasnya ditutup lembur/harian. Turun hanya lewat atrisi bertahap (±10%/bulan).
+    let need = Math.ceil((avg * (1 + g)) / w.util - 1e-9)
+    if (!multi) need = Math.max(w.min || 1, need)
+    if (hA == null || need > hA) hA = need
+    else if (need < hA) hA = Math.max(need, hA - Math.max(1, Math.round(hA * 0.1)))
+    hAt.set(i, hA)
+  }
+  const per = new Map() // key -> Map(i -> {...})
+  for (const k of keys) {
+    const m = new Map()
+    for (const i of is) {
+      const b = get(k, i)
+      const A = poolA.get(i)
+      const shareA = A > 0 ? b.a / A : multi ? 0 : 1
+      const hAk = hAt.get(i) * shareA // alokasi pecahan (untuk gaji); tampilan dibulatkan
+      const otK = Math.max(0, A - hAt.get(i)) * shareA
+      const hC = Math.ceil(b.c - 1e-9)
+      const fte = b.a + b.c
+      const skillA = b.a > 0 ? b.swA / b.a : 1
+      const skillC = b.c > 0 ? b.swC / b.c : 1
+      // wageUnits: kelipatan UMK yang dibayar (pekerja × keahlian); lembur dari kelebihan beban ad-hoc
+      m.set(i, { heads: Math.round(hAk) + hC, hA: hAk, hC, fteA: b.a, fteC: b.c, skillA, skillC, wageUnits: hAk * skillA + hC * skillC, ot: otK * skillA, util: hAk + hC > 0 ? fte / (hAk + hC) : 0 })
+    }
+    per.set(k, m)
+  }
+  const at = (k, i) => per.get(k)?.get(i) || { heads: 0, hA: 0, hC: 0, fteA: 0, fteC: 0, skillA: 1, skillC: 1, wageUnits: 0, ot: 0, util: 0 }
+  const heads = (i) => hAt.get(i) + keys.reduce((s, k) => s + at(k, i).hC, 0)
+  return {
+    mode: 'payroll',
+    keys,
+    rgOfKey,
+    at,
+    heads,
+    series: is.map((i) => {
+      const xs = keys.map((k) => at(k, i))
+      const hd = heads(i)
+      const fte = xs.reduce((s, x) => s + x.fteA + x.fteC, 0)
+      return { i, heads: hd, fte, util: hd ? fte / hd : 0, overtime_fte: xs.reduce((s, x) => s + x.ot, 0), by_region: multi ? Object.fromEntries(keys.map((k) => [k, at(k, i).heads])) : undefined }
+    }),
+  }
 }
 
 function simulateBusiness(biz, ctx, attempt) {
@@ -827,45 +1054,58 @@ function simulateBusiness(biz, ctx, attempt) {
   const intensity = intensityFn(biz)
   const owner = ownerId(biz.k)
   const g = r.uni(sc.gDraw[0], sc.gDraw[1])
+  // Lapisan makro: kenaikan tarif Januari & pertengahan tahun (per usaha), eskalasi kontrak non-UMK.
+  const priceJan = r.uni(MACRO.servicePriceJan[biz.scale][0], MACRO.servicePriceJan[biz.scale][1])
+  const midAdj = r.chance(MACRO.servicePriceMid.p) ? r.uni(MACRO.servicePriceMid.pct[0], MACRO.servicePriceMid.pct[1]) : 0
   const cShare = biz.contract?.share || 0
   const months = ctx.months // [{i, y, m, startMs, days}]
+  const idx = buildIndices(months, { priceJan, midAdj })
+  const I = idx.I
   const meanRaw = months.filter((x) => x.i >= 0 && x.i < ctx.nMonths).reduce((s, x) => s + x.raw(intensity), 0) / ctx.nMonths
   const custs = makeCustomerFactory(biz, r)
   const asof = ctx.asof
-  const priceIdx = (i) => Math.pow(1.0025, i) // ~3%/th inflasi harga jasa
   const jobs = []
   const lost = []
   const contracts = []
   const monthStats = new Map()
   const thrPaid = new Set()
+  const natNominal = nominalOf(MACRO.realGdp)
 
+  // Bobot wilayah enterprise: condong ke wilayah yang ekonominya (NOMINAL = riil + inflasi) tumbuh lebih cepat.
   const regionWeights = (i) => {
-    const nat = 0.05
     const alpha = biz.regionAlpha || 0
     return biz.regions.map((rg) => {
       if (i < rg.open) return [rg, 0]
       const ramp = rg.open > -50 ? Math.min(1, (i - rg.open + 1) / 3) : 1
-      const tilt = Math.pow((1 + rg.growth) / (1 + nat), (alpha * i) / 12)
+      const tilt = Math.pow((1 + rg.nominal) / (1 + natNominal), (alpha * i) / 12)
       return [rg, rg.w * ramp * tilt]
     })
   }
+  let lab = null // diisi setelah semua pekerjaan diundi
   const workerFor = (i, rg, price, avg) => {
     const w = biz.workers
     if (w.owner) {
-      const active = w.helpers.filter(([, from]) => i >= from).map(([n]) => n)
+      const active = w.helpers.slice(0, lab.helpers(i))
       const useHelper = r.chance(w.helperP)
-      if (!useHelper) return { name: w.owner, helper: false }
-      return { name: active.length ? r.pick(active) : w.owner, helper: true }
+      if (!useHelper || !active.length) return { name: w.owner, helper: false }
+      if (w.pairs) {
+        const ppl = [w.short || w.owner, ...active.map((h) => h.n)]
+        const a = r.int(0, ppl.length - 1)
+        let b = r.int(0, ppl.length - 2)
+        if (b >= a) b++
+        return { name: `${ppl[Math.min(a, b)]} & ${ppl[Math.max(a, b)]}`, helper: true }
+      }
+      return { name: r.pick(active).label, helper: true }
     }
     if (w.roster) {
-      const need = Math.max(w.min, Math.min(w.max, Math.ceil((biz.base * Math.pow(1 + g, Math.max(0, i))) / w.revPerWorker)))
-      const lead = w.roster[r.int(0, need - 1)]
+      const need = Math.max(1, lab.heads(i))
+      const k = r.int(0, need - 1)
+      const lead = w.roster[k] || `Pekerja ${k + 1}`
       const n = price > avg * 1.6 ? r.int(3, 5) : price > avg * 0.8 ? r.int(2, 3) : 1
       return { name: n > 1 ? w.team.replace('{lead}', lead).replace('{n}', n) : lead, helper: true, need }
     }
-    // enterprise: tim per wilayah
-    const monthlyRegionRev = (biz.base * Math.pow(1 + g, Math.max(0, i))) * 0.15
-    const teams = Math.max(1, Math.round(monthlyRegionRev / w.teamPerRev))
+    // enterprise: tim per wilayah, jumlah tim mengikuti pekerja tetap ad-hoc di wilayah itu
+    const teams = Math.max(1, Math.ceil(lab.at(rg.key, i).hA / w.teamSize))
     const t = r.int(1, teams)
     const spvR = makeRng(hashStr(`${biz.key}:${rg.key}:${t}`))
     const spv = `${spvR.pick(M_FIRST.concat(F_FIRST))} ${spvR.pick(LAST)}`
@@ -881,13 +1121,17 @@ function simulateBusiness(biz, ctx, attempt) {
   const qty = (svc) => (Array.isArray(svc.q[0]) ? r.wpick(svc.q) : r.int(svc.q[0], svc.q[1]))
   const vars = (svc, extra) => ({ r, pick: r.pick, issue: svc.issues ? r.pick(svc.issues) : '', ...extra })
 
-  const mkPrice = (svc, q, cust, i) => {
+  /** Harga nominal. Kontrak per petugas dihargai dari UMK wilayah (× kelipatan); lainnya dari katalog × indeks tarif P. */
+  const mkPrice = (svc, q, cust, i, rg) => {
     const corp = ['korporat', 'instansi', 'mall', 'kantor', 'rs', 'klinik'].includes(cust.type)
     const u = corp ? 0.35 + 0.65 * r.next() : r.next()
+    if (svc.priceUmk) return roundP(q * idx.umkAt(rg, i) * (svc.priceUmk[0] + (svc.priceUmk[1] - svc.priceUmk[0]) * u))
     let p = q * (svc.price[0] + (svc.price[1] - svc.price[0]) * u)
     if (svc.min) p = Math.max(svc.min, p)
-    return roundP(p * priceIdx(i))
+    return roundP(p * I('P', i))
   }
+  /** Indeks harga yang melekat pada harga: dipakai untuk mendeflasi pendapatan (riil = nominal ÷ px). */
+  const pxOf = (svc, i) => (svc.priceUmk ? I('W', i) : I('P', i))
 
   const buildTimeline = (S, kind, durH, rg) => {
     const tz = rg.tz
@@ -923,7 +1167,7 @@ function simulateBusiness(biz, ctx, attempt) {
   for (const mo of months) {
     const i = mo.i
     const S_i = mo.raw(intensity) / meanRaw
-    const trend = biz.base * Math.pow(1 + g, i)
+    const trend = biz.base * Math.pow(1 + g, i) // target NOMINAL (tren bisnis), bukan pertumbuhan riil
     const eps = r.lognoise(sc.sigma)
     const target = trend * (cShare + (1 - cShare) * S_i) * eps
     const rw = regionWeights(i)
@@ -935,7 +1179,15 @@ function simulateBusiness(biz, ctx, attempt) {
     if (biz.contract) {
       const cTarget = trend * cShare * eps
       for (const c of contracts) if (c.active && i > c.start && r.chance(biz.contract.churn)) c.active = false
-      if (mo.m === 0 && prevContractMonthDone !== null) for (const c of contracts) if (c.active) c.value = roundP(c.value * r.uni(1.03, 1.06)) // eskalasi Januari
+      if (mo.m === 0 && prevContractMonthDone !== null) {
+        // Eskalasi Januari: kontrak per petugas mengikuti kenaikan UMK; kontrak lain mengikuti rentang MACRO.contractEsc.
+        for (const c of contracts) {
+          if (!c.active) continue
+          const e = c.svc.priceUmk ? MACRO.umkStep : r.uni(MACRO.contractEsc[0], MACRO.contractEsc[1])
+          c.value = roundP(c.value * (1 + e))
+          c.px *= 1 + e
+        }
+      }
       let sum = contracts.filter((c) => c.active).reduce((s, c) => s + c.value, 0)
       let guard = 0
       while (guard++ < 200) {
@@ -943,9 +1195,9 @@ function simulateBusiness(biz, ctx, attempt) {
         const rg = r.wpick(activeRegions)
         const q = qty(svc)
         const cust = custs.create(rg, svc.types || Object.keys(biz.custMix))
-        const value = mkPrice(svc, q, cust, i)
+        const value = mkPrice(svc, q, cust, i, rg)
         if (sum + value / 2 > cTarget) break
-        contracts.push({ svc, rg, q, cust, value, start: i, active: true, no: contracts.length + 1, billDay: r.int(1, 26) })
+        contracts.push({ svc, rg, q, cust, value, px: pxOf(svc, i), start: i, active: true, no: contracts.length + 1, billDay: r.int(1, 26) })
         sum += value
       }
       for (const c of contracts.filter((x) => x.active)) {
@@ -958,7 +1210,7 @@ function simulateBusiness(biz, ctx, attempt) {
         const tl = { R: R0, O, A, S, C, P: C + r.uni(1, 20) * HOUR }
         c.cust.jobs++
         contractRev += c.value
-        jobs.push({ kind: 'contract', i, svc: c.svc, rg: c.rg, cust: c.cust, q: c.q, price: c.value, tl, contract: c, period: `${monthLabel(mo.y, mo.m)} (siklus tgl ${c.billDay})` })
+        jobs.push({ kind: 'contract', i, svc: c.svc, rg: c.rg, cust: c.cust, q: c.q, price: c.value, px: c.px, tl, contract: c, period: `${monthLabel(mo.y, mo.m)} (siklus tgl ${c.billDay})` })
       }
       prevContractMonthDone = i
     }
@@ -991,7 +1243,7 @@ function simulateBusiness(biz, ctx, attempt) {
         })()
       } else cust = custs.get(rg, svc.types || Object.keys(biz.custMix), sc.repeat)
       const q = qty(svc)
-      const price = mkPrice(svc, q, cust, i)
+      const price = mkPrice(svc, q, cust, i, rg)
       if (sum + price / 2 > adhocTarget) break
       sum += price
       nAdhoc++
@@ -1004,7 +1256,7 @@ function simulateBusiness(biz, ctx, attempt) {
         const pm = wibMonth(tl.P)
         if (pm.y === mo.y && pm.m === mo.m) break // pendapatan diakui di bulan target
       }
-      jobs.push({ kind: 'adhoc', i, svc, rg, cust, q, price, tl, avgTicket })
+      jobs.push({ kind: 'adhoc', i, svc, rg, cust, q, price, px: pxOf(svc, i), tl, avgTicket })
     }
 
     /* --- prospek yang tidak jadi (funnel) --- */
@@ -1015,7 +1267,7 @@ function simulateBusiness(biz, ctx, attempt) {
       const rg = r.wpick(activeRegions)
       const cust = custs.get(rg, svc.types || Object.keys(biz.custMix), sc.repeat * 0.6)
       const q = qty(svc)
-      const price = mkPrice(svc, q, cust, i)
+      const price = mkPrice(svc, q, cust, i, rg)
       const day = sampleDay(mo)
       const Rt = localToUtc(day, r.uni(7.5, 21), rg.tz)
       const noOffer = r.chance(sc.noOffer)
@@ -1024,6 +1276,9 @@ function simulateBusiness(biz, ctx, attempt) {
       lost.push({ i, svc, rg, cust, q, price, R: Rt, O: noOffer ? null : O, D })
     }
   }
+
+  /* --- kapasitas: headcount mengikuti volume riil --- */
+  lab = computeLabour(biz, jobs, months, idx, g)
 
   /* --- biaya overhead bulanan, THR, dan baris SQL --- */
   const rows = { requests: [], offers: [], assignments: [], completions: [], ledger_entries: [], reports: [] }
@@ -1066,54 +1321,82 @@ function simulateBusiness(biz, ctx, attempt) {
     rows.completions.push({ id: complId, owner_id: owner, assignment_id: asgId, notes: note, photos_path: null, status: 'done', completed_at: cIso, created_at: cIso })
     completionsByTime.push({ id: complId, t: tl.C, rg })
     if (tl.P > asof) continue
-    // ---- jurnal per pekerjaan
+    // ---- jurnal per pekerjaan (biaya variabel). Biaya riil × indeks biaya ÷ indeks harga jual.
     const revenue = r.chance(0.06) ? roundP(j.price * r.uni(1.03, 1.12)) : j.price // tambahan sparepart/volume aktual
     const costBuf = []
-    const post = (cat, amt, dt = 0) => {
+    const post = (cat, amt, dt = 0, extra = {}) => {
       const a = Math.round(amt / 1000) * 1000
       if (a <= 0) return
       const t = iso(tl.P + dt) // selalu dipanggil agar urutan PRNG sama di mode penuh & lean
-      const row = { owner_id: owner, completion_id: complId, amount: a, category: cat, status: 'posted', posted_at: t, created_at: t, _ms: tl.P + dt, _rg: rg.key, _cust: cust.name, _svc: svc.name }
+      const row = { owner_id: owner, completion_id: complId, amount: a, category: cat, status: 'posted', posted_at: t, created_at: t, _ms: tl.P + dt, _rg: rg.key, _cust: cust.name, _svc: svc.name, _kind: 'var', ...extra }
       if (ctx.lean && cat !== 'pendapatan') costBuf.push(row)
       else rows.ledger_entries.push({ id: nextId('ledger_entries'), ...row })
     }
-    post('pendapatan', revenue)
+    post('pendapatan', revenue, 0, { _px: j.px, _contract: isContract })
     const c = svc.cost
-    const labourOk = biz.labourLineP == null || wk.helper
-    if (labourOk && (biz.labourLineP == null || r.chance(biz.labourLineP / (biz.workers.helperP || 1)))) post('biaya_tenaga', revenue * r.uni(c.tenaga[0], c.tenaga[1]), 2 * MIN)
-    post('biaya_bahan', revenue * r.uni(c.bahan[0], c.bahan[1]), 3 * MIN)
-    if (biz.transportAbs) post('biaya_transport', r.uni(biz.transportAbs[0], biz.transportAbs[1]) * (j.q > 4 ? 1.3 : 1), 4 * MIN)
-    else if (r.chance(sc.transportLine)) post('biaya_transport', revenue * r.uni(0.015, 0.035) / sc.transportLine, 4 * MIN)
+    const ji = j.i
+    if (sc.labour === 'perJob') {
+      // Sole: helper harian dibayar per job; tarifnya naik mengikuti UMK tiap Januari (W), harga jual mengikuti P.
+      const labourOk = biz.labourLineP == null || wk.helper
+      if (labourOk && (biz.labourLineP == null || r.chance(biz.labourLineP / (biz.workers.helperP || 1)))) post('biaya_tenaga', revenue * r.uni(c.tenaga[0], c.tenaga[1]) * (I('W', ji) / j.px), 2 * MIN)
+    }
+    post('biaya_bahan', revenue * r.uni(c.bahan[0], c.bahan[1]) * (I('mat', ji) / j.px), 3 * MIN)
+    if (biz.transportAbs) post('biaya_transport', r.uni(biz.transportAbs[0], biz.transportAbs[1]) * (j.q > 4 ? 1.3 : 1) * I('fuel', ji), 4 * MIN)
+    else if (r.chance(sc.transportLine)) post('biaya_transport', revenue * r.uni(0.015, 0.035) / sc.transportLine * (I('fuel', ji) / j.px), 4 * MIN)
     if (isContract && biz.sla && r.chance(biz.sla.p)) post('biaya_lain', revenue * r.uni(biz.sla.pct[0], biz.sla.pct[1]), 5 * MIN)
     if (costBuf.length) rows.ledger_entries.push({ id: nextId('ledger_entries'), ...mergeCosts(costBuf) })
   }
 
-  // Overhead bulanan & THR: dilekatkan ke penyelesaian terakhir sebelum tanggal posting (skema mewajibkan completion_id).
+  // Overhead bulanan, gaji tetap & THR: dilekatkan ke penyelesaian terakhir sebelum tanggal posting (skema mewajibkan completion_id).
   completionsByTime.sort((a, b) => a.t - b.t)
   const attach = (ms) => {
     let lo = 0
     let hi = completionsByTime.length - 1
     let best = null
     while (lo <= hi) {
-      const mid = (lo + hi) >> 1
-      if (completionsByTime[mid].t <= ms) { best = completionsByTime[mid]; lo = mid + 1 } else hi = mid - 1
+      const mid2 = (lo + hi) >> 1
+      if (completionsByTime[mid2].t <= ms) { best = completionsByTime[mid2]; lo = mid2 + 1 } else hi = mid2 - 1
     }
     return best
   }
-  const tzHQ = biz.regions.find((x) => x.key === biz.hq)?.tz || biz.regions[0].tz
+  const hqReg = biz.regions.find((x) => x.key === biz.hq) || biz.regions[0]
+  const tzHQ = hqReg.tz
+  const allInMonthly = biz.thr.kind === 'accrued' ? MACRO.allIn : 1 + MACRO.allInParts.bpjs + MACRO.allInParts.other // UKM: THR dibayar tunai terpisah
+  const revBy = new Map()
+  for (const j of jobs) {
+    const x = revBy.get(j.i) || { rev: 0, real: 0 }
+    x.rev += j.price
+    x.real += j.price / j.px
+    revBy.set(j.i, x)
+  }
   for (const mo of months.filter((x) => x.i >= 0 && x.i < ctx.nMonths)) {
     const i = mo.i
-    const trend = biz.base * Math.pow(1 + g, i)
     const branches = biz.regions.filter((x) => i >= x.open).length - 1
-    const cctx = { r, i, trend, branches }
+    const heads = sc.labour === 'perJob' ? lab.helpers(i) : lab.heads(i)
+    const umk = idx.umkAt(biz.regions[0], i)
+    const staff = biz.staff ? biz.staff(heads) : []
+    const cctx = { r, i, m: mo.m, I: (n) => I(n, i), rev: revBy.get(i)?.rev || 0, real: revBy.get(i)?.real || 0, heads, branches, umk, umkHq: hqReg.umk, allInMonthly, staffUnits: staffUnits(staff) }
     const items = biz.overheads.map((o) => ({ ...o, amount: o.amt(cctx) }))
+    // Gaji pekerja tetap (UMK × all-in) dan lembur/harian di bulan puncak
+    if (lab.mode === 'payroll') {
+      let ot = 0
+      for (const k of lab.keys) {
+        const x = lab.at(k, i)
+        if (!x.heads) continue
+        const rg = lab.rgOfKey(k)
+        const u = idx.umkAt(rg, i)
+        items.push({ label: `Gaji pekerja lapangan tetap${lab.keys.length > 1 ? ` ${rg.key}` : ''} (${x.heads} org × UMK × ${allInMonthly.toFixed(3).replace('.', ',')})`, cat: 'biaya_tenaga', day: 25, kind: 'step', amount: x.wageUnits * u * allInMonthly })
+        ot += x.ot * u * MACRO.allIn * MACRO.overtime
+      }
+      items.push({ label: 'Lembur & tenaga harian (beban di atas kapasitas)', cat: 'biaya_tenaga', day: 28, kind: 'var', amount: ot })
+    }
     // THR tunai: H-10 Lebaran di bulan tersebut
     for (const L of LEBARAN) {
       const lm = new Date(L - 10 * DAY)
       if (lm.getUTCFullYear() === mo.y && lm.getUTCMonth() === mo.m && biz.thr.kind !== 'accrued' && !thrPaid.has(L)) {
         thrPaid.add(L)
-        const workers = biz.workers.roster ? Math.max(biz.workers.min, Math.min(biz.workers.max, Math.ceil(trend / biz.workers.revPerWorker))) : 1
-        items.push({ label: biz.thr.label, cat: 'biaya_tenaga', day: lm.getUTCDate(), amount: biz.thr.kind === 'perWorker' ? workers * biz.thr.amount : biz.thr.amount })
+        const amount = biz.thr.kind === 'umk' ? (heads + cctx.staffUnits) * umk : biz.thr.amount * Math.max(1, heads)
+        items.push({ label: biz.thr.label, cat: 'biaya_tenaga', day: lm.getUTCDate(), kind: 'step', amount })
       }
     }
     const ohBuf = []
@@ -1124,8 +1407,9 @@ function simulateBusiness(biz, ctx, attempt) {
       const host = attach(t)
       if (!host) continue
       const a = Math.round(it.amount / 1000) * 1000
+      if (a <= 0) continue
       const ts = iso(t)
-      const row = { owner_id: owner, completion_id: host.id, amount: a, category: it.cat, status: 'posted', posted_at: ts, created_at: ts, _ms: t, _overhead: it.label }
+      const row = { owner_id: owner, completion_id: host.id, amount: a, category: it.cat, status: 'posted', posted_at: ts, created_at: ts, _ms: t, _overhead: it.label, _kind: it.kind || 'fixed' }
       if (ctx.lean) ohBuf.push(row)
       else rows.ledger_entries.push({ id: nextId('ledger_entries'), ...row })
     }
@@ -1148,32 +1432,104 @@ function simulateBusiness(biz, ctx, attempt) {
     rows.offers.push({ id: nextId('offers'), owner_id: owner, request_id: reqId, ai_proposal_json: JSON.stringify({ scope, price: aiPrice, terms: r.pick(terms), notes: status === 'rejected' ? r.pick(['Pelanggan membandingkan dengan vendor lain.', 'Menunggu persetujuan anggaran pelanggan.', 'Jadwal pelanggan belum pasti.']) : 'Menunggu konfirmasi pelanggan.' }), validated_price: L.price, validated_scope: scope, status, created_at: iso(L.O) })
   }
 
-  return { biz, g, rows, monthStats, attempt, custCount: custs.count(), contracts: contracts.length, activeContracts: contracts.filter((c) => c.active).length, regionsOf: rows }
+  const macro = { price_jan_step: priceJan, price_mid_step: midAdj, umk_step: MACRO.umkStep, umk_primary_region: biz.regions[0].umk, umk_hq: hqReg.umk, all_in_monthly: allInMonthly }
+  return { biz, g, rows, monthStats, attempt, custCount: custs.count(), contracts: contracts.length, activeContracts: contracts.filter((c) => c.active).length, lab, idx, macro }
 }
 
 /* =================================================== Statistik & cek */
 
+/** Regresi log-linear y = a + b·x → pertumbuhan per periode e^b − 1, plus deviasi standar residual. */
+function logFit(xs, vals) {
+  const ys = vals.map((v) => Math.log(v))
+  const xm = xs.reduce((a, b) => a + b, 0) / xs.length
+  const ym = ys.reduce((a, b) => a + b, 0) / ys.length
+  let num = 0
+  let den = 0
+  for (let k = 0; k < xs.length; k++) { num += (xs[k] - xm) * (ys[k] - ym); den += (xs[k] - xm) ** 2 }
+  const b = num / den
+  const res = ys.map((y, k) => y - (ym + b * (xs[k] - xm)))
+  const sd = Math.sqrt(res.reduce((s, e) => s + e * e, 0) / Math.max(1, res.length - 2))
+  return { g: Math.exp(b) - 1, sd }
+}
+
+/** Estimasi pajak per bulan (TIDAK ditulis ke buku besar; buku besar = laba sebelum pajak). */
+function taxModel(biz, sim, months) {
+  const T = MACRO.tax
+  if (biz.scale === 'enterprise') {
+    // PT: PPh Badan 22% atas laba (perkiraan kasar, tanpa koreksi fiskal) dengan fasilitas Pasal 31E bila peredaran ≤ Rp50 M.
+    const full = months.filter((m) => m.full)
+    const annual = (full.reduce((s, m) => s + m.rev, 0) / Math.max(1, full.length)) * 12
+    const slice = annual <= T.corp31eGross ? Math.min(1, T.corp31eSlice / annual) : 0
+    const eff = T.corporate * (1 - 0.5 * slice)
+    return { method: `Perkiraan PPh Badan ${idPct(T.corporate, 0)} × laba sebelum pajak${slice ? `, fasilitas Pasal 31E (peredaran setahun ±${idRp(annual)} ≤ Rp50 M; porsi ${idPct(slice, 0)} PKP bertarif 50%)` : ''}; tarif efektif ±${idPct(eff)}. Tanpa koreksi fiskal; hanya ilustrasi, tidak ditulis ke buku besar.`, eff, annual_turnover: annual, monthly: (m) => (m.rev - m.cost) * eff, floorTotal: true }
+  }
+  // Sole (WP orang pribadi) & UKM (CV): PPh Final 0,5% × peredaran bruto (PP 55/2022). WP OP: Rp500 jt pertama setahun bebas.
+  const indiv = biz.scale === 'sole'
+  // Peredaran Jan..sebelum bulan pertama jendela (tahun pajak berjalan): diekstrapolasi mundur dari tren.
+  const first = months[0]
+  let pre = 0
+  for (let k = 1; k <= first.m0; k++) pre += biz.base * Math.pow(1 + sim.g, -k)
+  const ytd = new Map()
+  let acc = pre
+  let year = first.y
+  const full = months.filter((m) => m.full)
+  const annual = (full.reduce((s, m) => s + m.rev, 0) / Math.max(1, full.length)) * 12
+  for (const m of months) {
+    if (m.y !== year) { year = m.y; acc = 0 }
+    const before = acc
+    acc += m.rev
+    ytd.set(m.key, { before, after: acc })
+  }
+  const capOk = annual <= T.turnoverCap
+  return {
+    method: indiv
+      ? `PPh Final UMKM ${idPct(T.pphFinal)} × peredaran bruto di atas Rp${T.individualExempt / 1e6} jt pertama per tahun pajak (WP orang pribadi, PP 55/2022). Peredaran setahun ±${idRp(annual)}${annual < T.individualExempt ? ' < Rp500 jt, jadi estimasi pajak Rp0' : ''}.`
+      : `PPh Final UMKM ${idPct(T.pphFinal)} × peredaran bruto bulanan (CV, PP 55/2022; batas waktu CV 4 tahun pajak diasumsikan belum lewat). Peredaran setahun ±${idRp(annual)} ${capOk ? '≤' : '>'} Rp4,8 M${capOk ? '' : ': DI ATAS BATAS, rezim final tidak berlaku'}.`,
+    eff: null,
+    annual_turnover: annual,
+    turnover_cap_ok: capOk,
+    pre_window_ytd: indiv ? pre : undefined,
+    monthly: (m) => {
+      if (!capOk) return 0
+      if (!indiv) return m.rev * T.pphFinal
+      const y = ytd.get(m.key)
+      const taxable = Math.max(0, y.after - Math.max(T.individualExempt, y.before))
+      return taxable * T.pphFinal
+    },
+    floorTotal: false,
+  }
+}
+
 function analyse(sim, ctx) {
-  const { biz, rows, monthStats } = sim
+  const { biz, rows, monthStats, lab } = sim
+  const sc = SCALE[biz.scale]
   const per = new Map()
+  const blank = () => ({ rev: 0, real: 0, revContract: 0, cost: 0, jobs: 0, byReg: {}, ck: {} })
   for (const l of rows.ledger_entries) {
     const { y, m } = wibMonth(l._ms)
     const key = `${y}-${String(m + 1).padStart(2, '0')}`
-    if (!per.has(key)) per.set(key, { rev: 0, cost: 0, jobs: 0, byReg: {} })
+    if (!per.has(key)) per.set(key, blank())
     const p = per.get(key)
     if (l.category === 'pendapatan') {
       p.rev += l.amount
+      p.real += l.amount / (l._px || 1)
+      if (l._contract) p.revContract += l.amount
       p.jobs++
       p.byReg[l._rg] = (p.byReg[l._rg] || 0) + l.amount
-    } else p.cost += l.amount
+    } else {
+      p.cost += l.amount
+      for (const [k, v] of Object.entries(l._ck || { [`${l.category}|${l._kind || 'var'}`]: l.amount })) p.ck[k] = (p.ck[k] || 0) + v
+    }
   }
   const out = []
+  const firstMo = ctx.months.find((x) => x.i === 0)
   for (const mo of ctx.months.filter((x) => x.i >= 0 && x.i < ctx.nMonths)) {
     const key = `${mo.y}-${String(mo.m + 1).padStart(2, '0')}`
-    const p = per.get(key) || { rev: 0, cost: 0, jobs: 0, byReg: {} }
+    const p = per.get(key) || blank()
     const full = mo.endMs <= ctx.asof
     const frac = full ? 1 : Math.max(0.01, (ctx.asof - mo.startMs) / (mo.endMs - mo.startMs))
-    out.push({ key, label: monthLabel(mo.y, mo.m), i: mo.i, full, frac, ...p, SI: monthStats.get(mo.i).SI })
+    const L = lab.series.find((x) => x.i === mo.i)
+    out.push({ key, y: mo.y, m: mo.m, m0: firstMo.m, label: monthLabel(mo.y, mo.m), i: mo.i, full, frac, ...p, SI: monthStats.get(mo.i).SI, P: sim.idx.I('P', mo.i), W: sim.idx.I('W', mo.i), lab: L })
   }
   const full = out.filter((x) => x.full)
   for (let k = 0; k < out.length; k++) {
@@ -1183,27 +1539,77 @@ function analyse(sim, ctx) {
     cur.mom = prev && cur.full ? rr(cur) / rr(prev) - 1 : null
     cur.momDes = prev && cur.full ? (rr(cur) / cur.SI) / (rr(prev) / prev.SI) - 1 : null
   }
-  // regresi log-linear pendapatan desesonal (bulan penuh)
   const xs = full.map((x) => x.i)
-  const ys = full.map((x) => Math.log(x.rev / x.SI))
-  const xm = xs.reduce((a, b) => a + b, 0) / xs.length
-  const ym = ys.reduce((a, b) => a + b, 0) / ys.length
-  let num = 0
-  let den = 0
-  for (let k = 0; k < xs.length; k++) { num += (xs[k] - xm) * (ys[k] - ym); den += (xs[k] - xm) ** 2 }
-  const trendG = Math.exp(num / den) - 1
+  // Tren NOMINAL desesonal (yang diuji terhadap band bisnis) dan tren volume RIIL (pendapatan ÷ indeks harga).
+  const nomFit = logFit(xs, full.map((x) => x.rev / x.SI))
+  const realFit = logFit(xs, full.map((x) => x.real / x.SI))
+  const rawFit = logFit(xs, full.map((x) => x.rev))
+  const trendG = nomFit.g
+  const realG = realFit.g
+  const priceG = (1 + trendG) / (1 + realG) - 1
   const first = full[0]
   const last = full[full.length - 1]
-  const cmgr = Math.pow(last.rev / first.rev, 1 / (last.i - first.i)) - 1
-  const cmgrDes = Math.pow((last.rev / last.SI) / (first.rev / first.SI), 1 / (last.i - first.i)) - 1
+  const n = last.i - first.i
+  const cmgr = Math.pow(last.rev / first.rev, 1 / n) - 1
+  const cmgrDes = Math.pow((last.rev / last.SI) / (first.rev / first.SI), 1 / n) - 1
+  const priceIdxChange = (last.rev / last.real) / (first.rev / first.real) - 1 // perubahan indeks harga efektif (bauran)
+  // Volatilitas: CV di sekitar tren (musim + derau), CV mentah, dan derau setelah koreksi musim.
+  const mean = full.reduce((s, x) => s + x.rev, 0) / full.length
+  const cvRaw = Math.sqrt(full.reduce((s, x) => s + (x.rev - mean) ** 2, 0) / (full.length - 1)) / mean
+  const cv = rawFit.sd
+  const cvNoise = nomFit.sd
+  const momAbs = full.filter((x) => x.mom != null).reduce((s, x, _, a) => s + Math.abs(x.mom) / a.length, 0)
+  // Pasar wilayah (rata-rata tertimbang pangsa pendapatan)
+  const regShareAll = {}
+  for (const x of full) for (const [k2, v] of Object.entries(x.byReg)) regShareAll[k2] = (regShareAll[k2] || 0) + v
+  const totReg = Object.values(regShareAll).reduce((a, b) => a + b, 0)
+  let mReal = 0
+  let mNom = 0
+  for (const [k2, v] of Object.entries(regShareAll)) {
+    const rg = biz.regions.find((x) => x.key === k2)
+    mReal += (v / totReg) * (Math.pow(1 + rg.real, 1 / 12) - 1)
+    mNom += (v / totReg) * (Math.pow(1 + rg.nominal, 1 / 12) - 1)
+  }
+  // Biaya & pajak
   const totRev = full.reduce((s, x) => s + x.rev, 0)
   const totCost = full.reduce((s, x) => s + x.cost, 0)
   const margin = (totRev - totCost) / totRev
-  const band = SCALE[biz.scale].band
-  const ok = trendG >= band[0] && trendG <= band[1] && margin >= biz.margin[0] && margin <= biz.margin[1]
-  // pangsa wilayah (pendapatan) bulan penuh pertama vs terakhir
+  const tax = taxModel(biz, sim, out)
+  for (const x of out) x.tax = tax.monthly(x)
+  let totTax = full.reduce((s, x) => s + x.tax, 0)
+  if (tax.floorTotal) totTax = Math.max(0, totTax)
+  const marginAfter = (totRev - totCost - totTax) / totRev
+  const ck = {}
+  for (const x of full) for (const [k2, v] of Object.entries(x.ck)) ck[k2] = (ck[k2] || 0) + v
+  const sumCk = (fn) => Object.entries(ck).filter(([k2]) => fn(...k2.split('|'))).reduce((s, [, v]) => s + v, 0) / totRev
+  const costShare = {
+    labour: sumCk((c) => c === 'biaya_tenaga'),
+    labour_fixed: sumCk((c, k2) => c === 'biaya_tenaga' && k2 !== 'var'),
+    labour_variable: sumCk((c, k2) => c === 'biaya_tenaga' && k2 === 'var'),
+    materials: sumCk((c) => c === 'biaya_bahan'),
+    transport: sumCk((c) => c === 'biaya_transport'),
+    other: sumCk((c) => c === 'biaya_lain'),
+    variable: sumCk((c, k2) => k2 === 'var'),
+    fixed: sumCk((c, k2) => k2 === 'fixed'),
+    semi_fixed: sumCk((c, k2) => k2 === 'step'),
+  }
+  // Leverage operasi: margin kuartal pertama vs terakhir (bulan penuh)
+  const q = (xs2) => (xs2.reduce((s, x) => s + x.rev - x.cost, 0) / xs2.reduce((s, x) => s + x.rev, 0))
+  const marginFirstQ = q(full.slice(0, 3))
+  const marginLastQ = q(full.slice(-3))
+  const band = sc.band
+  const cvOk = !sc.cvBand || (cv >= sc.cvBand[0] && cv <= sc.cvBand[1])
+  const ok = trendG >= band[0] && trendG <= band[1] && margin >= biz.margin[0] && margin <= biz.margin[1] && cvOk && tax.turnover_cap_ok !== false
   const share = (x) => Object.fromEntries(Object.entries(x.byReg).map(([k2, v]) => [k2, v / x.rev]))
-  return { months: out, trendG, cmgr, cmgrDes, cagrEq: Math.pow(1 + trendG, 12) - 1, margin, ok, band, totRev, totCost, regFirst: share(first), regLast: share(last) }
+  const headStart = first.lab.heads
+  const headEnd = last.lab.heads
+  return {
+    months: out, trendG, realG, priceG, priceIdxChange, marketReal: mReal, marketNominal: mNom, shareGain: (1 + realG) / (1 + mReal) - 1,
+    cmgr, cmgrDes, cagrEq: Math.pow(1 + trendG, 12) - 1, realCagrEq: Math.pow(1 + realG, 12) - 1,
+    cv, cvRaw, cvNoise, momAbs, cvOk,
+    margin, marginAfter, totTax, tax, costShare, marginFirstQ, marginLastQ,
+    ok, band, totRev, totCost, regFirst: share(first), regLast: share(last), headStart, headEnd,
+  }
 }
 
 /* ============================================================ Laporan */
@@ -1289,7 +1695,7 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 const pctFmt = (n) => `${n.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`
 function explainHTML(s, biz) {
   const out = [`<h3>Ringkasan ${esc(s.period)}</h3>`]
-  out.push(`<p>Pendapatan <strong>${fmtRp(s.total_revenue)}</strong>, biaya <strong>${fmtRp(s.total_cost)}</strong>, ${s.net_profit >= 0 ? 'laba' : 'rugi'} bersih <strong>${fmtRp(Math.abs(s.net_profit))}</strong> (margin ${pctFmt(s.margin_pct ?? 0)}).</p>`)
+  out.push(`<p>Pendapatan <strong>${fmtRp(s.total_revenue)}</strong>, biaya <strong>${fmtRp(s.total_cost)}</strong>, ${s.net_profit >= 0 ? 'laba' : 'rugi'} sebelum pajak <strong>${fmtRp(Math.abs(s.net_profit))}</strong> (margin ${pctFmt(s.margin_pct ?? 0)}).</p>`)
   if (s.previous_period && s.previous_period.total_revenue > 0) {
     const g = ((s.total_revenue - s.previous_period.total_revenue) / s.previous_period.total_revenue) * 100
     out.push(`<p>Dibanding ${esc(s.previous_period.label)}, pendapatan ${g >= 0 ? 'naik' : 'turun'} <strong>${pctFmt(Math.abs(g))}</strong>.</p>`)
@@ -1299,6 +1705,8 @@ function explainHTML(s, biz) {
   if (cost[0]) recs.push(`Komponen biaya terbesar adalah ${esc(cost[0].label.toLowerCase())} (${pctFmt((cost[0].amount / Math.max(1, s.total_revenue)) * 100)} dari pendapatan); pantau produktivitas per petugas.`)
   if (s.top_customers[0]) recs.push(`Pelanggan terbesar: ${esc(s.top_customers[0].name)} (${pctFmt((s.top_customers[0].revenue / Math.max(1, s.total_revenue)) * 100)} dari pendapatan).`)
   if (s.margin_pct != null && s.margin_pct < biz.margin[0] * 100) recs.push('Margin di bawah target usaha; periksa harga penawaran dan biaya bahan.')
+  if (biz.scale !== 'enterprise') recs.push(biz.scale === 'sole' ? 'Pajak belum dihitung: PPh Final UMKM 0,5% hanya berlaku atas peredaran di atas Rp500 jt setahun (WP orang pribadi, PP 55/2022).' : `Pajak belum dihitung: estimasi PPh Final UMKM 0,5% × pendapatan ≈ ${fmtRp(s.total_revenue * MACRO.tax.pphFinal)} (PP 55/2022).`)
+  else recs.push('Pajak belum dihitung: PPh Badan dihitung tahunan atas laba fiskal.')
   out.push(`<h3>Catatan</h3><ul>${recs.map((x) => `<li>${x}</li>`).join('')}</ul>`)
   out.push('<p><small>Contoh penjelasan untuk DATA DEMO (dibuat skrip seed, bukan model AI).</small></p>')
   return out.join('\n')
@@ -1346,6 +1754,197 @@ function emitInserts(out, table, rows) {
   }
   flush()
   return stmts
+}
+
+/* ===================================================== Ringkasan & laporan MD */
+
+const r4 = (x) => (x == null || !Number.isFinite(x) ? null : Number(x.toFixed(4)))
+
+function macroSummary() {
+  return {
+    note: 'ASUMSI PERENCANAAN untuk data demo, bukan angka resmi. Verifikasi: PDB/PDRB riil & inflasi IHK → BRS BPS (bps.go.id); UMK → SK Gubernur; pajak → PP 55/2022, UU HPP, Pasal 31E UU PPh.',
+    real_gdp_national: MACRO.realGdp,
+    cpi: MACRO.cpi,
+    nominal_national: r4(nominalOf(MACRO.realGdp)),
+    service_price_jan: MACRO.servicePriceJan,
+    service_price_mid: MACRO.servicePriceMid,
+    contract_escalation: MACRO.contractEsc,
+    umk_step: MACRO.umkStep,
+    umk_year0: MACRO.year0,
+    labour_all_in: MACRO.allIn,
+    labour_all_in_parts: { bpjs: MACRO.allInParts.bpjs, thr: r4(MACRO.allInParts.thr), other: MACRO.allInParts.other },
+    materials_inflation: MACRO.materials,
+    fuel_inflation: MACRO.fuel,
+    rent_step: MACRO.rentStep,
+    software_step: MACRO.softwareStep,
+    overtime_multiplier: MACRO.overtime,
+    tax: MACRO.tax,
+    profiles: PROFILES,
+    regions: Object.values(REG).map((x) => ({ key: x.key, name: x.name, profile: x.profile, real: x.real, cpi: x.cpi, nominal: r4(x.nominal), umk_year0: x.umk, umk_next: Math.round(x.umk * (1 + MACRO.umkStep)), used_by: BUSINESSES.filter((b) => b.regions.some((y) => y.key === x.key)).map((b) => b.key) })),
+  }
+}
+
+function bizSummary(sim, an) {
+  const b = sim.biz
+  return {
+    k: b.k, key: b.key, name: b.name, scale: b.scale, email: b.email, owner_id: ownerId(b.k), industry: b.industry,
+    regions: b.regions.map((x) => ({ key: x.key, name: x.name, profile: x.profile, real: x.real, nominal: r4(x.nominal), umk_year0: x.umk, open_month_index: x.open < -50 ? null : x.open })),
+    g_model: r4(sim.g), trend_g: r4(an.trendG), cmgr: r4(an.cmgr), cmgr_deseasonalised: r4(an.cmgrDes), cagr_equivalent: r4(an.cagrEq), margin: r4(an.margin), in_band: an.ok,
+    growth: {
+      note: 'Target bisnis = pertumbuhan pendapatan NOMINAL desesonal. nominal = (1 + volume riil) × (1 + harga) − 1.',
+      nominal_trend_g: r4(an.trendG), real_volume_g: r4(an.realG), price_contribution_g: r4(an.priceG),
+      price_share_of_growth: r4(Math.log(1 + an.priceG) / Math.log(1 + an.trendG)),
+      price_index_change_window: r4(an.priceIdxChange), price_jan_step: r4(sim.macro.price_jan_step), price_mid_step: r4(sim.macro.price_mid_step),
+      market_real_g: r4(an.marketReal), market_nominal_g: r4(an.marketNominal), share_gain_g: r4(an.shareGain),
+      real_cagr_equivalent: r4(an.realCagrEq),
+    },
+    volatility: { cv: r4(an.cv), cv_raw: r4(an.cvRaw), cv_noise: r4(an.cvNoise), mom_abs_mean: r4(an.momAbs), band: SCALE[b.scale].cvBand, ok: an.cvOk, definition: 'cv = deviasi standar residual ln(pendapatan bulanan) terhadap garis tren log-linear (musim + derau, tanpa pertumbuhan); cv_raw = stdev/mean pendapatan bulanan; cv_noise = residual setelah koreksi musim.' },
+    profit: {
+      revenue: an.totRev, cost: an.totCost, profit_pre_tax: an.totRev - an.totCost, margin_pre_tax: r4(an.margin),
+      tax_estimate: Math.round(an.totTax), profit_after_tax_estimate: Math.round(an.totRev - an.totCost - an.totTax), margin_after_tax_estimate: r4(an.marginAfter),
+      tax_method: an.tax.method, tax_effective_rate: an.tax.eff == null ? null : r4(an.tax.eff), annual_turnover_estimate: Math.round(an.tax.annual_turnover),
+      tax_in_ledger: false,
+    },
+    cost_structure: { ...Object.fromEntries(Object.entries(an.costShare).map(([k, v]) => [k, r4(v)])), margin_first_quarter: r4(an.marginFirstQ), margin_last_quarter: r4(an.marginLastQ) },
+    labour: { mode: sim.lab.mode, headcount_start: an.headStart, headcount_end: an.headEnd, all_in_monthly: r4(sim.macro.all_in_monthly), umk_primary_region_year0: sim.macro.umk_primary_region },
+    customers: sim.custCount, contracts_total: sim.contracts, contracts_active: sim.activeContracts,
+    rows: rowCounts(sim),
+    months: an.months.map((m) => ({
+      month: m.key, full: m.full, revenue: m.rev, real_revenue: Math.round(m.real), contract_revenue: m.revContract, cost: m.cost, profit: m.rev - m.cost,
+      tax_estimate: Math.round(m.tax), profit_after_tax: Math.round(m.rev - m.cost - m.tax),
+      fixed_cost: Math.round(Object.entries(m.ck).filter(([k]) => !k.endsWith('|var')).reduce((s, [, v]) => s + v, 0)),
+      variable_cost: Math.round(Object.entries(m.ck).filter(([k]) => k.endsWith('|var')).reduce((s, [, v]) => s + v, 0)),
+      jobs: m.jobs, headcount: m.lab.heads, utilisation: r4(m.lab.util), overtime_fte: m.lab.overtime_fte == null ? undefined : r4(m.lab.overtime_fte), headcount_by_region: m.lab.by_region,
+      price_index: r4(m.P), wage_index: r4(m.W),
+      mom: r4(m.mom), mom_deseasonalised: r4(m.momDes), seasonal_index: Number(m.SI.toFixed(3)),
+    })),
+    region_share_first: an.regFirst, region_share_last: an.regLast,
+  }
+}
+
+/* ---- Markdown (dibuat dari objek ringkasan; tidak membaca data simulasi lain) */
+const idNum = (x, d = 1) => (x == null ? '–' : x.toLocaleString('id-ID', { minimumFractionDigits: d, maximumFractionDigits: d }))
+const idPct = (x, d = 1, sign = false) => (x == null ? '–' : `${sign && x >= 0 ? '+' : ''}${idNum(x * 100, d)}%`)
+const idRp = (n) => {
+  if (n == null) return '–'
+  if (Math.round(n) === 0) return 'Rp0'
+  const a = Math.abs(n)
+  const s = a >= 1e9 ? `${idNum(a / 1e9, 2)} M` : a >= 1e6 ? `${idNum(a / 1e6, 1)} jt` : `${idNum(a / 1e3, 0)} rb`
+  return `${n < 0 ? '−' : ''}Rp${s}`
+}
+const SCALE_LABEL = { sole: 'Sole', ukm: 'UKM', enterprise: 'Enterprise' }
+const BLN = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+const mon = (key) => `${BLN[Number(key.slice(5, 7)) - 1]}-${key.slice(2, 4)}`
+
+function renderReport(S) {
+  const g = S.generated_with
+  const M = S.macro
+  const B = S.businesses
+  const L = []
+  const t = (head, rows) => {
+    L.push(`| ${head.join(' | ')} |`)
+    L.push(`|${head.map(() => '---').join('|')}|`)
+    for (const r of rows) L.push(`| ${r.join(' | ')} |`)
+    L.push('')
+  }
+  L.push('# Ringkasan Ekonomi Data Demo (dibuat otomatis)')
+  L.push('')
+  L.push('> **Jangan diedit manual.** Berkas ini dibuat oleh `node scripts/seed-demo.mjs --report md` dari objek ringkasan yang sama dengan `seeds/demo-summary.json`, sehingga angka di sini selalu sama dengan data seed. Untuk membuat ulang tanpa simulasi: `node scripts/seed-demo.mjs --report md --from-summary seeds/demo-summary.json`.')
+  L.push('')
+  L.push(`Parameter: ${g.lean ? 'mode lean, ' : ''}${g.months} bulan s.d. ${g.end}, as-of ${g.asof}, seed ${g.seed}${g.only ? `, hanya ${g.only.join(', ')}` : ''}. Semua data **DUMMY**. Penjelasan model: [2026-10-28-demo-growth-data-design.md](../2026-10-28-demo-growth-data-design.md).`)
+  L.push('')
+  L.push('## 1. Asumsi makro')
+  L.push('')
+  L.push(`${M.note}`)
+  L.push('')
+  t(['Parameter', 'Nilai', 'Dipakai untuk'], [
+    ['PDB riil nasional', `${idPct(M.real_gdp_national)}/th`, 'Pembanding pertumbuhan wilayah (riil)'],
+    ['Inflasi IHK', `${idPct(M.cpi)}/th`, 'Nominal wilayah = (1 + riil) × (1 + IHK) − 1; indeks biaya umum'],
+    ['Pertumbuhan nominal nasional', `${idPct(M.nominal_national, 2)}/th`, 'Bobot wilayah enterprise (kemiringan relatif)'],
+    ['Kenaikan tarif jasa Januari', Object.entries(M.service_price_jan).map(([k, v]) => `${SCALE_LABEL[k]} ${idPct(v[0], 0)}–${idPct(v[1], 0)}`).join('; '), 'Harga tiket jasa ad-hoc'],
+    ['Penyesuaian tarif pertengahan tahun', `peluang ${idPct(M.service_price_mid.p, 0)}, ${idPct(M.service_price_mid.pct[0], 0)}–${idPct(M.service_price_mid.pct[1], 0)} di ${BULAN[M.service_price_mid.month]}`, 'Harga tiket jasa ad-hoc'],
+    ['Eskalasi kontrak non-UMK (Januari)', `${idPct(M.contract_escalation[0], 0)}–${idPct(M.contract_escalation[1], 0)}`, 'Kontrak pest, laundry, cleaning, FM cabang'],
+    ['Kenaikan UMK (1 Januari)', idPct(M.umk_step), 'Gaji pekerja, tarif helper, kontrak per petugas'],
+    ['Biaya tenaga all-in', `${idNum(M.labour_all_in, 2)} × UMK (BPJS ${idPct(M.labour_all_in_parts.bpjs)}, THR ${idPct(M.labour_all_in_parts.thr)}, lain ${idPct(M.labour_all_in_parts.other)})`, 'UKM: 1,167 × UMK per bulan + THR tunai saat Lebaran; enterprise: 1,25 × UMK diakrualkan'],
+    ['Inflasi bahan/material', `${idPct(M.materials_inflation)}/th (bertahap)`, 'Biaya bahan per job'],
+    ['Inflasi BBM/transport', `${idPct(M.fuel_inflation)}/th (bertahap)`, 'Transport per job, BBM armada'],
+    ['Kenaikan sewa (Januari)', idPct(M.rent_step), 'Sewa kantor, gudang, outlet'],
+    ['Lembur/harian di atas kapasitas', `${idNum(M.overtime_multiplier, 1)} × tarif normal`, 'Beban bulan puncak'],
+    ['PPh Final UMKM (PP 55/2022)', `${idPct(M.tax.pphFinal)} peredaran bruto; batas Rp${idNum(M.tax.turnoverCap / 1e9, 1)} M/th; WP OP bebas Rp${M.tax.individualExempt / 1e6} jt pertama/th`, 'Estimasi pajak sole & UKM (tidak ditulis ke buku besar)'],
+    ['PPh Badan (UU HPP)', `${idPct(M.tax.corporate, 0)}; Pasal 31E untuk peredaran ≤ Rp${M.tax.corp31eGross / 1e9} M`, 'Perkiraan kasar enterprise (tidak ditulis ke buku besar)'],
+  ])
+  L.push('## 2. Profil wilayah')
+  L.push('')
+  t(['Kode', 'Wilayah', 'Profil', 'PDRB riil/th', 'IHK/th', 'Nominal/th', `UMK ${M.umk_year0} (perkiraan)`, `UMK ${M.umk_year0 + 1} (×${idNum(1 + M.umk_step, 3)})`, 'Dipakai oleh'],
+    M.regions.map((x) => [x.key, x.name, x.profile, idPct(x.real), idPct(x.cpi), idPct(x.nominal, 2), idRp(x.umk_year0), idRp(x.umk_next), x.used_by.join(', ') || '(belum dipakai)']))
+  L.push('UMK dibulatkan ke Rp0,1 jt dan merupakan **perkiraan**; nilai resmi ada di SK Gubernur masing-masing provinsi. Pertumbuhan riil wilayah adalah asumsi; cek BRS PDRB BPS.')
+  L.push('')
+  L.push('## 3. Hasil per usaha')
+  L.push('')
+  L.push('Semua persentase pertumbuhan adalah **per bulan**, dihitung dari bulan penuh dengan regresi log-linear setelah koreksi musim. Target bisnis (sole/UKM 1–2%/bln, enterprise 5–10%/bln) adalah target **nominal**.')
+  L.push('')
+  t(['Akun', 'Skala', 'Tren nominal', 'Volume riil', 'Kontribusi harga (porsi)', 'CV', 'Margin sebelum pajak', 'Margin setelah pajak (est.)', 'Headcount awal→akhir', 'Band'],
+    B.map((b) => [b.key, SCALE_LABEL[b.scale], idPct(b.growth.nominal_trend_g, 2, true), idPct(b.growth.real_volume_g, 2, true), `${idPct(b.growth.price_contribution_g, 2, true)} (${idPct(b.growth.price_share_of_growth, 0)})`, idPct(b.volatility.cv), idPct(b.profit.margin_pre_tax), idPct(b.profit.margin_after_tax_estimate), `${b.labour.headcount_start} → ${b.labour.headcount_end}`, b.in_band ? 'OK' : '**DI LUAR BAND**']))
+  L.push('## 4. Dekomposisi pertumbuhan')
+  L.push('')
+  L.push('`nominal ≈ (1 + volume riil) × (1 + harga) − 1`. Volume riil = pendapatan dideflasi dengan indeks harga yang melekat di tiap tagihan (tarif jasa, atau UMK untuk kontrak per petugas). Pasar wilayah = PDRB riil wilayah per bulan, ditimbang pangsa pendapatan. Tambahan pangsa = volume riil di atas pertumbuhan pasar.')
+  L.push('')
+  t(['Akun', 'g model (nominal)', 'Tren nominal', 'Harga', 'Kenaikan tarif Jan / pertengahan th', 'Volume riil', 'Pasar wilayah riil', 'Tambahan pangsa', 'Setara tahunan nominal / riil', 'CMGR mentah'],
+    B.map((b) => [b.key, idPct(b.g_model, 2), idPct(b.growth.nominal_trend_g, 2), idPct(b.growth.price_contribution_g, 2), `${idPct(b.growth.price_jan_step, 1)} / ${b.growth.price_mid_step ? idPct(b.growth.price_mid_step, 1) : '–'}`, idPct(b.growth.real_volume_g, 2), idPct(b.growth.market_real_g, 2), idPct(b.growth.share_gain_g, 2), `${idPct(b.cagr_equivalent, 0)} / ${idPct(b.growth.real_cagr_equivalent, 0)}`, idPct(b.cmgr, 2)]))
+  L.push('## 5. Volatilitas bulanan')
+  L.push('')
+  t(['Akun', 'CV sekitar tren', 'Band', 'CV mentah (stdev/mean)', 'Derau setelah koreksi musim', 'Rata-rata MoM absolut'],
+    B.map((b) => [b.key, idPct(b.volatility.cv), b.volatility.band ? `${idPct(b.volatility.band[0], 0)}–${idPct(b.volatility.band[1], 0)}` : '–', idPct(b.volatility.cv_raw), idPct(b.volatility.cv_noise), idPct(b.volatility.mom_abs_mean)]))
+  L.push(`Definisi: ${B[0]?.volatility.definition || ''} CV mentah enterprise besar karena tren 5–10%/bln ikut terhitung.`)
+  L.push('')
+  L.push('## 6. Struktur biaya (porsi pendapatan, bulan penuh)')
+  L.push('')
+  t(['Akun', 'Tenaga (tetap / variabel)', 'Bahan', 'Transport', 'Lain-lain', 'Biaya variabel', 'Tetap + semi-tetap', 'Margin kuartal pertama → terakhir'],
+    B.map((b) => { const c = b.cost_structure; return [b.key, `${idPct(c.labour)} (${idPct(c.labour_fixed)} / ${idPct(c.labour_variable)})`, idPct(c.materials), idPct(c.transport), idPct(c.other), idPct(c.variable), `${idPct(c.fixed + c.semi_fixed)}`, `${idPct(c.margin_first_quarter)} → ${idPct(c.margin_last_quarter)}`] }))
+  L.push('Tenaga tetap = gaji pekerja tetap (headcount × UMK × all-in), staf, dan THR. Tenaga variabel = helper harian per job (sole) dan lembur/harian saat beban melebihi kapasitas. Kenaikan margin dari kuartal pertama ke terakhir menunjukkan *operating leverage* biaya tetap.')
+  L.push('')
+  L.push('## 7. Laba sebelum dan setelah pajak (estimasi)')
+  L.push('')
+  t(['Akun', 'Pendapatan', 'Biaya', 'Laba sebelum pajak', 'Estimasi pajak', 'Laba setelah pajak (est.)', 'Peredaran setahun (est.)', 'Metode'],
+    B.map((b) => { const p = b.profit; return [b.key, idRp(p.revenue), idRp(p.cost), `${idRp(p.profit_pre_tax)} (${idPct(p.margin_pre_tax)})`, idRp(p.tax_estimate), `${idRp(p.profit_after_tax_estimate)} (${idPct(p.margin_after_tax_estimate)})`, idRp(p.annual_turnover_estimate), p.tax_method] }))
+  L.push('Pajak **tidak** ditulis ke buku besar: aplikasi melabeli pendapatan − biaya sebagai "Laba sebelum pajak", dan `LEDGER_CATEGORIES` belum punya kategori pajak.')
+  L.push('')
+  L.push('## 8. Kapasitas: headcount per bulan')
+  L.push('')
+  const keys = B[0]?.months.map((m) => m.month) || []
+  t(['Akun', ...keys.map(mon)], B.map((b) => [b.key, ...b.months.map((m) => String(m.headcount))]))
+  L.push('Sole: owner + helper aktif. UKM: pekerja lapangan tetap (tidak termasuk admin/staf). Enterprise: petugas kontrak + pekerja tetap ad-hoc di semua wilayah (tidak termasuk kantor pusat).')
+  L.push('')
+  t(['Akun', ...keys.map(mon)], B.map((b) => [b.key, ...b.months.map((m) => idPct(m.utilisation, 0))]))
+  L.push('Utilisasi = beban kerja (FTE) ÷ headcount. Di atas 100% berarti lembur/harian.')
+  L.push('')
+  L.push('## 9. Indeks musiman (SI)')
+  L.push('')
+  t(['Akun', ...keys.map(mon)], B.map((b) => [b.key, ...b.months.map((m) => idNum(m.seasonal_index, 2))]))
+  if (B.some((b) => b.regions.length > 1)) {
+    L.push('## 10. Pangsa wilayah (bulan penuh pertama → terakhir)')
+    L.push('')
+    const fmtS = (o) => Object.entries(o).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${idPct(v, 0)}`).join(', ')
+    t(['Akun', 'Awal', 'Akhir'], B.filter((b) => b.regions.length > 1).map((b) => [b.key, fmtS(b.region_share_first), fmtS(b.region_share_last)]))
+  }
+  L.push('## 11. Bulanan per usaha')
+  L.push('')
+  for (const b of B) {
+    L.push(`### ${b.k}. ${b.key}: ${b.name}`)
+    L.push('')
+    t(['Bulan', 'Pendapatan', 'Riil (harga awal)', 'Biaya', 'Laba sblm pajak', 'Margin', 'Pajak est.', 'Laba stlh pajak est.', 'MoM', 'MoM desesonal', 'Job', 'Org', 'Indeks harga'],
+      b.months.map((m) => [`${mon(m.month)}${m.full ? '' : '*'}`, idRp(m.revenue), idRp(m.real_revenue), idRp(m.cost), idRp(m.profit), idPct(m.revenue ? m.profit / m.revenue : null), idRp(m.tax_estimate), idRp(m.profit_after_tax), idPct(m.mom, 1, true), idPct(m.mom_deseasonalised, 1, true), String(m.jobs), String(m.headcount), idNum(m.price_index, 3)]))
+  }
+  L.push('\\* Bulan berjalan, terpotong di as-of: tidak ikut MoM, regresi tren, maupun total.')
+  L.push('')
+  return L.join('\n')
+}
+
+function writeReport(summary, path, log = console.log) {
+  const p = resolve(path)
+  mkdirSync(dirname(p), { recursive: true })
+  writeFileSync(p, renderReport(summary))
+  log(`Ringkasan ekonomi MD: ${p}`)
 }
 
 /* =============================================================== main */
@@ -1515,6 +2114,10 @@ const sumRows = (o) => DOMAIN_TABLES.reduce((s, t) => s + (o?.[t] || 0), 0)
 
 function main() {
   const args = parseArgs(process.argv.slice(2))
+  if (args.fromSummary) {
+    writeReport(JSON.parse(readFileSync(resolve(args.fromSummary), 'utf8')), args.reportOut)
+    return
+  }
   const ctx = buildContext(args)
   const list = args.only ? BUSINESSES.filter((b) => args.only.includes(b.key)) : BUSINESSES
   if (!list.length) throw new Error('--only tidak cocok dengan usaha mana pun (pakai mis. demo-ac,demo-rs)')
@@ -1559,31 +2162,25 @@ function main() {
   const totalRows = sumRows(counts)
   const log = (...a) => { if (!args.quiet) console.log(...a) }
   log(`\nSatu Alur demo seed${args.lean ? ' [LEAN]' : ''} — as-of ${new Date(ctx.asof).toISOString()} (WIB ${new Date(ctx.asof + 7 * HOUR).toISOString().slice(0, 16).replace('T', ' ')})`)
-  const summary = { generated_with: { lean: args.lean, months: args.months, end: args.end, asof: new Date(ctx.asof).toISOString(), seed: args.seed, only: args.only, split: N }, businesses: [], counts, total_rows: totalRows, sql_bytes: totalBytes, statements: totalStmts }
+  const summary = { generated_with: { lean: args.lean, months: args.months, end: args.end, asof: new Date(ctx.asof).toISOString(), seed: args.seed, only: args.only, split: N }, macro: macroSummary(), businesses: [], counts, total_rows: totalRows, sql_bytes: totalBytes, statements: totalStmts }
   for (const { sim, an } of results) {
     const b = sim.biz
     log(`\n[${b.k}] ${b.name} — ${b.industry} (${b.scale}) · ${b.email}`)
-    log(`    g model ${(sim.g * 100).toFixed(2)}%/bln · attempt ${sim.attempt} · pelanggan ${sim.custCount}${sim.contracts ? ` · kontrak ${sim.activeContracts} aktif/${sim.contracts} total` : ''} · ${fmtN(sumRows(rowCounts(sim)))} baris`)
-    log(`    ${pad('Bulan', 15)}${pad('Pendapatan', 12, true)}${pad('Biaya', 12, true)}${pad('Laba', 12, true)}${pad('Margin', 8, true)}${pad('MoM', 9, true)}${pad('MoM-des', 9, true)}${pad('Job', 6, true)}`)
+    log(`    g model ${(sim.g * 100).toFixed(2)}%/bln · tarif Jan +${(sim.macro.price_jan_step * 100).toFixed(1)}%${sim.macro.price_mid_step ? `, Jul +${(sim.macro.price_mid_step * 100).toFixed(1)}%` : ''} · attempt ${sim.attempt} · pelanggan ${sim.custCount}${sim.contracts ? ` · kontrak ${sim.activeContracts} aktif/${sim.contracts} total` : ''} · ${fmtN(sumRows(rowCounts(sim)))} baris`)
+    log(`    ${pad('Bulan', 15)}${pad('Pendapatan', 12, true)}${pad('Biaya', 12, true)}${pad('Laba', 12, true)}${pad('Margin', 8, true)}${pad('MoM', 9, true)}${pad('MoM-des', 9, true)}${pad('Job', 6, true)}${pad('Org', 5, true)}${pad('Idx P', 7, true)}`)
     for (const m of an.months) {
       const mg = m.rev ? (m.rev - m.cost) / m.rev : 0
-      log(`    ${pad(m.label + (m.full ? '' : '*'), 15)}${pad(fmtJt(m.rev), 12, true)}${pad(fmtJt(m.cost), 12, true)}${pad(fmtJt(m.rev - m.cost), 12, true)}${pad((mg * 100).toFixed(1) + '%', 8, true)}${pad(pct(m.mom), 9, true)}${pad(pct(m.momDes), 9, true)}${pad(m.jobs, 6, true)}`)
+      log(`    ${pad(m.label + (m.full ? '' : '*'), 15)}${pad(fmtJt(m.rev), 12, true)}${pad(fmtJt(m.cost), 12, true)}${pad(fmtJt(m.rev - m.cost), 12, true)}${pad((mg * 100).toFixed(1) + '%', 8, true)}${pad(pct(m.mom), 9, true)}${pad(pct(m.momDes), 9, true)}${pad(m.jobs, 6, true)}${pad(m.lab.heads, 5, true)}${pad(m.P.toFixed(3), 7, true)}`)
     }
-    log(`    Tren desesonal ${pct(an.trendG)}/bln (band ${(an.band[0] * 100).toFixed(0)}–${(an.band[1] * 100).toFixed(0)}%) · CMGR mentah ${pct(an.cmgr)} · CMGR desesonal ${pct(an.cmgrDes)} · setara tahunan ${pct(an.cagrEq)} · margin ${(an.margin * 100).toFixed(1)}% (target ${(b.margin[0] * 100).toFixed(0)}–${(b.margin[1] * 100).toFixed(0)}%) → ${an.ok ? 'OK' : 'DI LUAR BAND'}`)
+    log(`    Tren desesonal NOMINAL ${pct(an.trendG)}/bln (band ${(an.band[0] * 100).toFixed(0)}–${(an.band[1] * 100).toFixed(0)}%) = volume riil ${pct(an.realG)} + harga ${pct(an.priceG)} · pasar wilayah riil ${pct(an.marketReal)}/bln · CMGR mentah ${pct(an.cmgr)} · setara tahunan ${pct(an.cagrEq)}`)
+    log(`    CV sekitar tren ${(an.cv * 100).toFixed(1)}%${SCALE[b.scale].cvBand ? ` (band ${SCALE[b.scale].cvBand.map((x) => x * 100).join('–')}%)` : ''} · CV mentah ${(an.cvRaw * 100).toFixed(1)}% · derau desesonal ${(an.cvNoise * 100).toFixed(1)}% · headcount ${an.headStart}→${an.headEnd}`)
+    log(`    Margin sebelum pajak ${(an.margin * 100).toFixed(1)}% (target ${(b.margin[0] * 100).toFixed(0)}–${(b.margin[1] * 100).toFixed(0)}%) · pajak est. ${fmtJt(an.totTax)} · setelah pajak est. ${(an.marginAfter * 100).toFixed(1)}% · tenaga ${(an.costShare.labour * 100).toFixed(0)}% · bahan ${(an.costShare.materials * 100).toFixed(0)}% · tetap+semi ${((an.costShare.fixed + an.costShare.semi_fixed) * 100).toFixed(0)}% → ${an.ok ? 'OK' : 'DI LUAR BAND'}`)
     if (b.regions.length > 1) {
       const fmtS = (o) => Object.entries(o).sort((x, y) => y[1] - x[1]).map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`).join(', ')
       log(`    Pangsa wilayah: ${an.months.find((x) => x.full).label}: ${fmtS(an.regFirst)}`)
       log(`                    ${an.months.filter((x) => x.full).pop().label}: ${fmtS(an.regLast)}`)
     }
-    summary.businesses.push({
-      k: b.k, key: b.key, name: b.name, scale: b.scale, email: b.email, owner_id: ownerId(b.k), industry: b.industry,
-      regions: b.regions.map((x) => ({ key: x.key, name: x.name, profile: x.profile, growth: x.growth, open_month_index: x.open < -50 ? null : x.open })),
-      g_model: Number(sim.g.toFixed(4)), trend_g: Number(an.trendG.toFixed(4)), cmgr: Number(an.cmgr.toFixed(4)), cmgr_deseasonalised: Number(an.cmgrDes.toFixed(4)), cagr_equivalent: Number(an.cagrEq.toFixed(4)), margin: Number(an.margin.toFixed(4)), in_band: an.ok,
-      customers: sim.custCount, contracts_total: sim.contracts, contracts_active: sim.activeContracts,
-      rows: rowCounts(sim),
-      months: an.months.map((m) => ({ month: m.key, full: m.full, revenue: m.rev, cost: m.cost, profit: m.rev - m.cost, jobs: m.jobs, mom: m.mom == null ? null : Number(m.mom.toFixed(4)), mom_deseasonalised: m.momDes == null ? null : Number(m.momDes.toFixed(4)), seasonal_index: Number(m.SI.toFixed(3)) })),
-      region_share_first: an.regFirst, region_share_last: an.regLast,
-    })
+    summary.businesses.push(bizSummary(sim, an))
   }
   log(`\nBaris insert: ${Object.entries(counts).map(([k, v]) => `${k} ${fmtN(v)}`).join(' · ')} · total ${fmtN(totalRows)} (+${list.length} users)`)
   for (const f of files) log(`SQL: ${f.path} · ${(f.bytes / 1e6).toFixed(2)} MB · ${f.stmts} INSERT · ${fmtN(f.rows)} baris · ±${fmtN(f.writes)} writes · ${f.businesses.join(', ')}`)
@@ -1610,6 +2207,7 @@ function main() {
     writeFileSync(sp, `${JSON.stringify(summary, null, 2)}\n`)
     log(`Ringkasan JSON: ${sp}`)
   }
+  if (args.report === 'md') writeReport(summary, args.reportOut, log)
   if (results.some((x) => !x.an.ok)) {
     console.error('PERINGATAN: ada usaha di luar band pertumbuhan/margin.')
     process.exitCode = 2
