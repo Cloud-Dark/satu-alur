@@ -154,9 +154,9 @@ export async function mountFlowScene(container, opts = {}) {
   function placeParticles(time) {
     for (let i = 0; i < PARTICLES; i++) {
       const s = i * 4
-      const t = (seeds[s] + time * seeds[s + 1]) % 1
+      const t = (((seeds[s] + time * seeds[s + 1]) % 1) + 1) % 1
       const f = t * LUT_SIZE
-      const i0 = Math.floor(f)
+      const i0 = Math.min(Math.floor(f), LUT_SIZE - 1)
       const i1 = Math.min(i0 + 1, LUT_SIZE)
       const k = f - i0
       const a = lut[i0]
@@ -202,6 +202,8 @@ export async function mountFlowScene(container, opts = {}) {
     const distW = 5.9 / (tanHalf * camera.aspect)
     const distH = 5.3 / tanHalf
     baseZ = Math.min(Math.max(distW, distH, 12), 40)
+    // Narrow (stacked) layouts: centre the S; wide hero: keep it right of the title.
+    world.position.x = w < 640 ? -1.3 : 0
     camera.updateProjectionMatrix()
   }
   let baseZ = 16
@@ -242,7 +244,7 @@ export async function mountFlowScene(container, opts = {}) {
 
   const tick = (now) => {
     raf = 0
-    elapsed = (now - start) / 1000
+    elapsed = Math.max(0, (now - start) / 1000)
     frame(elapsed)
     if (shouldRun()) raf = requestAnimationFrame(tick)
   }

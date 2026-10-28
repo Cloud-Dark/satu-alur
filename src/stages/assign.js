@@ -146,25 +146,26 @@ export async function render(container, ctx = {}) {
       rows: flow.assignments,
       columns: [
         { label: 'Pelanggan', render: (a) => { const r = flow.requestOfAssignment(a); return C.cellStack(customerLabel(r), r?.service_type) } },
-        { label: 'Pelaksana', render: (a) => a.worker_name || '—' },
         {
-          label: 'Jadwal',
-          className: 'col-date',
+          label: 'Pelaksana · jadwal',
+          render: (a) => el('div', { className: 'cell-stack' },
+            el('span', { className: 'cell-primary' }, a.worker_name || '—'),
+            el('time', { className: 'cell-secondary mono', datetime: a.scheduled_at || '' }, C.formatDateTime(a.scheduled_at)),
+          ),
+        },
+        {
+          label: 'Status',
           render: (a) => {
-            const isDone = a.status === 'done' || flow.completionsOf(a.id).length > 0
-            const late = !isDone && C.toDate(a.scheduled_at) && C.toDate(a.scheduled_at).getTime() < now
-            return el('div', { className: 'cell-stack' },
-              el('time', { className: 'mono', datetime: a.scheduled_at || '' }, C.formatDateTime(a.scheduled_at)),
-              late ? el('span', {}, C.tag('Lewat jadwal', 'warn')) : null,
-            )
+            if (a.status === 'done' || flow.completionsOf(a.id).length) return C.tag('Selesai', 'ok')
+            const sched = C.toDate(a.scheduled_at)
+            return sched && sched.getTime() < now ? C.tag('Lewat jadwal', 'warn') : C.tag('Ditugaskan', 'ink')
           },
         },
-        { label: 'Status', render: (a) => (a.status === 'done' || flow.completionsOf(a.id).length ? C.tag('Selesai', 'ok') : C.tag('Ditugaskan', 'ink')) },
         {
           label: 'Aksi',
           className: 'col-action',
           render: (a) => {
-            if (a.status === 'done' || flow.completionsOf(a.id).length) return el('span', { className: 'muted mono' }, '—')
+            if (a.status === 'done' || flow.completionsOf(a.id).length) return el('span', { className: 'muted mono nil' }, '—')
             const b = C.button({ label: 'Tandai selesai', iconRight: 'arrowRight', size: 'sm' })
             b.addEventListener('click', () => navigate('complete', { assignmentId: a.id }))
             return b

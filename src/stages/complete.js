@@ -138,12 +138,11 @@ export async function render(container, ctx = {}) {
         { label: 'Pelanggan', render: (c) => { const r = flow.requestOfCompletion(c); const a = flow.assignmentOfCompletion(c); return C.cellStack(customerLabel(r), a?.worker_name) } },
         { label: 'Catatan', className: 'col-wide', render: (c) => el('span', { className: 'cell-note', title: c.notes || '' }, c.notes || '—') },
         { label: 'Selesai', className: 'col-date', render: (c) => el('time', { className: 'mono', datetime: c.completed_at || '', title: C.formatDateTime(c.completed_at) }, C.formatDate(c.completed_at || c.created_at)) },
-        { label: 'Buku', render: (c) => (flow.ledgerOf(c.id).length ? C.tag('Terbukukan', 'ok') : C.tag('Belum', 'warn')) },
         {
-          label: 'Aksi',
+          label: 'Pembukuan',
           className: 'col-action',
           render: (c) => {
-            if (flow.ledgerOf(c.id).length) return el('span', { className: 'muted mono' }, '—')
+            if (flow.ledgerOf(c.id).length) return C.tag('Terbukukan', 'ok')
             const b = C.button({ label: 'Posting', iconRight: 'arrowRight', size: 'sm' })
             b.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
             return b

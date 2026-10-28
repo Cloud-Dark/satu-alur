@@ -46,7 +46,6 @@ function append(node, children) {
 const rupiahFmt = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
 const compactFmt = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 })
 const numFmt = new Intl.NumberFormat('id-ID')
-const relFmt = new Intl.RelativeTimeFormat('id-ID', { numeric: 'auto' })
 
 export const rupiah = (n) => rupiahFmt.format(Number(n) || 0)
 export const rupiahCompact = (n) => `Rp${compactFmt.format(Number(n) || 0)}`
@@ -73,12 +72,16 @@ export function formatDateTime(v) {
 export function relativeTime(v, now = Date.now()) {
   const d = toDate(v)
   if (!d) return '—'
-  const diff = (d.getTime() - now) / 1000
+  const diff = now - d.getTime()
   const abs = Math.abs(diff)
-  if (abs < 60) return 'baru saja'
-  if (abs < 3600) return relFmt.format(Math.round(diff / 60), 'minute')
-  if (abs < 86400) return relFmt.format(Math.round(diff / 3600), 'hour')
-  if (abs < 86400 * 30) return relFmt.format(Math.round(diff / 86400), 'day')
+  const past = diff >= 0
+  const fmt = (n, unit) => (past ? `${n} ${unit} lalu` : `dalam ${n} ${unit}`)
+  if (abs < 60000) return 'baru saja'
+  if (abs < 3600000) return fmt(Math.round(abs / 60000), 'mnt')
+  if (abs < 86400000) return fmt(Math.round(abs / 3600000), 'jam')
+  const days = Math.round(abs / 86400000)
+  if (days === 1) return past ? 'kemarin' : 'besok'
+  if (days < 30) return fmt(days, 'hari')
   return formatDate(d)
 }
 
@@ -302,7 +305,7 @@ export function dataTable({ columns, rows, caption, rowAttrs }) {
       return el('td', {
         className: [c.align === 'right' ? 'num' : '', c.className || ''].join(' ').trim() || undefined,
         'data-label': c.label,
-      }, v == null || v === '' ? '—' : v)
+      }, v == null || v === '' ? el('span', { className: 'muted nil' }, '—') : v)
     }))))
   return el('div', { className: 'table-wrap' },
     el('table', { className: 'ledger' }, caption ? el('caption', { className: 'sr-only' }, caption) : null, thead, tbody))

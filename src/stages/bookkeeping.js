@@ -162,8 +162,8 @@ export async function render(container, ctx = {}) {
       columns: [
         { label: 'Tanggal', className: 'col-date', render: (l) => el('time', { className: 'mono', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
         { label: 'Keterangan', render: (l) => C.cellStack(customerLabel(flow.requestOfLedger(l)), categoryLabel(l.category)) },
-        { label: 'Masuk', align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, C.rupiah(l.amount)) : el('span', { className: 'muted' }, '—')) },
-        { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, C.rupiah(l.amount)) : el('span', { className: 'muted' }, '—')) },
+        { label: 'Masuk', align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, C.rupiah(l.amount)) : el('span', { className: 'muted nil' }, '—')) },
+        { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, C.rupiah(l.amount)) : el('span', { className: 'muted nil' }, '—')) },
         { label: 'Saldo', align: 'right', render: (l) => { const b = balance.get(l); return el('span', { className: `tnum strong ${b < 0 ? 'amt-neg' : ''}` }, C.rupiah(b)) } },
       ],
     }))

@@ -20,7 +20,7 @@ export async function render(container, ctx = {}) {
 
   const form = el('form', { className: 'form', noValidate: '' },
     name.wrap, service.wrap,
-    el('div', { className: 'form-row' }, location.wrap, phone.wrap),
+    el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap),
     desc.wrap,
     el('div', { className: 'form-actions' }, submit),
     msg,
@@ -109,23 +109,23 @@ export async function render(container, ctx = {}) {
       caption: 'Daftar permintaan',
       rows,
       columns: [
-        { label: 'ID', className: 'col-id mono', render: (r) => `#${r.id}` },
         {
           label: 'Pelanggan',
           render: (r) => {
-            const stack = C.cellStack(customerLabel(r), r.service_type)
+            const stack = C.cellStack(customerLabel(r), [r.service_type, r.location].filter(Boolean).join(' · '))
+            stack.querySelector('.cell-primary').prepend(el('span', { className: 'cell-id mono' }, `#${r.id}`))
             if (r.description) stack.appendChild(el('span', { className: 'cell-note', title: r.description }, r.description))
+            if (r.phone) stack.appendChild(el('span', { className: 'cell-secondary mono' }, r.phone))
             return stack
           },
         },
-        { label: 'Lokasi', render: (r) => C.cellStack(r.location || '—', r.phone || null) },
         { label: 'Status', render: (r) => { const s = model.requestStage(r); return C.tag(s.label, s.tone) } },
         { label: 'Masuk', className: 'col-date', render: (r) => el('time', { className: 'mono', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, C.formatDate(r.created_at)) },
         {
           label: 'Aksi',
           className: 'col-action',
           render: (r) => {
-            if (model.offersOf(r.id).length) return el('span', { className: 'muted mono' }, '—')
+            if (model.offersOf(r.id).length) return el('span', { className: 'muted mono nil' }, '—')
             const b = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm' })
             b.setAttribute('aria-label', `Buat penawaran untuk ${customerLabel(r)}`)
             b.addEventListener('click', () => navigate('offer', { requestId: r.id }))

@@ -277,8 +277,15 @@ export async function render(container, ctx = {}) {
       rows: flow.offers,
       rowAttrs: (o) => ({ className: params.offerId != null && String(params.offerId) === String(o.id) ? 'is-focus' : undefined, dataset: { id: String(o.id) } }),
       columns: [
-        { label: 'Pelanggan', render: (o) => { const r = flow.requestOfOffer(o); return C.cellStack(customerLabel(r), r?.service_type) } },
-        { label: 'Ruang lingkup', className: 'col-wide', render: (o) => el('span', { className: 'cell-note', title: o.validated_scope || '' }, o.validated_scope || '—') },
+        {
+          label: 'Pelanggan',
+          render: (o) => {
+            const r = flow.requestOfOffer(o)
+            const stack = C.cellStack(customerLabel(r), r?.service_type)
+            if (o.validated_scope) stack.appendChild(el('span', { className: 'cell-note', title: o.validated_scope }, o.validated_scope))
+            return stack
+          },
+        },
         { label: 'Harga', align: 'right', render: (o) => el('span', { className: 'tnum' }, C.rupiah(o.validated_price)) },
         { label: 'Status', render: (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn')) },
         { label: 'Dibuat', className: 'col-date', render: (o) => el('time', { className: 'mono', datetime: o.created_at, title: C.formatDateTime(o.created_at) }, C.formatDate(o.created_at)) },

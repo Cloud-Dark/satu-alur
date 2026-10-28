@@ -62,7 +62,7 @@ export async function render(container, ctx = {}) {
     el('span', { className: 'live-dot', 'aria-hidden': 'true' }),
     el('span', {}, `${ctx.isMock ? 'Mode demo · data lokal' : 'Cloudflare D1'} · memuat…`),
   )
-  const refreshBtn = C.iconButton({ iconName: 'refresh', label: 'Muat ulang data' })
+  const refreshBtn = C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost' })
   const head = el('header', { className: 'dash-head' },
     el('div', { className: 'dash-head-text' },
       el('span', { className: 'kicker' }, `00 — ${now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`),
@@ -110,7 +110,7 @@ export async function render(container, ctx = {}) {
     ))
     sections.push(el('div', { className: 'dash-grid' },
       renderActivity(m),
-      renderComposition(m),
+      el('div', { className: 'span-5 dash-stack' }, renderStatusMix(m), renderComposition(m)),
     ))
   }
   body.replaceChildren(...sections)
@@ -275,20 +275,23 @@ function s(tag, attrs = {}, ...children) {
   return n
 }
 
-function niceMax(v) {
-  if (v <= 0) return 1
-  const exp = Math.pow(10, Math.floor(Math.log10(v)))
-  const f = v / exp
-  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10
-  return nice * exp
+/** A "nice" axis: step from {1,1.5,2,2.5,3,4,5,6,8}×10^n so that ≤4 steps cover v. */
+function niceScale(v) {
+  if (v <= 0) return { max: 1, step: 0.25, ticks: 4 }
+  const raw = v / 4
+  const exp = Math.pow(10, Math.floor(Math.log10(raw)))
+  const step = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((f) => f * exp).find((x) => x >= raw)
+  const ticks = Math.max(1, Math.ceil(v / step))
+  return { max: step * ticks, step, ticks }
 }
 
 function buildBarChart(days, width, label) {
-  const height = 232
-  const mg = { t: 12, r: 8, b: 30, l: 58 }
+  const height = 268
+  const mg = { t: 12, r: 8, b: 30, l: 62 }
   const iw = width - mg.l - mg.r
   const ih = height - mg.t - mg.b
-  const max = niceMax(Math.max(...days.map((d) => Math.max(d.rev, d.cost))))
+  const scale = niceScale(Math.max(...days.map((d) => Math.max(d.rev, d.cost))))
+  const max = scale.max
   const y = (v) => mg.t + ih - (v / max) * ih
   const gw = iw / days.length
   const bw = Math.max(2, Math.min(14, (gw * 0.72) / 2))
@@ -301,8 +304,8 @@ function buildBarChart(days, width, label) {
   ))
 
   // Grid + y labels
-  for (let i = 0; i <= 4; i++) {
-    const v = (max / 4) * i
+  for (let i = 0; i <= scale.ticks; i++) {
+    const v = scale.step * i
     const yy = Math.round(y(v)) + 0.5
     svg.appendChild(s('line', { x1: mg.l, x2: width - mg.r, y1: yy, y2: yy, class: i === 0 ? 'axis' : 'grid' }))
     svg.appendChild(s('text', { x: mg.l - 8, y: yy + 3.5, class: 'tick', 'text-anchor': 'end' }, i === 0 ? '0' : C.rupiahCompact(v)))
@@ -311,7 +314,7 @@ function buildBarChart(days, width, label) {
   const hover = s('rect', { class: 'hover-col', x: 0, y: mg.t, width: gw, height: ih, visibility: 'hidden' })
   svg.appendChild(hover)
 
-  const every = days.length <= 14 ? 2 : 5
+  const every = Math.max(days.length <= 14 ? 2 : 5, Math.ceil(64 / gw))
   days.forEach((d, i) => {
     const gx = mg.l + i * gw
     const cx = gx + gw / 2
@@ -400,7 +403,7 @@ function renderActions(m, navigate) {
   }
   items.sort((a, b) => a.rank - b.rank)
 
-  const LIMIT = 6
+  const LIMIT = 5
   const shown = items.slice(0, LIMIT)
   const content = items.length
     ? el('ol', { className: 'todo' }, shown.map((it) => {
@@ -446,7 +449,7 @@ function renderActivity(m) {
     const r = m.requestOfLedger(l)
     ev.push({ at: ledgerDate(l), num: '05', title: isRevenue(l) ? 'Pendapatan diposting' : 'Biaya diposting', text: `${categoryLabel(l.category)} · ${C.rupiah(l.amount)}${r ? ` · ${customerLabel(r)}` : ''}` })
   }
-  const recent = ev.filter((e) => C.toDate(e.at)).sort((a, b) => C.toDate(b.at) - C.toDate(a.at)).slice(0, 8)
+  const recent = ev.filter((e) => C.toDate(e.at)).sort((a, b) => C.toDate(b.at) - C.toDate(a.at)).slice(0, 7)
 
   const list = el('ol', { className: 'feed' }, recent.map((e) =>
     el('li', { className: 'feed-item' },
@@ -483,7 +486,31 @@ function renderComposition(m) {
       )
     : C.emptyState({ kicker: 'Pembukuan', title: 'Belum ada jurnal.', body: 'Komposisi muncul setelah jurnal pertama diposting.' })
 
-  return C.panel({ title: 'Komposisi buku besar', meta: `${m.ledger.length} jurnal`, className: 'span-5' }, content)
+  return C.panel({ title: 'Komposisi buku besar', meta: `${m.ledger.length} jurnal` }, content)
+}
+
+/* ========================================================== Status mix */
+
+function renderStatusMix(m) {
+  const ORDER = [
+    ['new', 'Baru'], ['draft', 'Draf penawaran'], ['offered', 'Ditawarkan'],
+    ['assigned', 'Ditugaskan'], ['done', 'Selesai'], ['booked', 'Terbukukan'],
+  ]
+  const counts = new Map(ORDER.map(([k]) => [k, 0]))
+  for (const r of m.requests) { const k = m.requestStage(r).key; counts.set(k, (counts.get(k) || 0) + 1) }
+  const total = m.requests.length || 1
+  const strip = el('div', { className: 'mix-strip', 'aria-hidden': 'true' },
+    ORDER.filter(([k]) => counts.get(k)).map(([k]) => el('span', { className: `mix-seg mix-${k}`, style: `flex-grow:${counts.get(k)}` })))
+  const legend = el('ul', { className: 'mix-legend' }, ORDER.map(([k, label]) =>
+    el('li', { className: counts.get(k) ? '' : 'is-zero' },
+      el('i', { className: `mix-key mix-${k}` }),
+      el('span', {}, label),
+      el('b', { className: 'tnum' }, String(counts.get(k))),
+    )))
+  return C.panel({ title: 'Posisi permintaan', meta: `${m.requests.length} permintaan` },
+    m.requests.length ? el('div', {}, strip, legend) : C.emptyState({ kicker: 'Kosong', title: 'Belum ada permintaan.' }),
+    el('p', { className: 'sr-only' }, ORDER.map(([k, label]) => `${label}: ${counts.get(k)}`).join(', ') + ` dari ${total}.`),
+  )
 }
 
 /* ========================================================== Onboarding */

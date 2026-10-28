@@ -182,7 +182,7 @@ export function renderShell(root, ctx) {
 
   const shell = el('div', { className: 'app-shell' },
     el('a', { className: 'skip-link', href: '#main', onClick: (e) => { e.preventDefault(); host.focus() } }, 'Lewati ke konten'),
-    sidebar,
+    el('div', { className: 'side-rail' }, sidebar),
     scrim,
     el('div', { className: 'main-col' }, topbar, host),
     drawerScrim,
@@ -289,7 +289,7 @@ export function renderShell(root, ctx) {
       const m = await loadFlow()
       if (seq !== countsSeq) return
       const pending = {
-        offer: m.requestsWithoutOffer().length,
+        offer: m.requestsWithoutOffer().length + m.draftOffers().length,
         assign: m.approvedWithoutAssignment().length,
         complete: m.activeAssignments().length,
         bookkeeping: m.completionsWithoutLedger().length,

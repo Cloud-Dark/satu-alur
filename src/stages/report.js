@@ -67,7 +67,7 @@ export async function render(container, ctx = {}) {
     C.pageHeader({ num: '06', label: 'Laporan', title: 'Laporan keuangan', description: 'Angka dihitung langsung dari buku besar. Pilih periode, lalu minta AI menjelaskannya.', actions: seg }),
     periodLine,
     kpis,
-    el('div', { className: 'dash-grid' }, catPanel, custPanel),
+    el('div', { className: 'dash-grid is-stretch' }, catPanel, custPanel),
     aiPanel,
   )
 
