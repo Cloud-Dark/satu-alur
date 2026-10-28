@@ -719,10 +719,20 @@ export function seedDemoData() {
     { id: 5012, completion_id: 4004, amount: 650000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(3), created_at: daysAgo(3) },
   ]
 
+  // --- Workers (for Field Team) ---
+  state.workers = [
+    { id: 'w1', name: 'Budi Santoso', phone: '0812-3456-7890', email: 'budi@satualur.id', skills: ['ac', 'cleaning'], zones: ['Jakarta Selatan', 'Depok'], rating: 4.9, completed: 156, onTime: 97, status: 'available', address: 'Jl. Fatmawati No.15, Jakarta Selatan', lat: -6.2673, lng: 106.7976, maxJobs: 4, created_at: daysAgo(60) },
+    { id: 'w2', name: 'Agus Wijaya', phone: '0821-9876-5432', email: 'agus@satualur.id', skills: ['waterproofing', 'roof'], zones: ['Jakarta Pusat', 'Jakarta Timur'], rating: 4.7, completed: 98, onTime: 92, status: 'on_job', address: 'Jl. Salemba Raya No.42, Jakarta Pusat', lat: -6.1965, lng: 106.8478, maxJobs: 3, created_at: daysAgo(55) },
+    { id: 'w3', name: 'Siti Rahayu', phone: '0838-1234-5678', email: 'siti@satualur.id', skills: ['cleaning', 'carpet', 'sofa'], zones: ['Tangerang', 'Bekasi'], rating: 4.8, completed: 203, onTime: 95, status: 'available', address: 'Jl. MH Thamrin No.8, Tangerang', lat: -6.1777, lng: 106.6296, maxJobs: 5, created_at: daysAgo(90) },
+    { id: 'w4', name: 'Dedi Kurniawan', phone: '0856-7890-1234', email: 'dedi@satualur.id', skills: ['ac', 'electrical'], zones: ['Jakarta Selatan', 'Jakarta Barat'], rating: 4.5, completed: 74, onTime: 88, status: 'off_duty', address: 'Jl. Sisingamangaraja No.22, Jakarta Selatan', lat: -6.2436, lng: 106.8006, maxJobs: 4, created_at: daysAgo(45) },
+    { id: 'w5', name: 'Rina Puspita', phone: '0877-4567-8901', email: 'rina@satualur.id', skills: ['pool', 'garden'], zones: ['Bogor', 'Depok'], rating: 4.9, completed: 112, onTime: 96, status: 'available', address: 'Jl. Pajajaran No.55, Bogor', lat: -6.5942, lng: 106.7892, maxJobs: 3, created_at: daysAgo(70) },
+    { id: 'w6', name: 'Eko Prasetyo', phone: '0813-5678-9012', email: 'eko@satualur.id', skills: ['pest', 'cleaning'], zones: ['Surabaya', 'Sidoarjo'], rating: 4.6, completed: 67, onTime: 90, status: 'available', address: 'Jl. Darmo Permai Selatan No.12, Surabaya', lat: -7.2905, lng: 112.7271, maxJobs: 4, created_at: daysAgo(40) },
+  ]
+
   state.users = [{ id: 'demo-user', email: 'demo@satualur.id', name: 'Demo User', created_at: daysAgo(30) }]
   state._seeded = true
   saveState(state)
-  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries')
+  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries, 6 workers')
 }
 
 export function createMockWorkBuddyCloud() {
