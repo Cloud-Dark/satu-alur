@@ -65,6 +65,12 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 
 - Halaman login punya dua mode: **Live** (email + OTP) dan **Akun demo** (pilih skala dan bisnis dari dropdown yang bisa dicari, masuk tanpa OTP lewat `POST /api/auth/demo-login`, hanya untuk 9 email demo; nonaktifkan dengan `DEMO_LOGIN="false"`). Tautan langsung: `#/masuk?demo`.
 
+- **Radar peluang**: peluang dihitung dari transaksi asli (layanan berulang jatuh tempo, risiko churn, upsell kontrak, cross-sell, penawaran tertunda, tawarkan ulang, musiman) dengan skor transparan dan bukti; migrasi `0005_opportunity_states.sql`.
+- **Pencari prospek** (MVP B2B): titik + radius + kriteria di peta OpenStreetMap (Google Places opsional lewat secret), ranking AI, estimasi nilai dari rata-rata pekerjaan asli, draf penawaran ke alur; migrasi `0006_leads.sql`. Tidak ada pengiriman otomatis.
+- Pagination (`C.pager`/`C.paginate`) di semua daftar panjang; Penasihat AI muat satu layar (pemilih penasihat di header chat, panel bertab Snapshot/Kalkulator/Statistik).
+- Label "Laba bersih" menjadi "Laba sebelum pajak".
+- Test suite: `npm test` (unit + e2e), master test case, `docs/ENVIRONMENTS.md`, `docs/DEMO_SCRIPT.md`; generator seed dengan lapisan makro (riil vs nominal, inflasi, upah, pajak).
+
 ### Fixed
 
 - Hemat kuota D1: paging data memakai keyset (`id > last`) sehingga D1 hanya membaca baris yang dikirim (sebelumnya OFFSET/sort membaca 3–6× lebih banyak); migrasi `0004_drop_unused_fk_indexes.sql` menghapus 4 indeks relasi yang tidak dipakai query sehingga setiap insert hanya 2 tulisan (sebelumnya 3).
