@@ -25,7 +25,6 @@ import * as StageLeads from '../stages/leads.js'
 
 import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
-import * as StagePortfolio from '../stages/portfolio.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
 
 export const STAGES = [
@@ -56,8 +55,6 @@ export const STAGES = [
     action: { label: 'Asisten AI', icon: 'bot', to: 'ai-assistant' } },
   { key: 'ai-assistant', label: 'AI Superpowers', icon: 'bot', module: StageAIAssistant,
     action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
-  { key: 'portfolio', label: 'Industri & Portofolio', icon: 'building', module: StagePortfolio,
-    action: { label: 'Ringkasan', icon: 'home', to: 'dashboard' } },
   { key: 'pertumbuhan', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
 ]

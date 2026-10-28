@@ -305,7 +305,7 @@ untuk perusahaan besar."
 
 **Fitur yang di-expose:**
 - ✅ Login dengan Email OTP (tanpa kata sandi)
-- ✅ Sidebar: Ringkasan, 6 tahap alur, Social Media, AI Superpowers, Industri & Portofolio, plus Pengaturan di bagian bawah
+- ✅ Sidebar: Ringkasan, 6 tahap alur, Social Media, AI Superpowers, Pertumbuhan, plus Pengaturan di bagian bawah
 - ✅ **4 KPI:** Pendapatan, Biaya, Laba bersih, Tingkat penyelesaian
 - ✅ Grafik **Pendapatan vs biaya** (14/30 hari)
 - ✅ **Alur kerja** — konversi per tahap
@@ -583,37 +583,7 @@ dan Partnership untuk kerjasama dengan tim marketing kami."
 
 ---
 
-### **BAGIAN 6: Industri & Portofolio (9:00 - 10:00)**
-
-**Navigasi:** Sidebar → Industri & Portofolio
-
-**Aksi:**
-1. **Tab Sole Trader:** Lihat contoh Budi (Tukang AC), Mba Yanti (Cuci Sofa), Pak Rudi (Waterproofing)
-2. **Tab UKM:** Lihat PT Bersih Sejahtera, Klinik Mobil, Nusantara Pest Control
-3. **Tab Enterprise:** Lihat Green Property, Horison Hotel, Mega Mall
-4. Di panel **Simulasi industri** (paling bawah), pilih "Hospitality"
-5. Lihat tips membangun portofolio sehat
-
-**Fitur yang di-expose:**
-- ✅ Use case per tier (realistic stories)
-- ✅ Before/After comparison
-- ✅ Metrics per tier (rata-rata pendapatan, pertumbuhan, total klien) dan per kasus
-- ✅ Industry simulation selector (menyimpan pilihan industri; belum mengubah data dashboard)
-- ✅ Portfolio health tips
-
-**Script:**
-```
-"Satu Alur digunakan oleh berbagai industri — dari tukang AC 
-mandiri sampai perusahaan facility management dengan 50+ gedung. 
-Di halaman Industri & Portofolio, kita bisa lihat contoh kasus 
-sukses per tier dengan before/after yang jelas. Ada juga tips 
-membangun portofolio sehat: diversifikasi klien, tracking profit 
-per proyek, retensi pelanggan, dan data-driven decisions."
-```
-
----
-
-### **BAGIAN 7: Settings & Konfigurasi (10:00 - 10:30)**
+### **BAGIAN 6: Settings & Konfigurasi (9:00 - 9:30)**
 
 **Navigasi:** Sidebar bawah → ⚙️ Pengaturan
 
@@ -645,7 +615,7 @@ status koneksi cloud."
 
 ---
 
-### **BAGIAN 8: Logout & Closing (10:30 - 11:00)**
+### **BAGIAN 7: Logout & Closing (9:30 - 10:00)**
 
 **Aksi:**
 1. Klik ikon "Keluar" di sidebar bawah
@@ -655,7 +625,7 @@ status koneksi cloud."
 ```
 "Itu tadi demo lengkap Satu Alur — dari landing page, login, 
 dashboard, alur kerja end-to-end dengan AI, AI Superpowers, 
-Social Media & Meta Ads, sampai industri dan portofolio. 
+sampai Social Media & Meta Ads. 
 Satu Alur siap membantu bisnis jasa Anda tumbuh dengan sistem 
 yang terintegrasi dan AI yang powerful.
 
@@ -669,7 +639,7 @@ Kunjungi satualur.id. Terima kasih!"
 
 ### Core Platform (Wajib)
 - [ ] Login Email OTP
-- [ ] Sidebar Navigation (Ringkasan + 6 tahap + Social Media + AI Superpowers + Industri & Portofolio)
+- [ ] Sidebar Navigation (Ringkasan + 6 tahap + Social Media + AI Superpowers + Pertumbuhan)
 - [ ] Dashboard (KPI + grafik + alur kerja + perlu tindakan + aktivitas)
 - [ ] Request Form (vertical stack design)
 - [ ] AI Offer Generation (streaming)
@@ -690,13 +660,6 @@ Kunjungi satualur.id. Terima kasih!"
 - [ ] Brainstorm Lab
 - [ ] Meta Ads Optimizer (audience + hashtags)
 - [ ] Partnership Hub (3 layanan)
-
-### Industri & Portofolio
-- [ ] 3 Tier tabs (Sole Trader, UKM, Enterprise)
-- [ ] 3 Use cases per tier (9 total)
-- [ ] Before/After comparison
-- [ ] Metrics display
-- [ ] Industry simulation selector
 
 ### Landing Page
 - [ ] Hero + CTA
