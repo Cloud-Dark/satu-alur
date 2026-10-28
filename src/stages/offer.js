@@ -140,7 +140,7 @@ export async function render(container) {
             ai_proposal_json: offerJson,
             validated_price: offerJson.price,
             validated_scope: offerJson.scope,
-            status: 'draft',
+            status: 'approved',
           })
           if (error) throw new Error(error.message)
           msg.className = 'form-message success'

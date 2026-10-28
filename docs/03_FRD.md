@@ -122,10 +122,10 @@ Kriteria penerimaan:
 Sumber: `src/stages/settings.js`.
 
 Kriteria penerimaan:
-- Tab MCP Connectors (WhatsApp/WAPilot, Email SMTP), Agent Skills (prompt penawaran dan laporan, temperature, max tokens, preferensi model), dan tab konfigurasi cloud.
+- Tab MCP Connectors (WhatsApp/WAPilot, Email SMTP), Agent Skills (prompt penawaran dan laporan, temperature, max tokens, preferensi model), dan tab Cloud.
+- Tab Cloud menampilkan status mode (Cloudflare Worker + D1 atau mock lokal) tanpa konfigurasi tambahan di peramban.
 - Nilai pengaturan disimpan di `localStorage` peramban dan dipakai oleh `src/ai/agent.js`.
 - Kredensial SMTP/API key di `localStorage` tidak dikirim ke Worker (lihat R-011).
-- Tab konfigurasi cloud masih memakai istilah WorkBuddy; penyesuaian ke Cloudflare `_TBD_`.
 
 ## Lintas Fitur
 

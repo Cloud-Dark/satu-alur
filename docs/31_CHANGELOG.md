@@ -30,7 +30,7 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 - Bagian Tech Stack, aktivasi cloud, struktur, dan skrip di `README.md` disesuaikan dengan Cloudflare.
 
 #### Dihapus
-- Dependensi `@tencent-ai/workbuddy-cloud-sdk` dan konfigurasi `src/cloud.config.example.js` (berkas `.gitignore` untuk `src/cloud.config.js` dan `scripts/setup.js` masih ada; pembersihan _TBD_).
+- Dependensi `@tencent-ai/workbuddy-cloud-sdk` dan konfigurasi `src/cloud.config.example.js` (sisa referensi lama seperti `scripts/setup.js` dan entri `.gitignore` untuk `src/cloud.config.js`: pembersihan _TBD_).
 
 #### Diketahui / Belum Selesai
 - OTP belum dikirim lewat email; hanya mode demo (R-001, R-002).
@@ -49,3 +49,8 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 - Penawaran dan penjelasan laporan berbasis AI dengan streaming dan validasi domain.
 - Mode prototype dengan data di `localStorage`.
 - Desain awal untuk WorkBuddy Cloud SDK/PostgreSQL (`docs/API.md`, `docs/DATABASE_SCHEMA.md`).
+
+### Fixed
+
+- Form Permintaan mengirim kolom `phone` yang tidak ada di skema: ditambahkan kolom `phone` (migrasi `0002_requests_phone.sql`) dan whitelist Worker.
+- Penawaran yang disimpan kini berstatus `approved` agar muncul di tahap Penugasan (sebelumnya `draft`, alur terhenti).

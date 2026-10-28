@@ -37,7 +37,7 @@ const JSON_HINT =
 // Whitelisted tables -> columns. `json` columns are stored as TEXT JSON.
 const TABLES = {
   requests: {
-    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'location', 'description', 'status', 'created_at'],
+    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'created_at'],
   },
   offers: {
     columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'created_at'],
