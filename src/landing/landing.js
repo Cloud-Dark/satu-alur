@@ -217,7 +217,7 @@ function featuresHTML() {
             <span class="lp-chat-head-ic">${iconHTML('sparkles', { size: 18, stroke: 1.9 })}</span>
             <div class="lp-chat-head-text">
               <p>Penawaran AI</p>
-              <span><span class="pulse-dot" aria-hidden="true"></span>Streaming · Workers AI</span>
+              <span><span class="pulse-dot" aria-hidden="true"></span>Streaming<span class="lp-hide-xs">&nbsp;· Workers AI</span></span>
             </div>
             <span class="tag tag-accent">Contoh</span>
           </div>

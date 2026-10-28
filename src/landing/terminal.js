@@ -63,12 +63,14 @@ export function mountAgentDemo(body, demo) {
   let running = false
   let visible = false
   // Start on the finished proposal (never an empty card), hold, then replay.
-  showAll()
-  let queue = [
+  // Whenever it leaves the screen it snaps back to the finished state.
+  const replay = () => [
     () => 2400,
     () => { body.classList.add('is-fading'); return 420 },
     () => { body.classList.remove('is-fading'); reset(); return 300 },
   ]
+  showAll()
+  let queue = replay()
 
   function reset() {
     steps.forEach((s) => s.classList.remove('is-shown'))
@@ -115,7 +117,13 @@ export function mountAgentDemo(body, demo) {
   }
   const io = new IntersectionObserver(([e]) => {
     visible = e.isIntersecting
-    if (!visible) { window.clearTimeout(timer); running = false }
+    if (!visible) {
+      window.clearTimeout(timer)
+      running = false
+      body.classList.remove('is-fading')
+      showAll()
+      queue = replay()
+    }
     resume()
   }, { threshold: 0.25 })
   io.observe(body)

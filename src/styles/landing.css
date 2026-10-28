@@ -110,13 +110,13 @@ html.lp-lock { overflow: hidden; }
 }
 .lp-nav a:hover { background: var(--surface-sunken); color: var(--text); }
 .lp-nav a.is-active { background: var(--brand-50); color: var(--brand-600); }
-.lp-header-actions { display: flex; align-items: center; gap: var(--s-2); margin-left: auto; }
-.lp-nav + .lp-header-actions { margin-left: 0; }
+.lp-header-actions { display: flex; align-items: center; gap: var(--s-2); }
 .lp-burger { display: none; }
 
 @media (max-width: 959px) {
   .lp-nav { display: none; }
   .lp-burger { display: inline-grid; }
+  .lp-header-actions { margin-left: auto; }
   .lp-hide-md { display: none; }
 }
 @media (max-width: 559px) {
@@ -128,6 +128,7 @@ html.lp-lock { overflow: hidden; }
 /* ---------- Mobile menu ---------- */
 .lp-menu { position: fixed; inset: 0; z-index: 100; }
 .lp-menu[hidden] { display: none; }
+.lp-menu:not(.is-open) { pointer-events: none; }
 .lp-menu-scrim {
   position: absolute;
   inset: 0;
@@ -433,9 +434,9 @@ html.lp-lock { overflow: hidden; }
   .lp-hero-points { flex-direction: column; gap: 10px; }
   .lp-hero-visual { height: auto; display: flex; flex-direction: column; }
   .lp-scene { position: relative; inset: auto; height: 330px; margin: 0 -8px; }
-  .lp-chip-float { top: 6px; right: 0; padding: 8px 14px 8px 8px; }
-  .lp-chip-ic { width: 30px; height: 30px; }
-  .lp-preview { position: relative; left: auto; bottom: auto; width: 100%; max-width: 360px; margin: -56px auto 0; }
+  .lp-chip-float { display: none; }
+  .lp-scene { height: 340px; }
+  .lp-preview { position: relative; left: auto; bottom: auto; width: 100%; max-width: 360px; margin: -40px auto 0; }
 }
 
 /* ---------- Capability ticker ---------- */
@@ -631,6 +632,8 @@ html.lp-lock { overflow: hidden; }
 .lp-chat-head-text p { font-size: var(--fs-sm); font-weight: 700; line-height: 1.3; }
 .lp-chat-head-text span { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-xs); color: var(--text-muted); }
 .lp-chat-head .tag { margin-left: auto; }
+.lp-chat-head-text { min-width: 0; }
+@media (max-width: 420px) { .lp-hide-xs { display: none; } }
 .lp-chat-body {
   display: flex;
   flex-direction: column;
