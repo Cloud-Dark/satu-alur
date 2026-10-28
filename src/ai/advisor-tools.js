@@ -263,7 +263,7 @@ export function projectionToContext(proj, { source = 'kalkulator' } = {}) {
 
 export function fmtJobs(n) {
   if (n == null || !Number.isFinite(n)) return '—'
-  return n.toLocaleString('id-ID', { maximumFractionDigits: n < 10 ? 1 : 0 })
+  return n.toLocaleString('id-ID', { maximumFractionDigits: n < 1 ? 2 : n < 10 ? 1 : 0 })
 }
 
 /** Finds a monthly growth target in a question ("naik 2%", "5 persen"). */

@@ -169,7 +169,7 @@ async function* raceAbort(stream, signal) {
     }
   } finally {
     signal?.removeEventListener('abort', onAbort)
-    try { it.return?.() } catch { /* ignore */ }
+    try { it.return?.()?.catch?.(() => {}) } catch { /* ignore */ }
   }
 }
 

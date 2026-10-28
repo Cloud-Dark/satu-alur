@@ -1,0 +1,1803 @@
+{
+  "generated_with": {
+    "months": 12,
+    "end": "2026-10-31",
+    "asof": "2026-10-28T10:00:00.000Z",
+    "seed": 20261028
+  },
+  "businesses": [
+    {
+      "k": 1,
+      "key": "ac",
+      "name": "Budi Santoso (Servis AC)",
+      "scale": "sole",
+      "email": "demo-ac@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a01-5a7a1a1d0001",
+      "industry": "Servis AC rumah & ruko",
+      "regions": [
+        {
+          "key": "BKS",
+          "name": "Kota/Kab. Bekasi",
+          "profile": "nasional",
+          "growth": 0.052,
+          "open_month_index": null
+        }
+      ],
+      "g_model": 0.0171,
+      "trend_g": 0.0118,
+      "cmgr": 0.0243,
+      "cmgr_deseasonalised": 0.0131,
+      "cagr_equivalent": 0.1507,
+      "margin": 0.3141,
+      "in_band": true,
+      "customers": 487,
+      "contracts_total": 0,
+      "contracts_active": 0,
+      "rows": {
+        "requests": 580,
+        "offers": 574,
+        "assignments": 521,
+        "completions": 517,
+        "ledger_entries": 2003,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 18470000,
+          "cost": 12602000,
+          "profit": 5868000,
+          "jobs": 37,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.011
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 18215000,
+          "cost": 12099000,
+          "profit": 6116000,
+          "jobs": 44,
+          "mom": -0.0138,
+          "mom_deseasonalised": 0.0304,
+          "seasonal_index": 0.967
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 15895000,
+          "cost": 11290000,
+          "profit": 4605000,
+          "jobs": 32,
+          "mom": -0.1274,
+          "mom_deseasonalised": -0.0113,
+          "seasonal_index": 0.854
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 15125000,
+          "cost": 11229000,
+          "profit": 3896000,
+          "jobs": 33,
+          "mom": -0.0484,
+          "mom_deseasonalised": 0.005,
+          "seasonal_index": 0.808
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 15960000,
+          "cost": 12414000,
+          "profit": 3546000,
+          "jobs": 33,
+          "mom": 0.0552,
+          "mom_deseasonalised": -0.0077,
+          "seasonal_index": 0.86
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 19355000,
+          "cost": 13023000,
+          "profit": 6332000,
+          "jobs": 42,
+          "mom": 0.2127,
+          "mom_deseasonalised": 0.0558,
+          "seasonal_index": 0.987
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 19050000,
+          "cost": 13306000,
+          "profit": 5744000,
+          "jobs": 39,
+          "mom": -0.0158,
+          "mom_deseasonalised": -0.0698,
+          "seasonal_index": 1.045
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 20375000,
+          "cost": 13830000,
+          "profit": 6545000,
+          "jobs": 51,
+          "mom": 0.0696,
+          "mom_deseasonalised": 0.1101,
+          "seasonal_index": 1.007
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 20905000,
+          "cost": 14091000,
+          "profit": 6814000,
+          "jobs": 41,
+          "mom": 0.026,
+          "mom_deseasonalised": -0.0052,
+          "seasonal_index": 1.038
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 21980000,
+          "cost": 14354000,
+          "profit": 7626000,
+          "jobs": 53,
+          "mom": 0.0514,
+          "mom_deseasonalised": -0.0016,
+          "seasonal_index": 1.093
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 23485000,
+          "cost": 14980000,
+          "profit": 8505000,
+          "jobs": 60,
+          "mom": 0.0685,
+          "mom_deseasonalised": 0.035,
+          "seasonal_index": 1.129
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 23930000,
+          "cost": 15242000,
+          "profit": 8688000,
+          "jobs": 51,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.201
+        }
+      ],
+      "region_share_first": {
+        "BKS": 1
+      },
+      "region_share_last": {
+        "BKS": 1
+      }
+    },
+    {
+      "k": 2,
+      "key": "cleaning",
+      "name": "Rina Kusuma (Rapi Bersih Home Cleaning)",
+      "scale": "sole",
+      "email": "demo-cleaning@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a02-5a7a1a1d0002",
+      "industry": "Cleaning service rumah & kos",
+      "regions": [
+        {
+          "key": "MKS",
+          "name": "Makassar",
+          "profile": "cepat",
+          "growth": 0.08,
+          "open_month_index": null
+        }
+      ],
+      "g_model": 0.0147,
+      "trend_g": 0.0175,
+      "cmgr": 0.0084,
+      "cmgr_deseasonalised": 0.0104,
+      "cagr_equivalent": 0.2317,
+      "margin": 0.3139,
+      "in_band": true,
+      "customers": 304,
+      "contracts_total": 7,
+      "contracts_active": 4,
+      "rows": {
+        "requests": 370,
+        "offers": 363,
+        "assignments": 342,
+        "completions": 337,
+        "ledger_entries": 1375,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 15155000,
+          "cost": 10419000,
+          "profit": 4736000,
+          "jobs": 29,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.014
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 14390000,
+          "cost": 9900000,
+          "profit": 4490000,
+          "jobs": 16,
+          "mom": -0.0505,
+          "mom_deseasonalised": -0.0635,
+          "seasonal_index": 1.028
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 13825000,
+          "cost": 9142000,
+          "profit": 4683000,
+          "jobs": 31,
+          "mom": -0.0393,
+          "mom_deseasonalised": 0.0379,
+          "seasonal_index": 0.952
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 13825000,
+          "cost": 9467000,
+          "profit": 4358000,
+          "jobs": 18,
+          "mom": 0,
+          "mom_deseasonalised": 0.0379,
+          "seasonal_index": 0.917
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 14400000,
+          "cost": 11617000,
+          "profit": 2783000,
+          "jobs": 26,
+          "mom": 0.0416,
+          "mom_deseasonalised": 0.0306,
+          "seasonal_index": 0.927
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 15460000,
+          "cost": 9669000,
+          "profit": 5791000,
+          "jobs": 25,
+          "mom": 0.0736,
+          "mom_deseasonalised": 0.0001,
+          "seasonal_index": 0.995
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 16160000,
+          "cost": 11104000,
+          "profit": 5056000,
+          "jobs": 27,
+          "mom": 0.0453,
+          "mom_deseasonalised": 0.056,
+          "seasonal_index": 0.985
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 16680000,
+          "cost": 10997000,
+          "profit": 5683000,
+          "jobs": 34,
+          "mom": 0.0322,
+          "mom_deseasonalised": -0.0023,
+          "seasonal_index": 1.019
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 18395000,
+          "cost": 12493000,
+          "profit": 5902000,
+          "jobs": 36,
+          "mom": 0.1028,
+          "mom_deseasonalised": 0.0325,
+          "seasonal_index": 1.088
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 17275000,
+          "cost": 11426000,
+          "profit": 5849000,
+          "jobs": 33,
+          "mom": -0.0609,
+          "mom_deseasonalised": -0.009,
+          "seasonal_index": 1.031
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 16485000,
+          "cost": 11805000,
+          "profit": 4680000,
+          "jobs": 30,
+          "mom": -0.0457,
+          "mom_deseasonalised": -0.011,
+          "seasonal_index": 0.995
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 16550000,
+          "cost": 11549000,
+          "profit": 5001000,
+          "jobs": 32,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.049
+        }
+      ],
+      "region_share_first": {
+        "MKS": 1
+      },
+      "region_share_last": {
+        "MKS": 1
+      }
+    },
+    {
+      "k": 3,
+      "key": "listrik",
+      "name": "Hendra Siregar (Listrik Siaga Medan)",
+      "scale": "sole",
+      "email": "demo-listrik@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a03-5a7a1a1d0003",
+      "industry": "Tukang listrik: instalasi & perbaikan",
+      "regions": [
+        {
+          "key": "MDN",
+          "name": "Medan",
+          "profile": "nasional",
+          "growth": 0.049,
+          "open_month_index": null
+        }
+      ],
+      "g_model": 0.0125,
+      "trend_g": 0.0167,
+      "cmgr": 0.0034,
+      "cmgr_deseasonalised": 0.0117,
+      "cagr_equivalent": 0.2199,
+      "margin": 0.3159,
+      "in_band": true,
+      "customers": 290,
+      "contracts_total": 0,
+      "contracts_active": 0,
+      "rows": {
+        "requests": 346,
+        "offers": 341,
+        "assignments": 315,
+        "completions": 313,
+        "ledger_entries": 1211,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 17130000,
+          "cost": 11417000,
+          "profit": 5713000,
+          "jobs": 21,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.067
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 15745000,
+          "cost": 11326000,
+          "profit": 4419000,
+          "jobs": 20,
+          "mom": -0.0809,
+          "mom_deseasonalised": -0.0682,
+          "seasonal_index": 1.052
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 16960000,
+          "cost": 11905000,
+          "profit": 5055000,
+          "jobs": 23,
+          "mom": 0.0772,
+          "mom_deseasonalised": 0.0382,
+          "seasonal_index": 1.092
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 16005000,
+          "cost": 11307000,
+          "profit": 4698000,
+          "jobs": 29,
+          "mom": -0.0563,
+          "mom_deseasonalised": 0.0397,
+          "seasonal_index": 0.991
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 16750000,
+          "cost": 13203000,
+          "profit": 3547000,
+          "jobs": 20,
+          "mom": 0.0465,
+          "mom_deseasonalised": 0.1298,
+          "seasonal_index": 0.918
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 17255000,
+          "cost": 11087000,
+          "profit": 6168000,
+          "jobs": 31,
+          "mom": 0.0301,
+          "mom_deseasonalised": -0.0174,
+          "seasonal_index": 0.962
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 17050000,
+          "cost": 11749000,
+          "profit": 5301000,
+          "jobs": 18,
+          "mom": -0.0119,
+          "mom_deseasonalised": 0.001,
+          "seasonal_index": 0.95
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 16515000,
+          "cost": 10812000,
+          "profit": 5703000,
+          "jobs": 31,
+          "mom": -0.0314,
+          "mom_deseasonalised": -0.0239,
+          "seasonal_index": 0.943
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 17545000,
+          "cost": 11632000,
+          "profit": 5913000,
+          "jobs": 26,
+          "mom": 0.0624,
+          "mom_deseasonalised": -0.0101,
+          "seasonal_index": 1.012
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 17840000,
+          "cost": 10971000,
+          "profit": 6869000,
+          "jobs": 32,
+          "mom": 0.0168,
+          "mom_deseasonalised": 0.0448,
+          "seasonal_index": 0.985
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 17715000,
+          "cost": 12185000,
+          "profit": 5530000,
+          "jobs": 29,
+          "mom": -0.007,
+          "mom_deseasonalised": -0.0044,
+          "seasonal_index": 0.982
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 17495000,
+          "cost": 11887000,
+          "profit": 5608000,
+          "jobs": 33,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.047
+        }
+      ],
+      "region_share_first": {
+        "MDN": 1
+      },
+      "region_share_last": {
+        "MDN": 1
+      }
+    },
+    {
+      "k": 4,
+      "key": "pest",
+      "name": "CV Basmi Hama Nusantara",
+      "scale": "ukm",
+      "email": "demo-pest@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a04-5a7a1a1d0004",
+      "industry": "Pest control (rumah, F&B, gudang, pabrik)",
+      "regions": [
+        {
+          "key": "SBY",
+          "name": "Surabaya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "SDA",
+          "name": "Sidoarjo–Gresik",
+          "profile": "nasional",
+          "growth": 0.052,
+          "open_month_index": null
+        }
+      ],
+      "g_model": 0.0166,
+      "trend_g": 0.0162,
+      "cmgr": 0.0041,
+      "cmgr_deseasonalised": 0.0073,
+      "cagr_equivalent": 0.2122,
+      "margin": 0.2367,
+      "in_band": true,
+      "customers": 214,
+      "contracts_total": 16,
+      "contracts_active": 15,
+      "rows": {
+        "requests": 405,
+        "offers": 403,
+        "assignments": 373,
+        "completions": 358,
+        "ledger_entries": 1437,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 182350000,
+          "cost": 126900000,
+          "profit": 55450000,
+          "jobs": 30,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.032
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 174900000,
+          "cost": 128051000,
+          "profit": 46849000,
+          "jobs": 32,
+          "mom": -0.0409,
+          "mom_deseasonalised": -0.0632,
+          "seasonal_index": 1.057
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 196400000,
+          "cost": 142789000,
+          "profit": 53611000,
+          "jobs": 35,
+          "mom": 0.1229,
+          "mom_deseasonalised": 0.1264,
+          "seasonal_index": 1.054
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 192600000,
+          "cost": 141181000,
+          "profit": 51419000,
+          "jobs": 30,
+          "mom": -0.0193,
+          "mom_deseasonalised": 0.0073,
+          "seasonal_index": 1.026
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 173300000,
+          "cost": 182369000,
+          "profit": -9069000,
+          "jobs": 24,
+          "mom": -0.1002,
+          "mom_deseasonalised": -0.0202,
+          "seasonal_index": 0.942
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 186500000,
+          "cost": 140784000,
+          "profit": 45716000,
+          "jobs": 32,
+          "mom": 0.0762,
+          "mom_deseasonalised": 0.0084,
+          "seasonal_index": 1.005
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 178650000,
+          "cost": 132673000,
+          "profit": 45977000,
+          "jobs": 26,
+          "mom": -0.0421,
+          "mom_deseasonalised": 0.017,
+          "seasonal_index": 0.947
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 183050000,
+          "cost": 136283000,
+          "profit": 46767000,
+          "jobs": 33,
+          "mom": 0.0246,
+          "mom_deseasonalised": 0.0212,
+          "seasonal_index": 0.95
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 211600000,
+          "cost": 156236000,
+          "profit": 55364000,
+          "jobs": 22,
+          "mom": 0.156,
+          "mom_deseasonalised": 0.1098,
+          "seasonal_index": 0.99
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 198050000,
+          "cost": 147560000,
+          "profit": 50490000,
+          "jobs": 31,
+          "mom": -0.064,
+          "mom_deseasonalised": -0.0281,
+          "seasonal_index": 0.953
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 189950000,
+          "cost": 143223000,
+          "profit": 46727000,
+          "jobs": 26,
+          "mom": -0.0409,
+          "mom_deseasonalised": -0.0858,
+          "seasonal_index": 1
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 214000000,
+          "cost": 156007000,
+          "profit": 57993000,
+          "jobs": 36,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.045
+        }
+      ],
+      "region_share_first": {
+        "SBY": 0.8549492733753771,
+        "SDA": 0.14505072662462298
+      },
+      "region_share_last": {
+        "SDA": 0.15109239273493025,
+        "SBY": 0.8489076072650698
+      }
+    },
+    {
+      "k": 5,
+      "key": "laundry",
+      "name": "CV Wangi Bersih Laundry",
+      "scale": "ukm",
+      "email": "demo-laundry@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a05-5a7a1a1d0005",
+      "industry": "Laundry kiloan + B2B hotel/restoran/klinik",
+      "regions": [
+        {
+          "key": "BDG",
+          "name": "Bandung Raya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        }
+      ],
+      "g_model": 0.0128,
+      "trend_g": 0.0149,
+      "cmgr": 0.0136,
+      "cmgr_deseasonalised": 0.014,
+      "cagr_equivalent": 0.1946,
+      "margin": 0.2235,
+      "in_band": true,
+      "customers": 125,
+      "contracts_total": 12,
+      "contracts_active": 10,
+      "rows": {
+        "requests": 802,
+        "offers": 795,
+        "assignments": 779,
+        "completions": 765,
+        "ledger_entries": 3014,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 158000000,
+          "cost": 123316000,
+          "profit": 34684000,
+          "jobs": 61,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.005
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 172950000,
+          "cost": 127419000,
+          "profit": 45531000,
+          "jobs": 71,
+          "mom": 0.0946,
+          "mom_deseasonalised": 0.0319,
+          "seasonal_index": 1.066
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 155050000,
+          "cost": 120104000,
+          "profit": 34946000,
+          "jobs": 59,
+          "mom": -0.1035,
+          "mom_deseasonalised": -0.0137,
+          "seasonal_index": 0.969
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 156750000,
+          "cost": 120534000,
+          "profit": 36216000,
+          "jobs": 62,
+          "mom": 0.011,
+          "mom_deseasonalised": 0.0131,
+          "seasonal_index": 0.967
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 158600000,
+          "cost": 167003000,
+          "profit": -8403000,
+          "jobs": 60,
+          "mom": 0.0118,
+          "mom_deseasonalised": 0.0583,
+          "seasonal_index": 0.924
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 159850000,
+          "cost": 121815000,
+          "profit": 38035000,
+          "jobs": 58,
+          "mom": 0.0079,
+          "mom_deseasonalised": -0.0576,
+          "seasonal_index": 0.988
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 175350000,
+          "cost": 132116000,
+          "profit": 43234000,
+          "jobs": 65,
+          "mom": 0.097,
+          "mom_deseasonalised": 0.1221,
+          "seasonal_index": 0.966
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 177600000,
+          "cost": 129915000,
+          "profit": 47685000,
+          "jobs": 62,
+          "mom": 0.0128,
+          "mom_deseasonalised": -0.0421,
+          "seasonal_index": 1.022
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 194500000,
+          "cost": 139708000,
+          "profit": 54792000,
+          "jobs": 78,
+          "mom": 0.0952,
+          "mom_deseasonalised": 0.0325,
+          "seasonal_index": 1.084
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 175450000,
+          "cost": 131882000,
+          "profit": 43568000,
+          "jobs": 64,
+          "mom": -0.0979,
+          "mom_deseasonalised": -0.002,
+          "seasonal_index": 0.98
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 180800000,
+          "cost": 134365000,
+          "profit": 46435000,
+          "jobs": 63,
+          "mom": 0.0305,
+          "mom_deseasonalised": 0.0092,
+          "seasonal_index": 1
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 171600000,
+          "cost": 130323000,
+          "profit": 41277000,
+          "jobs": 62,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.029
+        }
+      ],
+      "region_share_first": {
+        "BDG": 1
+      },
+      "region_share_last": {
+        "BDG": 1
+      }
+    },
+    {
+      "k": 6,
+      "key": "dinding",
+      "name": "CV Glasur Dinding Borneo",
+      "scale": "ukm",
+      "email": "demo-dinding@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a06-5a7a1a1d0006",
+      "industry": "Glasur & dinding: pengecatan, coating, waterproofing",
+      "regions": [
+        {
+          "key": "BPN",
+          "name": "Balikpapan & koridor IKN",
+          "profile": "cepat",
+          "growth": 0.09,
+          "open_month_index": null
+        }
+      ],
+      "g_model": 0.015,
+      "trend_g": 0.0123,
+      "cmgr": 0.0367,
+      "cmgr_deseasonalised": 0.0149,
+      "cagr_equivalent": 0.1581,
+      "margin": 0.1775,
+      "in_band": true,
+      "customers": 189,
+      "contracts_total": 0,
+      "contracts_active": 0,
+      "rows": {
+        "requests": 266,
+        "offers": 264,
+        "assignments": 228,
+        "completions": 226,
+        "ledger_entries": 928,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 173650000,
+          "cost": 138054000,
+          "profit": 35596000,
+          "jobs": 15,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 0.933
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 179150000,
+          "cost": 149130000,
+          "profit": 30020000,
+          "jobs": 21,
+          "mom": 0.0317,
+          "mom_deseasonalised": 0.0548,
+          "seasonal_index": 0.912
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 159900000,
+          "cost": 134693000,
+          "profit": 25207000,
+          "jobs": 16,
+          "mom": -0.1075,
+          "mom_deseasonalised": -0.0422,
+          "seasonal_index": 0.85
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 161000000,
+          "cost": 134102000,
+          "profit": 26898000,
+          "jobs": 14,
+          "mom": 0.0069,
+          "mom_deseasonalised": 0.0501,
+          "seasonal_index": 0.815
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 169350000,
+          "cost": 185679000,
+          "profit": -16329000,
+          "jobs": 19,
+          "mom": 0.0519,
+          "mom_deseasonalised": 0.0001,
+          "seasonal_index": 0.857
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 183500000,
+          "cost": 148673000,
+          "profit": 34827000,
+          "jobs": 22,
+          "mom": 0.0836,
+          "mom_deseasonalised": -0.0574,
+          "seasonal_index": 0.986
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 201650000,
+          "cost": 166796000,
+          "profit": 34854000,
+          "jobs": 20,
+          "mom": 0.0989,
+          "mom_deseasonalised": 0.0994,
+          "seasonal_index": 0.985
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 213950000,
+          "cost": 168536000,
+          "profit": 45414000,
+          "jobs": 20,
+          "mom": 0.061,
+          "mom_deseasonalised": -0.0168,
+          "seasonal_index": 1.063
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 242400000,
+          "cost": 183723000,
+          "profit": 58677000,
+          "jobs": 17,
+          "mom": 0.133,
+          "mom_deseasonalised": 0.0085,
+          "seasonal_index": 1.194
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 234800000,
+          "cost": 183422000,
+          "profit": 51378000,
+          "jobs": 20,
+          "mom": -0.0314,
+          "mom_deseasonalised": 0.0433,
+          "seasonal_index": 1.109
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 248900000,
+          "cost": 190682000,
+          "profit": 58218000,
+          "jobs": 24,
+          "mom": 0.0601,
+          "mom_deseasonalised": 0.0197,
+          "seasonal_index": 1.153
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 235200000,
+          "cost": 183228000,
+          "profit": 51972000,
+          "jobs": 18,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.143
+        }
+      ],
+      "region_share_first": {
+        "BPN": 1
+      },
+      "region_share_last": {
+        "BPN": 1
+      }
+    },
+    {
+      "k": 7,
+      "key": "mall",
+      "name": "PT Arunika Layanan Ritel",
+      "scale": "enterprise",
+      "email": "demo-mall@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a07-5a7a1a1d0007",
+      "industry": "Retail mall: kebersihan & maintenance mal",
+      "regions": [
+        {
+          "key": "JKT",
+          "name": "DKI Jakarta",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "BDT",
+          "name": "Bodetabek",
+          "profile": "nasional",
+          "growth": 0.052,
+          "open_month_index": null
+        },
+        {
+          "key": "BDG",
+          "name": "Bandung Raya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "SBY",
+          "name": "Surabaya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "MDN",
+          "name": "Medan",
+          "profile": "nasional",
+          "growth": 0.049,
+          "open_month_index": null
+        },
+        {
+          "key": "BTM",
+          "name": "Batam",
+          "profile": "menengah",
+          "growth": 0.065,
+          "open_month_index": 3
+        },
+        {
+          "key": "MKS",
+          "name": "Makassar",
+          "profile": "cepat",
+          "growth": 0.08,
+          "open_month_index": 2
+        },
+        {
+          "key": "BPN",
+          "name": "Balikpapan & koridor IKN",
+          "profile": "cepat",
+          "growth": 0.09,
+          "open_month_index": 6
+        }
+      ],
+      "g_model": 0.089,
+      "trend_g": 0.0906,
+      "cmgr": 0.0893,
+      "cmgr_deseasonalised": 0.0877,
+      "cagr_equivalent": 1.8315,
+      "margin": 0.1459,
+      "in_band": true,
+      "customers": 379,
+      "contracts_total": 21,
+      "contracts_active": 16,
+      "rows": {
+        "requests": 989,
+        "offers": 960,
+        "assignments": 816,
+        "completions": 793,
+        "ledger_entries": 2908,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 1557000000,
+          "cost": 1390826000,
+          "profit": 166174000,
+          "jobs": 37,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.005
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 1730100000,
+          "cost": 1509723000,
+          "profit": 220377000,
+          "jobs": 48,
+          "mom": 0.1112,
+          "mom_deseasonalised": 0.0579,
+          "seasonal_index": 1.055
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 1688800000,
+          "cost": 1491503000,
+          "profit": 197297000,
+          "jobs": 37,
+          "mom": -0.0239,
+          "mom_deseasonalised": 0.066,
+          "seasonal_index": 0.966
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 1816800000,
+          "cost": 1603518000,
+          "profit": 213282000,
+          "jobs": 67,
+          "mom": 0.0758,
+          "mom_deseasonalised": 0.0801,
+          "seasonal_index": 0.962
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 1916400000,
+          "cost": 1719216000,
+          "profit": 197184000,
+          "jobs": 44,
+          "mom": 0.0548,
+          "mom_deseasonalised": 0.1014,
+          "seasonal_index": 0.922
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 2268600000,
+          "cost": 1963542000,
+          "profit": 305058000,
+          "jobs": 61,
+          "mom": 0.1838,
+          "mom_deseasonalised": 0.0797,
+          "seasonal_index": 1.01
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 2495800000,
+          "cost": 2155804000,
+          "profit": 339996000,
+          "jobs": 72,
+          "mom": 0.1001,
+          "mom_deseasonalised": 0.15,
+          "seasonal_index": 0.967
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 2852300000,
+          "cost": 2366214000,
+          "profit": 486086000,
+          "jobs": 74,
+          "mom": 0.1428,
+          "mom_deseasonalised": 0.0904,
+          "seasonal_index": 1.013
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 3143000000,
+          "cost": 2611824000,
+          "profit": 531176000,
+          "jobs": 91,
+          "mom": 0.1019,
+          "mom_deseasonalised": 0.0517,
+          "seasonal_index": 1.061
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 3201100000,
+          "cost": 2664381000,
+          "profit": 536719000,
+          "jobs": 82,
+          "mom": 0.0185,
+          "mom_deseasonalised": 0.0991,
+          "seasonal_index": 0.984
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 3664000000,
+          "cost": 3014480000,
+          "profit": 649520000,
+          "jobs": 84,
+          "mom": 0.1446,
+          "mom_deseasonalised": 0.1036,
+          "seasonal_index": 1.02
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 3759400000,
+          "cost": 3115425000,
+          "profit": 643975000,
+          "jobs": 92,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.035
+        }
+      ],
+      "region_share_first": {
+        "MDN": 0.29492614001284523,
+        "BDT": 0.346242774566474,
+        "JKT": 0.26435452793834296,
+        "SBY": 0.06506101477199742,
+        "BDG": 0.029415542710340397
+      },
+      "region_share_last": {
+        "JKT": 0.39208515283842793,
+        "BDG": 0.12873908296943232,
+        "BDT": 0.1804312227074236,
+        "MDN": 0.1425764192139738,
+        "SBY": 0.080867903930131,
+        "MKS": 0.0351528384279476,
+        "BTM": 0.018149563318777293,
+        "BPN": 0.021997816593886464
+      }
+    },
+    {
+      "k": 8,
+      "key": "fm",
+      "name": "PT Prima Layanan Fasilitas",
+      "scale": "enterprise",
+      "email": "demo-fm@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a08-5a7a1a1d0008",
+      "industry": "Facility management kantor BUMN, perbankan & perkantoran",
+      "regions": [
+        {
+          "key": "JKT",
+          "name": "DKI Jakarta",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "BDT",
+          "name": "Bodetabek",
+          "profile": "nasional",
+          "growth": 0.052,
+          "open_month_index": null
+        },
+        {
+          "key": "BDG",
+          "name": "Bandung Raya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "SBY",
+          "name": "Surabaya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "MDN",
+          "name": "Medan",
+          "profile": "nasional",
+          "growth": 0.049,
+          "open_month_index": null
+        },
+        {
+          "key": "SMG",
+          "name": "Semarang",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "BPN",
+          "name": "Balikpapan & koridor IKN",
+          "profile": "cepat",
+          "growth": 0.09,
+          "open_month_index": 1
+        },
+        {
+          "key": "MKS",
+          "name": "Makassar",
+          "profile": "cepat",
+          "growth": 0.08,
+          "open_month_index": 4
+        },
+        {
+          "key": "MRW",
+          "name": "Morowali–Kendari",
+          "profile": "cepat",
+          "growth": 0.1,
+          "open_month_index": 6
+        }
+      ],
+      "g_model": 0.069,
+      "trend_g": 0.0701,
+      "cmgr": 0.0692,
+      "cmgr_deseasonalised": 0.0673,
+      "cagr_equivalent": 1.2546,
+      "margin": 0.1265,
+      "in_band": true,
+      "customers": 288,
+      "contracts_total": 15,
+      "contracts_active": 15,
+      "rows": {
+        "requests": 747,
+        "offers": 735,
+        "assignments": 628,
+        "completions": 610,
+        "ledger_entries": 2239,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 1645700000,
+          "cost": 1364013000,
+          "profit": 281687000,
+          "jobs": 39,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.023
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 1764100000,
+          "cost": 1567224000,
+          "profit": 196876000,
+          "jobs": 29,
+          "mom": 0.0719,
+          "mom_deseasonalised": 0.0423,
+          "seasonal_index": 1.052
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 1680800000,
+          "cost": 1541824000,
+          "profit": 138976000,
+          "jobs": 32,
+          "mom": -0.0472,
+          "mom_deseasonalised": 0.0553,
+          "seasonal_index": 0.95
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 1829100000,
+          "cost": 1622114000,
+          "profit": 206986000,
+          "jobs": 46,
+          "mom": 0.0882,
+          "mom_deseasonalised": 0.083,
+          "seasonal_index": 0.955
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 1889300000,
+          "cost": 1717658000,
+          "profit": 171642000,
+          "jobs": 40,
+          "mom": 0.0329,
+          "mom_deseasonalised": 0.1016,
+          "seasonal_index": 0.895
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 2222200000,
+          "cost": 1960255000,
+          "profit": 261945000,
+          "jobs": 41,
+          "mom": 0.1762,
+          "mom_deseasonalised": 0.0519,
+          "seasonal_index": 1.001
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 2254200000,
+          "cost": 2002953000,
+          "profit": 251247000,
+          "jobs": 42,
+          "mom": 0.0144,
+          "mom_deseasonalised": 0.042,
+          "seasonal_index": 0.974
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 2512400000,
+          "cost": 2207841000,
+          "profit": 304559000,
+          "jobs": 54,
+          "mom": 0.1145,
+          "mom_deseasonalised": 0.0773,
+          "seasonal_index": 1.008
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 2898700000,
+          "cost": 2485635000,
+          "profit": 413065000,
+          "jobs": 85,
+          "mom": 0.1538,
+          "mom_deseasonalised": 0.1084,
+          "seasonal_index": 1.049
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 2912500000,
+          "cost": 2504376000,
+          "profit": 408124000,
+          "jobs": 64,
+          "mom": 0.0048,
+          "mom_deseasonalised": 0.062,
+          "seasonal_index": 0.993
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 3212000000,
+          "cost": 2706810000,
+          "profit": 505190000,
+          "jobs": 70,
+          "mom": 0.1028,
+          "mom_deseasonalised": 0.0518,
+          "seasonal_index": 1.041
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 3364600000,
+          "cost": 2869964000,
+          "profit": 494636000,
+          "jobs": 64,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.057
+        }
+      ],
+      "region_share_first": {
+        "JKT": 0.6298231755483988,
+        "BDG": 0.3137874460715805,
+        "SBY": 0.015069575256729658,
+        "SMG": 0.026432521115634683,
+        "BDT": 0.00273439873610014,
+        "MDN": 0.012152883271556177
+      },
+      "region_share_last": {
+        "SBY": 0.13309464508094646,
+        "BPN": 0.02437733499377335,
+        "JKT": 0.4940846824408468,
+        "BDG": 0.17861145703611456,
+        "BDT": 0.07693026151930261,
+        "MDN": 0.030510585305105854,
+        "MRW": 0.04688667496886675,
+        "MKS": 0.0072851805728518055,
+        "SMG": 0.00821917808219178
+      }
+    },
+    {
+      "k": 9,
+      "key": "rs",
+      "name": "PT Sehat Bersih Medika",
+      "scale": "enterprise",
+      "email": "demo-rs@satualur.id",
+      "owner_id": "0d3e5a11-7c1a-4b5e-9a09-5a7a1a1d0009",
+      "industry": "Hospital & healthcare housekeeping (RS, klinik bersalin, lab)",
+      "regions": [
+        {
+          "key": "SBY",
+          "name": "Surabaya",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "JKT",
+          "name": "DKI Jakarta",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "MLG",
+          "name": "Malang",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "SMG",
+          "name": "Semarang",
+          "profile": "nasional",
+          "growth": 0.05,
+          "open_month_index": null
+        },
+        {
+          "key": "DPS",
+          "name": "Denpasar–Badung",
+          "profile": "menengah",
+          "growth": 0.065,
+          "open_month_index": null
+        },
+        {
+          "key": "MKS",
+          "name": "Makassar",
+          "profile": "cepat",
+          "growth": 0.08,
+          "open_month_index": 2
+        },
+        {
+          "key": "BPN",
+          "name": "Balikpapan & koridor IKN",
+          "profile": "cepat",
+          "growth": 0.09,
+          "open_month_index": 5
+        },
+        {
+          "key": "MDN",
+          "name": "Medan",
+          "profile": "nasional",
+          "growth": 0.049,
+          "open_month_index": 7
+        }
+      ],
+      "g_model": 0.0881,
+      "trend_g": 0.087,
+      "cmgr": 0.0878,
+      "cmgr_deseasonalised": 0.0863,
+      "cagr_equivalent": 1.7199,
+      "margin": 0.1161,
+      "in_band": true,
+      "customers": 419,
+      "contracts_total": 18,
+      "contracts_active": 18,
+      "rows": {
+        "requests": 1077,
+        "offers": 1058,
+        "assignments": 898,
+        "completions": 873,
+        "ledger_entries": 3201,
+        "reports": 11
+      },
+      "months": [
+        {
+          "month": "2025-11",
+          "full": true,
+          "revenue": 1414900000,
+          "cost": 1276667000,
+          "profit": 138233000,
+          "jobs": 37,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.005
+        },
+        {
+          "month": "2025-12",
+          "full": true,
+          "revenue": 1571100000,
+          "cost": 1375150000,
+          "profit": 195950000,
+          "jobs": 53,
+          "mom": 0.1104,
+          "mom_deseasonalised": 0.1065,
+          "seasonal_index": 1.009
+        },
+        {
+          "month": "2026-01",
+          "full": true,
+          "revenue": 1643500000,
+          "cost": 1506302000,
+          "profit": 137198000,
+          "jobs": 48,
+          "mom": 0.0461,
+          "mom_deseasonalised": 0.0285,
+          "seasonal_index": 1.026
+        },
+        {
+          "month": "2026-02",
+          "full": true,
+          "revenue": 1805200000,
+          "cost": 1625020000,
+          "profit": 180180000,
+          "jobs": 64,
+          "mom": 0.0984,
+          "mom_deseasonalised": 0.1237,
+          "seasonal_index": 1.003
+        },
+        {
+          "month": "2026-03",
+          "full": true,
+          "revenue": 1837700000,
+          "cost": 1654871000,
+          "profit": 182829000,
+          "jobs": 63,
+          "mom": 0.018,
+          "mom_deseasonalised": 0.109,
+          "seasonal_index": 0.92
+        },
+        {
+          "month": "2026-04",
+          "full": true,
+          "revenue": 2131800000,
+          "cost": 1857337000,
+          "profit": 274463000,
+          "jobs": 84,
+          "mom": 0.16,
+          "mom_deseasonalised": 0.0641,
+          "seasonal_index": 1.003
+        },
+        {
+          "month": "2026-05",
+          "full": true,
+          "revenue": 2273000000,
+          "cost": 2024298000,
+          "profit": 248702000,
+          "jobs": 58,
+          "mom": 0.0662,
+          "mom_deseasonalised": 0.1017,
+          "seasonal_index": 0.971
+        },
+        {
+          "month": "2026-06",
+          "full": true,
+          "revenue": 2433000000,
+          "cost": 2170923000,
+          "profit": 262077000,
+          "jobs": 71,
+          "mom": 0.0704,
+          "mom_deseasonalised": 0.0474,
+          "seasonal_index": 0.992
+        },
+        {
+          "month": "2026-07",
+          "full": true,
+          "revenue": 2941000000,
+          "cost": 2529415000,
+          "profit": 411585000,
+          "jobs": 107,
+          "mom": 0.2088,
+          "mom_deseasonalised": 0.1609,
+          "seasonal_index": 1.033
+        },
+        {
+          "month": "2026-08",
+          "full": true,
+          "revenue": 2892400000,
+          "cost": 2508644000,
+          "profit": 383756000,
+          "jobs": 92,
+          "mom": -0.0165,
+          "mom_deseasonalised": 0.0303,
+          "seasonal_index": 0.986
+        },
+        {
+          "month": "2026-09",
+          "full": true,
+          "revenue": 3283900000,
+          "cost": 2886727000,
+          "profit": 397173000,
+          "jobs": 87,
+          "mom": 0.1354,
+          "mom_deseasonalised": 0.0988,
+          "seasonal_index": 1.019
+        },
+        {
+          "month": "2026-10",
+          "full": false,
+          "revenue": 3556700000,
+          "cost": 3065111000,
+          "profit": 491589000,
+          "jobs": 101,
+          "mom": null,
+          "mom_deseasonalised": null,
+          "seasonal_index": 1.033
+        }
+      ],
+      "region_share_first": {
+        "JKT": 0.06382076471835466,
+        "SBY": 0.3682239027493109,
+        "MLG": 0.21987419605625838,
+        "SMG": 0.32186020213442645,
+        "DPS": 0.026220934341649585
+      },
+      "region_share_last": {
+        "JKT": 0.10658059015195347,
+        "SBY": 0.307622034775724,
+        "MLG": 0.17470081305764487,
+        "SMG": 0.1422089588598922,
+        "DPS": 0.09634885349736594,
+        "MKS": 0.13627089740856907,
+        "MDN": 0.01285057401260696,
+        "BPN": 0.02341727823624349
+      }
+    }
+  ],
+  "counts": {
+    "requests": 5582,
+    "offers": 5493,
+    "assignments": 4900,
+    "completions": 4792,
+    "ledger_entries": 18316,
+    "reports": 99
+  },
+  "total_rows": 39182,
+  "sql_bytes": 10608256,
+  "statements": 415
+}

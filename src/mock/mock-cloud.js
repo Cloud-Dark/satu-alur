@@ -361,6 +361,210 @@ function parseReport(text) {
   try { return JSON.parse(String(text).replace(/^Data laporan:\s*/, '')) } catch { return {} }
 }
 
+/* ------------------------------------------------------------------------
+ * Generic agent responder. Any request whose system prompt starts with the
+ * marker `[agent:<key>]` gets a plausible Indonesian answer built from the
+ * numbers in the context it was sent — clearly labelled as a local simulation.
+ * ---------------------------------------------------------------------- */
+
+async function* streamText(text, { step = 6, delay = 22 } = {}) {
+  for (let i = 0; i < text.length; i += step) {
+    await new Promise(r => setTimeout(r, delay))
+    yield { choices: [{ delta: { content: text.slice(i, i + step) }, finish_reason: null }] }
+  }
+  yield {
+    choices: [{ delta: {}, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 120, completion_tokens: Math.ceil(text.length / 4), total_tokens: 120 + Math.ceil(text.length / 4) },
+  }
+}
+
+const SIM_NOTE = '_Simulasi lokal: jawaban ini disusun otomatis dari angka konteks yang dikirim aplikasi, bukan dari model AI._'
+
+/** Reads "Label: value" lines from the context the app sent. */
+function contextReader(ctx) {
+  const grab = (label) => {
+    const m = ctx.match(new RegExp(`^${label}[^:\\n]*:\\s*(.+)$`, 'm'))
+    return m ? m[1].trim() : null
+  }
+  const money = (label) => grab(label)?.match(/Rp\s?[\d.]+/)?.[0] || null
+  const numericLines = ctx.split('\n').map(l => l.replace(/^[-\s]+/, '').trim())
+    .filter(l => /Rp\s?[\d.]+|\d+(?:,\d+)?%/.test(l) && !l.startsWith('['))
+  return { grab, money, numericLines }
+}
+
+function advisorMockAnswer(agent, question, ctx) {
+  const { grab, money, numericLines } = contextReader(ctx)
+  const noData = /Status data: belum ada data/.test(ctx)
+  const rev30 = money('Pendapatan 30 hari terakhir')
+  const profit30 = grab('Laba 30 hari terakhir')
+  const avgJob = money('Rata-rata nilai pekerjaan')
+  const mom = grab('Pertumbuhan bulan ke bulan')
+  const topCost = grab('Biaya terbesar')
+  const topService = grab('Layanan teratas')
+  const topCustomer = grab('Pelanggan teratas')
+  const pending = grab('Pekerjaan tertunda')
+  const conversion = grab('Konversi')
+  const target = grab('Target pertumbuhan')
+  const nextMonth = grab('Bulan depan saja')
+  const m12 = ctx.match(/^- Bulan ke-12: (.+)$/m)?.[1]
+  const repeat = grab('Pelanggan berulang')
+  const q = String(question || '').replace(/\s+/g, ' ').trim().slice(0, 140)
+
+  const out = []
+  if (noData) {
+    out.push(`Belum ada data permintaan maupun jurnal di akun ini, jadi saya menjawab "${q}" dengan saran umum dulu.`)
+    out.push('### Mulai dari dasar')
+    out.push('1. Catat setiap permintaan pelanggan di tahap **01 Permintaan**, sekecil apa pun.')
+    out.push('2. Kirim penawaran tertulis untuk setiap permintaan dalam 24 jam.')
+    out.push('3. Bukukan pendapatan dan biaya tiap pekerjaan agar margin terlihat.')
+    out.push('Untuk usaha perorangan atau UKM, target pertumbuhan yang sehat adalah **1–2% per bulan**. Setelah satu bulan data terkumpul, saya bisa menghitung target yang spesifik untuk Anda.')
+  } else {
+    const facts = []
+    if (rev30) facts.push(`pendapatan 30 hari terakhir **${rev30}**`)
+    if (profit30) facts.push(`laba ${profit30.replace(/(Rp[\d.]+)/, '**$1**')}`)
+    if (avgJob) facts.push(`rata-rata nilai pekerjaan **${avgJob}**`)
+    out.push(`Untuk pertanyaan "${q}", saya berangkat dari angka Anda: ${facts.length ? facts.join(', ') : numericLines.slice(0, 2).join('; ')}.`)
+
+    if (agent === 'keuangan') {
+      out.push('### Yang terlihat di angka')
+      if (topCost) out.push(`- Komponen biaya terbesar: **${topCost}**. Ini kandidat pertama untuk dihemat.`)
+      if (mom) out.push(`- Pertumbuhan bulan ke bulan: ${mom}.`)
+      out.push('- Periksa apakah harga per pekerjaan sudah menutup biaya tenaga, bahan, dan transport dengan margin minimal 30%.')
+      out.push('### Rekomendasi')
+      out.push('1. Negosiasikan harga bahan untuk pembelian bulanan, bukan per pekerjaan.')
+      out.push('2. Gabungkan pekerjaan di area yang sama pada hari yang sama untuk menekan transport.')
+      out.push('3. Naikkan harga 5–10% untuk layanan dengan permintaan tertinggi.')
+    } else if (agent === 'pertumbuhan') {
+      out.push('### Target dan kebutuhan')
+      if (target) out.push(`- ${target}`)
+      if (nextMonth) out.push(`- ${nextMonth}`)
+      if (m12) out.push(`- Bulan ke-12: ${m12}`)
+      if (mom) out.push(`- Pertumbuhan aktual Anda: ${mom}.`)
+      out.push('- Patokan: UKM sehat tumbuh **1–2% per bulan**; enterprise menargetkan **5–10%**.')
+      out.push('### Cara mencapainya')
+      out.push(`1. Tawarkan ulang layanan ke pelanggan lama${repeat ? ` (saat ini ${repeat})` : ''}.`)
+      out.push(`2. Dorong layanan teratas${topService ? `: ${topService.split(';')[0]}` : ''}.`)
+      out.push('3. Pastikan kapasitas tim cukup sebelum menambah promosi.')
+    } else if (agent === 'pemasaran') {
+      out.push('### Peluang pemasaran')
+      if (topService) out.push(`- Layanan dengan pendapatan terbesar: ${topService.split(';')[0]}. Jadikan pesan utama promosi.`)
+      if (repeat) out.push(`- Pelanggan berulang: ${repeat}. Paket langganan bisa menaikkan angka ini.`)
+      if (topCustomer) out.push(`- Pelanggan teratas: ${topCustomer.split(';')[0]}. Minta testimoni dan referral.`)
+      out.push('### Rekomendasi')
+      out.push('1. Kirim pesan WhatsApp pengingat perawatan ke pelanggan yang selesai 2–3 bulan lalu.')
+      out.push('2. Minta ulasan Google Maps setiap pekerjaan selesai.')
+      out.push('3. Buat promo musiman dengan kuota terbatas agar kapasitas tetap terjaga.')
+    } else if (agent === 'operasional') {
+      out.push('### Kondisi alur kerja')
+      if (pending) out.push(`- ${pending}.`)
+      if (conversion) out.push(`- ${conversion}.`)
+      out.push('### Rekomendasi')
+      out.push('1. Tetapkan batas waktu: penawaran dikirim maksimal 24 jam setelah permintaan masuk.')
+      out.push('2. Jadwalkan pekerjaan per wilayah agar teknisi tidak bolak-balik.')
+      out.push('3. Bukukan penyelesaian di hari yang sama supaya laporan selalu akurat.')
+    } else {
+      out.push('### Gambaran singkat')
+      for (const line of numericLines.slice(0, 4)) out.push(`- ${line}`)
+      out.push('### Prioritas')
+      out.push(`1. Selesaikan pekerjaan tertunda${pending ? ` (${pending.split(',')[0]})` : ''}.`)
+      out.push('2. Jaga margin dengan meninjau biaya terbesar setiap bulan.')
+      out.push('3. Tetapkan target pertumbuhan 1–2% per bulan dan pantau di halaman ini.')
+    }
+  }
+  out.push('### Langkah minggu ini')
+  out.push('- Pilih satu rekomendasi di atas, tetapkan angkanya, dan cek hasilnya di Laporan minggu depan.')
+  out.push(SIM_NOTE)
+  return out.join('\n\n').replace(/\n\n(?=- |\d+\. )/g, '\n')
+}
+
+function socialMockAnswer(question, ctx) {
+  const q = String(question || '').toLowerCase()
+  const { grab, numericLines } = contextReader(ctx)
+  const service = grab('Layanan') || grab('Layanan teratas')?.split(/\s+Rp/)[0] || 'servis AC'
+  const out = []
+  if (/ide|brainstorm|konten apa/.test(q)) {
+    out.push(`### Ide konten untuk ${service}`)
+    out.push('1. **Sebelum dan sesudah**: video 15 detik proses pengerjaan, tutup dengan hasil akhir.')
+    out.push('2. **Tips perawatan**: carousel "5 tanda perangkat Anda perlu diservis".')
+    out.push('3. **Di balik layar**: kenalkan teknisi dan standar kerja tim.')
+    out.push('4. **Testimoni pelanggan**: kutipan singkat dan foto hasil kerja (dengan izin).')
+    out.push('5. **Promo musiman**: kuota terbatas minggu ini, ajak pesan lewat WhatsApp.')
+  } else if (/hashtag|tagar/.test(q)) {
+    out.push('### Hashtag yang disarankan')
+    out.push('#jasaprofesional #servisac #perawatanrumah #jasabersih #layananlokal #pesanviawa')
+  } else if (/iklan|ads|meta/.test(q)) {
+    out.push('### Rekomendasi iklan')
+    out.push('- **Target**: pemilik rumah dan kantor kecil, usia 25–55, radius 10 km dari area layanan.')
+    out.push('- **Anggaran awal**: Rp50.000 per hari selama 7 hari, lalu evaluasi biaya per chat WhatsApp.')
+    out.push('- **Pesan utama**: jadwal cepat, harga transparan, garansi kerja.')
+  } else {
+    out.push(`### Caption untuk ${service}`)
+    out.push(`Rumah nyaman dimulai dari perawatan yang tepat. Tim kami menangani ${service} dengan rapi, tepat waktu, dan bergaransi.`)
+    out.push('Jadwal minggu ini masih tersedia. Kirim pesan WhatsApp untuk cek harga tanpa biaya survei.')
+    out.push('#jasaprofesional #perawatanrumah #layananlokal')
+  }
+  if (numericLines.length) out.push(`Angka dari konteks Anda: ${numericLines.slice(0, 2).join('; ')}.`)
+  out.push(SIM_NOTE)
+  return out.join('\n\n').replace(/\n\n(?=- |\d+\. )/g, '\n')
+}
+
+/* json_schema requests: return valid JSON with the schema's keys filled in. */
+function sampleString(key, i = 0) {
+  const k = String(key).toLowerCase()
+  const pick = (arr) => arr[i % arr.length]
+  if (/hashtag|tag/.test(k)) return pick(['#jasaprofesional', '#servisac', '#perawatanrumah', '#jasabersih', '#layananlokal'])
+  if (/platform/.test(k)) return pick(['instagram', 'tiktok', 'facebook'])
+  if (/caption|body|isi|konten|content|text|copy|naskah/.test(k)) return pick(['Rumah nyaman dimulai dari perawatan yang tepat. Jadwal minggu ini masih tersedia, pesan lewat WhatsApp.', 'Tim kami datang tepat waktu, bekerja rapi, dan memberi garansi. Cek harga tanpa biaya survei.', 'Perawatan rutin membuat perangkat awet dan tagihan listrik lebih hemat. Tanyakan paket langganan kami.'])
+  if (/title|judul|name|nama|hook|headline/.test(k)) return pick(['Sebelum dan sesudah perawatan', 'Lima tanda perlu servis', 'Kenalan dengan tim lapangan', 'Promo kuota terbatas'])
+  if (/cta|ajakan/.test(k)) return 'Pesan lewat WhatsApp hari ini'
+  if (/time|jam|waktu/.test(k)) return pick(['09:00', '12:30', '19:00'])
+  if (/date|tanggal/.test(k)) return new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10)
+  if (/agent|route|kategori|category|type|jenis|format/.test(k)) return pick(['umum', 'reels', 'carousel'])
+  if (/reason|alasan|why|insight|catatan|notes|summary|ringkas/.test(k)) return 'Simulasi lokal: nilai contoh yang dibuat dari skema, bukan dari model AI.'
+  if (/prompt/.test(k)) return 'Foto produk jasa di rumah modern, cahaya alami, gaya fotografi komersial, ruang kosong untuk teks'
+  return `Contoh ${k.replace(/_/g, ' ')} (simulasi lokal)`
+}
+
+function sampleNumber(key, schema, i = 0) {
+  const k = String(key).toLowerCase()
+  let n = /price|harga|budget|anggaran|biaya|amount|nilai/.test(k) ? 150000 + i * 50000
+    : /rate|persen|pct|percent|score|skor/.test(k) ? 4 + i
+      : /count|jumlah|total|reach|jangkauan/.test(k) ? 120 + i * 40
+        : 1 + i
+  if (typeof schema.minimum === 'number') n = Math.max(n, schema.minimum)
+  if (typeof schema.maximum === 'number') n = Math.min(n, schema.maximum)
+  return schema.type === 'integer' ? Math.round(n) : n
+}
+
+function sampleFromSchema(schema = {}, key = 'nilai', depth = 0, i = 0) {
+  if (!schema || typeof schema !== 'object' || depth > 6) return null
+  if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[i % schema.enum.length]
+  const type = Array.isArray(schema.type) ? schema.type.find(t => t !== 'null') : schema.type
+    || (schema.properties ? 'object' : schema.items ? 'array' : 'string')
+  if (type === 'object') {
+    const props = schema.properties || {}
+    const keys = [...new Set([...(schema.required || []), ...Object.keys(props)])]
+    return Object.fromEntries(keys.map(k => [k, sampleFromSchema(props[k] || { type: 'string' }, k, depth + 1, i)]))
+  }
+  if (type === 'array') {
+    const min = Number.isInteger(schema.minItems) ? schema.minItems : 3
+    const max = Number.isInteger(schema.maxItems) ? schema.maxItems : Math.max(min, 5)
+    const n = Math.max(1, Math.min(Math.max(min, 3), max))
+    return Array.from({ length: n }, (_, j) => sampleFromSchema(schema.items || { type: 'string' }, key, depth + 1, j))
+  }
+  if (type === 'integer' || type === 'number') return sampleNumber(key, { ...schema, type }, i)
+  if (type === 'boolean') return true
+  return sampleString(key, i)
+}
+
+function schemaJson(responseFormat) {
+  const rf = responseFormat || {}
+  const schema = rf.json_schema?.schema || rf.json_schema || { type: 'object', properties: { hasil: { type: 'string' } } }
+  return JSON.stringify(sampleFromSchema(schema, 'hasil'), null, 2)
+}
+
+const lastUserText = (messages) => [...messages].reverse().find(m => m.role === 'user')?.content || ''
+
 const mockLLM = {
   models: {
     async list() {
@@ -375,8 +579,15 @@ const mockLLM = {
       create({ messages, stream, response_format }) {
         const userMsg = messages.find(m => m.role === 'user')?.content || ''
         const isOffer = userMsg.includes('Permintaan jasa')
-        const generator = isOffer ? mockStreamOffer(JSON.parse(userMsg.replace('Permintaan jasa:\n', ''))) : mockStreamExplain(parseReport(userMsg))
-        return generator
+        if (isOffer) return mockStreamOffer(JSON.parse(userMsg.replace('Permintaan jasa:\n', '')))
+        if (response_format?.type === 'json_schema' || response_format?.type === 'json_object') {
+          return streamText(schemaJson(response_format), { step: 10, delay: 14 })
+        }
+        const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
+        const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
+        if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
+        if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
+        return mockStreamExplain(parseReport(userMsg))
       }
     }
   }

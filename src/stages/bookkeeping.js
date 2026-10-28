@@ -11,39 +11,90 @@ export async function render(container, ctx = {}) {
   const params = ctx.params || {}
 
   const complSel = C.select({ label: 'Pekerjaan selesai', name: 'completion_id', required: true, hint: 'Satu pekerjaan boleh punya beberapa jurnal: pendapatan dan biaya-biayanya.', options: [{ value: '', label: 'Memuat…' }] })
+  const preview = el('div', { hidden: true })
+  const ctxBox = el('div', {})
   const category = C.select({ label: 'Kategori', name: 'category', required: true, options: [{ value: '', label: 'Pilih kategori' }, ...LEDGER_CATEGORIES] })
   const amount = C.field({ label: 'Jumlah (Rp)', name: 'amount', type: 'number', required: true, placeholder: '1500000', attrs: { min: '1', step: '1', inputmode: 'numeric' } })
   const fillBtn = el('button', { type: 'button', className: 'link-btn', hidden: true }, '')
   amount.wrap.appendChild(fillBtn)
-  const submit = C.button({ label: 'Posting jurnal', icon: 'ledger', variant: 'primary', type: 'submit' })
-  const msg = C.message()
-
-  const form = el('form', { className: 'form' },
-    complSel.wrap,
-    el('div', { className: 'form-row' }, category.wrap, amount.wrap),
-    el('div', { className: 'form-actions' }, submit),
-    msg,
-  )
-  form.noValidate = true
+  const reviewBox = el('div', { className: 'proposal' })
 
   const summary = el('div', { className: 'kpis kpis-3' })
   const listBody = el('div', {}, C.skeletonRows(6))
   const listPanel = C.panel({ title: 'Buku besar', meta: 'memuat…', className: 'list-panel' }, summary, listBody)
 
+  let flow = null
+  const selected = () => flow?.completion(complSel.input.value) || null
+  const amountValue = () => Number(amount.input.value)
+
+  const wiz = C.wizard({
+    label: 'Posting jurnal',
+    steps: [
+      {
+        key: 'pick',
+        title: 'Pilih pekerjaan',
+        description: 'Pekerjaan selesai yang akan dibukukan.',
+        content: [complSel.wrap, preview],
+        validate: () => (selected() ? [] : [{ text: 'Pilih pekerjaan selesai.', input: complSel.input }]),
+        primary: () => ({ disabled: !flow?.completions.length }),
+      },
+      {
+        key: 'entry',
+        title: 'Jurnal',
+        description: 'Pendapatan atau biaya, beserta jumlahnya.',
+        content: [ctxBox, category.wrap, amount.wrap],
+        validate: () => {
+          const errs = []
+          if (!category.input.value) errs.push({ text: 'Pilih kategori.', input: category.input })
+          const amt = amountValue()
+          if (!amount.input.value || !Number.isFinite(amt) || amt <= 0) errs.push({ text: 'Jumlah harus angka lebih dari nol.', input: amount.input })
+          return errs
+        },
+        onEnter: () => drawContext(),
+      },
+      {
+        key: 'review',
+        title: 'Tinjau',
+        description: 'Periksa jurnal sebelum diposting.',
+        content: reviewBox,
+        primary: { label: 'Posting jurnal', icon: 'ledger', iconRight: undefined },
+        validate: () => {
+          const errs = []
+          if (!selected()) errs.push('Pilih pekerjaan selesai.')
+          if (!category.input.value) errs.push('Pilih kategori.')
+          if (!(amountValue() > 0)) errs.push('Jumlah harus angka lebih dari nol.')
+          return errs
+        },
+        onPrimary: () => save(),
+        onEnter: () => drawReview(),
+      },
+    ],
+  })
+  const msg = wiz.msg
+
   container.replaceChildren(
     C.pageHeader({ num: '05', label: 'Pembukuan', title: 'Pembukuan & saldo', em: 'saldo', description: 'Catat pendapatan dan biaya dari setiap pekerjaan selesai. Saldo dihitung berjalan dari jurnal tertua.' }),
-    el('div', { className: 'stage-grid' },
-      C.panel({ title: 'Posting jurnal', meta: 'Pendapatan atau biaya', raised: true, className: 'form-panel' }, form),
-      listPanel,
-    ),
+    el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
   )
-
-  let flow = null
 
   const offerPrice = (c) => Number(flow?.offerOfCompletion(c)?.validated_price) || 0
 
+  const completionPreview = (c) => {
+    const n = flow.ledgerOf(c.id).length
+    const a = flow.assignmentOfCompletion(c)
+    return C.miniPreview({
+      title: customerLabel(flow.requestOfCompletion(c)),
+      aside: C.rupiah(offerPrice(c)),
+      chips: [
+        a?.worker_name ? { icon: 'users', text: a.worker_name } : null,
+        { icon: 'calendar', text: C.formatDate(c.completed_at || c.created_at), title: 'Tanggal selesai' },
+        { icon: 'ledger', text: n ? `${n} jurnal` : 'Belum dibukukan' },
+      ],
+    })
+  }
+
   function syncFill() {
-    const c = flow?.completion(complSel.input.value)
+    const c = selected()
     const price = c ? offerPrice(c) : 0
     if (c && price && category.input.value === 'pendapatan') {
       fillBtn.textContent = `Isi nilai penawaran ${C.rupiah(price)}`
@@ -53,18 +104,52 @@ export async function render(container, ctx = {}) {
     }
   }
   fillBtn.addEventListener('click', () => {
-    const c = flow?.completion(complSel.input.value)
-    if (c) { amount.input.value = String(offerPrice(c)); amount.input.focus() }
+    const c = selected()
+    if (c) {
+      amount.input.value = String(offerPrice(c))
+      amount.input.dispatchEvent(new Event('input'))
+      amount.input.focus()
+    }
   })
-  complSel.input.addEventListener('change', () => { msg.hide(); syncFill() })
+  complSel.input.addEventListener('change', () => { msg.hide(); syncFill(); showPreview() })
   category.input.addEventListener('change', () => {
     syncFill()
     if (category.input.value === 'pendapatan' && !amount.input.value) {
-      const c = flow?.completion(complSel.input.value)
+      const c = selected()
       if (c && offerPrice(c)) amount.input.value = String(offerPrice(c))
     }
   })
 
+  function showPreview() {
+    const c = selected()
+    if (!c) { preview.hidden = true; return }
+    preview.replaceChildren(completionPreview(c))
+    preview.hidden = false
+  }
+
+  function drawContext() {
+    const c = selected()
+    ctxBox.replaceChildren(c ? completionPreview(c) : '')
+    syncFill()
+  }
+
+  function drawReview() {
+    const c = selected()
+    if (!c) { reviewBox.replaceChildren(); return }
+    const rev = isRevenue({ category: category.input.value })
+    const amt = amountValue()
+    reviewBox.replaceChildren(
+      el('dl', { className: 'sum-grid' },
+        el('div', { className: 'is-wide' }, el('dt', {}, 'Pekerjaan'), el('dd', {}, customerLabel(flow.requestOfCompletion(c)))),
+        el('div', {}, el('dt', {}, 'Kategori'), el('dd', {}, categoryLabel(category.input.value))),
+        el('div', {}, el('dt', {}, rev ? 'Masuk' : 'Keluar'), el('dd', {}, el('span', { className: `tnum strong ${rev ? 'amt-in' : 'amt-out'}` }, `${rev ? '+' : '−'}${C.rupiah(amt)}`))),
+        el('div', {}, el('dt', {}, 'Nilai penawaran'), el('dd', {}, el('span', { className: 'tnum' }, C.rupiah(offerPrice(c))))),
+        el('div', {}, el('dt', {}, 'Jurnal sebelumnya'), el('dd', {}, String(flow.ledgerOf(c.id).length))),
+      ),
+    )
+  }
+
+  let firstFill = true
   function fillCompletions() {
     const all = [...flow.completions]
     const unbooked = all.filter((c) => !flow.ledgerOf(c.id).length)
@@ -73,33 +158,25 @@ export async function render(container, ctx = {}) {
     const opts = [{ value: '', label: all.length ? 'Pilih pekerjaan' : 'Belum ada pekerjaan selesai' }]
     unbooked.forEach((c) => opts.push({ value: c.id, label: label(c) }))
     booked.forEach((c) => opts.push({ value: c.id, label: `${label(c)} (${flow.ledgerOf(c.id).length} jurnal)` }))
-    const keep = complSel.input.value || (params.completionId != null ? String(params.completionId) : '')
+    const keep = complSel.input.value || (firstFill && params.completionId != null ? String(params.completionId) : '')
     C.setOptions(complSel.input, opts, keep)
-    submit.disabled = !all.length
-    if (!all.length) {
+    if (!all.length && wiz.index === 0 && !wiz.done) {
       msg.show('info', 'Belum ada pekerjaan selesai. Tandai pekerjaan selesai di tahap 04 terlebih dahulu.')
       const go = C.button({ label: 'Ke penyelesaian', iconRight: 'arrowRight', size: 'sm' })
       go.addEventListener('click', () => navigate('complete'))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
     }
     syncFill()
+    showPreview()
+    wiz.syncPrimary()
+    if (firstFill && params.completionId != null && selected()) wiz.go('entry', { focus: false, animate: false })
+    firstFill = false
   }
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    msg.hide()
-    const c = flow?.completion(complSel.input.value)
-    const amt = Number(amount.input.value)
-    const errors = []
-    if (!c) errors.push('Pilih pekerjaan selesai.')
-    if (!category.input.value) errors.push('Pilih kategori.')
-    if (!amount.input.value || !Number.isFinite(amt) || amt <= 0) errors.push('Jumlah harus angka lebih dari nol.')
-    if (errors.length) {
-      msg.show('danger', 'Periksa kembali isian berikut.', errors)
-      ;(!c ? complSel.input : !category.input.value ? category.input : amount.input).focus()
-      return
-    }
-    const restore = C.setBusy(submit, 'Memposting…')
+  async function save() {
+    const c = selected()
+    const amt = amountValue()
+    const restore = wiz.busy('Memposting…')
     try {
       const { error } = await getCloud().database.from('ledger_entries').insert({
         completion_id: Number(c.id),
@@ -109,21 +186,35 @@ export async function render(container, ctx = {}) {
         posted_at: new Date().toISOString(),
       })
       if (error) throw new Error(error.message)
+      restore()
       const catText = categoryLabel(category.input.value)
-      msg.show('ok', `${catText} ${C.rupiah(amt)} untuk ${customerLabel(flow.requestOfCompletion(c))} diposting.`)
-      amount.input.value = ''
-      category.input.value = ''
+      const clearEntry = () => {
+        amount.input.value = ''
+        category.input.value = ''
+        category.input.dispatchEvent(new Event('change'))
+      }
+      const more = C.button({ label: 'Tambah jurnal', icon: 'plus', size: 'sm', variant: 'primary' })
+      more.addEventListener('click', () => { clearEntry(); wiz.reset({ to: 1 }) })
+      const other = C.button({ label: 'Pekerjaan lain', icon: 'refresh', size: 'sm', variant: 'soft' })
+      other.addEventListener('click', () => {
+        clearEntry()
+        complSel.input.value = ''
+        complSel.input.dispatchEvent(new Event('change'))
+        wiz.reset()
+      })
+      const report = C.button({ label: 'Lihat laporan', iconRight: 'arrowRight', size: 'sm', variant: 'ghost' })
+      report.addEventListener('click', () => navigate('report'))
+      wiz.complete({ text: `${catText} ${C.rupiah(amt)} untuk ${customerLabel(flow.requestOfCompletion(c))} diposting.`, actions: [more, other, report] })
       showToast('Jurnal diposting.', 'success')
       notifyDataChanged()
-      await loadList({ keepMessage: true })
+      await loadList()
     } catch (err) {
-      msg.show('danger', `Gagal memposting: ${err.message}`)
-    } finally {
       restore()
+      msg.show('danger', `Gagal memposting: ${err.message}`)
     }
-  })
+  }
 
-  async function loadList({ keepMessage = false } = {}) {
+  async function loadList() {
     try {
       flow = await loadFlow()
     } catch (err) {
@@ -131,9 +222,7 @@ export async function render(container, ctx = {}) {
       return
     }
     if (ctx.signal?.aborted) return
-    const saved = keepMessage && !msg.hidden ? { cls: msg.className, nodes: Array.from(msg.childNodes) } : null
     fillCompletions()
-    if (saved) { msg.className = saved.cls; msg.replaceChildren(...saved.nodes); msg.hidden = false }
 
     const t = totals(flow.ledger)
     summary.replaceChildren(

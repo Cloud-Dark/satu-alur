@@ -511,3 +511,325 @@ export function segmented({ options, value, label, onChange }) {
   wrap.append(...buttons)
   return wrap
 }
+
+/* ---------------------------------------------------------- Compact bits */
+
+/**
+ * Compact preview card: optional strong title, a row of icon chips and an
+ * optional clamped note. chips: [{ icon, text, title? }]
+ */
+export function miniPreview({ title, chips = [], note, noteLines = 2, aside } = {}) {
+  const list = chips.filter((c) => c && c.text != null && c.text !== '')
+  return el('div', { className: 'mini-preview' },
+    title || aside
+      ? el('div', { className: 'mini-head' },
+          title ? el('span', { className: 'mini-title' }, title) : null,
+          aside ? el('span', { className: 'mini-aside' }, aside) : null)
+      : null,
+    list.length
+      ? el('ul', { className: 'chips', role: 'list' }, list.map((c) =>
+          el('li', { className: 'chip', title: c.title || String(c.text) },
+            c.icon ? icon(c.icon, { size: 14 }) : null,
+            el('span', { className: 'chip-text' }, String(c.text)))))
+      : null,
+    note ? clampText(note, noteLines) : null,
+  )
+}
+
+/**
+ * Text clamped to `lines` (2 | 3 | 4) with a "selengkapnya" toggle that only
+ * appears when the text actually overflows.
+ */
+export function clampText(text, lines = 4) {
+  const p = el('p', { className: `clamp clamp-${lines}` }, String(text ?? ''))
+  const toggle = el('button', { type: 'button', className: 'clamp-toggle', hidden: true, 'aria-expanded': 'false' }, 'selengkapnya')
+  const wrap = el('div', { className: 'clamp-wrap' }, p, toggle)
+  let open = false
+  toggle.addEventListener('click', () => {
+    open = !open
+    p.classList.toggle('is-open', open)
+    toggle.textContent = open ? 'lebih sedikit' : 'selengkapnya'
+    toggle.setAttribute('aria-expanded', String(open))
+  })
+  const measure = () => {
+    if (open || !p.isConnected || !p.clientHeight) return
+    toggle.hidden = p.scrollHeight <= p.clientHeight + 1
+  }
+  if (typeof ResizeObserver === 'function') new ResizeObserver(measure).observe(p)
+  else requestAnimationFrame(measure)
+  return wrap
+}
+
+/* ---------------------------------------------------------------- Wizard */
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** The visible control for an input (the combobox trigger for enhanced selects). */
+function visibleControl(input) {
+  if (input?.classList?.contains('combo-native')) return input.closest('.combo')?.querySelector('.combo-trigger') || input
+  return input
+}
+
+/**
+ * Multi-step form card with a stepper header, one visible step and a sticky
+ * footer action bar.
+ *
+ * wizard({ label, steps, className })
+ *   steps: [{
+ *     key, title, description?, content: Node,
+ *     validate?(wiz) -> Array<string | { text, input }>   (empty = ok; may be async)
+ *     primary?: { label, icon, iconRight, disabled } | (wiz) => that   (default "Lanjut")
+ *     onPrimary?: async (wiz) => void      (default: advance to the next step)
+ *     onEnter?(wiz, { from })              (after the step is shown)
+ *   }]
+ *
+ * Returns an API: { root, msg, primary, back, index, key, go, next, prev,
+ *   syncPrimary, setPrimaryDisabled, busy, invalid, clearErrors, complete, reset }
+ */
+export function wizard({ label = 'Formulir', steps, className = '' }) {
+  const wid = nextId('wiz')
+  const total = steps.length
+  let index = 0
+  let isBusy = false
+  let isDone = false
+
+  /* Stepper (desktop) */
+  const navItems = steps.map((s, i) => {
+    const num = el('span', { className: 'wiz-num', 'aria-hidden': 'true' })
+    const b = el('button', { type: 'button', className: 'wiz-step', dataset: { index: String(i) } },
+      num,
+      el('span', { className: 'wiz-step-title' }, s.title),
+      el('span', { className: 'sr-only wiz-step-state' }, ''),
+    )
+    b.addEventListener('click', () => { if (i < index && !isBusy && !isDone) go(i) })
+    return { li: el('li', { className: 'wiz-step-li' }, b), b, num }
+  })
+  const nav = el('nav', { className: 'wiz-nav', 'aria-label': `Langkah ${label}` },
+    el('ol', { className: 'wiz-steps' }, navItems.map((n) => n.li)))
+
+  /* Compact header (mobile) */
+  const compactText = el('span', { className: 'wiz-compact-text' })
+  const bar = el('span', { className: 'wiz-bar-fill' })
+  const compact = el('div', { className: 'wiz-compact', 'aria-hidden': 'true' },
+    compactText,
+    el('span', { className: 'wiz-bar' }, bar))
+
+  /* Panes */
+  const panes = steps.map((s, i) => {
+    const hid = `${wid}-h${i}`
+    const heading = el('h3', { className: 'wiz-pane-title', id: hid, tabindex: '-1' }, s.title)
+    const pane = el('section', { className: 'wiz-pane', 'aria-labelledby': hid, hidden: i !== 0, dataset: { step: s.key } },
+      el('header', { className: 'wiz-pane-head' },
+        heading,
+        s.description ? el('p', { className: 'wiz-pane-desc' }, s.description) : null),
+      el('div', { className: 'wiz-pane-body' }, s.content),
+    )
+    pane.addEventListener('animationend', () => pane.classList.remove('wiz-in-next', 'wiz-in-prev'))
+    return { pane, heading }
+  })
+  const msg = message()
+  const body = el('div', { className: 'wiz-body' }, panes.map((p) => p.pane), msg)
+
+  /* Footer */
+  const back = button({ label: 'Kembali', icon: 'arrowLeft', variant: 'ghost', className: 'wiz-back' })
+  const primary = el('button', { type: 'submit', className: 'btn btn-primary wiz-primary' })
+  const foot = el('div', { className: 'wiz-foot' }, back, primary)
+
+  /* Success state */
+  const doneText = el('p', { className: 'wiz-done-text', tabindex: '-1' })
+  const doneActions = el('div', { className: 'wiz-done-actions' })
+  const doneBox = el('div', { className: 'wiz-done', hidden: true, role: 'status' },
+    el('span', { className: 'wiz-done-ico', 'aria-hidden': 'true' }, icon('checkCircle', { size: 20 })),
+    el('div', { className: 'wiz-done-body' }, doneText, doneActions))
+
+  const root = el('form', { className: `panel is-raised form-panel wiz-panel ${className}`.trim(), 'aria-label': label, noValidate: true },
+    el('div', { className: 'wiz-head' }, nav, compact),
+    body, doneBox, foot)
+  root.noValidate = true
+
+  function syncNav() {
+    navItems.forEach((n, i) => {
+      const done = isDone || i < index
+      const current = !isDone && i === index
+      n.li.classList.toggle('is-done', done)
+      n.li.classList.toggle('is-current', current)
+      n.li.classList.toggle('is-future', !done && !current)
+      n.num.replaceChildren(done ? icon('check', { size: 14 }) : String(i + 1))
+      if (current) n.b.setAttribute('aria-current', 'step')
+      else n.b.removeAttribute('aria-current')
+      const clickable = done && !isDone && !isBusy
+      n.b.disabled = !clickable && !current
+      n.b.tabIndex = current && !clickable ? -1 : 0
+      n.b.querySelector('.wiz-step-state').textContent = done ? ' (selesai)' : current ? ' (sekarang)' : ''
+      n.b.title = clickable ? `Kembali ke langkah ${i + 1}` : ''
+    })
+    compactText.replaceChildren(...(isDone
+      ? [el('b', {}, 'Selesai')]
+      : [el('span', {}, `Langkah ${index + 1} dari ${total}`), el('span', { className: 'wiz-compact-sep' }, ' · '), el('b', {}, steps[index].title)]))
+    bar.style.width = `${isDone ? 100 : ((index + 1) / total) * 100}%`
+    back.hidden = index === 0 || isDone
+    back.disabled = isBusy
+  }
+
+  function primaryCfg() {
+    const s = steps[index]
+    const cfg = typeof s.primary === 'function' ? s.primary(api) : s.primary
+    return { label: 'Lanjut', iconRight: index < total - 1 ? 'arrowRight' : undefined, ...(cfg || {}) }
+  }
+
+  function syncPrimary() {
+    if (isBusy) return
+    const cfg = primaryCfg()
+    primary.replaceChildren(...[
+      cfg.icon ? icon(cfg.icon) : null,
+      el('span', { className: 'btn-label' }, cfg.label),
+      cfg.iconRight ? icon(cfg.iconRight, { className: 'icon-trailing' }) : null,
+    ].filter(Boolean))
+    primary.disabled = Boolean(cfg.disabled)
+  }
+
+  function scrollIntoViewIfNeeded() {
+    const r = root.getBoundingClientRect()
+    const topbar = parseFloat(getComputedStyle(root).scrollMarginTop) || 80
+    const fits = r.height <= innerHeight - topbar
+    if (r.top < topbar - 4 || r.top > innerHeight * 0.6 || (fits && r.bottom > innerHeight)) root.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })
+  }
+
+  function go(target, { focus = true, animate = true, force = false } = {}) {
+    const i = typeof target === 'string' ? steps.findIndex((s) => s.key === target) : target
+    if (i < 0 || i >= total || (i === index && !force)) return
+    const from = index
+    clearErrors()
+    msg.hide()
+    panes[from].pane.hidden = true
+    index = i
+    const p = panes[i].pane
+    p.classList.remove('wiz-in-next', 'wiz-in-prev')
+    p.hidden = false
+    if (animate && !reducedMotion() && from !== i) {
+      void p.offsetWidth
+      p.classList.add(i > from ? 'wiz-in-next' : 'wiz-in-prev')
+    }
+    body.scrollTop = 0
+    syncNav()
+    syncPrimary()
+    steps[i].onEnter?.(api, { from })
+    if (focus) {
+      panes[i].heading.focus({ preventScroll: true })
+      scrollIntoViewIfNeeded()
+    }
+  }
+
+  function clearErrors() {
+    root.querySelectorAll('.field-error').forEach((n) => n.remove())
+    root.querySelectorAll('[aria-invalid="true"]').forEach((n) => {
+      n.removeAttribute('aria-invalid')
+      n.classList.remove('is-invalid')
+      const ids = (n.getAttribute('aria-describedby') || '').split(' ').filter((x) => x && !x.endsWith('-err'))
+      if (ids.length) n.setAttribute('aria-describedby', ids.join(' '))
+      else n.removeAttribute('aria-describedby')
+    })
+  }
+
+  /** Shows validation errors: inline under fields when `input` is given. */
+  function invalid(errors) {
+    clearErrors()
+    const loose = []
+    let first = null
+    for (const e of errors) {
+      const text = typeof e === 'string' ? e : e.text
+      const input = typeof e === 'string' ? null : e.input
+      const ctl = visibleControl(input)
+      const fieldEl = input?.closest('.field')
+      if (!ctl || !fieldEl) { loose.push(text); continue }
+      const eid = `${ctl.id || nextId('ctl')}-err`
+      if (!ctl.id) ctl.id = eid.replace(/-err$/, '')
+      ctl.setAttribute('aria-invalid', 'true')
+      ctl.classList.add('is-invalid')
+      ctl.setAttribute('aria-describedby', [ctl.getAttribute('aria-describedby'), eid].filter(Boolean).join(' '))
+      fieldEl.appendChild(el('span', { className: 'field-error', id: eid }, icon('alert', { size: 14 }), text))
+      const clear = () => {
+        ctl.removeAttribute('aria-invalid')
+        ctl.classList.remove('is-invalid')
+        document.getElementById(eid)?.remove()
+      }
+      input.addEventListener('input', clear, { once: true })
+      input.addEventListener('change', clear, { once: true })
+      first = first || ctl
+    }
+    if (loose.length) msg.show('danger', loose.length === 1 ? loose[0] : 'Periksa kembali isian berikut.', loose.length > 1 ? loose : undefined)
+    if (first) first.focus()
+    else if (loose.length) msg.scrollIntoView({ block: 'nearest' })
+  }
+
+  async function runPrimary() {
+    if (isBusy || isDone || primary.disabled) return
+    const s = steps[index]
+    msg.hide()
+    clearErrors()
+    const errs = (await s.validate?.(api)) || []
+    if (errs.length) { invalid(errs); return }
+    if (s.onPrimary) await s.onPrimary(api)
+    else go(index + 1)
+  }
+  root.addEventListener('submit', (e) => { e.preventDefault(); runPrimary() })
+  back.addEventListener('click', () => { if (!isBusy) go(index - 1) })
+
+  /** Marks the wizard busy; returns a restore function. */
+  function busy(busyLabel) {
+    const restore = setBusy(primary, busyLabel)
+    isBusy = true
+    syncNav()
+    return () => {
+      isBusy = false
+      restore()
+      syncNav()
+      syncPrimary()
+    }
+  }
+
+  /** Swaps the steps for a one-line success state with follow-up actions. */
+  function complete({ text, actions = [] }) {
+    isDone = true
+    msg.hide()
+    body.hidden = true
+    foot.hidden = true
+    doneText.textContent = text
+    doneActions.replaceChildren(...actions)
+    doneBox.hidden = false
+    syncNav()
+    if (!reducedMotion()) { doneBox.classList.remove('wiz-in-next'); void doneBox.offsetWidth; doneBox.classList.add('wiz-in-next') }
+    doneText.focus({ preventScroll: true })
+    scrollIntoViewIfNeeded()
+  }
+
+  /** Back to a step (default the first) after a success state or a cancel. */
+  function reset({ to = 0, focus = true } = {}) {
+    isDone = false
+    doneBox.hidden = true
+    body.hidden = false
+    foot.hidden = false
+    go(to, { focus, force: true, animate: true })
+  }
+
+  const api = {
+    root, msg, primary, back,
+    get index() { return index },
+    get key() { return steps[index].key },
+    get done() { return isDone },
+    go,
+    next: () => go(index + 1),
+    prev: () => go(index - 1),
+    syncPrimary,
+    setPrimaryDisabled(v) { if (!isBusy) primary.disabled = Boolean(v) },
+    busy,
+    invalid,
+    clearErrors,
+    complete,
+    reset,
+  }
+  syncNav()
+  syncPrimary()
+  queueMicrotask(() => steps[0].onEnter?.(api, { from: -1 }))
+  return api
+}
