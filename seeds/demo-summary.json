@@ -1,9 +1,12 @@
 {
   "generated_with": {
+    "lean": false,
     "months": 12,
     "end": "2026-10-31",
     "asof": "2026-10-28T10:00:00.000Z",
-    "seed": 20261028
+    "seed": 20261028,
+    "only": null,
+    "split": 1
   },
   "businesses": [
     {
@@ -1798,6 +1801,114 @@
     "reports": 99
   },
   "total_rows": 39182,
-  "sql_bytes": 10608256,
-  "statements": 415
+  "sql_bytes": 10608982,
+  "statements": 415,
+  "write_estimate": {
+    "model": {
+      "requests": 2,
+      "offers": 2,
+      "assignments": 2,
+      "completions": 2,
+      "ledger_entries": 2,
+      "reports": 2,
+      "users": 3
+    },
+    "existing_source": "asumsi: seed penuh sebelumnya (parameter yang sama)",
+    "existing": {
+      "ac": {
+        "requests": 580,
+        "offers": 574,
+        "assignments": 521,
+        "completions": 517,
+        "ledger_entries": 2003,
+        "reports": 11
+      },
+      "cleaning": {
+        "requests": 370,
+        "offers": 363,
+        "assignments": 342,
+        "completions": 337,
+        "ledger_entries": 1375,
+        "reports": 11
+      },
+      "listrik": {
+        "requests": 346,
+        "offers": 341,
+        "assignments": 315,
+        "completions": 313,
+        "ledger_entries": 1211,
+        "reports": 11
+      },
+      "pest": {
+        "requests": 405,
+        "offers": 403,
+        "assignments": 373,
+        "completions": 358,
+        "ledger_entries": 1437,
+        "reports": 11
+      },
+      "laundry": {
+        "requests": 802,
+        "offers": 795,
+        "assignments": 779,
+        "completions": 765,
+        "ledger_entries": 3014,
+        "reports": 11
+      },
+      "dinding": {
+        "requests": 266,
+        "offers": 264,
+        "assignments": 228,
+        "completions": 226,
+        "ledger_entries": 928,
+        "reports": 11
+      },
+      "mall": {
+        "requests": 989,
+        "offers": 960,
+        "assignments": 816,
+        "completions": 793,
+        "ledger_entries": 2908,
+        "reports": 11
+      },
+      "fm": {
+        "requests": 747,
+        "offers": 735,
+        "assignments": 628,
+        "completions": 610,
+        "ledger_entries": 2239,
+        "reports": 11
+      },
+      "rs": {
+        "requests": 1077,
+        "offers": 1058,
+        "assignments": 898,
+        "completions": 873,
+        "ledger_entries": 3201,
+        "reports": 11
+      }
+    },
+    "insert_writes": 78400,
+    "delete_writes": 78364,
+    "total_writes": 156764,
+    "fresh_db_writes": 78400,
+    "files": [
+      {
+        "path": "/home/user/satu-alur/seeds/demo.sql",
+        "writes": 156764,
+        "rows": 39182,
+        "businesses": [
+          "ac",
+          "cleaning",
+          "listrik",
+          "pest",
+          "laundry",
+          "dinding",
+          "mall",
+          "fm",
+          "rs"
+        ]
+      }
+    ]
+  }
 }

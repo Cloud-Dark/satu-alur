@@ -14,8 +14,9 @@
  * Asumsi, rumus, dan kalender musiman: docs/specs/2026-10-28-demo-growth-data-design.md
  * Tanpa dependency (Node >= 18, ESM).
  */
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const HOUR = 3600000
 const DAY = 24 * HOUR
@@ -24,7 +25,7 @@ const MIN = 60000
 /* ================================================================== CLI */
 
 function parseArgs(argv) {
-  const a = { months: 12, end: '2026-10-31', asof: null, seed: 20261028, out: 'seeds/demo.sql', summary: 'seeds/demo-summary.json', only: null, quiet: false }
+  const a = { months: 12, end: '2026-10-31', asof: null, seed: 20261028, out: 'seeds/demo.sql', summary: 'seeds/demo-summary.json', only: null, quiet: false, lean: false, split: 1, existing: null, budget: 90000, perFile: 45000 }
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i]
     const v = () => {
@@ -38,16 +39,22 @@ function parseArgs(argv) {
     else if (k === '--seed') a.seed = Number(v())
     else if (k === '--out') a.out = v()
     else if (k === '--summary') a.summary = v()
-    else if (k === '--only') a.only = v().split(',').map((s) => s.trim()).filter(Boolean)
+    else if (k === '--only') a.only = v().split(',').map((s) => s.trim().toLowerCase().replace(/@.*$/, '').replace(/^demo-/, '')).filter(Boolean)
+    else if (k === '--lean') a.lean = true
+    else if (k === '--split') a.split = Number(v())
+    else if (k === '--existing-counts') a.existing = v()
+    else if (k === '--budget') a.budget = Number(v())
+    else if (k === '--per-file') a.perFile = Number(v())
     else if (k === '--quiet') a.quiet = true
     else if (k === '-h' || k === '--help') {
-      console.log('Pemakaian: node scripts/seed-demo.mjs [--months 12] [--end YYYY-MM-DD] [--asof ISO|now] [--seed N] [--out file.sql] [--summary file.json|none] [--only ac,fm] [--quiet]')
+      console.log('Pemakaian: node scripts/seed-demo.mjs [--lean] [--months 12] [--end YYYY-MM-DD] [--asof ISO|now] [--seed N] [--out file.sql] [--summary file.json|none]\n  [--only demo-ac,demo-rs] [--split N] [--existing-counts seeds/existing.json] [--budget 90000] [--per-file 45000] [--quiet]')
       process.exit(0)
     } else throw new Error(`Argumen tidak dikenal: ${k}`)
   }
   if (!Number.isInteger(a.months) || a.months < 3 || a.months > 36) throw new Error('--months harus 3..36')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(a.end)) throw new Error('--end harus YYYY-MM-DD')
   if (!Number.isFinite(a.seed)) throw new Error('--seed harus angka')
+  if (!Number.isInteger(a.split) || a.split < 1 || a.split > 9) throw new Error('--split harus 1..9')
   return a
 }
 
@@ -195,6 +202,29 @@ const TERMS = {
 
 const fmtRp = (n) => `Rp${Math.round(n).toLocaleString('id-ID')}`
 const jt = (n) => (n / 1e6).toLocaleString('id-ID', { maximumFractionDigits: 1 })
+
+/* ------------------------------------------------- Mode --lean (hemat tulis) */
+// Seri bervolume tinggi diringkas: rekap kiloan mingguan (laundry), work order kecil
+// enterprise ditagih sebagai rekap bulanan per klien, proyek lebih sedikit tapi lebih besar,
+// dan kontrak enterprise lebih besar (lebih sedikit tagihan per bulan).
+function leanEnterprise(services, smallName, { recapPrice = [35e6, 150e6], bigMul = 1.8, bigW = 0.5 } = {}) {
+  const small = services.find((x) => x.name === smallName)
+  const recap = {
+    ...small, name: 'Rekap work order bulanan', w: small.w * 0.6, price: recapPrice, dur: [6, 10],
+    desc: (v) => `Rekap ${v.r.int(12, 45)} work order bulan ini untuk ${v.customer} (antara lain: ${v.issue}).`,
+    scope: () => 'Rekap work order corrective/perbaikan ringan selama satu bulan sesuai tiket helpdesk, ditagih sekaligus dengan lampiran foto per tiket.',
+    done: ['Rekap bulanan disetujui PIC, lampiran tiket lengkap.', 'Rekap disetujui; 2 tiket dipindah ke periode berikutnya.', 'Rekap disetujui setelah verifikasi foto before-after.'],
+  }
+  return [recap, ...services.filter((x) => x !== small).map((x) => ({ ...x, w: x.w * bigW, price: [x.price[0] * bigMul, x.price[1] * bigMul] }))]
+}
+function applyLean(biz) {
+  const L = biz.lean
+  if (!L) return biz
+  const b = { ...biz }
+  if (L.contractQMul && b.contract) b.contract = { ...b.contract, services: b.contract.services.map((x) => ({ ...x, q: x.q.map(([v, w]) => [Math.round(v * L.contractQMul), w]) })) }
+  if (L.services) b.services = L.services(b.services)
+  return b
+}
 
 const BUSINESSES = [
   /* ------------------------------------------------------------ 1. AC */
@@ -435,6 +465,12 @@ const BUSINESSES = [
         done: ['Selesai tepat waktu, dikemas per divisi.'] },
     ],
     outlets: ['Outlet Dago', 'Outlet Buahbatu', 'Outlet Antapani'],
+    lean: { services: (list) => list.map((x) => (x.fixed !== 'outlet' ? x : {
+      ...x, name: 'Rekap laundry kiloan mingguan', w: x.w / 6, price: [x.price[0] * 6, x.price[1] * 6], dur: [150, 165],
+      desc: (v) => `Rekap kasir kiloan & satuan walk-in ${v.customer.replace('Pelanggan walk-in — ', '')} minggu ini: ${v.r.int(180, 420)} nota, ±${v.r.int(800, 1900)} kg.`,
+      scope: () => 'Rekap penjualan layanan kiloan, satuan, dan express pelanggan walk-in selama satu minggu (7 kas harian).',
+      done: ['Rekap mingguan ditutup, sesuai 7 laporan kas harian.', 'Rekap ditutup; 2 klaim baju luntur dikompensasi.'],
+    })) },
     overheads: [
       { label: 'Gaji admin, kurir & BPJS', cat: 'biaya_tenaga', day: 25, amt: (c) => 11e6 * c.r.uni(0.98, 1.02) },
       { label: 'Sewa 3 outlet & workshop', cat: 'biaya_lain', day: 3, amt: () => 11.5e6 },
@@ -493,6 +529,7 @@ const BUSINESSES = [
     k: 7, key: 'mall', scale: 'enterprise', email: 'demo-mall@satualur.id', name: 'PT Arunika Layanan Ritel', industry: 'Retail mall: kebersihan & maintenance mal',
     regions: [region('JKT', { w: 0.34 }), region('BDT', { w: 0.2 }), region('BDG', { w: 0.12 }), region('SBY', { w: 0.14 }), region('MDN', { w: 0.1 }), region('BTM', { w: 0.05, open: 3 }), region('MKS', { w: 0.07, open: 2 }), region('BPN', { w: 0.07, open: 6 })],
     base: 1.5e9, margin: [0.1, 0.18], regionAlpha: 8, hq: 'JKT',
+    lean: { contractQMul: 1.6, services: (list) => leanEnterprise(list, 'Work order perbaikan ringan tenant/area publik') },
     moy: [0.9, 0.95, 1.06, 1.0, 0.98, 1.04, 1.04, 0.98, 0.98, 1.0, 1.0, 1.12],
     custMix: { mall: 100 },
     workers: { teamPerRev: 140e6 },
@@ -551,6 +588,7 @@ const BUSINESSES = [
     k: 8, key: 'fm', scale: 'enterprise', email: 'demo-fm@satualur.id', name: 'PT Prima Layanan Fasilitas', industry: 'Facility management kantor BUMN, perbankan & perkantoran',
     regions: [region('JKT', { w: 0.4 }), region('BDT', { w: 0.12 }), region('BDG', { w: 0.1 }), region('SBY', { w: 0.12 }), region('MDN', { w: 0.08 }), region('SMG', { w: 0.06 }), region('BPN', { w: 0.08, open: 1 }), region('MKS', { w: 0.06, open: 4 }), region('MRW', { w: 0.05, open: 6 })],
     base: 1.6e9, margin: [0.1, 0.18], regionAlpha: 8, hq: 'JKT',
+    lean: { contractQMul: 1.6, services: (list) => leanEnterprise(list, 'Work order perbaikan ringan kantor') },
     moy: [0.86, 0.93, 0.98, 0.97, 1.0, 1.02, 1.0, 1.0, 1.02, 1.04, 1.04, 1.1],
     custMix: { kantor: 100 },
     workers: { teamPerRev: 150e6 },
@@ -609,6 +647,7 @@ const BUSINESSES = [
     k: 9, key: 'rs', scale: 'enterprise', email: 'demo-rs@satualur.id', name: 'PT Sehat Bersih Medika', industry: 'Hospital & healthcare housekeeping (RS, klinik bersalin, lab)',
     regions: [region('SBY', { w: 0.32 }), region('JKT', { w: 0.22 }), region('MLG', { w: 0.1 }), region('SMG', { w: 0.08 }), region('DPS', { w: 0.08 }), region('MKS', { w: 0.08, open: 2 }), region('BPN', { w: 0.07, open: 5 }), region('MDN', { w: 0.05, open: 7 })],
     base: 1.4e9, margin: [0.1, 0.18], regionAlpha: 8, hq: 'SBY',
+    lean: { contractQMul: 1.6, services: (list) => leanEnterprise(list, 'Work order kebersihan tambahan', { recapPrice: [30e6, 120e6] }) },
     moy: [1.06, 1.06, 1.02, 0.98, 0.98, 0.98, 0.98, 0.98, 0.98, 1.0, 1.0, 1.0],
     custMix: { rs: 70, klinik: 30 },
     workers: { teamPerRev: 130e6 },
@@ -760,6 +799,21 @@ function intensityFn(biz) {
   }
 }
 const isRainy = (m) => m >= 10 || m <= 2 // Nov..Mar (0-based)
+
+/**
+ * Lean: gabungkan beberapa baris biaya menjadi satu. Jumlah = total semua bagian;
+ * kategori = komponen terbesar; waktu = baris acuan (default baris pertama).
+ */
+function mergeCosts(parts, ref = parts[0]) {
+  const byCat = new Map()
+  let total = 0
+  for (const p of parts) {
+    byCat.set(p.category, (byCat.get(p.category) || 0) + p.amount)
+    total += p.amount
+  }
+  const category = [...byCat.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  return { ...ref, amount: total, category, _parts: Object.fromEntries(byCat) }
+}
 
 function simulateBusiness(biz, ctx, attempt) {
   const sc = SCALE[biz.scale]
@@ -1008,11 +1062,14 @@ function simulateBusiness(biz, ctx, attempt) {
     if (tl.P > asof) continue
     // ---- jurnal per pekerjaan
     const revenue = r.chance(0.06) ? roundP(j.price * r.uni(1.03, 1.12)) : j.price // tambahan sparepart/volume aktual
+    const costBuf = []
     const post = (cat, amt, dt = 0) => {
       const a = Math.round(amt / 1000) * 1000
       if (a <= 0) return
-      const t = iso(tl.P + dt)
-      rows.ledger_entries.push({ id: nextId('ledger_entries'), owner_id: owner, completion_id: complId, amount: a, category: cat, status: 'posted', posted_at: t, created_at: t, _ms: tl.P + dt, _rg: rg.key, _cust: cust.name, _svc: svc.name })
+      const t = iso(tl.P + dt) // selalu dipanggil agar urutan PRNG sama di mode penuh & lean
+      const row = { owner_id: owner, completion_id: complId, amount: a, category: cat, status: 'posted', posted_at: t, created_at: t, _ms: tl.P + dt, _rg: rg.key, _cust: cust.name, _svc: svc.name }
+      if (ctx.lean && cat !== 'pendapatan') costBuf.push(row)
+      else rows.ledger_entries.push({ id: nextId('ledger_entries'), ...row })
     }
     post('pendapatan', revenue)
     const c = svc.cost
@@ -1022,6 +1079,7 @@ function simulateBusiness(biz, ctx, attempt) {
     if (biz.transportAbs) post('biaya_transport', r.uni(biz.transportAbs[0], biz.transportAbs[1]) * (j.q > 4 ? 1.3 : 1), 4 * MIN)
     else if (r.chance(sc.transportLine)) post('biaya_transport', revenue * r.uni(0.015, 0.035) / sc.transportLine, 4 * MIN)
     if (isContract && biz.sla && r.chance(biz.sla.p)) post('biaya_lain', revenue * r.uni(biz.sla.pct[0], biz.sla.pct[1]), 5 * MIN)
+    if (costBuf.length) rows.ledger_entries.push({ id: nextId('ledger_entries'), ...mergeCosts(costBuf) })
   }
 
   // Overhead bulanan & THR: dilekatkan ke penyelesaian terakhir sebelum tanggal posting (skema mewajibkan completion_id).
@@ -1052,6 +1110,7 @@ function simulateBusiness(biz, ctx, attempt) {
         items.push({ label: biz.thr.label, cat: 'biaya_tenaga', day: lm.getUTCDate(), amount: biz.thr.kind === 'perWorker' ? workers * biz.thr.amount : biz.thr.amount })
       }
     }
+    const ohBuf = []
     for (const it of items) {
       const day = Math.min(it.day, mo.days)
       const t = localToUtc(mo.startMs + (day - 1) * DAY, r.uni(9, 16), tzHQ)
@@ -1060,7 +1119,14 @@ function simulateBusiness(biz, ctx, attempt) {
       if (!host) continue
       const a = Math.round(it.amount / 1000) * 1000
       const ts = iso(t)
-      rows.ledger_entries.push({ id: nextId('ledger_entries'), owner_id: owner, completion_id: host.id, amount: a, category: it.cat, status: 'posted', posted_at: ts, created_at: ts, _ms: t, _overhead: it.label })
+      const row = { owner_id: owner, completion_id: host.id, amount: a, category: it.cat, status: 'posted', posted_at: ts, created_at: ts, _ms: t, _overhead: it.label }
+      if (ctx.lean) ohBuf.push(row)
+      else rows.ledger_entries.push({ id: nextId('ledger_entries'), ...row })
+    }
+    // Lean: satu baris overhead per bulan, diposting pada tanggal item terakhir (total bulanan tetap sama).
+    if (ohBuf.length) {
+      const last = ohBuf.reduce((x, y) => (y._ms > x._ms ? y : x))
+      rows.ledger_entries.push({ id: nextId('ledger_entries'), ...mergeCosts(ohBuf, last), _overhead: ohBuf.map((x) => x._overhead).join('; ') })
     }
   }
 
@@ -1327,33 +1393,92 @@ function fmtJt(n) {
 const pct = (x) => (x == null ? '—' : `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`)
 const pad = (s, n, left = false) => (left ? String(s).padStart(n) : String(s).padEnd(n))
 
-function main() {
-  const args = parseArgs(process.argv.slice(2))
-  const ctx = buildContext(args)
-  const list = args.only ? BUSINESSES.filter((b) => args.only.includes(b.key)) : BUSINESSES
-  if (!list.length) throw new Error('--only tidak cocok dengan usaha mana pun')
-  const results = []
-  for (const biz of list) {
-    let sim
-    let an
-    for (let attempt = 0; attempt < 40; attempt++) {
-      const c2 = { ...ctx, months: freshMonths(ctx) }
-      sim = simulateBusiness(biz, c2, attempt)
-      an = analyse(sim, c2)
-      if (an.ok) break
-    }
-    buildReports(sim, ctx)
-    results.push({ sim, an })
-  }
+/* ===================================================== Estimasi tulis D1 */
+// D1 menagih "rows written" = baris tabel + setiap entri indeks yang ikut berubah.
+// Jumlah indeks dibaca dari migrations/ (CREATE/DROP INDEX), ditambah autoindex
+// untuk PRIMARY KEY bertipe TEXT dan kolom UNIQUE.
+const DOMAIN_TABLES = ['requests', 'offers', 'assignments', 'completions', 'ledger_entries', 'reports']
+const AUTOINDEX = { users: 2, sessions: 1, otp_codes: 1 }
 
-  /* ---- SQL */
+function loadWriteModel() {
+  const idx = new Map()
+  let source = 'migrations/'
+  try {
+    const dir = resolve(dirname(fileURLToPath(import.meta.url)), '../migrations')
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) {
+      const sql = readFileSync(resolve(dir, f), 'utf8').replace(/--.*$/gm, '')
+      for (const m of sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)\s+ON\s+(\w+)/gi)) idx.set(m[1], m[2])
+      for (const m of sql.matchAll(/DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?(\w+)/gi)) idx.delete(m[1])
+    }
+  } catch {
+    source = 'default (migrations/ tidak terbaca)'
+    for (const t of [...DOMAIN_TABLES, 'social_contents', 'social_schedules', 'ai_messages']) idx.set(`idx_${t}_owner_id`, t)
+  }
+  const perTable = {}
+  for (const t of idx.values()) perTable[t] = (perTable[t] || 0) + 1
+  const wpr = (t) => 1 + (perTable[t] || 0) + (AUTOINDEX[t] || 0)
+  return { wpr, perTable, source }
+}
+
+/** Biaya tulis satu usaha: insert baru + hapus baris lama + upsert user. */
+function bizWrites(rows, existing, wm) {
+  let ins = 0
+  let del = 0
+  for (const t of DOMAIN_TABLES) {
+    ins += (rows[t] || 0) * wm.wpr(t)
+    del += (existing?.[t] || 0) * wm.wpr(t)
+  }
+  const user = wm.wpr('users') + 1 // INSERT OR IGNORE (kasus terburuk) + UPDATE name
+  return { ins, del, user, total: ins + del + user }
+}
+
+const normKey = (v) => String(v || '').trim().toLowerCase().replace(/@.*$/, '').replace(/^demo-/, '')
+
+/** --existing-counts: output `wrangler d1 execute --json`, demo-summary.json lama, objek per akun, atau total datar. */
+function loadExisting(path, list, fallback) {
+  const raw = JSON.parse(readFileSync(resolve(path), 'utf8'))
+  const out = {}
+  const pickRow = (r) => Object.fromEntries(DOMAIN_TABLES.map((t) => [t, Number(r?.[t]) || 0]))
+  if (Array.isArray(raw)) {
+    for (const r of raw.flatMap((x) => x.results || [])) out[normKey(r.email || r.key)] = pickRow(r)
+  } else if (Array.isArray(raw.businesses)) {
+    for (const b of raw.businesses) out[normKey(b.key || b.email)] = pickRow(b.rows)
+  } else if (DOMAIN_TABLES.some((t) => typeof raw[t] === 'number')) {
+    // total datar: dibagi proporsional terhadap seed penuh
+    const tot = Object.fromEntries(DOMAIN_TABLES.map((t) => [t, list.reduce((s, b) => s + (fallback[b.key]?.[t] || 0), 0)]))
+    for (const b of list) out[b.key] = Object.fromEntries(DOMAIN_TABLES.map((t) => [t, tot[t] ? Math.round(((fallback[b.key]?.[t] || 0) / tot[t]) * raw[t]) : 0]))
+  } else {
+    for (const [k, v] of Object.entries(raw)) out[normKey(k)] = pickRow(v)
+  }
+  return Object.fromEntries(list.map((b) => [b.key, out[b.key] || Object.fromEntries(DOMAIN_TABLES.map((t) => [t, 0]))]))
+}
+
+function generate(biz, ctx, lean) {
+  const b = lean ? applyLean(biz) : biz
+  let sim
+  let an
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const c2 = { ...ctx, lean, months: freshMonths(ctx) }
+    sim = simulateBusiness(b, c2, attempt)
+    an = analyse(sim, c2)
+    if (an.ok) break
+  }
+  buildReports(sim, ctx)
+  return { sim, an }
+}
+
+/** SQL untuk sekumpulan usaha (hapus data lama → user → insert). */
+function buildSql(results, args, ctx, note) {
+  const list = results.map((x) => x.sim.biz)
   const out = []
   const allIds = list.map((b) => `'${ownerId(b.k)}'`).join(', ')
   const allEmails = list.map((b) => `'${b.email}'`).join(', ')
   out.push('-- =====================================================================')
   out.push('-- Satu Alur: DATA DEMO (DUMMY). Semua pelanggan, telepon, alamat, dan angka FIKTIF.')
-  out.push(`-- Dibuat oleh scripts/seed-demo.mjs --months ${args.months} --end ${args.end} --asof ${new Date(ctx.asof).toISOString()} --seed ${args.seed}`)
-  out.push('-- Aman dijalankan ulang: menghapus dulu seluruh data milik akun demo lalu mengisi ulang.')
+  out.push(`-- Dibuat oleh scripts/seed-demo.mjs${args.lean ? ' --lean' : ''} --months ${args.months} --end ${args.end} --asof ${new Date(ctx.asof).toISOString()} --seed ${args.seed}`)
+  out.push(`-- Usaha: ${list.map((b) => b.email).join(', ')}`)
+  if (note) out.push(`-- ${note}`)
+  out.push('-- Aman dijalankan ulang: menghapus dulu seluruh data milik akun demo di file ini lalu mengisi ulang.')
   out.push('-- Lihat seeds/README.md dan docs/specs/2026-10-28-demo-growth-data-design.md.')
   out.push('-- =====================================================================')
   out.push('')
@@ -1364,31 +1489,75 @@ function main() {
   out.push(`DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE email IN (${allEmails}) AND id NOT IN (${allIds}));`)
   out.push(`DELETE FROM users WHERE email IN (${allEmails}) AND id NOT IN (${allIds});`)
   out.push(`INSERT OR IGNORE INTO users (id, email, name, created_at) VALUES\n${list.map((b) => `(${sqlVal(ownerId(b.k))}, ${sqlVal(b.email)}, ${sqlVal(b.name)}, '2025-10-01T02:00:00.000Z')`).join(',\n')};`)
-  for (const b of list) out.push(`UPDATE users SET name = ${sqlVal(b.name)} WHERE id = ${sqlVal(ownerId(b.k))};`)
+  for (const b of list) out.push(`UPDATE users SET name = ${sqlVal(b.name)} WHERE id = ${sqlVal(ownerId(b.k))} AND name IS NOT ${sqlVal(b.name)};`)
   out.push('')
   const counts = {}
   let stmts = 0
-  for (const t of ['requests', 'offers', 'assignments', 'completions', 'ledger_entries', 'reports']) {
+  for (const t of DOMAIN_TABLES) {
     const rows = results.flatMap((x) => x.sim.rows[t]).sort((a, b) => a.id - b.id)
     counts[t] = rows.length
     out.push(`-- ${t}: ${rows.length} baris`)
     stmts += emitInserts(out, t, rows)
     out.push('')
   }
-  const sql = `${out.join('\n')}\n`
-  const outPath = resolve(args.out)
-  mkdirSync(dirname(outPath), { recursive: true })
-  writeFileSync(outPath, sql)
+  return { sql: `${out.join('\n')}\n`, counts, stmts }
+}
+
+const fmtN = (n) => Math.round(n).toLocaleString('id-ID')
+const rowCounts = (sim) => Object.fromEntries(DOMAIN_TABLES.map((t) => [t, sim.rows[t].length]))
+const sumRows = (o) => DOMAIN_TABLES.reduce((s, t) => s + (o?.[t] || 0), 0)
+
+function main() {
+  const args = parseArgs(process.argv.slice(2))
+  const ctx = buildContext(args)
+  const list = args.only ? BUSINESSES.filter((b) => args.only.includes(b.key)) : BUSINESSES
+  if (!list.length) throw new Error('--only tidak cocok dengan usaha mana pun (pakai mis. demo-ac,demo-rs)')
+  const missing = (args.only || []).filter((k) => !BUSINESSES.some((b) => b.key === k))
+  if (missing.length) throw new Error(`--only tidak dikenal: ${missing.join(', ')}`)
+  const results = list.map((biz) => generate(biz, ctx, args.lean))
+
+  /* ---- estimasi tulis */
+  const wm = loadWriteModel()
+  // Baris lama per usaha: dari --existing-counts, atau diasumsikan seed PENUH sebelumnya (parameter sama).
+  const fullCounts = Object.fromEntries(list.map((biz, i) => [biz.key, args.lean ? rowCounts(generate(biz, ctx, false).sim) : rowCounts(results[i].sim)]))
+  const existing = args.existing ? loadExisting(args.existing, list, fullCounts) : fullCounts
+  const existingSrc = args.existing ? args.existing : 'asumsi: seed penuh sebelumnya (parameter yang sama)'
+  const per = results.map(({ sim }) => ({ sim, rows: rowCounts(sim), w: bizWrites(rowCounts(sim), existing[sim.biz.key], wm), wFresh: bizWrites(rowCounts(sim), null, wm) }))
+
+  /* ---- bagi ke N file (bin-packing usaha utuh) */
+  const N = Math.min(args.split, per.length)
+  const bins = Array.from({ length: N }, () => ({ items: [], writes: 0 }))
+  for (const it of [...per].sort((a, b) => b.w.total - a.w.total)) {
+    const bin = bins.reduce((x, y) => (y.writes < x.writes ? y : x))
+    bin.items.push(it)
+    bin.writes += it.w.total
+  }
+  for (const b of bins) b.items.sort((x, y) => x.sim.biz.k - y.sim.biz.k)
+  const outBase = resolve(args.out)
+  const files = []
+  let totalStmts = 0
+  let totalBytes = 0
+  bins.forEach((bin, i) => {
+    const path = N === 1 ? outBase : outBase.replace(/\.sql$/i, '') + `.part${i + 1}of${N}.sql`
+    const note = `Perkiraan D1 rows written file ini: ${fmtN(bin.writes)} (hapus ${fmtN(bin.items.reduce((s, x) => s + x.w.del, 0))} + insert ${fmtN(bin.items.reduce((s, x) => s + x.w.ins + x.w.user, 0))}).${N > 1 ? ` File ${i + 1} dari ${N}; terapkan di hari yang berbeda.` : ''}`
+    const { sql, counts, stmts } = buildSql(bin.items.map((x) => results.find((r) => r.sim === x.sim)), args, ctx, note)
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, sql)
+    totalStmts += stmts
+    totalBytes += Buffer.byteLength(sql)
+    files.push({ path, writes: bin.writes, bytes: Buffer.byteLength(sql), rows: sumRows(counts), stmts, businesses: bin.items.map((x) => x.sim.biz.key) })
+  })
 
   /* ---- ringkasan */
-  const totalRows = Object.values(counts).reduce((a, b) => a + b, 0)
+  const counts = Object.fromEntries(DOMAIN_TABLES.map((t) => [t, per.reduce((s, x) => s + x.rows[t], 0)]))
+  const totalRows = sumRows(counts)
   const log = (...a) => { if (!args.quiet) console.log(...a) }
-  log(`\nSatu Alur demo seed — as-of ${new Date(ctx.asof).toISOString()} (WIB ${new Date(ctx.asof + 7 * HOUR).toISOString().slice(0, 16).replace('T', ' ')})`)
-  const summary = { generated_with: { months: args.months, end: args.end, asof: new Date(ctx.asof).toISOString(), seed: args.seed }, businesses: [], counts, total_rows: totalRows, sql_bytes: Buffer.byteLength(sql), statements: stmts }
+  log(`\nSatu Alur demo seed${args.lean ? ' [LEAN]' : ''} — as-of ${new Date(ctx.asof).toISOString()} (WIB ${new Date(ctx.asof + 7 * HOUR).toISOString().slice(0, 16).replace('T', ' ')})`)
+  const summary = { generated_with: { lean: args.lean, months: args.months, end: args.end, asof: new Date(ctx.asof).toISOString(), seed: args.seed, only: args.only, split: N }, businesses: [], counts, total_rows: totalRows, sql_bytes: totalBytes, statements: totalStmts }
   for (const { sim, an } of results) {
     const b = sim.biz
     log(`\n[${b.k}] ${b.name} — ${b.industry} (${b.scale}) · ${b.email}`)
-    log(`    g model ${(sim.g * 100).toFixed(2)}%/bln · attempt ${sim.attempt} · pelanggan ${sim.custCount}${sim.contracts ? ` · kontrak ${sim.activeContracts} aktif/${sim.contracts} total` : ''}`)
+    log(`    g model ${(sim.g * 100).toFixed(2)}%/bln · attempt ${sim.attempt} · pelanggan ${sim.custCount}${sim.contracts ? ` · kontrak ${sim.activeContracts} aktif/${sim.contracts} total` : ''} · ${fmtN(sumRows(rowCounts(sim)))} baris`)
     log(`    ${pad('Bulan', 15)}${pad('Pendapatan', 12, true)}${pad('Biaya', 12, true)}${pad('Laba', 12, true)}${pad('Margin', 8, true)}${pad('MoM', 9, true)}${pad('MoM-des', 9, true)}${pad('Job', 6, true)}`)
     for (const m of an.months) {
       const mg = m.rev ? (m.rev - m.cost) / m.rev : 0
@@ -1405,13 +1574,29 @@ function main() {
       regions: b.regions.map((x) => ({ key: x.key, name: x.name, profile: x.profile, growth: x.growth, open_month_index: x.open < -50 ? null : x.open })),
       g_model: Number(sim.g.toFixed(4)), trend_g: Number(an.trendG.toFixed(4)), cmgr: Number(an.cmgr.toFixed(4)), cmgr_deseasonalised: Number(an.cmgrDes.toFixed(4)), cagr_equivalent: Number(an.cagrEq.toFixed(4)), margin: Number(an.margin.toFixed(4)), in_band: an.ok,
       customers: sim.custCount, contracts_total: sim.contracts, contracts_active: sim.activeContracts,
-      rows: Object.fromEntries(Object.entries(sim.rows).map(([t, v]) => [t, v.length])),
+      rows: rowCounts(sim),
       months: an.months.map((m) => ({ month: m.key, full: m.full, revenue: m.rev, cost: m.cost, profit: m.rev - m.cost, jobs: m.jobs, mom: m.mom == null ? null : Number(m.mom.toFixed(4)), mom_deseasonalised: m.momDes == null ? null : Number(m.momDes.toFixed(4)), seasonal_index: Number(m.SI.toFixed(3)) })),
       region_share_first: an.regFirst, region_share_last: an.regLast,
     })
   }
-  log(`\nBaris: ${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(' · ')} · total ${totalRows}`)
-  log(`SQL: ${outPath} · ${(Buffer.byteLength(sql) / 1e6).toFixed(2)} MB · ${stmts} INSERT (≤${MAX_ROWS} baris, ≤${MAX_STMT_BYTES / 1000} KB per statement)`)
+  log(`\nBaris insert: ${Object.entries(counts).map(([k, v]) => `${k} ${fmtN(v)}`).join(' · ')} · total ${fmtN(totalRows)} (+${list.length} users)`)
+  for (const f of files) log(`SQL: ${f.path} · ${(f.bytes / 1e6).toFixed(2)} MB · ${f.stmts} INSERT · ${fmtN(f.rows)} baris · ±${fmtN(f.writes)} writes · ${f.businesses.join(', ')}`)
+  log(`(≤${MAX_ROWS} baris dan ≤${MAX_STMT_BYTES / 1000} KB per statement)`)
+
+  // Estimasi rows written D1
+  const sumW = (k) => per.reduce((s, x) => s + x.w[k], 0)
+  const fresh = per.reduce((s, x) => s + x.wFresh.total, 0)
+  const total = sumW('total')
+  log(`\nEstimasi D1 rows written (indeks dari ${wm.source}: ${DOMAIN_TABLES.map((t) => `${t} ×${wm.wpr(t)}`).join(', ')}, users ×${wm.wpr('users')})`)
+  log(`    ${pad('Akun', 14)}${pad('Baris baru', 12, true)}${pad('Insert', 10, true)}${pad('Baris lama', 12, true)}${pad('Hapus', 10, true)}${pad('Total', 10, true)}`)
+  for (const x of per) log(`    ${pad(x.sim.biz.key, 14)}${pad(fmtN(sumRows(x.rows)), 12, true)}${pad(fmtN(x.w.ins + x.w.user), 10, true)}${pad(fmtN(sumRows(existing[x.sim.biz.key])), 12, true)}${pad(fmtN(x.w.del), 10, true)}${pad(fmtN(x.w.total), 10, true)}`)
+  log(`    ${pad('TOTAL', 14)}${pad(fmtN(totalRows), 12, true)}${pad(fmtN(sumW('ins') + sumW('user')), 10, true)}${pad(fmtN(per.reduce((s, x) => s + sumRows(existing[x.sim.biz.key]), 0)), 12, true)}${pad(fmtN(sumW('del')), 10, true)}${pad(fmtN(total), 10, true)}`)
+  log(`    Baris lama: ${existingSrc}. Bila DB kosong (tanpa hapus): ±${fmtN(fresh)} writes.`)
+  summary.write_estimate = { model: Object.fromEntries([...DOMAIN_TABLES, 'users'].map((t) => [t, wm.wpr(t)])), existing_source: existingSrc, existing, insert_writes: sumW('ins') + sumW('user'), delete_writes: sumW('del'), total_writes: total, fresh_db_writes: fresh, files: files.map((f) => ({ path: f.path, writes: f.writes, rows: f.rows, businesses: f.businesses })) }
+  const loud = (msg) => console.error(`\n${'!'.repeat(78)}\n${msg}\n${'!'.repeat(78)}`)
+  if (total > args.budget) loud(`PERINGATAN KUOTA D1: estimasi total ${fmtN(total)} rows written > ${fmtN(args.budget)}.\nFree tier D1 = 100.000 rows written/hari (reset 00:00 UTC). ${N > 1 && files.every((f) => f.writes <= args.perFile) ? `Sudah dibagi ke ${N} file (masing-masing ≤ ${fmtN(args.perFile)}): terapkan SATU file per hari, jangan sekaligus.` : 'Pakai --lean, --only, atau --split N dan terapkan per hari.'}`)
+  for (const f of files) if (f.writes > args.perFile) loud(`PERINGATAN: ${f.path} ±${fmtN(f.writes)} writes > ${fmtN(args.perFile)} per file. Naikkan --split atau pakai --only.`)
+
   log('* = bulan berjalan (terpotong di as-of): tidak dihitung MoM dan tidak ikut regresi tren.')
   if (args.summary && args.summary !== 'none') {
     const sp = resolve(args.summary)

@@ -9,7 +9,9 @@
  * panel becomes a compact band above the card.
  */
 import '../styles/auth.css'
-import { sendEmailCode, submitEmailOtp } from './auth.js'
+import { sendEmailCode, submitEmailOtp, loginWithDemo } from './auth.js'
+import { DEMO_ACCOUNTS, DEMO_SCALES } from './demo-accounts.js'
+import { enhanceSelect } from '../ui/combobox.js'
 import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
 import { icon, iconHTML } from '../ui/icons.js'
@@ -208,13 +210,48 @@ export function renderLoginPage(root, ctx = {}) {
 
   const message = h('p', { class: 'auth-msg', 'aria-live': 'polite', role: 'status' })
 
+  /* ---- Mode switch: Live (email + OTP) or Demo (seeded accounts) ---- */
+  const modeLive = h('button', { type: 'button', class: 'auth-mode-btn', role: 'tab', 'aria-selected': 'true', id: 'auth-mode-live', 'aria-controls': 'auth-live' },
+    h('span', { class: 'auth-mode-icon', html: iconHTML('mail', { size: 16 }) }), h('span', {}, 'Live'))
+  const modeDemo = h('button', { type: 'button', class: 'auth-mode-btn', role: 'tab', 'aria-selected': 'false', id: 'auth-mode-demo', 'aria-controls': 'auth-demo-form', tabindex: '-1' },
+    h('span', { class: 'auth-mode-icon', html: iconHTML('sparkles', { size: 16 }) }), h('span', {}, 'Akun demo'))
+  const modeThumb = h('span', { class: 'auth-mode-thumb', 'aria-hidden': 'true' })
+  const modeSwitch = h('div', { class: 'auth-mode', role: 'tablist', 'aria-label': 'Cara masuk' }, modeThumb, modeLive, modeDemo)
+
+  const scaleSel = h('select', { id: 'auth-demo-scale', class: 'auth-select', name: 'scale' },
+    DEMO_SCALES.map((sc) => h('option', { value: sc.value }, sc.label)))
+  const acctSel = h('select', { id: 'auth-demo-account', class: 'auth-select', name: 'account' })
+  const demoPreview = h('div', { class: 'auth-demo-preview', 'aria-live': 'polite' })
+  const demoBtn = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
+    h('span', { class: 'auth-btn-label' }, 'Masuk ke mode demo'), btnIcon(),
+  )
+  const demoForm = h('form', { class: 'auth-form auth-form-demo', id: 'auth-demo-form', novalidate: true, hidden: true, role: 'tabpanel', 'aria-labelledby': 'auth-mode-demo' },
+    h('div', { class: 'auth-demo-grid' },
+      h('div', { class: 'auth-field field' },
+        h('label', { for: 'auth-demo-scale', class: 'auth-label' }, 'Skala bisnis'),
+        scaleSel,
+      ),
+      h('div', { class: 'auth-field field' },
+        h('label', { for: 'auth-demo-account', class: 'auth-label' }, 'Akun demo'),
+        acctSel,
+      ),
+    ),
+    demoPreview,
+    demoBtn,
+    h('p', { class: 'auth-field-hint auth-demo-shared' },
+      h('span', { html: iconHTML('info', { size: 14 }) }),
+      'Berisi data contoh 12 bulan. Akun demo dipakai bersama, jadi perubahan Anda bisa terlihat pengunjung lain.'),
+  )
+
+  const eyebrow = h('p', { class: 'eyebrow auth-eyebrow' }, 'Masuk atau daftar')
+  const livePanel = h('div', { class: 'auth-live', id: 'auth-live', role: 'tabpanel', 'aria-labelledby': 'auth-mode-live' }, stepper, emailForm, codeForm)
   const card = h('div', { class: 'auth-card surface' },
-    h('p', { class: 'eyebrow auth-eyebrow' }, 'Masuk atau daftar'),
+    modeSwitch,
+    eyebrow,
     title,
     helper,
-    stepper,
-    emailForm,
-    codeForm,
+    livePanel,
+    demoForm,
     message,
     h('p', { class: 'auth-privacy' },
       h('span', { html: iconHTML('shield', { size: 14 }) }),
@@ -547,6 +584,109 @@ export function renderLoginPage(root, ctx = {}) {
       digits[0].focus()
     }
   }
+
+  /* ---- Demo mode ---- */
+  let mode = 'live'
+  const DEMO_COPY = {
+    title: 'Coba <em>mode demo</em>.',
+    helper: 'Masuk ke salah satu dari 9 bisnis contoh dengan data 12 bulan. Tanpa email, tanpa kode.',
+  }
+
+  function fillAccounts() {
+    const list = DEMO_ACCOUNTS.filter((a) => a.scale === scaleSel.value)
+    acctSel.replaceChildren(...list.map((a) => h('option', { value: a.email }, `${a.name} · ${a.city}`)))
+    acctSel.value = list[0]?.email || ''
+    renderPreview()
+  }
+  function renderPreview() {
+    const a = DEMO_ACCOUNTS.find((x) => x.email === acctSel.value)
+    const sc = DEMO_SCALES.find((x) => x.value === scaleSel.value)
+    if (!a) { demoPreview.replaceChildren(); return }
+    demoPreview.replaceChildren(
+      h('span', { class: 'auth-demo-avatar', 'aria-hidden': 'true', html: iconHTML(a.scale === 'enterprise' ? 'building' : a.scale === 'ukm' ? 'store' : 'user', { size: 20 }) }),
+      h('div', { class: 'auth-demo-info' },
+        h('p', { class: 'auth-demo-name' }, a.name),
+        h('p', { class: 'auth-demo-meta' }, `${a.industry} · ${a.city}`),
+        h('p', { class: 'auth-demo-email' }, a.email),
+      ),
+      h('span', { class: 'tag tag-accent auth-demo-tag' }, sc?.target || ''),
+    )
+  }
+  scaleSel.addEventListener('change', fillAccounts)
+  acctSel.addEventListener('change', renderPreview)
+  enhanceSelect(scaleSel, { searchPlaceholder: 'Cari skala…' })
+  enhanceSelect(acctSel, { searchPlaceholder: 'Cari bisnis atau kota…' })
+  fillAccounts()
+
+  function setMode(next, { focus = false } = {}) {
+    if (busy || next === mode) return
+    mode = next
+    const demo = next === 'demo'
+    page.dataset.mode = next
+    modeLive.setAttribute('aria-selected', String(!demo))
+    modeDemo.setAttribute('aria-selected', String(demo))
+    modeLive.tabIndex = demo ? -1 : 0
+    modeDemo.tabIndex = demo ? 0 : -1
+    modeSwitch.classList.toggle('is-demo', demo)
+    livePanel.hidden = demo
+    demoForm.hidden = !demo
+    eyebrow.textContent = demo ? 'Mode demo' : 'Masuk atau daftar'
+    title.innerHTML = demo ? DEMO_COPY.title : COPY[step].title
+    helper.textContent = demo ? DEMO_COPY.helper : COPY[step].helper
+    setStatus(demo ? 'Mode demo' : COPY[step].status)
+    say('')
+    if (!reduced) {
+      const active = demo ? demoForm : livePanel
+      for (const el of [active, title, helper]) {
+        el.classList.remove('is-swapping')
+        void el.offsetWidth
+        el.classList.add('is-swapping')
+      }
+    }
+    if (focus) (demo ? modeDemo : modeLive).focus()
+  }
+  modeLive.addEventListener('click', () => setMode('live'))
+  modeDemo.addEventListener('click', () => setMode('demo'))
+  modeSwitch.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
+    e.preventDefault()
+    setMode(e.key === 'ArrowLeft' || e.key === 'Home' ? 'live' : 'demo', { focus: true })
+  })
+
+  demoForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    if (busy) return
+    const target = acctSel.value
+    if (!target) { say('Pilih akun demo terlebih dahulu.', 'error'); return }
+    say('')
+    setBusy(demoBtn, true, 'Membuka akun demo…')
+    setStatus('Membuka demo')
+    setSceneState('verifying')
+    try {
+      const result = await loginWithDemo(target)
+      if (disposed) return
+      page.classList.add('is-success')
+      demoBtn.classList.remove('is-loading')
+      demoBtn.classList.add('is-success')
+      demoBtn.querySelector('.auth-btn-label').textContent = 'Berhasil masuk'
+      demoBtn.querySelector('.auth-btn-icon').innerHTML = iconHTML('check', { size: 18, stroke: 2.5 })
+      setStatus('Masuk mode demo')
+      setSceneState('success')
+      say('Berhasil. Membuka dasbor demo…', 'ok')
+      successTimer = setTimeout(() => {
+        if (!disposed) ctx.onSignedIn?.(result?.user)
+      }, reduced ? 250 : 700)
+    } catch (err) {
+      if (disposed) return
+      setBusy(demoBtn, false, 'Masuk ke mode demo')
+      setStatus('Mode demo')
+      setSceneState('error')
+      later(() => !disposed && setSceneState('idle'), 600)
+      say(err?.message || 'Gagal membuka akun demo. Coba lagi.', 'error')
+    }
+  })
+
+  if (/[?&]demo\b/.test(location.hash)) setMode('demo')
 
   codeForm.addEventListener('submit', (e) => {
     e.preventDefault()

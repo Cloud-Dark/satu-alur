@@ -1,7 +1,9 @@
 -- =====================================================================
 -- Satu Alur: DATA DEMO (DUMMY). Semua pelanggan, telepon, alamat, dan angka FIKTIF.
 -- Dibuat oleh scripts/seed-demo.mjs --months 12 --end 2026-10-31 --asof 2026-10-28T10:00:00.000Z --seed 20261028
--- Aman dijalankan ulang: menghapus dulu seluruh data milik akun demo lalu mengisi ulang.
+-- Usaha: demo-ac@satualur.id, demo-cleaning@satualur.id, demo-listrik@satualur.id, demo-pest@satualur.id, demo-laundry@satualur.id, demo-dinding@satualur.id, demo-mall@satualur.id, demo-fm@satualur.id, demo-rs@satualur.id
+-- Perkiraan D1 rows written file ini: 156.764 (hapus 78.364 + insert 78.400).
+-- Aman dijalankan ulang: menghapus dulu seluruh data milik akun demo di file ini lalu mengisi ulang.
 -- Lihat seeds/README.md dan docs/specs/2026-10-28-demo-growth-data-design.md.
 -- =====================================================================
 
@@ -29,15 +31,15 @@ INSERT OR IGNORE INTO users (id, email, name, created_at) VALUES
 ('0d3e5a11-7c1a-4b5e-9a07-5a7a1a1d0007', 'demo-mall@satualur.id', 'PT Arunika Layanan Ritel', '2025-10-01T02:00:00.000Z'),
 ('0d3e5a11-7c1a-4b5e-9a08-5a7a1a1d0008', 'demo-fm@satualur.id', 'PT Prima Layanan Fasilitas', '2025-10-01T02:00:00.000Z'),
 ('0d3e5a11-7c1a-4b5e-9a09-5a7a1a1d0009', 'demo-rs@satualur.id', 'PT Sehat Bersih Medika', '2025-10-01T02:00:00.000Z');
-UPDATE users SET name = 'Budi Santoso (Servis AC)' WHERE id = '0d3e5a11-7c1a-4b5e-9a01-5a7a1a1d0001';
-UPDATE users SET name = 'Rina Kusuma (Rapi Bersih Home Cleaning)' WHERE id = '0d3e5a11-7c1a-4b5e-9a02-5a7a1a1d0002';
-UPDATE users SET name = 'Hendra Siregar (Listrik Siaga Medan)' WHERE id = '0d3e5a11-7c1a-4b5e-9a03-5a7a1a1d0003';
-UPDATE users SET name = 'CV Basmi Hama Nusantara' WHERE id = '0d3e5a11-7c1a-4b5e-9a04-5a7a1a1d0004';
-UPDATE users SET name = 'CV Wangi Bersih Laundry' WHERE id = '0d3e5a11-7c1a-4b5e-9a05-5a7a1a1d0005';
-UPDATE users SET name = 'CV Glasur Dinding Borneo' WHERE id = '0d3e5a11-7c1a-4b5e-9a06-5a7a1a1d0006';
-UPDATE users SET name = 'PT Arunika Layanan Ritel' WHERE id = '0d3e5a11-7c1a-4b5e-9a07-5a7a1a1d0007';
-UPDATE users SET name = 'PT Prima Layanan Fasilitas' WHERE id = '0d3e5a11-7c1a-4b5e-9a08-5a7a1a1d0008';
-UPDATE users SET name = 'PT Sehat Bersih Medika' WHERE id = '0d3e5a11-7c1a-4b5e-9a09-5a7a1a1d0009';
+UPDATE users SET name = 'Budi Santoso (Servis AC)' WHERE id = '0d3e5a11-7c1a-4b5e-9a01-5a7a1a1d0001' AND name IS NOT 'Budi Santoso (Servis AC)';
+UPDATE users SET name = 'Rina Kusuma (Rapi Bersih Home Cleaning)' WHERE id = '0d3e5a11-7c1a-4b5e-9a02-5a7a1a1d0002' AND name IS NOT 'Rina Kusuma (Rapi Bersih Home Cleaning)';
+UPDATE users SET name = 'Hendra Siregar (Listrik Siaga Medan)' WHERE id = '0d3e5a11-7c1a-4b5e-9a03-5a7a1a1d0003' AND name IS NOT 'Hendra Siregar (Listrik Siaga Medan)';
+UPDATE users SET name = 'CV Basmi Hama Nusantara' WHERE id = '0d3e5a11-7c1a-4b5e-9a04-5a7a1a1d0004' AND name IS NOT 'CV Basmi Hama Nusantara';
+UPDATE users SET name = 'CV Wangi Bersih Laundry' WHERE id = '0d3e5a11-7c1a-4b5e-9a05-5a7a1a1d0005' AND name IS NOT 'CV Wangi Bersih Laundry';
+UPDATE users SET name = 'CV Glasur Dinding Borneo' WHERE id = '0d3e5a11-7c1a-4b5e-9a06-5a7a1a1d0006' AND name IS NOT 'CV Glasur Dinding Borneo';
+UPDATE users SET name = 'PT Arunika Layanan Ritel' WHERE id = '0d3e5a11-7c1a-4b5e-9a07-5a7a1a1d0007' AND name IS NOT 'PT Arunika Layanan Ritel';
+UPDATE users SET name = 'PT Prima Layanan Fasilitas' WHERE id = '0d3e5a11-7c1a-4b5e-9a08-5a7a1a1d0008' AND name IS NOT 'PT Prima Layanan Fasilitas';
+UPDATE users SET name = 'PT Sehat Bersih Medika' WHERE id = '0d3e5a11-7c1a-4b5e-9a09-5a7a1a1d0009' AND name IS NOT 'PT Sehat Bersih Medika';
 
 -- requests: 5582 baris
 INSERT INTO requests (id, owner_id, customer_name, service_type, phone, location, description, status, created_at) VALUES

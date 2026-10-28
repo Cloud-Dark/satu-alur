@@ -68,6 +68,15 @@ const httpAuth = {
     return { data: { user }, error: null }
   },
 
+  async demoLogin({ email }) {
+    const res = await request('/api/auth/demo-login', { method: 'POST', body: { email } })
+    if (res.error) throw new Error(res.error.message)
+    const { user, access_token } = res.data
+    setToken(access_token)
+    notifyAuth('SIGNED_IN', { user, access_token })
+    return { data: { user }, error: null }
+  },
+
   async getSession() {
     const token = getToken()
     if (!token) return { data: null, error: { message: 'Belum masuk.' } }

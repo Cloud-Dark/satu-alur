@@ -69,6 +69,19 @@ const mockAuth = {
     return { data: { user }, error: null }
   },
 
+  async demoLogin({ email }) {
+    const users = ensureTable('users')
+    let user = users.find(u => u.email === email)
+    if (!user) {
+      user = { id: crypto.randomUUID(), email, name: email.split('@')[0], created_at: new Date().toISOString() }
+      users.push(user)
+      persist()
+    }
+    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
+    notifyAuth('SIGNED_IN')
+    return { data: { user }, error: null }
+  },
+
   async getSession() {
     if (_session) return { data: _session, error: null }
     return { data: null, error: { message: 'Belum masuk.' } }

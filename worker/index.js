@@ -273,6 +273,29 @@ async function handleVerifyOtp(request, env) {
   return ok({ user, access_token: accessToken });
 }
 
+// Demo accounts (seeded by scripts/seed-demo.mjs). Keep in sync with
+// src/auth/demo-accounts.js. Set DEMO_LOGIN = "false" to disable.
+const DEMO_EMAILS = new Set([
+  'demo-ac@satualur.id', 'demo-cleaning@satualur.id', 'demo-listrik@satualur.id',
+  'demo-pest@satualur.id', 'demo-laundry@satualur.id', 'demo-dinding@satualur.id',
+  'demo-mall@satualur.id', 'demo-fm@satualur.id', 'demo-rs@satualur.id',
+]);
+
+async function handleDemoLogin(request, env) {
+  if (env.DEMO_LOGIN === 'false') throw new HttpError(403, 'Mode demo tidak aktif.');
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  if (!email || !DEMO_EMAILS.has(email)) throw new HttpError(400, 'Akun demo tidak dikenal.');
+  const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
+  if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
+
+  const accessToken = randomHex(32);
+  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    .bind(await sha256Hex(accessToken), user.id, new Date(Date.now() + SESSION_TTL_MS).toISOString(), nowIso())
+    .run();
+  return ok({ user, access_token: accessToken });
+}
+
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
   return ok({ user });
@@ -720,6 +743,7 @@ function sseResponse(stream) {
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
   'POST /api/auth/verify-otp': handleVerifyOtp,
+  'POST /api/auth/demo-login': handleDemoLogin,
   'GET /api/auth/session': handleSession,
   'POST /api/auth/signout': handleSignout,
   'POST /api/db': handleDb,
