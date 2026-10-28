@@ -1,5 +1,7 @@
 # seeds/
 
+> **Peringatan kuota D1 (paket gratis):** paket Free membatasi **100.000 baris tulis per hari** (dihitung termasuk indeks). `demo.sql` penuh menulis ±112.000 baris, sehingga menerapkannya di akun Free menghabiskan kuota harian dan seluruh penyimpanan (termasuk login) gagal sampai 00.00 UTC. Terapkan seed penuh hanya di akun Workers Paid, atau buat seed lebih kecil (mis. `--months 3` atau sebagian bisnis) untuk akun Free.
+
 > Status: Draft
 > Terakhir diperbarui: 2026-10-28
 > Pemilik: _TBD_

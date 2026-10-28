@@ -745,6 +745,9 @@ export default {
       } catch (err) {
         if (err instanceof HttpError) return fail(err.status, err.message);
         console.error('Unhandled error', err); // logs only; never returned to client
+        if (/exceeded D1's .*limit/i.test(String(err?.message))) {
+          return fail(503, 'Batas penulisan harian database tercapai. Data bisa dibaca, tetapi penyimpanan baru tertunda sampai kuota pulih (00.00 UTC / 07.00 WIB).');
+        }
         return fail(500, 'Terjadi kesalahan pada server.');
       }
     }

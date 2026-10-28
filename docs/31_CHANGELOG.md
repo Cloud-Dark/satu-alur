@@ -65,6 +65,8 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 
 ### Fixed
 
+- Error D1 "daily row write limit" (paket Free) kini dikembalikan sebagai 503 dengan pesan jelas, bukan 500 generik.
+
 - Data hanya memuat 1.000 baris terbaru per tabel sehingga total dashboard dan "Perlu tindakan" salah untuk akun besar; kini dimuat per halaman.
 - Penawaran berstatus `rejected` dihitung sebagai draf; kini tampil "Ditolak" dan tidak masuk antrean.
 - "Pelanggan teratas" di laporan dikelompokkan per pelanggan (bukan per permintaan); `period_start/end` laporan memakai tanggal lokal.
