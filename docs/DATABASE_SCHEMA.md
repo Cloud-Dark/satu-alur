@@ -1,6 +1,8 @@
 # Database Schema
 
-Skema database untuk Satu Alur menggunakan PostgreSQL via WorkBuddy Cloud Service.
+> Superseded by [20_DATABASE.md](20_DATABASE.md) (D1). Dokumen ini dipertahankan sebagai referensi desain lama WorkBuddy/PostgreSQL dan tidak lagi diperbarui.
+
+Skema database lama Satu Alur (desain awal) memakai PostgreSQL via WorkBuddy Cloud Service. Sejak 2026-10-28 aplikasi memakai Cloudflare D1 (SQLite); lihat [20_DATABASE.md](20_DATABASE.md).
 
 ## Tables
 

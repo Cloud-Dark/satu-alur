@@ -3,17 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Satu Alur — Satu Alur untuk Semua Operasi Jasa</title>
-    <meta name="description" content="Satu Alur — Sistem otomasi operasi jasa dengan AI untuk perusahaan layanan jasa/on-demand di Indonesia." />
-    <meta name="theme-color" content="#faf6f1" />
-    <link rel="icon" type="image/png" href="/assets/icon-satu-alur.png" />
-    <link rel="apple-touch-icon" href="/assets/icon-satu-alur.png" />
+    <title>Satu Alur — Operasi jasa dalam satu alur, ditenagai AI</title>
+    <meta name="description" content="Satu Alur menyatukan permintaan, penawaran AI, penugasan, penyelesaian, pembukuan, dan laporan bisnis jasa Anda dalam satu alur kerja." />
+    <meta name="theme-color" content="#f7f4ee" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      (function () {
+        var t = null
+        try { t = localStorage.getItem('theme') } catch (e) {}
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        document.documentElement.dataset.theme = t
+      })()
+    </script>
     <style>
-      /* Critical CSS: pastikan ada konten visible sebelum JS load */
-      body { margin:0; font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:#faf6f1; color:#3d2b1f; }
+      body { margin:0; background:#f7f4ee; color:#16241f; font-family:'Plus Jakarta Sans', ui-sans-serif, sans-serif; }
+      :root[data-theme='dark'] body { background:#0b1310; color:#e9efeb; }
       noscript { display:block; padding:40px; text-align:center; }
       #app { min-height:100vh; }
     </style>

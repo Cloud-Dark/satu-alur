@@ -1,123 +1,142 @@
+/** 01 — Permintaan: capture a customer request; list with derived status. */
 import { getCloud } from '../cloud.js'
-import * as Components from '../ui/components.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import * as C from '../ui/components.js'
+import { showToast } from '../ui/animations.js'
+import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 
-export async function render(container) {
-  container.innerHTML = ''
+const { el } = C
 
-  const formCard = Components.el('div', { className: 'form-card card-accent-orange' },
-    Components.el('h3', { className: 'form-title' }, '📋 Buat Permintaan Jasa'),
-    Components.el('p', { className: 'form-subtitle' }, 'Catat permintaan pelanggan baru untuk diproses ke tahap penawaran.')
+export async function render(container, ctx = {}) {
+  const navigate = ctx.navigate || (() => {})
+
+  /* ------------------------------------------------------------- Form */
+  const name = C.field({ label: 'Nama pelanggan', name: 'customer_name', required: true, placeholder: 'PT Maju Jaya', hint: 'Perusahaan atau perorangan yang meminta layanan.', attrs: { autocomplete: 'organization', maxlength: '120' } })
+  const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
+  const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
+  const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
+  const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
+  const submit = C.button({ label: 'Simpan permintaan', icon: 'save', variant: 'primary', type: 'submit' })
+  const msg = C.message()
+
+  const form = el('form', { className: 'form', noValidate: '' },
+    name.wrap, service.wrap,
+    el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap),
+    desc.wrap,
+    el('div', { className: 'form-actions' }, submit),
+    msg,
   )
+  form.noValidate = true
 
-  const form = Components.el('form', { id: 'request-form' },
-    Components.el('div', { className: 'form-group' },
-      Components.el('label', {}, 'Nama Pelanggan', Components.el('span', { className: 'required' }, '*')),
-      Components.el('input', { type: 'text', name: 'customer_name', required: true, placeholder: 'Contoh: PT Maju Jaya' }),
-      Components.el('span', { className: 'field-hint' }, 'Nama perusahaan atau individu yang meminta layanan.')
+  const listBody = el('div', {}, C.skeletonRows(5))
+  const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari permintaan' })
+  const searchBox = el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search)
+  const listPanel = C.panel({ title: 'Daftar permintaan', meta: 'memuat…', actions: searchBox, className: 'list-panel' }, listBody)
+
+  container.replaceChildren(
+    C.pageHeader({ num: '01', label: 'Permintaan', title: 'Permintaan masuk', em: 'masuk', description: 'Catat kebutuhan pelanggan. Status setiap permintaan mengikuti seberapa jauh ia sudah bergerak di alur.' }),
+    el('div', { className: 'stage-grid' },
+      C.panel({ title: 'Permintaan baru', meta: 'Isi data pelanggan', raised: true, className: 'form-panel' }, form),
+      listPanel,
     ),
-    Components.el('div', { className: 'form-group' },
-      Components.el('label', {}, 'Jenis Layanan', Components.el('span', { className: 'required' }, '*')),
-      Components.el('input', { type: 'text', name: 'service_type', required: true, placeholder: 'Contoh: Pembersihan AC, Cuci karpet' }),
-      Components.el('span', { className: 'field-hint' }, 'Jenis layanan yang diminta oleh pelanggan.')
-    ),
-    Components.el('div', { className: 'form-row' },
-      Components.el('div', { className: 'form-group' },
-        Components.el('label', {}, 'Lokasi'),
-        Components.el('input', { type: 'text', name: 'location', placeholder: 'Contoh: Jakarta Selatan' })
-      ),
-      Components.el('div', { className: 'form-group' },
-        Components.el('label', {}, 'Nomor Telepon'),
-        Components.el('input', { type: 'tel', name: 'phone', placeholder: 'Contoh: 0812-3456-7890' })
-      )
-    ),
-    Components.el('div', { className: 'form-group' },
-      Components.el('label', {}, 'Deskripsi Kebutuhan'),
-      Components.el('textarea', { name: 'description', rows: 4, placeholder: 'Jelaskan detail kebutuhan pelanggan: jumlah unit, ukuran area, preferensi waktu, dll.' }),
-      Components.el('span', { className: 'field-hint' }, 'Semakin detail deskripsi, semakin akurat penawaran AI yang dihasilkan.')
-    ),
-    Components.el('div', { className: 'form-actions' },
-      Components.el('button', { type: 'submit' }, '💾 Simpan Permintaan')
-    )
   )
-
-  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
-  formCard.appendChild(form)
-  formCard.appendChild(msg)
-
-  const listCard = Components.section('📋 Daftar Permintaan',
-    Components.skeleton({ type: 'text', lines: 4 })
-  )
-  listCard.classList.add('card-accent-brown')
-
-  container.appendChild(formCard)
-  container.appendChild(listCard)
-
-  animateEntrance(formCard, 0)
-  animateEntrance(listCard, 100)
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
-    msg.style.display = 'none'
-    const fd = new FormData(form)
-    const data = Object.fromEntries(fd.entries())
+    msg.hide()
+    const data = {
+      customer_name: name.input.value.trim(),
+      service_type: service.input.value.trim(),
+      location: location.input.value.trim(),
+      phone: phone.input.value.trim(),
+      description: desc.input.value.trim(),
+    }
+    const missing = []
+    if (!data.customer_name) missing.push('Nama pelanggan wajib diisi.')
+    if (!data.service_type) missing.push('Jenis layanan wajib diisi.')
+    if (data.phone && !/^[+()\d\s.-]{6,32}$/.test(data.phone)) missing.push('Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.')
+    if (missing.length) {
+      msg.show('danger', 'Periksa kembali isian berikut.', missing)
+      ;(!data.customer_name ? name.input : !data.service_type ? service.input : phone.input).focus()
+      return
+    }
+    const restore = C.setBusy(submit, 'Menyimpan…')
     try {
-      const cloud = getCloud()
-      const { error } = await cloud.database.from('requests').insert(data)
+      const { data: created, error } = await getCloud().database.from('requests').insert(data)
       if (error) throw new Error(error.message)
-      msg.className = 'form-message success'
-      msg.textContent = '✅ Permintaan berhasil disimpan.'
-      msg.style.display = 'block'
+      const row = Array.isArray(created) ? created[0] : created
       form.reset()
-      showToast('Permintaan baru berhasil dibuat!', 'success')
+      msg.show('ok', `Permintaan ${data.customer_name} tersimpan. Lanjutkan dengan membuat penawaran.`)
+      if (row?.id != null) {
+        const next = C.button({ label: 'Buat penawaran', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+        next.addEventListener('click', () => navigate('offer', { requestId: row.id }))
+        msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
+      }
+      showToast('Permintaan baru tersimpan.', 'success')
+      notifyDataChanged()
       await loadList()
     } catch (err) {
-      msg.className = 'form-message error'
-      msg.textContent = err.message
-      msg.style.display = 'block'
+      msg.show('danger', `Gagal menyimpan: ${err.message}`)
+    } finally {
+      restore()
     }
   })
 
+  /* ------------------------------------------------------------- List */
+  let model = null
   async function loadList() {
-    const listEl = container.querySelector('#request-list')
-    if (!listEl) return
-    listEl.innerHTML = ''
-    listEl.appendChild(Components.skeleton({ type: 'text', lines: 4 }))
-
     try {
-      const cloud = getCloud()
-      const { data, error } = await cloud.database.from('requests')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
-      if (!data || data.length === 0) {
-        listEl.innerHTML = '<p style="color:var(--text-muted);">Belum ada permintaan. Buat permintaan pertama Anda di atas!</p>'
-        return
-      }
-      listEl.innerHTML = ''
-      data.forEach((r, i) => {
-        const card = Components.el('div', { className: 'card', style: 'margin-bottom:12px;' },
-          Components.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start;' },
-            Components.el('div', {},
-              Components.el('strong', { style: 'font-size:1.05rem;' }, r.customer_name),
-              Components.el('span', { style: 'color:var(--text-muted);font-size:0.85rem;display:block;margin-top:4px;' },
-                `${r.service_type} \u2022 ${r.location || '-'}`
-              )
-            ),
-            Components.badge('BARU', 'draft')
-          ),
-          Components.el('p', { style: 'margin:10px 0;font-size:0.9rem;color:var(--text-muted);' }, r.description || '-'),
-          Components.el('span', { style: 'font-size:0.75rem;color:var(--text-dim);' },
-            '🕐 ' + new Date(r.created_at).toLocaleString('id-ID')
-          )
-        )
-        animateEntrance(card, i * 80)
-        listEl.appendChild(card)
-      })
+      model = await loadFlow(['requests', 'offers', 'assignments', 'completions', 'ledger_entries'])
     } catch (err) {
-      listEl.innerHTML = `<p style="color:var(--danger);">Gagal memuat: ${err.message}</p>`
+      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      return
     }
+    if (ctx.signal?.aborted) return
+    drawList()
   }
+
+  function drawList() {
+    const q = search.value.trim().toLowerCase()
+    const rows = model.requests.filter((r) => !q || [r.customer_name, r.service_type, r.location].some((v) => String(v || '').toLowerCase().includes(q)))
+    listPanel.querySelector('.panel-meta').textContent = q ? `${rows.length} dari ${model.requests.length} baris` : `${model.requests.length} baris`
+    if (!model.requests.length) {
+      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada permintaan.', body: 'Isi formulir di samping untuk mencatat permintaan pertama.' }))
+      return
+    }
+    if (!rows.length) {
+      listBody.replaceChildren(C.emptyState({ kicker: 'Tidak ditemukan', title: `Tidak ada yang cocok dengan "${search.value.trim()}".` }))
+      return
+    }
+    listBody.replaceChildren(C.dataTable({
+      caption: 'Daftar permintaan',
+      rows,
+      columns: [
+        {
+          label: 'Pelanggan',
+          render: (r) => {
+            const stack = C.cellStack(customerLabel(r), [r.service_type, r.location].filter(Boolean).join(' · '))
+            stack.querySelector('.cell-primary').prepend(el('span', { className: 'cell-id tnum' }, `#${r.id}`))
+            if (r.description) stack.appendChild(el('span', { className: 'cell-note', title: r.description }, r.description))
+            if (r.phone) stack.appendChild(el('span', { className: 'cell-secondary tnum' }, r.phone))
+            return stack
+          },
+        },
+        { label: 'Status', render: (r) => { const s = model.requestStage(r); return C.tag(s.label, s.tone) } },
+        { label: 'Masuk', className: 'col-date', render: (r) => el('time', { className: 'tnum', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, C.formatDate(r.created_at)) },
+        {
+          label: 'Aksi',
+          className: 'col-action',
+          render: (r) => {
+            if (model.offersOf(r.id).length) return el('span', { className: 'muted nil' }, '—')
+            const b = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+            b.setAttribute('aria-label', `Buat penawaran untuk ${customerLabel(r)}`)
+            b.addEventListener('click', () => navigate('offer', { requestId: r.id }))
+            return b
+          },
+        },
+      ],
+    }))
+  }
+  search.addEventListener('input', () => model && drawList())
 
   await loadList()
 }

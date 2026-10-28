@@ -1,155 +1,155 @@
+/** 04 — Penyelesaian: close an active assignment with result notes. */
 import { getCloud } from '../cloud.js'
-import * as Components from '../ui/components.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import * as C from '../ui/components.js'
+import { showToast } from '../ui/animations.js'
+import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 
-export async function render(container) {
-  container.innerHTML = ''
+const { el } = C
 
-  let assignments = []
-  try {
-    const cloud = getCloud()
-    const { data } = await cloud.database.from('assignments')
-      .select('*')
-      .eq('status', 'assigned')
-      .order('created_at', { ascending: false })
-    assignments = data || []
-  } catch (err) {
-    container.appendChild(Components.el('p', { style: 'color:var(--danger)' }, 'Gagal memuat: ' + err.message))
-    return
-  }
+export async function render(container, ctx = {}) {
+  const navigate = ctx.navigate || (() => {})
+  const params = ctx.params || {}
 
-  if (assignments.length === 0) {
-    container.appendChild(Components.el('p', { style: 'color:var(--text-muted);padding:20px;' }, 'Tidak ada penugasan aktif. Buat penugasan di tahap sebelumnya.'))
-    return
-  }
+  const assignSel = C.select({ label: 'Penugasan aktif', name: 'assignment_id', required: true, options: [{ value: '', label: 'Memuat…' }] })
+  const preview = el('div', { className: 'req-preview', hidden: true })
+  const notes = C.textarea({ label: 'Catatan hasil pekerjaan', name: 'notes', rows: 5, placeholder: 'Kondisi akhir, kendala, saran perawatan…', hint: 'Catatan ini ikut tersimpan di riwayat dan membantu laporan.', attrs: { maxlength: '2000' } })
+  const submit = C.button({ label: 'Tandai selesai', icon: 'checkCircle', variant: 'primary', type: 'submit' })
+  const msg = C.message()
 
-  const cloud = getCloud()
+  const form = el('form', { className: 'form' },
+    assignSel.wrap, preview, notes.wrap,
+    el('div', { className: 'form-actions' }, submit),
+    msg,
+  )
+  form.noValidate = true
 
-  // Build select options
-  const selectOptions = [{ value: '', label: '-- Pilih penugasan --' }]
-  for (const a of assignments) {
-    const offerRes = await cloud.database.from('offers').select('request_id').eq('id', a.offer_id).maybeSingle()
-    const reqId = offerRes.data?.request_id
-    const reqRes = reqId ? await cloud.database.from('requests').select('customer_name,service_type').eq('id', reqId).maybeSingle() : { data: null }
-    const req = reqRes.data || {}
-    selectOptions.push({ value: String(a.id), label: `${req.customer_name || 'Pelanggan'} \u2014 ${req.service_type || '-'}` })
-  }
+  const listBody = el('div', {}, C.skeletonRows(5))
+  const listPanel = C.panel({ title: 'Riwayat penyelesaian', meta: 'memuat…', className: 'list-panel' }, listBody)
 
-  const formCard = Components.el('div', { className: 'form-card card-accent-olive' },
-    Components.el('h3', { className: 'form-title' }, '\u2705 Tandai Pekerjaan Selesai'),
-    Components.el('p', { className: 'form-subtitle' }, 'Pilih penugasan aktif dan catat hasil pekerjaan untuk diproses ke pembukuan.')
+  container.replaceChildren(
+    C.pageHeader({ num: '04', label: 'Penyelesaian', title: 'Penyelesaian pekerjaan', em: 'pekerjaan', description: 'Tutup penugasan yang sudah dikerjakan. Pekerjaan selesai siap dibukukan di tahap 05.' }),
+    el('div', { className: 'stage-grid' },
+      C.panel({ title: 'Konfirmasi selesai', meta: 'Catat hasil', raised: true, className: 'form-panel' }, form),
+      listPanel,
+    ),
   )
 
-  const msg = Components.el('div', { className: 'form-message', style: 'display:none;' })
+  let flow = null
 
-  const completeBtn = Components.el('button', { type: 'button' }, '\u2705 Tandai Selesai')
+  function fillAssignments() {
+    const active = flow.activeAssignments()
+    const opts = [{ value: '', label: active.length ? 'Pilih penugasan' : 'Tidak ada penugasan aktif' }]
+    active.forEach((a) => {
+      const r = flow.requestOfAssignment(a)
+      opts.push({ value: a.id, label: `${customerLabel(r)} — ${a.worker_name || 'tanpa nama'} · ${C.formatDate(a.scheduled_at)}` })
+    })
+    const wanted = params.assignmentId != null ? String(params.assignmentId) : ''
+    const keep = [assignSel.input.value, wanted].find((v) => v && active.some((a) => String(a.id) === v)) || ''
+    C.setOptions(assignSel.input, opts, keep)
+    submit.disabled = !active.length
+    if (!active.length) {
+      msg.show('info', flow.assignments.length
+        ? 'Semua penugasan sudah selesai. Buat penugasan baru di tahap 03.'
+        : 'Belum ada penugasan. Tugaskan pekerja di tahap 03 terlebih dahulu.')
+      const go = C.button({ label: 'Ke penugasan', iconRight: 'arrowRight', size: 'sm' })
+      go.addEventListener('click', () => navigate('assign'))
+      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
+    }
+    showPreview()
+  }
 
-  const assignSelect = Components.selectField({
-    label: 'Penugasan',
-    id: 'assignment_id',
-    required: true,
-    options: selectOptions,
-  })
+  function showPreview() {
+    const a = flow?.assignment(assignSel.input.value)
+    if (!a) { preview.hidden = true; return }
+    const r = flow.requestOfAssignment(a)
+    const o = flow.offerOfAssignment(a)
+    preview.replaceChildren(C.defList([
+      ['Pelanggan', `${customerLabel(r)}${r?.location ? ` · ${r.location}` : ''}`],
+      ['Pelaksana', a.worker_name || '—'],
+      ['Jadwal', C.formatDateTime(a.scheduled_at)],
+      ['Nilai', el('span', { className: 'tnum strong' }, C.rupiah(o?.validated_price))],
+    ]))
+    preview.hidden = false
+  }
+  assignSel.input.addEventListener('change', () => { msg.hide(); showPreview() })
 
-  const notesGroup = Components.textareaField({
-    label: 'Catatan Hasil Pekerjaan',
-    id: 'completion_notes',
-    placeholder: 'Deskripsikan hasil pekerjaan: kondisi akhir, catatan khusus, saran perawatan, dll.',
-    rows: 4,
-  })
-
-  const form = Components.el('form', { id: 'complete-form' },
-    assignSelect,
-    notesGroup,
-    Components.el('div', { className: 'form-actions' }, completeBtn),
-    msg
-  )
-
-  formCard.appendChild(form)
-
-  const listCard = Components.section('\ud83d\udccb Riwayat Penyelesaian',
-    Components.el('div', { id: 'complete-list' }, Components.el('div', { className: 'spinner' }))
-  )
-  listCard.classList.add('card-accent-secondary')
-
-  container.appendChild(formCard)
-  container.appendChild(listCard)
-
-  animateEntrance(formCard, 0)
-  animateEntrance(listCard, 100)
-
-  completeBtn.addEventListener('click', async () => {
-    msg.style.display = 'none'
-    const selectEl = form.querySelector('#assignment_id')
-    const notesEl = form.querySelector('#completion_notes')
-    if (!selectEl.value) {
-      msg.className = 'form-message error'
-      msg.textContent = 'Pilih penugasan terlebih dahulu.'
-      msg.style.display = 'block'
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    msg.hide()
+    const a = flow?.assignment(assignSel.input.value)
+    if (!a) {
+      msg.show('danger', 'Pilih penugasan terlebih dahulu.')
+      assignSel.input.focus()
       return
     }
+    const restore = C.setBusy(submit, 'Menyimpan…')
+    const db = getCloud().database
     try {
-      const { error } = await cloud.database.from('completions').insert({
-        assignment_id: Number(selectEl.value),
-        notes: notesEl.value.trim(),
+      const { data, error } = await db.from('completions').insert({
+        assignment_id: Number(a.id),
+        notes: notes.input.value.trim(),
         status: 'done',
         completed_at: new Date().toISOString(),
       })
       if (error) throw new Error(error.message)
-
-      await cloud.database.from('assignments').update({ status: 'done' }).eq('id', Number(selectEl.value))
-
-      msg.className = 'form-message success'
-      msg.textContent = '\u2705 Pekerjaan ditandai selesai.'
-      msg.style.display = 'block'
-      notesEl.value = ''
-      showToast('Pekerjaan selesai! Siap untuk pembukuan.', 'success')
-      await loadList()
+      const upd = await db.from('assignments').update({ status: 'done' }).eq('id', a.id)
+      if (upd.error) console.warn('Status penugasan tidak diperbarui:', upd.error.message)
+      const row = Array.isArray(data) ? data[0] : data
+      notes.input.value = ''
+      msg.show('ok', `Pekerjaan untuk ${customerLabel(flow.requestOfAssignment(a))} ditandai selesai. Siap dibukukan.`)
+      const next = C.button({ label: 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+      next.addEventListener('click', () => navigate('bookkeeping', { completionId: row?.id }))
+      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
+      showToast('Pekerjaan ditandai selesai.', 'success')
+      notifyDataChanged()
+      await loadList({ keepMessage: true })
     } catch (err) {
-      msg.className = 'form-message error'
-      msg.textContent = err.message
-      msg.style.display = 'block'
+      msg.show('danger', `Gagal menyimpan: ${err.message}`)
+    } finally {
+      restore()
+      submit.disabled = !flow?.activeAssignments().length
     }
   })
 
-  async function loadList() {
-    const el = container.querySelector('#complete-list')
+  async function loadList({ keepMessage = false } = {}) {
     try {
-      const { data, error } = await cloud.database.from('completions')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) throw new Error(error.message)
-      if (!data || data.length === 0) {
-        el.innerHTML = '<p style="color:var(--text-muted)">Belum ada penyelesaian.</p>'
-        return
-      }
-      el.innerHTML = ''
-      for (let i = 0; i < data.length; i++) {
-        const c = data[i]
-        const assignRes = await cloud.database.from('assignments').select('offer_id,worker_name').eq('id', c.assignment_id).maybeSingle()
-        const offerRes = assignRes.data?.offer_id ? await cloud.database.from('offers').select('request_id').eq('id', assignRes.data.offer_id).maybeSingle() : { data: null }
-        const reqRes = offerRes.data?.request_id ? await cloud.database.from('requests').select('customer_name').eq('id', offerRes.data.request_id).maybeSingle() : { data: null }
-        const card = Components.el('div', { className: 'card', style: 'margin-bottom:12px;' },
-          Components.el('div', { style: 'display:flex;justify-content:space-between;align-items:flex-start;' },
-            Components.el('div', {},
-              Components.el('strong', {}, reqRes.data?.customer_name || 'Pelanggan'),
-              Components.el('span', { style: 'color:var(--text-muted);font-size:0.85rem;display:block;margin-top:4px;' },
-                `\ud83d\udc77 ${assignRes.data?.worker_name || '-'}`
-              )
-            ),
-            Components.badge('SELESAI', 'completed')
-          ),
-          Components.el('p', { style: 'margin:10px 0;font-size:0.9rem;color:var(--text-muted);' }, c.notes || '-'),
-          Components.el('span', { style: 'font-size:0.75rem;color:var(--text-dim);' },
-            '\u2705 ' + new Date(c.completed_at).toLocaleString('id-ID')
-          )
-        )
-        animateEntrance(card, i * 60)
-        el.appendChild(card)
-      }
+      flow = await loadFlow()
     } catch (err) {
-      el.innerHTML = `<p style="color:var(--danger)">Gagal memuat: ${err.message}</p>`
+      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      return
     }
+    if (ctx.signal?.aborted) return
+    const prevMsg = keepMessage && !msg.hidden ? Array.from(msg.childNodes) : null
+    const prevClass = msg.className
+    fillAssignments()
+    if (prevMsg) { msg.className = prevClass; msg.replaceChildren(...prevMsg); msg.hidden = false }
+
+    const unbooked = flow.completionsWithoutLedger().length
+    listPanel.querySelector('.panel-meta').textContent = `${flow.completions.length} baris · ${unbooked} belum dibukukan`
+    if (!flow.completions.length) {
+      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada pekerjaan selesai.', body: 'Pekerjaan yang ditandai selesai akan muncul di sini.' }))
+      return
+    }
+    const rows = [...flow.completions].sort((x, y) => (C.toDate(y.completed_at || y.created_at) || 0) - (C.toDate(x.completed_at || x.created_at) || 0))
+    listBody.replaceChildren(C.dataTable({
+      caption: 'Riwayat penyelesaian',
+      rows,
+      columns: [
+        { label: 'Pelanggan', render: (c) => { const r = flow.requestOfCompletion(c); const a = flow.assignmentOfCompletion(c); return C.cellStack(customerLabel(r), a?.worker_name) } },
+        { label: 'Catatan', className: 'col-wide', render: (c) => el('span', { className: 'cell-note', title: c.notes || '' }, c.notes || '—') },
+        { label: 'Selesai', className: 'col-date', render: (c) => el('time', { className: 'tnum', datetime: c.completed_at || '', title: C.formatDateTime(c.completed_at) }, C.formatDate(c.completed_at || c.created_at)) },
+        {
+          label: 'Pembukuan',
+          className: 'col-action',
+          render: (c) => {
+            if (flow.ledgerOf(c.id).length) return C.tag('Terbukukan', 'ok')
+            const b = C.button({ label: 'Posting', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+            b.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
+            return b
+          },
+        },
+      ],
+    }))
   }
 
   await loadList()

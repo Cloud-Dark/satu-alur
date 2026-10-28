@@ -1,0 +1,25 @@
+name = "satu-alur"
+main = "worker/index.js"
+compatibility_date = "2025-09-01"
+
+# Static SPA (Vite build) + Worker API. Only /api/* runs the Worker first;
+# everything else is served from ./dist with SPA fallback.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "satu-alur-db"
+database_id = "085c9a7a-64c5-4ced-b0f3-3158870d64f4"
+migrations_dir = "migrations"
+
+[vars]
+# Demo mode: send-otp returns the OTP code in the response (no email provider yet).
+# Set to "false" (or remove) in production once an email provider is wired in.
+DEMO_OTP = "true"

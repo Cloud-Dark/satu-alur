@@ -1,230 +1,125 @@
-import * as Superpowers from '../ai/superpowers.js'
+import * as AI from '../ai/superpowers.js'
 import { loadModels, pickDefaultModel } from '../ai/models.js'
-import * as Components from '../ui/components.js'
-import { showToast, animateEntrance } from '../ui/animations.js'
+import * as C from '../ui/components.js'
 
-let selectedModel = null
+const { el } = C
 let currentAgent = 'general'
-let abortController = null
 
-const AGENT_OPTIONS = [
-  { key: 'general', label: '🤖 Asisten Umum', desc: 'Bantuan umum & troubleshooting' },
-  { key: 'offer', label: '💡 Agen Penawaran', desc: 'Membuat proposal penawaran' },
-  { key: 'report', label: '📈 Analis Laporan', desc: 'Analisis keuangan & laporan' },
-  { key: 'analyst', label: '📊 Analis Bisnis', desc: 'Analisis data dengan query DB' },
-]
+export async function render(container, ctx = {}) {
+  let controller = null
+  const agents = AI.getAgents().filter((a) => a.key !== 'social')
+  const agent = C.select({ label: 'Asisten', id: 'chat-agent', value: currentAgent,
+    options: agents.map((a) => ({ value: a.key, label: a.name })) })
+  const model = C.select({ label: 'Model AI', id: 'chat-model', options: [{ value: '', label: 'Memuat model…' }] })
+  const desc = el('p', { className: 'panel-lead' })
+  const messages = el('div', { className: 'assistant-messages', role: 'log', 'aria-label': 'Percakapan AI' })
+  const input = C.textarea({ label: 'Pesan Anda', id: 'chat-message', rows: 3, required: true,
+    placeholder: 'Apa yang ingin Anda kerjakan?', hint: 'Enter untuk mengirim · Shift + Enter untuk baris baru.', attrs: { maxlength: '8000' } })
+  const send = C.button({ label: 'Kirim pesan', icon: 'arrowUpRight', variant: 'primary', type: 'submit', disabled: true })
+  const stop = C.button({ label: 'Hentikan', icon: 'stop', variant: 'soft', hidden: true, onClick: () => controller?.abort() })
+  const reset = C.button({ label: 'Reset', icon: 'refresh', variant: 'ghost', size: 'sm', onClick: () => {
+    AI.clearHistory(currentAgent)
+    drawHistory()
+  } })
+  const error = C.message()
+  const stats = el('div', { className: 'workspace-stats' })
+  const form = el('form', { className: 'form assistant-composer' }, input.wrap,
+    el('div', { className: 'form-actions' }, send, stop), error)
 
-export async function render(container) {
-  container.innerHTML = ''
+  container.replaceChildren(
+    C.pageHeader({ title: 'Asisten untuk bisnis Anda', em: 'bisnis', description: 'Pilih spesialis, lanjutkan percakapan, dan gunakan data operasional untuk menentukan langkah berikutnya.' }),
+    el('div', { className: 'stage-grid workspace-grid' },
+      el('div', { className: 'workspace-stack' },
+        C.panel({ title: 'AI Superpowers', meta: 'Satu spesialis per percakapan' },
+          el('div', { className: 'form' }, agent.wrap, model.wrap, desc),
+          el('p', { className: 'field-hint' }, 'Riwayat disimpan di browser ini. Jangan masukkan rahasia atau data sensitif.')),
+        C.panel({ title: 'Aktivitas AI', meta: '100 interaksi terakhir' }, stats)),
+      C.panel({ title: 'Percakapan', actions: reset, className: 'assistant-panel' }, messages, form)))
+
+  function drawStats() {
+    const s = AI.getAnalyticsSummary()
+    stats.replaceChildren(C.defList([
+      ['Percakapan', String(s.total)], ['Berhasil', `${s.successRate}%`], ['Rata-rata respons', `${s.avgLatency} ms`],
+    ]))
+  }
+  function addMessage(role, text) {
+    const body = el('div', { className: 'assistant-message-text' })
+    body.innerHTML = C.sanitizeHTML(text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>'))
+    const row = el('article', { className: `assistant-message is-${role}` },
+      el('span', { className: 'assistant-avatar', 'aria-hidden': 'true' }, C.icon(role === 'user' ? 'user' : 'bot')),
+      el('div', {}, el('b', { className: 'assistant-author' }, role === 'user' ? 'Anda' : agent.input.selectedOptions[0]?.textContent || 'Asisten'), body))
+    if (role === 'user') body.textContent = text
+    messages.appendChild(row)
+    messages.scrollTop = messages.scrollHeight
+    return body
+  }
+  function drawHistory() {
+    desc.textContent = agents.find((a) => a.key === currentAgent)?.description || ''
+    const history = AI.getConversationHistory(currentAgent)
+    messages.replaceChildren()
+    if (!history.length) messages.appendChild(C.emptyState({ kicker: 'Mulai percakapan', iconName: 'message',
+      title: 'Ada yang ingin Anda diskusikan?', body: 'Tanyakan alur kerja, siapkan penawaran, atau minta ringkasan bisnis.' }))
+    history.forEach((h) => addMessage(h.role === 'user' ? 'user' : 'assistant', h.content))
+  }
+  agent.input.addEventListener('change', () => { currentAgent = agent.input.value; error.hide(); drawHistory() })
+  ctx.signal?.addEventListener('abort', () => controller?.abort(), { once: true })
+  drawHistory()
+  drawStats()
 
   try {
-    await loadModels()
-    selectedModel = pickDefaultModel()
-  } catch (e) {
-    console.warn('Model load error:', e.message)
-  }
+    const models = await loadModels()
+    if (ctx.signal?.aborted) return
+    C.setOptions(model.input, models.map((m) => ({ value: m.id, label: m.name || m.id })), pickDefaultModel()?.id)
+    send.disabled = false
+  } catch (err) { error.show('danger', `Model tidak tersedia: ${err.message}`) }
 
-  // Header
-  const header = Components.el('div', { className: 'form-card card-accent-orange' },
-    Components.el('h3', { className: 'form-title' }, '🦸 AI Superpowers'),
-    Components.el('p', { className: 'form-subtitle' }, 'AI Engine dengan multi-agent routing, conversation memory, tool calling, smart retry, dan analytics.')
-  )
-
-  // Agent selector
-  const agentSelect = Components.el('div', { className: 'form-row', style: 'margin-bottom:16px;' })
-  AGENT_OPTIONS.forEach(opt => {
-    const btn = Components.el('button', {
-      type: 'button',
-      style: `padding:10px 14px;border:1px solid ${opt.key === currentAgent ? 'var(--primary)' : 'var(--border)'};border-radius:var(--radius-sm);background:${opt.key === currentAgent ? 'var(--primary-soft)' : 'var(--bg-card)'};color:${opt.key === currentAgent ? 'var(--primary)' : 'var(--text-muted)'};cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s;`,
-      onClick: () => {
-        currentAgent = opt.key
-        render(container)
-      },
-    }, opt.label)
-    agentSelect.appendChild(btn)
+  input.input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!send.disabled) form.requestSubmit() }
   })
-
-  // Chat area
-  const chatCard = Components.el('div', { className: 'form-card', style: 'padding:0;overflow:hidden;' })
-
-  // Chat header
-  const chatHeader = Components.el('div', {
-    style: 'padding:16px 20px;background:var(--primary-soft);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;'
-  },
-    Components.el('div', {},
-      Components.el('strong', { style: 'font-size:0.95rem;color:var(--text);' }, AGENT_OPTIONS.find(a => a.key === currentAgent)?.label || 'AI'),
-      Components.el('span', { style: 'font-size:0.75rem;color:var(--text-muted);display:block;' }, AGENT_OPTIONS.find(a => a.key === currentAgent)?.desc || '')
-    ),
-    Components.el('div', { style: 'display:flex;gap:8px;' },
-      Components.el('button', {
-        type: 'button',
-        style: 'padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-muted);font-size:0.8rem;cursor:pointer;',
-        onClick: () => {
-          Superpowers.clearHistory(currentAgent)
-          chatMessages.innerHTML = ''
-          addBotMessage('Percakapan telah direset. Ada yang bisa saya bantu?')
-          showToast('Percakapan direset', 'info')
-        },
-      }, '🗑 Reset'),
-      Components.el('button', {
-        type: 'button',
-        style: 'padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);color:var(--text-muted);font-size:0.8rem;cursor:pointer;',
-        onClick: () => {
-          const summary = Superpowers.getAnalyticsSummary()
-          addBotMessage(`📊 **AI Analytics**\n\n- Total chat: ${summary.total}\n- Success rate: ${summary.successRate}%\n- Rata-rata latency: ${summary.avgLatency}ms\n- Distribusi agent: ${Object.entries(summary.byAgent).map(([k,v]) => `${k}: ${v}`).join(', ')}`)
-        },
-      }, '📈 Stats')
-    )
-  )
-
-  // Messages container
-  const chatMessages = Components.el('div', {
-    style: 'height:360px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--bg);'
-  })
-
-  // Load history
-  const history = Superpowers.getConversationHistory(currentAgent)
-  if (history.length === 0) {
-    addBotMessage(`Halo! Saya adalah ${AGENT_OPTIONS.find(a => a.key === currentAgent)?.label || 'AI Assistant'}.\n\nSaya memiliki beberapa "superpower":\n• 🧠 **Memory** — mengingat percakapan kita\n• 🔧 **Tool Calling** — kalkulator, query database, format rupiah\n• 🔄 **Smart Retry** — auto-switch model jika gagal\n• 📊 **Analytics** — tracking performa\n\nAda yang bisa saya bantu?`)
-  } else {
-    history.forEach(h => {
-      if (h.role === 'user') addUserMessage(h.content)
-      else addBotMessage(h.content)
-    })
-  }
-
-  // Input area
-  const chatInput = Components.el('input', {
-    type: 'text',
-    placeholder: 'Ketik pesan Anda...',
-    style: 'flex:1;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-warm);font-family:inherit;font-size:0.9rem;outline:none;'
-  })
-
-  const sendBtn = Components.el('button', {
-    type: 'button',
-    style: 'padding:12px 20px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);font-weight:700;cursor:pointer;transition:all 0.2s;',
-  }, 'Kirim')
-
-  const inputArea = Components.el('div', {
-    style: 'display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:var(--bg-surface);'
-  }, chatInput, sendBtn)
-
-  chatCard.appendChild(chatHeader)
-  chatCard.appendChild(chatMessages)
-  chatCard.appendChild(inputArea)
-
-  container.appendChild(header)
-  container.appendChild(agentSelect)
-  container.appendChild(chatCard)
-
-  animateEntrance(header, 0)
-  animateEntrance(chatCard, 100)
-
-  // Scroll to bottom
-  function scrollToBottom() {
-    chatMessages.scrollTop = chatMessages.scrollHeight
-  }
-
-  function addUserMessage(text) {
-    const msg = Components.el('div', {
-      style: 'align-self:flex-end;max-width:80%;padding:10px 14px;background:var(--primary);color:#fff;border-radius:var(--radius-sm);border-bottom-right-radius:4px;font-size:0.9rem;line-height:1.5;animation:msgIn 0.2s ease;'
-    }, text)
-    chatMessages.appendChild(msg)
-    scrollToBottom()
-  }
-
-  function addBotMessage(text) {
-    const msg = Components.el('div', {
-      style: 'align-self:flex-start;max-width:80%;padding:10px 14px;background:var(--bg-surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);border-bottom-left-radius:4px;font-size:0.9rem;line-height:1.5;animation:msgIn 0.2s ease;white-space:pre-wrap;'
-    })
-    msg.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
-    chatMessages.appendChild(msg)
-    scrollToBottom()
-  }
-
-  function addTypingIndicator() {
-    const indicator = Components.el('div', {
-      id: 'typing-indicator',
-      style: 'align-self:flex-start;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:0.9rem;color:var(--text-muted);display:flex;align-items:center;gap:6px;'
-    },
-      Components.el('div', { className: 'spinner', style: 'width:14px;height:14px;border-width:1.5px;' }),
-      'AI sedang mengetik...'
-    )
-    chatMessages.appendChild(indicator)
-    scrollToBottom()
-    return indicator
-  }
-
-  async function sendMessage() {
-    const text = chatInput.value.trim()
-    if (!text) return
-    if (!selectedModel) {
-      addBotMessage('❌ Model AI tidak tersedia. Silakan cek pengaturan.')
-      return
-    }
-
-    chatInput.value = ''
-    addUserMessage(text)
-
-    const typing = addTypingIndicator()
-    sendBtn.disabled = true
-    sendBtn.style.opacity = '0.5'
-
-    abortController = new AbortController()
-    let fullText = ''
-
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    if (controller || !input.input.value.trim() || !model.input.value) return
+    const text = input.input.value.trim()
+    input.input.value = ''
+    error.hide()
+    messages.querySelector('.empty')?.remove()
+    addMessage('user', text)
+    const response = addMessage('assistant', 'Sedang menyiapkan jawaban…')
+    controller = new AbortController()
+    const restore = C.setBusy(send, 'Menjawab…')
+    agent.input.disabled = true
+    model.input.disabled = true
+    reset.disabled = true
+    stop.hidden = false
+    messages.setAttribute('aria-busy', 'true')
+    let received = false
     try {
-      const generator = Superpowers.chatWithAgent({
-        agentKey: currentAgent,
-        message: text,
-        modelId: selectedModel.id,
-        signal: abortController.signal,
-      })
-
-      for await (const event of generator) {
+      for await (const event of AI.chatWithAgent({ agentKey: currentAgent, message: text, modelId: model.input.value, signal: controller.signal })) {
+        if (ctx.signal?.aborted) break
+        if (event.type === 'error') throw new Error(event.message)
         if (event.type === 'text') {
-          if (!fullText) {
-            typing.remove()
-            const msgEl = Components.el('div', {
-              id: 'streaming-msg',
-              style: 'align-self:flex-start;max-width:80%;padding:10px 14px;background:var(--bg-surface);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);border-bottom-left-radius:4px;font-size:0.9rem;line-height:1.5;white-space:pre-wrap;'
-            })
-            chatMessages.appendChild(msgEl)
-          }
-          fullText = event.full
-          const msgEl = chatMessages.querySelector('#streaming-msg')
-          if (msgEl) msgEl.innerHTML = fullText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')
-          scrollToBottom()
-        }
-        if (event.type === 'tool') {
-          typing.remove()
-          addBotMessage(`🔧 **Tool Executed:** ${event.result.tool}\n\n\`\`\`json\n${JSON.stringify(event.result.result, null, 2)}\n\`\`\``)
-        }
-        if (event.type === 'error') {
-          typing.remove()
-          addBotMessage('❌ ' + event.message)
-        }
-        if (event.type === 'done') {
-          const msgEl = chatMessages.querySelector('#streaming-msg')
-          if (msgEl) msgEl.removeAttribute('id')
+          received = true
+          response.innerHTML = C.sanitizeHTML(event.full.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>'))
+          messages.scrollTop = messages.scrollHeight
         }
       }
+      if (!received) response.textContent = 'AI tidak mengembalikan jawaban. Silakan coba lagi.'
     } catch (err) {
-      typing.remove()
       if (err.name === 'AbortError') {
-        addBotMessage('⏹ Dibatalkan.')
+        if (!received) response.textContent = 'Percakapan dihentikan.'
       } else {
-        addBotMessage('❌ Error: ' + err.message)
+        if (!received) response.textContent = 'Jawaban belum tersedia.'
+        error.show('danger', err.message)
       }
     } finally {
-      sendBtn.disabled = false
-      sendBtn.style.opacity = '1'
-      abortController = null
+      controller = null
+      restore()
+      agent.input.disabled = false
+      model.input.disabled = false
+      reset.disabled = false
+      stop.hidden = true
+      messages.setAttribute('aria-busy', 'false')
+      drawStats()
     }
-  }
-
-  sendBtn.addEventListener('click', sendMessage)
-  chatInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage()
   })
 }
