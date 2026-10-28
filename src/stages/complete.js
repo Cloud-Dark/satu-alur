@@ -45,6 +45,7 @@ export async function render(container, ctx = {}) {
 
   const listBody = el('div', {}, C.skeletonRows(5))
   const listPanel = C.panel({ title: 'Riwayat penyelesaian', meta: 'memuat…', className: 'list-panel' }, listBody)
+  const pg = C.pager({ key: 'completions', label: 'riwayat penyelesaian', onChange: () => drawList(), scrollTarget: listPanel })
 
   container.replaceChildren(
     C.pageHeader({ num: '04', label: 'Penyelesaian', title: 'Penyelesaian pekerjaan', em: 'pekerjaan', description: 'Tutup penugasan yang sudah dikerjakan. Pekerjaan selesai siap dibukukan di tahap 05.' }),
@@ -148,7 +149,10 @@ export async function render(container, ctx = {}) {
     }
     if (ctx.signal?.aborted) return
     fillAssignments()
+    drawList()
+  }
 
+  function drawList() {
     const unbooked = flow.completionsWithoutLedger().length
     listPanel.querySelector('.panel-meta').textContent = `${flow.completions.length} baris · ${unbooked} belum dibukukan`
     if (!flow.completions.length) {
@@ -158,7 +162,7 @@ export async function render(container, ctx = {}) {
     const rows = [...flow.completions].sort((x, y) => (C.toDate(y.completed_at || y.created_at) || 0) - (C.toDate(x.completed_at || x.created_at) || 0))
     listBody.replaceChildren(C.dataTable({
       caption: 'Riwayat penyelesaian',
-      rows,
+      rows: pg.slice(rows),
       columns: [
         { label: 'Pelanggan', render: (c) => { const r = flow.requestOfCompletion(c); const a = flow.assignmentOfCompletion(c); return C.cellStack(customerLabel(r), a?.worker_name) } },
         { label: 'Catatan', className: 'col-wide', render: (c) => el('span', { className: 'cell-note', title: c.notes || '' }, c.notes || '—') },
@@ -174,7 +178,7 @@ export async function render(container, ctx = {}) {
           },
         },
       ],
-    }))
+    }), pg.root)
   }
 
   await loadList()

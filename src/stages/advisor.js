@@ -23,7 +23,8 @@ const { el, icon } = C
 const SVGNS = 'http://www.w3.org/2000/svg'
 const PREF_AGENT = 'satualur_advisor_agent'
 const PREF_TARGET = 'satualur_advisor_target'
-const SHOW_LAST = 80
+const SHOW_STEP = 20 // messages rendered per "Muat pesan sebelumnya" step
+const PREF_TAB = 'satualur_advisor_tab'
 
 const store = {
   get(k) { try { return localStorage.getItem(k) } catch { return null } },
@@ -157,6 +158,7 @@ export async function render(container, ctx = {}) {
   let busy = false
   let current = null
   let lastAuto = null
+  let showCount = SHOW_STEP
   const routes = new Map() // row id -> route info for this session
   ctx.signal?.addEventListener('abort', () => current?.abort())
 
@@ -169,7 +171,7 @@ export async function render(container, ctx = {}) {
         el('span', { className: 'step-text' }, 'Pertumbuhan', el('span', { 'aria-hidden': 'true' }, '·'), el('b', {}, 'Penasihat AI')),
       ),
       el('h1', { className: 'page-title display', tabindex: '-1' }, C.displayTitle('Penasihat bisnis', 'bisnis')),
-      el('p', { className: 'page-desc' }, 'Lima penasihat AI yang membaca angka bisnis Anda sendiri: pendapatan, biaya, konversi, dan pekerjaan tertunda. Tanyakan cara tumbuh 1–2% per bulan, atau lebih.'),
+      el('p', { className: 'page-desc' }, 'Lima penasihat AI yang membaca angka bisnis Anda sendiri. Tanyakan cara tumbuh 1–2% per bulan, atau lebih.'),
     ),
     el('div', { className: 'page-head-actions' }, modelPill),
   )
@@ -177,11 +179,11 @@ export async function render(container, ctx = {}) {
   /* ------------------------------------------------------ Agent picker */
   const agentButtons = new Map()
   const agentCounts = new Map()
-  const agentList = el('div', { className: 'adv-agent-list', role: 'radiogroup', 'aria-label': 'Pilih penasihat' })
+  const agentList = el('div', { className: 'adv-agent-list', role: 'listbox', id: 'adv-agent-list', 'aria-label': 'Pilih penasihat' })
   for (const key of [AUTO, ...AGENT_KEYS]) {
     const meta = viewMeta(key)
     const count = el('span', { className: 'adv-agent-count tnum', hidden: true })
-    const b = el('button', { type: 'button', role: 'radio', className: `adv-agent ${key === AUTO ? 'is-auto' : ''}`.trim(), dataset: { agent: key } },
+    const b = el('button', { type: 'button', role: 'option', className: `adv-agent ${key === AUTO ? 'is-auto' : ''}`.trim(), dataset: { agent: key } },
       el('span', { className: 'adv-agent-ico', 'aria-hidden': 'true' }, icon(meta.icon, { size: 17 })),
       el('span', { className: 'adv-agent-text' },
         el('span', { className: 'adv-agent-name' }, meta.name),
@@ -189,25 +191,62 @@ export async function render(container, ctx = {}) {
       ),
       count,
     )
-    b.addEventListener('click', () => selectView(key))
+    b.addEventListener('click', () => { selectView(key); closePicker({ focus: true }) })
     agentButtons.set(key, b)
     agentCounts.set(key, count)
     agentList.append(b)
   }
-  agentList.addEventListener('keydown', (e) => {
-    const keys = [AUTO, ...AGENT_KEYS]
-    const dir = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key]
-    if (!dir) return
-    e.preventDefault()
-    const next = keys[(keys.indexOf(view) + dir + keys.length) % keys.length]
-    selectView(next)
-    agentButtons.get(next).focus()
+  const chatIco = el('span', { className: 'adv-chat-ico', 'aria-hidden': 'true' })
+  const chatName = el('span', { className: 'adv-chat-name', id: 'adv-chat-title' })
+  const chatRole = el('span', { className: 'adv-chat-role' })
+  const pickerBtn = el('button', {
+    type: 'button', className: 'adv-agent-trigger', 'aria-haspopup': 'listbox', 'aria-expanded': 'false', 'aria-controls': 'adv-agent-list',
+    title: 'Ganti penasihat',
+  },
+  chatIco,
+  el('span', { className: 'adv-trigger-text' },
+    el('span', { className: 'adv-trigger-kicker' }, 'Penasihat'),
+    el('span', { className: 'adv-trigger-name' }, chatName, icon('chevronDown', { size: 16, className: 'adv-trigger-chev' })),
+  ))
+  const pickerPop = el('div', { className: 'adv-agent-pop', hidden: true },
+    el('p', { className: 'adv-pop-head' }, 'Pilih penasihat', el('span', {}, 'Otomatis memilih sesuai pertanyaan')),
+    agentList)
+  const picker = el('div', { className: 'adv-picker' }, pickerBtn, pickerPop)
+  const optionKeys = [AUTO, ...AGENT_KEYS]
+  function openPicker() {
+    if (!pickerPop.hidden) return
+    pickerPop.hidden = false
+    pickerBtn.setAttribute('aria-expanded', 'true')
+    picker.classList.add('is-open')
+    agentButtons.get(view)?.focus({ preventScroll: true })
+    document.addEventListener('pointerdown', outside, true)
+  }
+  function closePicker({ focus = false } = {}) {
+    if (pickerPop.hidden) return
+    pickerPop.hidden = true
+    pickerBtn.setAttribute('aria-expanded', 'false')
+    picker.classList.remove('is-open')
+    document.removeEventListener('pointerdown', outside, true)
+    if (focus) pickerBtn.focus({ preventScroll: true })
+  }
+  function outside(e) { if (!picker.contains(e.target)) closePicker() }
+  ctx.signal?.addEventListener('abort', () => document.removeEventListener('pointerdown', outside, true))
+  pickerBtn.addEventListener('click', () => (pickerPop.hidden ? openPicker() : closePicker()))
+  pickerBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); openPicker() }
   })
-  const agentsPanel = C.panel({ title: 'Pilih penasihat', meta: 'Otomatis memilih sesuai pertanyaan', className: 'adv-agents' }, agentList)
+  pickerPop.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePicker({ focus: true }); return }
+    if (e.key === 'Tab') { closePicker(); return }
+    const dir = { ArrowDown: 1, ArrowUp: -1 }[e.key]
+    const cur = optionKeys.indexOf(document.activeElement?.dataset?.agent)
+    if (dir) { e.preventDefault(); agentButtons.get(optionKeys[(Math.max(0, cur) + dir + optionKeys.length) % optionKeys.length]).focus() }
+    else if (e.key === 'Home') { e.preventDefault(); agentButtons.get(optionKeys[0]).focus() }
+    else if (e.key === 'End') { e.preventDefault(); agentButtons.get(optionKeys.at(-1)).focus() }
+  })
 
   /* ---------------------------------------------------------- Snapshot */
   const snapBody = el('div', { className: 'adv-snap-body' }, C.skeleton({ lines: 4 }))
-  const snapPanel = C.panel({ title: 'Snapshot bisnis', meta: 'Angka ini dibaca AI sebagai konteks', className: 'adv-snap' }, snapBody)
 
   /* -------------------------------------------------------- Calculator */
   let target = Number(store.get(PREF_TARGET)) || 2
@@ -232,7 +271,7 @@ export async function render(container, ctx = {}) {
   const jobField = C.field({ label: 'Nilai per pekerjaan', name: 'adv_job', type: 'number', hint: 'Memuat…', attrs: { min: '0', step: '50000', inputmode: 'numeric' } })
   const calcOut = el('div', { className: 'adv-calc-out', 'aria-live': 'polite' })
   const askCalcBtn = C.button({ label: 'Tanya cara mencapainya', icon: 'message', variant: 'soft', size: 'sm' })
-  const calcPanel = C.panel({ title: 'Kalkulator target', meta: 'Pertumbuhan majemuk per bulan', className: 'adv-calc' },
+  const calcBody = el('div', { className: 'adv-calc' },
     el('div', { className: 'adv-calc-target' },
       el('span', { className: 'field-label', id: 'adv-target-label' }, 'Target per bulan'),
       el('div', { className: 'adv-target-row' }, presetWrap, el('div', { className: 'adv-custom' }, customField.input, el('span', { className: 'adv-custom-unit', 'aria-hidden': 'true' }, '%'))),
@@ -245,12 +284,61 @@ export async function render(container, ctx = {}) {
 
   /* ------------------------------------------------------------- Stats */
   const statsBody = el('div', {}, C.skeleton({ lines: 2 }))
-  const statsPanel = C.panel({ title: 'Statistik penasihat', meta: 'Dari riwayat tersimpan di akun Anda', className: 'adv-stats' }, statsBody)
+
+  /* -------------------------------------------------- Side panel (tabs) */
+  const TABS = [
+    { key: 'snapshot', label: 'Snapshot', icon: 'chart', meta: 'Angka bisnis yang dibaca AI sebagai konteks', body: el('div', { className: 'adv-snap' }, snapBody) },
+    { key: 'calc', label: 'Kalkulator', icon: 'calculator', meta: 'Target pertumbuhan majemuk per bulan', body: calcBody },
+    { key: 'stats', label: 'Statistik', icon: 'activity', meta: 'Dari riwayat tersimpan di akun Anda', body: el('div', { className: 'adv-stats' }, statsBody) },
+  ]
+  const savedTab = store.get(PREF_TAB)
+  let tab = TABS.some((t) => t.key === savedTab) ? savedTab : 'snapshot'
+  const tabBtns = new Map()
+  const tabPanes = new Map()
+  const tabList = el('div', { className: 'adv-tabs', role: 'tablist', 'aria-label': 'Data dan alat penasihat' })
+  const sideMeta = el('p', { className: 'adv-side-meta' })
+  for (const t of TABS) {
+    const b = el('button', { type: 'button', role: 'tab', className: 'adv-tab', id: `adv-tab-${t.key}`, 'aria-controls': `adv-pane-${t.key}`, dataset: { tab: t.key } },
+      icon(t.icon, { size: 15 }), el('span', {}, t.label))
+    b.addEventListener('click', () => selectTab(t.key))
+    tabBtns.set(t.key, b)
+    tabList.append(b)
+    tabPanes.set(t.key, el('div', { className: 'adv-pane', role: 'tabpanel', id: `adv-pane-${t.key}`, 'aria-labelledby': `adv-tab-${t.key}`, tabindex: '0', dataset: { pane: t.key } }, t.body))
+  }
+  tabList.addEventListener('keydown', (e) => {
+    const keys = TABS.map((t) => t.key)
+    const i = keys.indexOf(tab)
+    const next = { ArrowRight: keys[(i + 1) % keys.length], ArrowLeft: keys[(i - 1 + keys.length) % keys.length], Home: keys[0], End: keys.at(-1) }[e.key]
+    if (!next) return
+    e.preventDefault()
+    selectTab(next)
+    tabBtns.get(next).focus()
+  })
+  function selectTab(key) {
+    tab = key
+    store.set(PREF_TAB, key)
+    for (const t of TABS) {
+      const on = t.key === key
+      const b = tabBtns.get(t.key)
+      b.setAttribute('aria-selected', on ? 'true' : 'false')
+      b.tabIndex = on ? 0 : -1
+      tabPanes.get(t.key).hidden = !on
+      if (on) sideMeta.textContent = t.meta
+    }
+    tabPanes.get(key).scrollTop = 0
+  }
+  const side = el('section', { className: 'panel adv-side', id: 'adv-side', 'aria-label': 'Snapshot, kalkulator, dan statistik' },
+    el('div', { className: 'adv-side-head' }, tabList, sideMeta),
+    el('div', { className: 'adv-side-body' }, [...tabPanes.values()]),
+  )
+  selectTab(tab)
 
   /* -------------------------------------------------------------- Chat */
-  const chatIco = el('span', { className: 'adv-chat-ico', 'aria-hidden': 'true' })
-  const chatName = el('h2', { className: 'adv-chat-name' })
-  const chatRole = el('span', { className: 'adv-chat-role' })
+  const jumpBtn = C.button({ label: 'Data & kalkulator', icon: 'calculator', variant: 'soft', size: 'sm', className: 'adv-side-jump', 'aria-controls': 'adv-side', 'aria-label': 'Data & kalkulator', title: 'Snapshot, kalkulator, dan statistik' })
+  jumpBtn.addEventListener('click', () => {
+    side.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
+    tabBtns.get(tab).focus({ preventScroll: true })
+  })
   const clearBtn = C.button({ label: 'Hapus percakapan', icon: 'trash', variant: 'ghost', size: 'sm', className: 'adv-clear' })
   const log = el('div', { className: 'adv-log', role: 'log', 'aria-live': 'polite', 'aria-label': 'Percakapan dengan penasihat', tabindex: '0' })
   const status = el('p', { className: 'sr-only', role: 'status', 'aria-live': 'polite' })
@@ -271,8 +359,9 @@ export async function render(container, ctx = {}) {
   )
   const chat = el('section', { className: 'panel is-raised adv-chat', 'aria-labelledby': 'adv-chat-title' },
     el('div', { className: 'adv-chat-head' },
-      chatIco,
-      el('div', { className: 'adv-chat-title', id: 'adv-chat-title' }, chatName, chatRole),
+      picker,
+      el('div', { className: 'adv-chat-title' }, chatRole),
+      jumpBtn,
       clearBtn,
     ),
     log,
@@ -282,11 +371,7 @@ export async function render(container, ctx = {}) {
 
   container.replaceChildren(
     header,
-    el('div', { className: 'adv-grid' },
-      agentsPanel,
-      chat,
-      el('div', { className: 'adv-insights' }, snapPanel, calcPanel, statsPanel),
-    ),
+    el('div', { className: 'adv-grid' }, chat, side),
   )
 
   /* ============================================================ Logic */
@@ -295,6 +380,7 @@ export async function render(container, ctx = {}) {
 
   function selectView(key) {
     if (busy && key !== view) { showToast('Tunggu jawaban selesai atau hentikan dulu.', 'info'); return }
+    if (key !== view) showCount = SHOW_STEP
     view = key
     store.set(PREF_AGENT, key)
     syncAgents()
@@ -305,14 +391,14 @@ export async function render(container, ctx = {}) {
   function syncAgents() {
     for (const [key, b] of agentButtons) {
       const on = key === view
-      b.setAttribute('aria-checked', on ? 'true' : 'false')
-      b.tabIndex = on ? 0 : -1
+      b.setAttribute('aria-selected', on ? 'true' : 'false')
       b.classList.toggle('is-active', on)
     }
     const meta = viewMeta(view)
     chatIco.replaceChildren(icon(meta.icon, { size: 18 }))
     chatName.textContent = meta.name
     chatRole.textContent = view === AUTO ? 'Pertanyaan diarahkan ke penasihat yang paling cocok' : meta.role
+    pickerBtn.setAttribute('aria-label', `Penasihat: ${meta.name}. Ganti penasihat`)
     for (const [key, countEl] of agentCounts) {
       const n = (key === AUTO ? rows : rows.filter((r) => r.agent === key)).filter((r) => r.role === 'user').length
       countEl.hidden = n === 0
@@ -433,13 +519,33 @@ export async function render(container, ctx = {}) {
     return api
   }
 
-  function renderThread() {
-    const list = viewRows().slice(-SHOW_LAST)
+  function olderButton(hiddenCount) {
+    const n = Math.min(SHOW_STEP, hiddenCount)
+    const b = el('button', { type: 'button', className: 'adv-older' }, icon('arrowUp', { size: 14 }),
+      el('span', {}, `Muat pesan sebelumnya`), el('span', { className: 'adv-older-n tnum' }, hiddenCount > n ? `${n} dari ${hiddenCount} lagi` : `${hiddenCount} lagi`))
+    b.addEventListener('click', () => {
+      const before = log.scrollHeight - log.scrollTop
+      showCount += SHOW_STEP
+      renderThread({ keepScroll: true })
+      log.scrollTop = log.scrollHeight - before
+      const again = log.querySelector('.adv-older')
+      const first = log.querySelector('.adv-msg')
+      if (again) again.focus({ preventScroll: true })
+      else if (first) { first.tabIndex = -1; first.focus({ preventScroll: true }) }
+      status.textContent = `${n} pesan sebelumnya dimuat.`
+    })
+    return b
+  }
+
+  function renderThread({ keepScroll = false } = {}) {
+    const all = viewRows()
+    const list = all.slice(-showCount)
     renderChips()
     syncAgents()
     if (!list.length) { log.replaceChildren(emptyThread()); log.classList.add('is-empty'); return }
     log.classList.remove('is-empty')
     const nodes = []
+    if (all.length > list.length) nodes.push(olderButton(all.length - list.length))
     let prevDay = null
     for (const r of list) {
       const d = C.toDate(r.created_at)
@@ -447,7 +553,7 @@ export async function render(container, ctx = {}) {
       nodes.push(r.role === 'user' ? userMsg(r) : assistantMsg(r, { route: routes.get(r.id) }).node)
     }
     log.replaceChildren(...nodes)
-    log.scrollTop = log.scrollHeight
+    if (!keepScroll) log.scrollTop = log.scrollHeight
   }
 
   const nearBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 120
@@ -724,6 +830,14 @@ export async function render(container, ctx = {}) {
     return svg
   }
 
+  let projOpen = false
+  function projDetails(table) {
+    const d = el('details', { className: 'adv-proj-more', open: projOpen },
+      el('summary', {}, icon('chevronRight', { size: 14 }), 'Tabel proyeksi 12 bulan'), table)
+    d.addEventListener('toggle', () => { projOpen = d.open })
+    return d
+  }
+
   function drawCalc() {
     presetBtns.forEach((b) => {
       const on = Number(b.dataset.pct) === target
@@ -760,7 +874,7 @@ export async function render(container, ctx = {}) {
       ),
       el('div', { className: 'adv-proj-wrap' }, projectionChart(proj),
         el('div', { className: 'adv-proj-axis', 'aria-hidden': 'true' }, el('span', {}, 'Sekarang'), el('span', {}, '6 bln'), el('span', {}, '12 bln'))),
-      el('table', { className: 'adv-proj-table' },
+      projDetails(el('table', { className: 'adv-proj-table' },
         el('caption', { className: 'sr-only' }, `Proyeksi pendapatan pada target ${pctPlain(target)} per bulan`),
         el('thead', {}, el('tr', {},
           el('th', { scope: 'col' }, 'Bulan'),
@@ -773,7 +887,7 @@ export async function render(container, ctx = {}) {
             ? [fmtJobs(r.jobs), el('span', { className: 'adv-plus' }, ` +${fmtJobs(r.extraJobs)}`)]
             : `+${rp(r.delta)}`),
         ))),
-      ),
+      )),
       el('p', { className: 'adv-calc-note' }, `Tambahan pendapatan kumulatif 12 bulan: `, el('strong', { className: 'tnum' }, rp(proj.cumulativeExtra)), job > 0 ? `. Pekerjaan dihitung dengan nilai rata-rata ${rp(job)}.` : '. Isi nilai rata-rata pekerjaan untuk menghitung jumlah pekerjaan.'),
       compare,
     ].filter(Boolean))

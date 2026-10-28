@@ -80,6 +80,7 @@ export async function render(container, ctx = {}) {
   const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari permintaan' })
   const searchBox = el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search)
   const listPanel = C.panel({ title: 'Daftar permintaan', meta: 'memuat…', actions: searchBox, className: 'list-panel' }, listBody)
+  const pg = C.pager({ key: 'requests', label: 'daftar permintaan', onChange: () => drawList(), scrollTarget: listPanel })
 
   container.replaceChildren(
     C.pageHeader({ num: '01', label: 'Permintaan', title: 'Permintaan masuk', em: 'masuk', description: 'Catat kebutuhan pelanggan. Status setiap permintaan mengikuti seberapa jauh ia sudah bergerak di alur.' }),
@@ -161,7 +162,7 @@ export async function render(container, ctx = {}) {
     }
     listBody.replaceChildren(C.dataTable({
       caption: 'Daftar permintaan',
-      rows,
+      rows: pg.slice(rows, { resetKey: q }),
       columns: [
         {
           label: 'Pelanggan',
@@ -187,7 +188,7 @@ export async function render(container, ctx = {}) {
           },
         },
       ],
-    }))
+    }), pg.root)
   }
   search.addEventListener('input', () => model && drawList())
 

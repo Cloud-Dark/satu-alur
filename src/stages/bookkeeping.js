@@ -22,6 +22,7 @@ export async function render(container, ctx = {}) {
   const summary = el('div', { className: 'kpis kpis-3' })
   const listBody = el('div', {}, C.skeletonRows(6))
   const listPanel = C.panel({ title: 'Buku besar', meta: 'memuat…', className: 'list-panel' }, summary, listBody)
+  const pg = C.pager({ key: 'ledger', label: 'buku besar', onChange: () => drawList(), scrollTarget: () => listBody })
 
   let flow = null
   const selected = () => flow?.completion(complSel.input.value) || null
@@ -223,6 +224,10 @@ export async function render(container, ctx = {}) {
     }
     if (ctx.signal?.aborted) return
     fillCompletions()
+    drawList()
+  }
+
+  function drawList() {
 
     const t = totals(flow.ledger)
     summary.replaceChildren(
@@ -247,7 +252,7 @@ export async function render(container, ctx = {}) {
     const rows = asc.reverse()
     listBody.replaceChildren(C.dataTable({
       caption: 'Buku besar',
-      rows,
+      rows: pg.slice(rows),
       columns: [
         { label: 'Tanggal', className: 'col-date', render: (l) => el('time', { className: 'tnum', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
         { label: 'Keterangan', render: (l) => C.cellStack(customerLabel(flow.requestOfLedger(l)), categoryLabel(l.category)) },
@@ -255,7 +260,7 @@ export async function render(container, ctx = {}) {
         { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, `−${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
         { label: 'Saldo', align: 'right', render: (l) => { const b = balance.get(l); return el('span', { className: `tnum strong ${b < 0 ? 'amt-neg' : ''}` }, C.rupiah(b)) } },
       ],
-    }))
+    }), pg.root)
   }
 
   await loadList()

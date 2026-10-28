@@ -7,6 +7,7 @@ import { enhanceSelect } from './combobox.js'
 import { VALIDATOR, CONTENT_GATE, solidColor, createSkeleton } from './antislop.js'
 import { icon } from './icons.js'
 import { countUp } from './animations.js'
+import { PAGE_SIZES, GAP, pageCount, clampPage, pageWindow, pageBounds, rangeLabel, pageOfIndex, readPageSize, writePageSize } from './paging.js'
 
 export { icon }
 
@@ -510,6 +511,182 @@ export function segmented({ options, value, label, onChange }) {
   sync()
   wrap.append(...buttons)
   return wrap
+}
+
+/* ------------------------------------------------------------ Pagination */
+
+/**
+ * Display pagination for a list that is already fully loaded (filter and sort
+ * first, then page). The stage keeps rendering its own rows:
+ *
+ *   const pg = C.pager({ key: 'requests', label: 'daftar permintaan', onChange: drawList, scrollTarget: listPanel })
+ *   function drawList() {
+ *     const pageRows = pg.slice(rows, { resetKey: query })   // new query -> page 1
+ *     listBody.replaceChildren(table(pageRows), pg.root)
+ *   }
+ *
+ * Options: key (remembers the page size per list in sessionStorage), label
+ * (nav aria-label suffix), pageSize (default 10), sizes ([10, 25, 50]),
+ * onChange() (called after page / size change: redraw), scrollTarget (element
+ * or () => element brought into view on page change), unit (for the size
+ * label), hideSize (no size select).
+ *
+ * slice(items, { resetKey, focusIndex }) -> items of the current page.
+ *   resetKey: when it differs from the previous call the pager returns to
+ *   page 1 (search, filter or sort changed). Data reloads with the same key
+ *   keep the page (clamped). focusIndex: jump to the page holding that index.
+ */
+export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES, onChange, scrollTarget, hideSize = false, className = '' } = {}) {
+  const sizeList = sizes.includes(pageSize) ? sizes : [...sizes, pageSize].sort((a, b) => a - b)
+  let size = readPageSize(key, sizeList, pageSize)
+  let page = 1
+  let total = 0
+  let lastKey
+  let seenKey = false
+
+  const info = el('p', { className: 'pager-info tnum' })
+  const live = el('span', { className: 'sr-only', 'aria-live': 'polite' })
+  const prev = el('button', { type: 'button', className: 'icon-btn pager-step', 'aria-label': 'Halaman sebelumnya', title: 'Halaman sebelumnya', dataset: { step: 'prev' } }, icon('chevronLeft', { size: 18 }))
+  const next = el('button', { type: 'button', className: 'icon-btn pager-step', 'aria-label': 'Halaman berikutnya', title: 'Halaman berikutnya', dataset: { step: 'next' } }, icon('chevronRight', { size: 18 }))
+  const list = el('ul', { className: 'pager-pages', role: 'list' })
+  const where = el('span', { className: 'pager-where tnum', 'aria-hidden': 'true' })
+  const ctrl = el('div', { className: 'pager-ctrl' }, prev, list, where, next)
+  const sizeSel = hideSize ? null : select({
+    label: 'Per halaman',
+    name: key ? `pager-${key}` : undefined,
+    options: sizeList.map((n) => ({ value: n, label: `${n} baris` })),
+    value: size,
+  })
+  sizeSel?.wrap.classList.add('pager-size')
+  const root = el('nav', { className: `pager ${className}`.trim(), 'aria-label': `Halaman ${label}` },
+    el('div', { className: 'pager-bar' }, info, ctrl, sizeSel?.wrap), live)
+
+  const pages = () => pageCount(total, size)
+
+  function sync() {
+    const n = pages()
+    page = clampPage(page, n)
+    const small = total <= Math.min(...sizeList)
+    root.hidden = small
+    info.textContent = rangeLabel(page, size, total, number)
+    ctrl.hidden = n <= 1
+    prev.disabled = page <= 1
+    next.disabled = page >= n
+    where.textContent = `${page} / ${n}`
+    list.replaceChildren(...pageWindow(page, n).map((p) => {
+      if (p === GAP) return el('li', { className: 'pager-gap', 'aria-hidden': 'true' }, '…')
+      const on = p === page
+      return el('li', {}, el('button', {
+        type: 'button',
+        className: `pager-num tnum ${on ? 'is-current' : ''}`.trim(),
+        'aria-label': `Halaman ${p}`,
+        'aria-current': on ? 'page' : null,
+        dataset: { page: String(p) },
+      }, number(p)))
+    }))
+  }
+
+  function target() {
+    return typeof scrollTarget === 'function' ? scrollTarget() : scrollTarget
+  }
+
+  function bringIntoView() {
+    const t = target()
+    if (!t?.isConnected) return
+    t.setAttribute('data-pager-anchor', '')
+    const r = t.getBoundingClientRect()
+    const offset = (parseFloat(getComputedStyle(t).scrollMarginTop) || 80)
+    if (r.top < offset - 4 || r.top > innerHeight * 0.5) t.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })
+  }
+
+  function change(nextPage, focusSel) {
+    const n = pages()
+    const p = clampPage(nextPage, n)
+    if (p === page) return
+    page = p
+    onChange?.()
+    sync()
+    live.textContent = `Halaman ${page} dari ${n}. ${info.textContent}.`
+    bringIntoView()
+    const f = (focusSel && !root.querySelector(focusSel)?.disabled ? root.querySelector(focusSel) : null) || root.querySelector('.pager-num[aria-current="page"]')
+    f?.focus({ preventScroll: true })
+  }
+
+  prev.addEventListener('click', () => change(page - 1, '[data-step="prev"]'))
+  next.addEventListener('click', () => change(page + 1, '[data-step="next"]'))
+  list.addEventListener('click', (e) => {
+    const b = e.target.closest('.pager-num')
+    if (b) change(Number(b.dataset.page), `.pager-num[data-page="${b.dataset.page}"]`)
+  })
+  ctrl.addEventListener('keydown', (e) => {
+    if (e.target.closest('.pager-num, .pager-step') == null) return
+    if (e.key === 'ArrowLeft' && page > 1) { e.preventDefault(); change(page - 1, '[data-step="prev"]') }
+    else if (e.key === 'ArrowRight' && page < pages()) { e.preventDefault(); change(page + 1, '[data-step="next"]') }
+    else if (e.key === 'Home' && page > 1) { e.preventDefault(); change(1) }
+    else if (e.key === 'End' && page < pages()) { e.preventDefault(); change(pages()) }
+  })
+  sizeSel?.input.addEventListener('change', () => {
+    const v = Number(sizeSel.input.value)
+    if (!v || v === size) return
+    const first = pageBounds(page, size, total).start
+    size = v
+    writePageSize(key, v)
+    page = pageOfIndex(first, v)
+    onChange?.()
+    sync()
+    live.textContent = `${v} baris per halaman. ${info.textContent}.`
+  })
+
+  sync()
+  return {
+    root,
+    get page() { return page },
+    get size() { return size },
+    get pages() { return pages() },
+    slice(items = [], { resetKey, focusIndex } = {}) {
+      if (resetKey !== undefined) {
+        const k = typeof resetKey === 'object' && resetKey !== null ? JSON.stringify(resetKey) : String(resetKey)
+        if (seenKey && k !== lastKey) page = 1
+        lastKey = k
+        seenKey = true
+      }
+      total = items.length
+      if (focusIndex != null && focusIndex >= 0) page = pageOfIndex(focusIndex, size)
+      sync()
+      const { start, end } = pageBounds(page, size, total)
+      return items.slice(start, end)
+    },
+    /** Offset of the first item of the current page. */
+    get start() { return pageBounds(page, size, total).start },
+    goTo(p) { change(p) },
+    reset() { page = 1 },
+  }
+}
+
+/**
+ * Convenience wrapper that also owns the body:
+ *   const list = C.paginate({ key, label, render: (pageItems, { start }) => Node, ...pagerOpts })
+ *   host.append(list.root); list.update(items, { resetKey })
+ */
+export function paginate({ items = [], render, ...opts } = {}) {
+  const body = el('div', { className: 'paginate-body' })
+  let current = items
+  let pg = null
+  const draw = (sliceOpts) => {
+    const pageItems = pg.slice(current, sliceOpts)
+    const node = render(pageItems, { start: pg.start, total: current.length })
+    body.replaceChildren(...[node].flat().filter(Boolean))
+  }
+  const root = el('div', { className: 'paginate' }, body)
+  pg = pager({ scrollTarget: root, ...opts, onChange: () => { draw(); opts.onChange?.() } })
+  root.append(pg.root)
+  draw()
+  return {
+    root,
+    body,
+    pager: pg,
+    update(next, sliceOpts) { current = next || []; draw(sliceOpts) },
+  }
 }
 
 /* ---------------------------------------------------------- Compact bits */

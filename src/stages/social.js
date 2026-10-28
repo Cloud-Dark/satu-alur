@@ -632,6 +632,7 @@ export async function render(container, ctx = {}) {
     })
     const listBody = el('div', { className: 'sm-sched-body' }, C.skeletonRows(4))
     const listPanel = C.panel({ title: 'Jadwal posting', meta: 'memuat…', actions: seg, className: 'sm-sched-panel' }, listBody)
+    const pg = C.pager({ key: 'social-schedule', label: 'jadwal posting', className: 'is-bleed', onChange: () => draw(), scrollTarget: listPanel })
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -731,7 +732,7 @@ export async function render(container, ctx = {}) {
       }
 
       const groups = new Map()
-      for (const s of shown) {
+      for (const s of pg.slice(shown, { resetKey: filter })) {
         const k = dayKey(s.at)
         if (!groups.has(k)) groups.set(k, [])
         groups.get(k).push(s)
@@ -758,7 +759,7 @@ export async function render(container, ctx = {}) {
             )
           })),
         )
-      })))
+      })), pg.root)
     }
 
     data.on('schedules', draw)
@@ -1017,6 +1018,7 @@ export async function render(container, ctx = {}) {
       ),
     )
     const panel = C.panel({ title: 'Pustaka konten', meta: 'memuat…', className: 'sm-lib-panel' }, tools, body)
+    const pg = C.pager({ key: 'social-library', label: 'pustaka konten', className: 'is-bleed', onChange: () => draw(), scrollTarget: panel })
 
     function card(r) {
       const tags = Array.isArray(r.meta?.hashtags) ? r.meta.hashtags : []
@@ -1075,7 +1077,7 @@ export async function render(container, ctx = {}) {
         body.replaceChildren(C.emptyState({ kicker: 'Tidak cocok', title: 'Tidak ada yang sesuai filter.', body: 'Ubah jenis, platform, atau kata kunci pencarian.', iconName: 'search' }))
         return
       }
-      body.replaceChildren(el('ul', { className: 'sm-lib-list' }, shown.map(card)))
+      body.replaceChildren(el('ul', { className: 'sm-lib-list' }, pg.slice(shown, { resetKey: [kind, p, q] }).map(card)), pg.root)
     }
 
     data.on('library', draw)

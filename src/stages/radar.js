@@ -86,7 +86,9 @@ export async function render(container, ctx = {}) {
   let sort = 'score'
   let query = ''
   let showHidden = false
-  let shown = PAGE
+  let drawRadarList = null
+  let radarListHost = null
+  const rdPager = C.pager({ key: 'radar', label: 'daftar peluang', pageSize: PAGE, sizes: [PAGE, PAGE * 2, PAGE * 4], className: 'is-plain', onChange: () => drawRadarList?.(), scrollTarget: () => radarListHost })
   let aiCtl = null
   signal?.addEventListener('abort', () => { aiCtl?.abort(); closeDrawer({ restore: false }) })
 
@@ -261,7 +263,7 @@ export async function render(container, ctx = {}) {
       const on = filterType === value
       const b = el('button', { type: 'button', role: 'radio', className: 'rd-chip', 'aria-checked': on ? 'true' : 'false', tabindex: on ? '0' : '-1', dataset: { value } },
         iconName ? icon(iconName, { size: 14 }) : null, el('span', {}, label), el('span', { className: 'rd-chip-count tnum' }, String(n)))
-      b.addEventListener('click', () => { filterType = value; shown = PAGE; drawTab('radar'); tabPanels.get('radar').querySelector(`.rd-chip[data-value="${value}"]`)?.focus() })
+      b.addEventListener('click', () => { filterType = value; drawTab('radar'); tabPanels.get('radar').querySelector(`.rd-chip[data-value="${value}"]`)?.focus() })
       return b
     }
     const total = (showHidden ? hidden : visible).length
@@ -277,15 +279,15 @@ export async function render(container, ctx = {}) {
       btns[(i + d + btns.length) % btns.length].click()
     })
 
-    const sortSel = C.select({ label: 'Urutkan', name: 'rd-sort', options: SORTS, value: sort, attrs: { onChange: (e) => { sort = e.target.value; shown = PAGE; drawList() } } })
+    const sortSel = C.select({ label: 'Urutkan', name: 'rd-sort', options: SORTS, value: sort, attrs: { onChange: (e) => { sort = e.target.value; drawList() } } })
     sortSel.wrap.classList.add('rd-sort')
     const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari peluang', value: query })
     const searchBox = el('label', { className: 'search-box rd-search' }, icon('search', { size: 16 }), search)
-    search.addEventListener('input', () => { query = search.value; shown = PAGE; drawList() })
+    search.addEventListener('input', () => { query = search.value; drawList() })
     const hiddenBtn = C.button({
       label: showHidden ? 'Kembali ke radar' : `Disembunyikan (${hidden.length})`,
       icon: showHidden ? 'arrowLeft' : 'eyeOff', variant: 'ghost', size: 'sm',
-      onClick: () => { showHidden = !showHidden; filterType = 'all'; shown = PAGE; drawTab('radar') },
+      onClick: () => { showHidden = !showHidden; filterType = 'all'; drawTab('radar') },
     })
     hiddenBtn.hidden = !showHidden && !hidden.length
     const tools = el('div', { className: 'rd-tools' }, searchBox, sortSel.wrap, hiddenBtn)
@@ -322,12 +324,12 @@ export async function render(container, ctx = {}) {
             : C.emptyState({ kicker: 'Radar bersih', title: 'Belum ada peluang terdeteksi.', body: 'Semua pelanggan rutin masih dalam jadwal dan tidak ada penawaran yang tertahan. Radar dihitung ulang setiap kali data berubah.', iconName: 'checkCircle' }))
         return
       }
-      const grid = el('ul', { className: 'rd-grid', role: 'list' }, list.slice(0, shown).map((o, i) => el('li', {}, card(o, i))))
-      const more = list.length > shown
-        ? C.button({ label: `Tampilkan ${Math.min(PAGE, list.length - shown)} lagi`, icon: 'chevronDown', variant: 'soft', size: 'sm', className: 'rd-more', onClick: () => { const first = shown; shown += PAGE; drawList(); listHost.querySelectorAll('.rd-card-title-btn')[first]?.focus() } })
-        : null
-      listHost.replaceChildren(...kids(grid, more ? el('div', { className: 'rd-more-row' }, more, el('span', { className: 'rd-meta' }, `${shown} dari ${list.length}`)) : null))
+      const pageItems = rdPager.slice(list, { resetKey: [filterType, query.trim().toLowerCase(), sort, showHidden] })
+      const grid = el('ul', { className: 'rd-grid', role: 'list' }, pageItems.map((o, i) => el('li', {}, card(o, i))))
+      listHost.replaceChildren(grid, rdPager.root)
     }
+    drawRadarList = drawList
+    radarListHost = listHost
     drawList()
     return wrap
   }

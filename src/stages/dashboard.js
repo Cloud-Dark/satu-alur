@@ -479,10 +479,8 @@ function renderActions(m, navigate) {
   }
   items.sort((a, b) => a.rank - b.rank)
 
-  const LIMIT = 5
-  const shown = items.slice(0, LIMIT)
   const content = items.length
-    ? el('ol', { className: 'todo' }, shown.map((it) => {
+    ? C.paginate({ key: 'dash-todo', label: 'perlu tindakan', pageSize: 5, sizes: [5], hideSize: true, items, render: (shown) => el('ol', { className: 'todo' }, shown.map((it) => {
         const b = C.button({ label: it.cta, iconRight: 'arrowRight', size: 'sm', variant: 'soft', className: 'todo-btn' })
         b.setAttribute('aria-label', `${it.cta}: ${it.title}`)
         b.addEventListener('click', () => navigate(it.to, it.params))
@@ -495,12 +493,12 @@ function renderActions(m, navigate) {
           ),
           b,
         )
-      }))
+      })) }).root
     : C.emptyState({ kicker: 'Antrian bersih', title: 'Tidak ada yang menunggu.', body: 'Semua permintaan sudah diproses sampai pembukuan.', iconName: 'checkCircle' })
 
   return C.panel({
     title: 'Perlu tindakan',
-    meta: items.length ? `${items.length} item${items.length > LIMIT ? ` · ${LIMIT} teratas` : ''}` : 'kosong',
+    meta: items.length ? `${C.number(items.length)} item · paling mendesak dulu` : 'kosong',
     className: 'span-7 todo-panel',
   }, content)
 }
@@ -526,9 +524,9 @@ function renderActivity(m) {
     const r = m.requestOfLedger(l)
     ev.push({ at: ledgerDate(l), num: '05', title: isRevenue(l) ? 'Pendapatan diposting' : 'Biaya diposting', text: `${categoryLabel(l.category)} · ${C.rupiah(l.amount)}${r ? ` · ${customerLabel(r)}` : ''}` })
   }
-  const recent = ev.filter((e) => C.toDate(e.at)).sort((a, b) => C.toDate(b.at) - C.toDate(a.at)).slice(0, 7)
+  const recent = ev.filter((e) => C.toDate(e.at)).sort((a, b) => C.toDate(b.at) - C.toDate(a.at))
 
-  const list = el('ol', { className: 'feed' }, recent.map((e) =>
+  const list = C.paginate({ key: 'dash-feed', label: 'aktivitas terbaru', pageSize: 6, sizes: [6], hideSize: true, items: recent, render: (shown) => el('ol', { className: 'feed' }, shown.map((e) =>
     el('li', { className: 'feed-item' },
       el('span', { className: 'feed-node', 'aria-hidden': 'true' }, icon(STEP_ICON[e.num] || 'circleDot', { size: 14 })),
       el('div', { className: 'feed-text' },
@@ -536,8 +534,8 @@ function renderActivity(m) {
         el('span', { className: 'feed-desc' }, e.text),
       ),
       el('time', { className: 'feed-time', datetime: C.toDate(e.at).toISOString(), title: C.formatDateTime(e.at) }, C.relativeTime(e.at)),
-    )))
-  return C.panel({ title: 'Aktivitas terbaru', meta: `${recent.length} dari ${ev.length} peristiwa`, className: 'span-5 feed-panel' }, list)
+    ))) }).root
+  return C.panel({ title: 'Aktivitas terbaru', meta: `${C.number(recent.length)} peristiwa · terbaru dulu`, className: 'span-5 feed-panel' }, list)
 }
 
 /* ========================================================= Composition */

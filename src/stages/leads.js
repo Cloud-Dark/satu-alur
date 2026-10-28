@@ -98,7 +98,6 @@ export async function render(container, ctx = {}) {
     source: 'osm',
     sort: 'score',
     showHidden: false,
-    limit: PAGE_SIZE,
     search: null, // last response meta
     leads: [], // scored leads
     rankBasis: null, // 'ai' | 'heuristik' | 'mixed'
@@ -544,7 +543,7 @@ export async function render(container, ctx = {}) {
     let card = resultsList.querySelector(`[data-id="${CSS.escape(id)}"]`)
     if (!card && from === 'map') {
       const idx = visibleLeads().findIndex((x) => x.id === id)
-      if (idx >= state.limit) { state.limit = Math.ceil((idx + 1) / PAGE_SIZE) * PAGE_SIZE; drawResults(); card = resultsList.querySelector(`[data-id="${CSS.escape(id)}"]`) }
+      if (idx >= 0) { drawResults({ focusIndex: idx }); card = resultsList.querySelector(`[data-id="${CSS.escape(id)}"]`) }
     }
     card?.classList.add('is-focus')
     if (from === 'map') {
@@ -568,14 +567,9 @@ export async function render(container, ctx = {}) {
   const resultsList = el('ol', { className: 'ld-list', 'aria-label': 'Daftar prospek' })
   const hiddenToggle = el('button', { type: 'button', className: 'link-btn ld-hidden-toggle', hidden: true, 'aria-expanded': 'false' })
   hiddenToggle.addEventListener('click', () => { state.showHidden = !state.showHidden; drawResults() })
-  const moreBtn = C.button({ label: 'Tampilkan lagi', icon: 'chevronDown', variant: 'soft', size: 'sm', className: 'ld-more-btn', hidden: true })
-  moreBtn.addEventListener('click', () => {
-    const first = state.limit
-    state.limit += PAGE_SIZE
-    drawResults()
-    resultsList.children[first]?.querySelector('.ld-card-title')?.focus()
-  })
-  const resultsBody = el('div', { className: 'ld-results-body' }, statusSlot, resultsInfo, resultsList, moreBtn, hiddenToggle)
+  const resultsBody = el('div', { className: 'ld-results-body' }, statusSlot, resultsInfo, resultsList, hiddenToggle)
+  const resultsPager = C.pager({ key: 'leads-results', label: 'hasil prospek', pageSize: PAGE_SIZE, sizes: [PAGE_SIZE, PAGE_SIZE * 2, PAGE_SIZE * 4], className: 'is-plain', onChange: () => drawResults(), scrollTarget: () => resultsPanel })
+  resultsBody.insertBefore(resultsPager.root, hiddenToggle)
   const resultsPanel = el('section', { className: 'panel list-panel ld-results', 'aria-labelledby': 'ld-results-title' },
     el('div', { className: 'panel-head' },
       el('div', { className: 'panel-head-text' }, el('h2', { className: 'panel-title', id: 'ld-results-title' }, 'Hasil prospek'), resultsMeta),
@@ -609,7 +603,7 @@ export async function render(container, ctx = {}) {
     drawResults()
   }
 
-  function drawResults() {
+  function drawResults({ focusIndex } = {}) {
     const vis = visibleLeads()
     const hid = hiddenLeads()
     const src = state.search?.source
@@ -618,11 +612,10 @@ export async function render(container, ctx = {}) {
       ? `${vis.length} prospek${hid.length ? ` · ${hid.length} disaring` : ''} · ${SOURCE_LABEL[src] || src}${state.search.cached ? ' · dari cache 24 jam' : ''}`
       : 'Belum ada pencarian'
     drawInfo()
-    const shown = vis.slice(0, state.limit)
-    resultsList.replaceChildren(...shown.map((l, i) => leadCard(l, i + 1)))
-    moreBtn.hidden = vis.length <= shown.length
-    moreBtn.querySelector('.btn-label').textContent = `Tampilkan ${Math.min(PAGE_SIZE, vis.length - shown.length)} lagi dari ${vis.length - shown.length}`
-    if (state.showHidden && hid.length && moreBtn.hidden) {
+    const shown = resultsPager.slice(vis, { resetKey: state.sort, focusIndex })
+    const offset = resultsPager.start
+    resultsList.replaceChildren(...shown.map((l, i) => leadCard(l, offset + i + 1)))
+    if (state.showHidden && hid.length && resultsPager.page >= resultsPager.pages) {
       resultsList.append(el('li', { className: 'ld-list-sep', 'aria-hidden': 'true' }, 'Disaring AI (duplikat atau kurang relevan)'),
         ...hid.map((l) => leadCard(l, null)))
     }
@@ -733,7 +726,7 @@ export async function render(container, ctx = {}) {
     state.search = null
     state.focusId = null
     state.rankBasis = null
-    state.limit = PAGE_SIZE
+    resultsPager.reset()
     resultsList.replaceChildren()
     hiddenToggle.hidden = true
     sortSeg.hidden = true
@@ -840,6 +833,7 @@ export async function render(container, ctx = {}) {
       el('div', { className: 'panel-actions ld-saved-filter' }, savedSeg)),
     el('div', { className: 'panel-body' }, savedBody),
   )
+  const savedPager = C.pager({ key: 'leads-saved', label: 'prospek tersimpan', className: 'is-plain', onChange: () => drawSaved(), scrollTarget: savedPanel })
 
   async function loadSaved() {
     try {
@@ -881,7 +875,7 @@ export async function render(container, ctx = {}) {
       savedBody.replaceChildren(el('p', { className: 'muted small ld-saved-empty' }, 'Tidak ada prospek dengan status ini.'))
       return
     }
-    savedBody.replaceChildren(el('ul', { className: 'ld-saved-list' }, rows.map(savedRow)))
+    savedBody.replaceChildren(el('ul', { className: 'ld-saved-list' }, savedPager.slice(rows, { resetKey: savedFilter.status }).map(savedRow)), savedPager.root)
   }
 
   function savedRow(r) {

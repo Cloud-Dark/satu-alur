@@ -99,6 +99,8 @@ export async function render(container, ctx = {}) {
 
   const listBody = el('div', {}, C.skeletonRows(5))
   const listPanel = C.panel({ title: 'Daftar penawaran', meta: 'memuat…', className: 'list-panel' }, listBody)
+  const pg = C.pager({ key: 'offers', label: 'daftar penawaran', onChange: () => drawList(), scrollTarget: listPanel })
+  let focusPending = params.offerId != null
 
   container.replaceChildren(
     C.pageHeader({ num: '02', label: 'Penawaran', title: 'Penawaran AI', em: 'AI', description: 'AI menyusun ruang lingkup dan harga. Aturan domain memeriksa hasilnya sebelum Anda menyimpan.' }),
@@ -376,14 +378,20 @@ export async function render(container, ctx = {}) {
     }
     if (ctx.signal?.aborted) return
     fillRequests()
+    drawList()
+  }
+
+  function drawList() {
     listPanel.querySelector('.panel-meta').textContent = `${flow.offers.length} baris · ${flow.offers.filter((o) => o.status === 'approved').length} disetujui`
     if (!flow.offers.length) {
       listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada penawaran.', body: 'Pilih permintaan lalu hasilkan penawaran dengan AI.' }))
       return
     }
+    const focusIndex = focusPending ? flow.offers.findIndex((o) => String(o.id) === String(params.offerId)) : -1
+    const rows = pg.slice(flow.offers, { focusIndex })
     listBody.replaceChildren(C.dataTable({
       caption: 'Daftar penawaran',
-      rows: flow.offers,
+      rows,
       rowAttrs: (o) => ({ className: params.offerId != null && String(params.offerId) === String(o.id) ? 'is-focus' : undefined, dataset: { id: String(o.id) } }),
       columns: [
         {
@@ -416,8 +424,9 @@ export async function render(container, ctx = {}) {
           },
         },
       ],
-    }))
-    const focusRow = listBody.querySelector('tr.is-focus')
+    }), pg.root)
+    const focusRow = focusPending ? listBody.querySelector('tr.is-focus') : null
+    focusPending = false
     if (focusRow) focusRow.scrollIntoView({ block: 'center', behavior: 'smooth' })
   }
 

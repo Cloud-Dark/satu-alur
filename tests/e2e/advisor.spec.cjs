@@ -12,11 +12,22 @@ module.exports = async function advisor(t) {
   const waitIdle = () => p.waitForFunction(() => document.querySelector('.adv-stop')?.hidden === true, null, { timeout: 30000 })
   const lastBadge = () => p.$$eval('.adv-msg.is-assistant .adv-badge', (b) => b.at(-1)?.textContent.trim())
   const count = () => p.locator('.adv-msg').count()
+  // The agent picker is a popover in the chat header: open it, then choose.
+  const pick = async (key) => {
+    if (!(await p.isVisible(`.adv-agent[data-agent="${key}"]`))) await p.click('.adv-agent-trigger')
+    await p.click(`.adv-agent[data-agent="${key}"]`)
+    await p.waitForTimeout(150)
+    return (await p.getAttribute('.adv-agent-trigger', 'aria-expanded')) === 'false'
+  }
 
   t.check(await p.locator('.adv-agent').count() === 6, 'agent picker: Otomatis + 5 agents')
+  t.check(await p.isHidden('.adv-agent-pop'), 'agent picker is a closed popover in the chat header')
+  t.check(await p.locator('.adv-tab').count() === 3, 'side panel tabs: Snapshot, Kalkulator, Statistik')
+  const vh = await p.evaluate(() => [document.documentElement.scrollHeight, innerHeight])
+  t.check(vh[0] <= vh[1] + 40, 'advisor fits one viewport at 1440x900', `${vh[0]} vs ${vh[1]}`)
 
   // auto routing
-  await p.click('.adv-agent[data-agent="auto"]')
+  t.check(await pick('auto'), 'choosing an agent closes the picker')
   await p.fill('.adv-input', 'Bagaimana naik 2% bulan depan?')
   await p.waitForTimeout(200)
   const hint = norm(await p.textContent('.adv-route-hint'))
@@ -37,7 +48,7 @@ module.exports = async function advisor(t) {
   t.check(/Analis keuangan/.test(await lastBadge()), 'chip "Biaya mana…" routes to Analis keuangan', await lastBadge())
 
   // fixed agent
-  await p.click('.adv-agent[data-agent="pemasaran"]')
+  await pick('pemasaran')
   await p.waitForTimeout(300)
   await p.fill('.adv-input', 'Apa langkah pertama yang sebaiknya saya ambil?')
   await p.click('.adv-send')
@@ -53,7 +64,9 @@ module.exports = async function advisor(t) {
   const flags = await p.$$eval('.adv-flag', (f) => f.map((x) => x.textContent.trim()))
   t.check(flags.some((f) => /henti/i.test(f)), 'stopped answer flagged', flags.join(' | '))
 
-  // calculator
+  // calculator (side panel tab)
+  await p.click('.adv-tab[data-tab="calc"]')
+  t.check(await p.isVisible('.adv-preset[data-pct="2"]') && !(await p.isVisible('.adv-snap')), 'Kalkulator tab shows the calculator and hides the snapshot')
   const calc = {}
   for (const v of ['1', '2', '5', '10']) {
     await p.click(`.adv-preset[data-pct="${v}"]`)
@@ -69,7 +82,7 @@ module.exports = async function advisor(t) {
   await p.click('.adv-clear')
   await p.waitForTimeout(600)
   t.check(await count() < beforeClear && (await p.isVisible('.adv-empty')), 'clear empties the Pemasaran conversation')
-  await p.click('.adv-agent[data-agent="auto"]')
+  await pick('auto')
   await p.waitForTimeout(300)
   const autoCount = await count()
   t.check(autoCount >= 4, 'other agents keep their messages (Otomatis view)', autoCount)
@@ -81,7 +94,7 @@ module.exports = async function advisor(t) {
   await goStage(p, 'advisor')
   await p.waitForSelector('.adv-grid')
   await p.waitForTimeout(800)
-  await p.click('.adv-agent[data-agent="auto"]')
+  await pick('auto')
   await p.waitForTimeout(300)
   t.check(await count() === autoCount, 'conversation reloaded from storage', `${await count()} vs ${autoCount}`)
   await t.noErrors(p)

@@ -78,6 +78,7 @@ export async function render(container, ctx = {}) {
 
   const listBody = el('div', {}, C.skeletonRows(5))
   const listPanel = C.panel({ title: 'Daftar penugasan', meta: 'memuat…', className: 'list-panel' }, listBody)
+  const pg = C.pager({ key: 'assignments', label: 'daftar penugasan', onChange: () => drawList(), scrollTarget: listPanel })
 
   container.replaceChildren(
     C.pageHeader({ num: '03', label: 'Penugasan', title: 'Penugasan pelaksana', em: 'pelaksana', description: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.' }),
@@ -204,6 +205,10 @@ export async function render(container, ctx = {}) {
     }
     if (ctx.signal?.aborted) return
     fillOffers()
+    drawList()
+  }
+
+  function drawList() {
     const active = flow.activeAssignments().length
     listPanel.querySelector('.panel-meta').textContent = `${flow.assignments.length} baris · ${active} aktif`
     if (!flow.assignments.length) {
@@ -213,7 +218,7 @@ export async function render(container, ctx = {}) {
     const now = Date.now()
     listBody.replaceChildren(C.dataTable({
       caption: 'Daftar penugasan',
-      rows: flow.assignments,
+      rows: pg.slice(flow.assignments),
       columns: [
         { label: 'Pelanggan', render: (a) => { const r = flow.requestOfAssignment(a); return C.cellStack(customerLabel(r), r?.service_type) } },
         {
@@ -242,7 +247,7 @@ export async function render(container, ctx = {}) {
           },
         },
       ],
-    }))
+    }), pg.root)
   }
 
   await loadList()
