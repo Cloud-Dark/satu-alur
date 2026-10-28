@@ -13,6 +13,10 @@ test('inferSkill returns null for unmatched service', () => {
   assert.equal(inferSkill('Ducting & Exhaust Cleaning'), null)
   assert.equal(inferSkill('Service AC split'), 'ac')
 })
+test('inferSkill matches ac as a whole word only', () => {
+  assert.equal(inferSkill('Pembersihan Kaca Gedung'), 'cleaning')
+  assert.equal(inferSkill('Cuci AC split'), 'ac')
+})
 test('scoreWorkers: no coordinates → no distance', () => {
   const [s] = scoreWorkers({ workers: [W({ id: 1, skills: ['ac'] })], job: { skill: 'ac', scheduledAt: DAY }, assignments: [], links: [] })
   assert.equal(s.distanceKm, null)

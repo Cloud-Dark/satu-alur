@@ -1,7 +1,7 @@
 /** 03 — Penugasan: assign an approved offer to a worker with AI matching, map, and team management. */
-import { loadWorkers, loadLinks, saveWorker, removeWorker } from './workers-repo.js'
-import { SKILL_LABELS, workerState, completedCount, hasHistory } from '../domain/workers.js'
-import { getCloud } from '../cloud.js'
+import { loadWorkers, loadLinks, saveWorker, removeWorker, createTeamAssignment } from './workers-repo.js'
+import { geocode } from '../geo.js'
+import { SKILL_LABELS, workerState, completedCount, hasHistory, inferSkill, scoreWorkers, pickRecommended, joinWorkerNames } from '../domain/workers.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
@@ -17,14 +17,6 @@ function defaultSchedule() {
   d.setDate(d.getDate() + 1)
   d.setHours(9, 0, 0, 0)
   return toLocalInput(d)
-}
-
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371
-  const dLat = (lat2 - lat1) * Math.PI / 180
-  const dLng = (lng2 - lng1) * Math.PI / 180
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
 const STATUS_LABELS = {
@@ -83,7 +75,7 @@ export async function render(container, ctx = {}) {
     host.replaceChildren()
     if (!flow) return
     switch (currentTab) {
-      case 'assign': renderAssign(host, ctx, flow, workers); break
+      case 'assign': renderAssign(host, ctx, flow, workers, links, reload, status, () => tabs.querySelector('[data-value="team"]').click()); break
       case 'team': renderTeam(host, { workers, assignments: flow.assignments, completions: flow.completions, links, reload, status }); break
       case 'map': renderMap(host, flow, workers); break
       case 'performance': renderPerformance(host, workers); break
@@ -93,24 +85,36 @@ export async function render(container, ctx = {}) {
 }
 
 /* ================================================================ Tab: Assign */
-function renderAssign(target, ctx, flow, workers) {
+function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam) {
   const navigate = ctx.navigate || (() => {})
   const params = ctx.params || {}
 
-  const offerSel = C.select({ label: 'Penawaran disetujui', name: 'offer_id', required: true, hint: 'Pilih penawaran untuk lihat rekomendasi AI.', options: [{ value: '', label: 'Memuat…' }] })
+  const offerSel = C.select({ label: 'Penawaran disetujui', name: 'offer_id', required: true, hint: 'Pilih penawaran untuk lihat rekomendasi petugas.', options: [{ value: '', label: 'Memuat…' }] })
   const preview = el('div', { className: 'req-preview', hidden: true })
-  const workerSel = C.select({ label: 'Petugas (AI Rekomendasi)', name: 'worker_id', required: true, options: [{ value: '', label: 'Pilih penawaran terlebih dahulu' }] })
   const when = C.field({ label: 'Jadwal pelaksanaan', name: 'scheduled_at', type: 'datetime-local', required: true, value: defaultSchedule(), hint: 'Waktu lokal perangkat Anda.' })
   const submit = C.button({ label: 'Tugaskan', icon: 'users', variant: 'primary', type: 'submit' })
   const msg = C.message()
 
-  const aiPanel = el('div', { className: 'card', style: 'margin-bottom:16px;background:var(--bg-input);' })
+  const pickList = el('div', { className: 'worker-pick' })
+  const count = C.field({ label: 'Jumlah', name: 'recommend_n', type: 'number', value: '1', attrs: { min: '1' } })
+  const recommend = C.button({ label: 'Pilih rekomendasi', icon: 'check', variant: 'soft', onClick: () => {
+    const n = Math.max(1, parseInt(count.input.value, 10) || 1)
+    checked.clear()
+    pickRecommended(scored, n).forEach((w) => checked.add(w.id))
+    drawPick()
+  } })
+  const summary = el('div', { className: 'muted small' })
+  const picker = el('div', { className: 'field' },
+    el('span', { className: 'field-label' }, 'Petugas'),
+    workers.some((w) => w.status === 'active')
+      ? el('div', { className: 'form' }, el('div', { className: 'pick-recommend' }, count.wrap, recommend), pickList)
+      : C.emptyState({ title: 'Belum ada petugas aktif', iconName: 'users', body: 'Tambahkan petugas di tab Tim untuk mulai menugaskan.', action: C.button({ label: 'Ke tab Tim', icon: 'users', onClick: goTeam }) }),
+  )
 
   const form = el('form', { className: 'form' },
-    aiPanel,
     offerSel.wrap, preview,
-    workerSel.wrap,
-    el('div', { className: 'form-row' }, when.wrap),
+    when.wrap,
+    picker, summary,
     el('div', { className: 'form-actions' }, submit),
     msg,
   )
@@ -120,9 +124,65 @@ function renderAssign(target, ctx, flow, workers) {
   const listPanel = C.panel({ title: 'Daftar penugasan', meta: 'memuat…', className: 'list-panel' }, listBody)
 
   target.appendChild(el('div', { className: 'stage-grid' },
-    C.panel({ title: 'Tugaskan dengan AI', meta: 'Smart matching', raised: true, className: 'form-panel' }, form),
+    C.panel({ title: 'Tugaskan petugas', meta: 'Rekomendasi otomatis', raised: true, className: 'form-panel' }, form),
     listPanel,
   ))
+
+  let job = null // { skill, lat, lng } of the selected offer
+  let scored = []
+  const checked = new Set()
+
+  const scheduledDate = () => {
+    const d = when.input.value ? new Date(when.input.value) : null
+    return d && !Number.isNaN(d.getTime()) ? d : null
+  }
+
+  function rescore() {
+    const d = scheduledDate()
+    scored = job && d ? scoreWorkers({ workers, job: { ...job, scheduledAt: d.toISOString() }, assignments: flow.assignments, links }) : []
+    const ids = new Set(scored.map((s) => s.worker.id))
+    ;[...checked].forEach((id) => { if (!ids.has(id)) checked.delete(id) })
+    drawPick()
+  }
+
+  function drawPick() {
+    if (!job) { pickList.replaceChildren(el('p', { className: 'muted small', style: 'padding:12px;margin:0;' }, 'Pilih penawaran terlebih dahulu.')); drawSummary(); return }
+    if (!scored.length) { pickList.replaceChildren(el('p', { className: 'muted small', style: 'padding:12px;margin:0;' }, 'Isi jadwal pelaksanaan yang valid.')); drawSummary(); return }
+    pickList.replaceChildren(...scored.map((s) => {
+      const w = s.worker
+      const input = el('input', { type: 'checkbox', value: String(w.id) })
+      input.checked = checked.has(w.id)
+      input.addEventListener('change', () => { input.checked ? checked.add(w.id) : checked.delete(w.id); drawSummary() })
+      return el('label', { className: 'check-row' }, input,
+        el('span', { className: 'worker-pick-body' },
+          el('span', { className: 'worker-pick-tags' },
+            el('strong', {}, w.name),
+            ...(w.skills || []).map((k) => C.tag(SKILL_LABELS[k] || k)),
+            s.clash ? C.tag('Bentrok', 'warn') : null,
+            s.distanceKm !== null ? el('span', { className: 'muted small' }, `${s.distanceKm.toFixed(1).replace('.', ',')} km`) : null,
+          ),
+          el('span', { className: 'muted small' }, s.reasons.join(' · ')),
+        ),
+      )
+    }))
+    drawSummary()
+  }
+
+  const selected = () => scored.filter((s) => checked.has(s.worker.id))
+
+  function drawSummary() {
+    const sel = selected()
+    if (!sel.length) { summary.replaceChildren(); return }
+    const skills = [...new Set(sel.flatMap((s) => s.worker.skills || []))]
+    const warns = []
+    if (sel.some((s) => s.clash)) warns.push('Ada petugas yang bentrok di hari yang sama.')
+    if (job?.skill && !sel.some((s) => s.skillMatch === 'full')) warns.push('Tidak ada petugas terpilih yang memiliki keahlian yang dibutuhkan.')
+    summary.replaceChildren(
+      el('div', {}, el('strong', {}, 'Tim: '), joinWorkerNames(sel.map((s) => s.worker))),
+      el('div', {}, el('strong', {}, 'Keahlian: '), skills.map((k) => SKILL_LABELS[k] || k).join(', ') || '—'),
+      ...warns.map((t) => C.tag(t, 'warn')),
+    )
+  }
 
   function fillOffers() {
     if (!flow) return
@@ -142,12 +202,16 @@ function renderAssign(target, ctx, flow, workers) {
       go.addEventListener('click', () => navigate('offer'))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
     }
-    showPreview()
+    selectOffer()
   }
 
-  function showPreview() {
+  let selectToken = 0
+  async function selectOffer() {
+    const token = ++selectToken
     const o = flow?.offer(offerSel.input.value)
-    if (!o) { preview.hidden = true; aiPanel.replaceChildren(); return }
+    checked.clear()
+    job = null
+    if (!o) { preview.hidden = true; scored = []; drawPick(); return }
     const r = flow.requestOfOffer(o)
     preview.replaceChildren(C.defList([
       ['Pelanggan', `${customerLabel(r)}${r?.location ? ` · ${r.location}` : ''}`],
@@ -155,149 +219,48 @@ function renderAssign(target, ctx, flow, workers) {
       ['Nilai', el('span', { className: 'tnum strong' }, C.rupiah(o.validated_price))],
     ]))
     preview.hidden = false
-    runAiDispatch(o, r)
+    when.input.value = r?.requested_at && !Number.isNaN(new Date(r.requested_at).getTime()) ? toLocalInput(new Date(r.requested_at)) : defaultSchedule()
+    const geo = r?.location ? await geocode(r.location) : null
+    if (token !== selectToken) return
+    job = { skill: inferSkill(r?.service_type), lat: geo?.lat ?? null, lng: geo?.lng ?? null }
+    rescore()
   }
 
-  function runAiDispatch(offer, request) {
-    aiPanel.replaceChildren(el('div', { style: 'padding:12px;' },
-      el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px;' },
-        el('span', { style: 'font-size:1.2rem;' }, '🤖'),
-        el('strong', {}, 'AI Smart Dispatch'),
-      ),
-      el('p', { className: 'muted small', style: 'margin:0;' }, 'Menganalisis jarak, skill, workload, dan rating...'),
-    ))
+  offerSel.input.addEventListener('change', () => { msg.hide(); selectOffer() })
+  when.input.addEventListener('change', rescore)
 
-    // Simulate AI analysis delay
-    setTimeout(() => {
-      // Calculate scores for each worker
-      const jobLat = request?.lat || -6.2088
-      const jobLng = request?.lng || 106.8456
-      const jobSkill = inferSkill(request?.service_type || '')
-
-      const scored = workers.map((w) => {
-        const distance = haversine(w.lat || -6.2, w.lng || 106.8, jobLat, jobLng)
-        const hasSkill = w.skills?.includes(jobSkill) ? 100 : w.skills?.some((s) => jobSkill.includes(s) || s.includes(jobSkill)) ? 70 : 0
-        const workloadScore = w.status === 'available' ? 100 : w.status === 'on_job' ? 50 : 0
-        const distScore = Math.max(0, 100 - distance * 8)
-        const ratingScore = (w.rating || 4) * 20
-        const total = Math.round(distScore * 0.30 + hasSkill * 0.25 + workloadScore * 0.20 + ratingScore * 0.15 + 100 * 0.10)
-        return { worker: w, distance: Math.round(distance * 10) / 10, distScore, hasSkill, workloadScore, ratingScore, total }
-      }).sort((a, b) => b.total - a.total)
-
-      const top3 = scored.slice(0, 3)
-      const best = top3[0]
-
-      // Fill worker select with AI-ranked options
-      const workerOpts = [{ value: '', label: 'Pilih petugas (diurutkan AI)' }]
-      top3.forEach((s, i) => {
-        const w = s.worker
-        workerOpts.push({ value: w.id, label: `${i + 1}. ${w.name} — Score ${s.total} (${s.distance} km)` })
-      })
-      scored.slice(3).forEach((s) => {
-        workerOpts.push({ value: s.worker.id, label: `${s.worker.name} — Score ${s.total}` })
-      })
-      C.setOptions(workerSel.input, workerOpts, best?.worker.id || '')
-
-      aiPanel.replaceChildren(
-        el('div', { style: 'padding:16px;' },
-          el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:12px;' },
-            el('span', { style: 'font-size:1.3rem;' }, '🤖'),
-            el('strong', { style: 'font-size:1rem;' }, 'AI Rekomendasi'),
-          ),
-          best ? el('div', { style: 'background:var(--bg);padding:12px;border-radius:var(--radius-sm);border:1px solid var(--success);' },
-            el('div', { style: 'display:flex;justify-content:space-between;align-items:center;' },
-              el('div', {},
-                el('strong', {}, best.worker.name),
-                el('div', { className: 'muted small' }, `${best.distance} km · ${best.worker.rating}★ · ${STATUS_LABELS[best.worker.status]?.label || best.worker.status}`),
-              ),
-              el('div', { style: 'text-align:right;' },
-                el('div', { style: 'font-size:1.5rem;font-weight:800;color:var(--success);' }, best.total),
-                el('div', { className: 'muted small' }, 'AI Score'),
-              ),
-            ),
-            el('div', { style: 'display:grid;grid-template-columns:repeat(5, 1fr);gap:6px;margin-top:10px;' },
-              scoreMini('Jarak', best.distScore, 30),
-              scoreMini('Skill', best.hasSkill, 25),
-              scoreMini('Beban', best.workloadScore, 20),
-              scoreMini('Rating', best.ratingScore, 15),
-              scoreMini('Biaya', 100, 10),
-            ),
-          ) : el('p', {}, 'Tidak ada petugas tersedia.'),
-          top3.length > 1 ? el('div', { style: 'margin-top:10px;' },
-            el('p', { className: 'muted small', style: 'margin:0 0 6px;' }, 'Alternatif:'),
-            ...top3.slice(1).map((s) => el('div', { style: 'display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);' },
-              el('span', {}, s.worker.name),
-              el('span', { style: 'color:var(--text-muted);' }, `Score ${s.total} · ${s.distance} km`),
-            )),
-          ) : null,
-        ),
-      )
-    }, 800)
-  }
-
-  function scoreMini(label, score, weight) {
-    return el('div', { style: 'text-align:center;' },
-      el('div', { className: 'muted small', style: 'font-size:0.65rem;' }, label),
-      el('div', { style: `font-size:0.8rem;font-weight:700;color:${score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--warning)' : 'var(--danger)'};` }, score),
-      el('div', { className: 'muted small', style: 'font-size:0.6rem;' }, `${weight}%`),
-    )
-  }
-
-  function inferSkill(serviceType) {
-    const s = (serviceType || '').toLowerCase()
-    if (s.includes('ac')) return 'ac'
-    if (s.includes('sofa') || s.includes('karpet')) return 'cleaning'
-    if (s.includes('kolam')) return 'pool'
-    if (s.includes('taman')) return 'garden'
-    if (s.includes('hama') || s.includes('pest')) return 'pest'
-    if (s.includes('waterproofing') || s.includes('bocor')) return 'waterproofing'
-    if (s.includes('kaca') || s.includes('gedung')) return 'cleaning'
-    return 'cleaning'
-  }
-
-  offerSel.input.addEventListener('change', () => { msg.hide(); showPreview() })
-
+  let saving = false
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
+    if (saving) return
     msg.hide()
     const errors = []
     const offer = flow?.offer(offerSel.input.value)
-    const workerId = workerSel.input.value
-    const selectedWorker = workers.find((w) => w.id === workerId)
-    const date = when.input.value ? new Date(when.input.value) : null
+    const team = selected().map((s) => s.worker)
+    const date = scheduledDate()
     if (!offer) errors.push('Pilih penawaran.')
-    if (!workerId) errors.push('Pilih petugas.')
-    if (!date || Number.isNaN(date.getTime())) errors.push('Isi jadwal pelaksanaan yang valid.')
+    if (!team.length) errors.push('Pilih minimal satu petugas.')
+    if (!date) errors.push('Isi jadwal pelaksanaan yang valid.')
     if (errors.length) {
       msg.show('danger', 'Periksa kembali isian berikut.', errors)
       return
     }
+    saving = true
     const restore = C.setBusy(submit, 'Menyimpan…')
     try {
-      const { data, error } = await getCloud().database.from('assignments').insert({
-        offer_id: Number(offer.id),
-        worker_id: workerId,
-        worker_name: selectedWorker?.name || 'Tim',
-        scheduled_at: date.toISOString(),
-        status: 'assigned',
-      })
-      if (error) throw new Error(error.message)
-      const row = Array.isArray(data) ? data[0] : data
-      workerSel.input.value = ''
-      offerSel.input.value = ''
-      when.input.value = defaultSchedule()
-      aiPanel.replaceChildren()
-      msg.show('ok', `${selectedWorker?.name} ditugaskan untuk ${customerLabel(flow.requestOfOffer(offer))}, ${C.formatDateTime(date)}.`)
+      const row = await createTeamAssignment({ offerId: Number(offer.id), scheduledAt: date.toISOString(), workers: team })
+      const text = `${joinWorkerNames(team)} ditugaskan untuk ${customerLabel(flow.requestOfOffer(offer))}, ${C.formatDateTime(date)}.`
+      showToast('Penugasan tersimpan.', 'success')
+      // reload redraws this page, so the success note goes on the page-level status
+      await reload()
+      status.show('ok', text)
       const next = C.button({ label: 'Tandai selesai nanti', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       next.addEventListener('click', () => navigate('complete', { assignmentId: row?.id }))
-      msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
-      showToast('Penugasan tersimpan.', 'success')
-      notifyDataChanged()
-      await loadList()
+      status.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
     } catch (err) {
       msg.show('danger', `Gagal menyimpan: ${err.message}`)
-    } finally {
       restore()
+      saving = false
     }
   })
 
@@ -319,9 +282,8 @@ function renderAssign(target, ctx, flow, workers) {
         {
           label: 'Petugas · jadwal',
           render: (a) => {
-            const w = workers.find((x) => x.id === a.worker_id)
             return el('div', { className: 'cell-stack' },
-              el('span', { className: 'cell-primary' }, w?.name || a.worker_name || '—'),
+              el('span', { className: 'cell-primary' }, a.worker_name || '—'),
               el('time', { className: 'cell-secondary tnum', datetime: a.scheduled_at || '' }, C.formatDateTime(a.scheduled_at)),
             )
           },

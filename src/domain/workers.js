@@ -15,7 +15,7 @@ export function haversine(lat1, lng1, lat2, lng2) {
 
 export function inferSkill(serviceType) {
   const s = (serviceType || '').toLowerCase()
-  if (s.includes('ac')) return 'ac'
+  if (/\bac\b/.test(s)) return 'ac'
   if (s.includes('sofa') || s.includes('karpet')) return 'cleaning'
   if (s.includes('kolam')) return 'pool'
   if (s.includes('taman')) return 'garden'

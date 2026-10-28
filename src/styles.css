@@ -1457,3 +1457,16 @@ body.scroll-lock { overflow: hidden; }
   .wiz-in-next, .wiz-in-prev { animation: none; }
   .wiz-bar-fill, .wiz-num, .wiz-step-li + .wiz-step-li::before { transition: none; }
 }
+
+/* Petugas: checkbox rows, worker picker and the Tim dialog */
+.check-row { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; cursor: pointer; }
+.check-row input { flex-shrink: 0; }
+dialog.panel { width: min(560px, calc(100vw - 2 * var(--s-4))); margin: auto; padding: var(--s-5); color: var(--text); }
+dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
+.worker-pick { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--r-lg); }
+.worker-pick .check-row { display: flex; flex-wrap: nowrap; align-items: flex-start; padding: var(--s-3); border-bottom: 1px solid var(--line); }
+.worker-pick .check-row:last-child { border-bottom: 0; }
+.worker-pick-body { display: grid; gap: var(--s-1); min-width: 0; }
+.worker-pick-tags { display: flex; flex-wrap: wrap; gap: var(--s-1); align-items: center; }
+.pick-recommend { display: flex; align-items: flex-end; gap: var(--s-3); flex-wrap: wrap; }
+.pick-recommend .field { width: 6rem; }
