@@ -68,6 +68,14 @@ export async function render(container, ctx = {}) {
   })
   const msg = wiz.msg
 
+  // Arriving with a prefill (e.g. from Radar peluang): fill the form and open step 2.
+  const pre = ctx.params?.prefill
+  if (pre && typeof pre === 'object') {
+    const put = (f, v) => { if (v) f.input.value = String(v).slice(0, Number(f.input.maxLength) > 0 ? Number(f.input.maxLength) : 2000) }
+    put(name, pre.customer_name); put(location, pre.location); put(phone, pre.phone); put(service, pre.service_type); put(desc, pre.description)
+    if (pre.customer_name) queueMicrotask(() => wiz.go('need', { focus: false, animate: false }))
+  }
+
   const listBody = el('div', {}, C.skeletonRows(5))
   const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari permintaan' })
   const searchBox = el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search)

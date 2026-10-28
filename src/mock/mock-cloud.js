@@ -323,7 +323,7 @@ function explainHTML(report = {}) {
     out.push('<h3>Dibanding periode sebelumnya</h3><ul>')
     out.push(`<li>${compareLine('Pendapatan', rev, prev.total_revenue, prev.label)}</li>`)
     out.push(`<li>${compareLine('Biaya', cost, prev.total_cost, prev.label, { lowerIsBetter: true })}</li>`)
-    out.push(`<li>Laba bersih ${esc(prev.label)}: ${rp(prev.net_profit)}; periode ini: ${rp(profit)}.</li>`)
+    out.push(`<li>Laba sebelum pajak ${esc(prev.label)}: ${rp(prev.net_profit)}; periode ini: ${rp(profit)}.</li>`)
     out.push('</ul>')
   } else {
     out.push('<p>Periode ini tidak memiliki periode pembanding, jadi tidak ada tren yang disimpulkan.</p>')

@@ -4,7 +4,7 @@
  * the model receives as grounding context. Nothing is invented: when data is
  * missing the snapshot says so instead of guessing.
  */
-import { totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from '../stages/data.js'
+import { totals, ledgerDate, isRevenue, categoryLabel, customerLabel, customerKey } from '../stages/data.js'
 
 const DAY = 86400000
 const idr = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
@@ -126,15 +126,21 @@ export function buildSnapshot(flow, now = new Date()) {
   const services = sumBy(revRows, (l) => reqOf(l)?.service_type || 'Tidak diketahui', (l) => Number(l.amount) || 0)
     .slice(0, 4).map((s) => ({ name: s.key, revenue: s.amount, jobs: s.n, share: all.revenue > 0 ? (s.amount / all.revenue) * 100 : null }))
   const demand = sumBy(requests, (r) => r.service_type || 'Lainnya', () => 1).slice(0, 4).map((s) => ({ name: s.key, requests: s.n }))
-  const customers = sumBy(revRows, (l) => customerLabel(reqOf(l)), (l) => Number(l.amount) || 0)
-    .slice(0, 4).map((c) => ({ name: c.key, revenue: c.amount, share: all.revenue > 0 ? (c.amount / all.revenue) * 100 : null }))
+  const displayName = new Map()
+  for (const l of revRows) {
+    const r = reqOf(l)
+    const k = customerKey(r)
+    if (!displayName.has(k)) displayName.set(k, customerLabel(r))
+  }
+  const customers = sumBy(revRows, (l) => customerKey(reqOf(l)), (l) => Number(l.amount) || 0)
+    .slice(0, 4).map((c) => ({ name: displayName.get(c.key) || c.key, revenue: c.amount, share: all.revenue > 0 ? (c.amount / all.revenue) * 100 : null }))
   const costMix = sumBy(ledger.filter((l) => !isRevenue(l)), (l) => l.category, (l) => Number(l.amount) || 0)
     .map((c) => ({ category: c.key, label: categoryLabel(c.key), amount: c.amount, ofRevenue: all.revenue > 0 ? (c.amount / all.revenue) * 100 : null, ofCost: all.cost > 0 ? (c.amount / all.cost) * 100 : null }))
 
   const byCustomer = new Map()
   for (const r of requests) {
-    const k = String(r.customer_name || '').trim().toLowerCase()
-    if (k) byCustomer.set(k, (byCustomer.get(k) || 0) + 1)
+    const k = customerKey(r)
+    if (k !== 'x') byCustomer.set(k, (byCustomer.get(k) || 0) + 1)
   }
   const repeat = { customers: byCustomer.size, returning: [...byCustomer.values()].filter((n) => n > 1).length }
 

@@ -160,7 +160,7 @@ function renderKpis(m, now) {
   const pct = (n) => `${Math.round(n)}%`
   return el('div', { className: 'kpis', role: 'group', 'aria-label': 'Indikator utama' },
     C.kpi({
-      label: 'Laba bersih',
+      label: 'Laba sebelum pajak',
       hero: true,
       iconName: 'sprout',
       value: C.rupiah(all.profit),

@@ -78,7 +78,7 @@ function previewHTML() {
     </div>
     <div class="lp-preview-kpis">
       <div><span>Pendapatan</span><strong class="tnum">Rp24,6 jt</strong></div>
-      <div><span>Laba bersih</span><strong class="tnum">Rp8,2 jt</strong></div>
+      <div><span>Laba sebelum pajak</span><strong class="tnum">Rp8,2 jt</strong></div>
     </div>
     <svg class="lp-preview-chart" viewBox="0 0 300 92" preserveAspectRatio="none" aria-hidden="true">
       <defs>
