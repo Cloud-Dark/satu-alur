@@ -1,10 +1,12 @@
 # UAT Deploy Cloudflare
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-28
+> Terakhir diperbarui: 2026-10-29
 > Pemilik: _TBD_
 
 Template UAT pasca-deploy Satu Alur di Cloudflare. Semua hasil berstatus `_PENDING_` sampai diisi oleh pelaksana deployment. Jangan mengubah status tanpa menjalankan skenario. Referensi: [18_INSTALLATION.md](../18_INSTALLATION.md), [03_FRD.md](../03_FRD.md), [API.md](../API.md).
+
+Daftar induk test case per modul (termasuk Media sosial, Penasihat AI, Radar peluang, Pencari prospek, dan skenario bisnis 9 akun demo) ada di [2026-10-29_test-cases.md](2026-10-29_test-cases.md). UAT-01 sampai UAT-09 di bawah adalah subset pasca-deploy dan dipetakan ke TC-LIV, TC-REQ, TC-OFR, TC-ASG, TC-CMP, TC-BKP, TC-RPT, dan TC-SEC. Lingkungan, akun, dan batas kuota: [ENVIRONMENTS.md](../ENVIRONMENTS.md).
 
 ## Informasi Eksekusi
 

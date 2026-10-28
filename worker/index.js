@@ -7,6 +7,8 @@
  * Response envelope: { data, error, count? }, error = { message }.
  */
 
+import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.js';
+
 // ---------------------------------------------------------------- constants
 
 const MAX_BODY_BYTES = 256 * 1024; // auth + db
@@ -70,6 +72,13 @@ const TABLES = {
   },
   ai_messages: {
     columns: ['id', 'owner_id', 'agent', 'role', 'content', 'model', 'latency_ms', 'error', 'created_at'],
+  },
+  opportunity_states: {
+    columns: ['id', 'owner_id', 'opp_key', 'status', 'until', 'note', 'created_at'],
+  },
+  leads: {
+    columns: ['id', 'owner_id', 'source', 'source_id', 'name', 'category', 'address', 'phone', 'website', 'lat', 'lon', 'distance_km', 'score', 'est_value', 'status', 'notes', 'meta_json', 'created_at'],
+    json: ['meta_json'],
   },
 };
 // Columns the client may never set directly.
@@ -740,6 +749,9 @@ function sseResponse(stream) {
 
 // ------------------------------------------------------------------- router
 
+// Helpers handed to the lead-finder routes in ./leads.js (avoids a circular import).
+const LEAD_DEPS = { authenticate, readJson, ok, HttpError };
+
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
   'POST /api/auth/verify-otp': handleVerifyOtp,
@@ -749,6 +761,9 @@ const ROUTES = {
   'POST /api/db': handleDb,
   'GET /api/llm/models': handleModels,
   'POST /api/llm/chat': handleChat,
+  'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, LEAD_DEPS),
+  'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, LEAD_DEPS),
+  'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, LEAD_DEPS),
 };
 
 async function handleApi(request, env, path) {

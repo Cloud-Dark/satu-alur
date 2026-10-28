@@ -20,6 +20,8 @@ import * as StageReport from '../stages/report.js'
 import * as StageSettings from '../stages/settings.js'
 import * as StageSocial from '../stages/social.js'
 import * as StageAdvisor from '../stages/advisor.js'
+import * as StageRadar from '../stages/radar.js'
+import * as StageLeads from '../stages/leads.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
@@ -36,6 +38,10 @@ export const STAGES = [
     action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
   { key: 'report', num: '06', label: 'Laporan', icon: 'chart', module: StageReport,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
+  { key: 'radar', group: 'growth', label: 'Radar peluang', sub: 'Peluang dari transaksi', icon: 'radar', module: StageRadar,
+    action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
+  { key: 'leads', group: 'growth', label: 'Pencari prospek', sub: 'Peta & radius', icon: 'mapPin', module: StageLeads,
+    action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
   { key: 'social', group: 'growth', label: 'Media sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocial,
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
   { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,

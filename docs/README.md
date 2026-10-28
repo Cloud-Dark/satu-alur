@@ -56,3 +56,10 @@ Indeks dokumentasi. Per 2026-10-28 aplikasi berjalan di Cloudflare (Worker + D1 
 | [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) | Digantikan oleh [20_DATABASE.md](20_DATABASE.md) (desain PostgreSQL/WorkBuddy lama) |
 
 Nomor dokumen yang dilewati belum dibuat.
+
+## Pengujian dan Demo (tambahan 2026-10-29)
+
+- [uat/2026-10-29_test-cases.md](uat/2026-10-29_test-cases.md): daftar induk test case manual per modul + skenario bisnis 9 akun demo
+- [ENVIRONMENTS.md](ENVIRONMENTS.md): lingkungan (produksi, mock, Worker lokal), akun demo, cara masuk, batas paket gratis, log
+- [DEMO_SCRIPT.md](DEMO_SCRIPT.md): skrip demo dan rekaman video
+- Test otomatis: `npm run test:unit` (node:test, `tests/*.test.mjs`), `npm run test:e2e` (Playwright mode mock, `tests/e2e/`)
