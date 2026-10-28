@@ -50,6 +50,13 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 - Mode prototype dengan data di `localStorage`.
 - Desain awal untuk WorkBuddy Cloud SDK/PostgreSQL (`docs/API.md`, `docs/DATABASE_SCHEMA.md`).
 
+### Changed
+
+- Desain ulang total ke Design System v2 "Tumbuh" (krem, hijau hutan, aksen kunyit; Instrument Serif + Plus Jakarta Sans). Spesifikasi: [specs/2026-10-28-design-system-v2-design.md](specs/2026-10-28-design-system-v2-design.md).
+- Landing page baru (`#/`) dengan scene Three.js pita alur, pricing 3 paket (Sole Trader, UKM, Enterprise — harga draf), FAQ, dan demo agen AI.
+- Halaman login baru (`#/masuk`) dengan OTP 6 kotak dan scene Three.js; dashboard dan semua tahap didesain ulang dengan metrik yang dihitung dari data (tanpa angka tren palsu).
+- Routing hash: `#/` landing, `#/masuk` login, `#/app` aplikasi.
+
 ### Fixed
 
 - Deploy pertama ke Cloudflare (https://satu-alur.apipedia.workers.dev, D1 `satu-alur-db` 085c9a7a-64c5-4ced-b0f3-3158870d64f4).
