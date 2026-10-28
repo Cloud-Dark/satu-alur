@@ -1,13 +1,13 @@
 /**
- * Satu Alur brand mark: a rounded green tile with one flowing line
- * (the "alur") that bends into an S, starting from a turmeric seed.
+ * Satu Alur brand mark: a rounded green tile with one continuous line that
+ * climbs in steps (one flow, growing stage by stage) up to a turmeric milestone.
  */
 
 export function logoMarkHTML({ size = 30 } = {}) {
   return `<svg class="brand-mark" width="${size}" height="${size}" viewBox="0 0 32 32" fill="none" aria-hidden="true">
     <rect width="32" height="32" rx="9" fill="var(--brand)"/>
-    <path d="M9.5 22.5c0 0 2.2 1.5 6.5 1.5 3.6 0 5.8-1.6 5.8-4.1 0-2.6-2.4-3.4-5.8-3.9-3.4-.5-5.8-1.3-5.8-3.9C10.2 9.6 12.4 8 16 8c3.2 0 5.3 1 6.5 2" stroke="var(--text-on-brand)" stroke-width="2.4" stroke-linecap="round"/>
-    <circle cx="22.5" cy="10" r="2.4" fill="var(--accent)"/>
+    <path d="M7.5 23.5h5.5v-5h5.5v-5h4" stroke="var(--text-on-brand)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="23.5" cy="9.5" r="3" fill="var(--accent)"/>
   </svg>`
 }
 

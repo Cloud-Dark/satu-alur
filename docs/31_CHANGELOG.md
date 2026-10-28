@@ -53,8 +53,9 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 ### Changed
 
 - Desain ulang total ke Design System v2 "Tumbuh" (krem, hijau hutan, aksen kunyit; Instrument Serif + Plus Jakarta Sans). Spesifikasi: [specs/2026-10-28-design-system-v2-design.md](specs/2026-10-28-design-system-v2-design.md).
-- Landing page baru (`#/`) dengan scene Three.js pita alur, pricing 3 paket (Sole Trader, UKM, Enterprise — harga draf), FAQ, dan demo agen AI.
+- Landing page baru (`#/`) dengan scene Three.js 6 pilar tumbuh (benih kunyit melompat antar tahap), pricing 3 paket (Sole Trader, UKM, Enterprise — harga draf), FAQ, dan demo agen AI.
 - Halaman login baru (`#/masuk`) dengan OTP 6 kotak dan scene Three.js; dashboard dan semua tahap didesain ulang dengan metrik yang dihitung dari data (tanpa angka tren palsu).
+- Logo baru: satu garis bertangga naik dengan titik kunyit (menggantikan bentuk S).
 - Routing hash: `#/` landing, `#/masuk` login, `#/app` aplikasi.
 
 ### Fixed

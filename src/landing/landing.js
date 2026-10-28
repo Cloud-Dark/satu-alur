@@ -119,12 +119,15 @@ function heroHTML(user) {
       <div class="lp-hero-visual reveal" style="--d: 200ms">
         <div class="lp-scene" data-scene aria-hidden="true">
           <svg class="lp-scene-fallback" viewBox="0 0 400 420" fill="none" aria-hidden="true">
-            <path d="M40 70 C 160 20, 330 40, 320 130 S 90 200, 110 290 S 320 380, 370 350" stroke="var(--brand-500)" stroke-width="22" stroke-linecap="round" opacity="0.85"/>
-            <circle cx="110" cy="50" r="13" fill="var(--surface)" stroke="var(--line-strong)"/>
-            <circle cx="300" cy="80" r="13" fill="var(--accent)"/>
-            <circle cx="215" cy="190" r="13" fill="var(--surface)" stroke="var(--line-strong)"/>
-            <circle cx="112" cy="285" r="13" fill="var(--surface)" stroke="var(--line-strong)"/>
-            <circle cx="250" cy="355" r="13" fill="var(--surface)" stroke="var(--line-strong)"/>
+            <ellipse cx="200" cy="350" rx="185" ry="46" fill="var(--surface)" stroke="var(--line)"/>
+            <rect x="48" y="282" width="38" height="62" rx="9" fill="var(--brand-300)"/>
+            <rect x="102" y="250" width="38" height="94" rx="9" fill="var(--brand-300)" opacity="0.9"/>
+            <rect x="156" y="214" width="38" height="130" rx="9" fill="var(--brand-500)" opacity="0.75"/>
+            <rect x="210" y="174" width="38" height="170" rx="9" fill="var(--brand-500)"/>
+            <rect x="264" y="130" width="38" height="214" rx="9" fill="var(--brand-600)"/>
+            <rect x="318" y="82" width="38" height="262" rx="9" fill="var(--brand)"/>
+            <path d="M40 300 L67 282 L121 250 L175 214 L229 174 L283 130 L337 82 L372 58" stroke="var(--brand-500)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="121" cy="236" r="12" fill="var(--accent)"/>
           </svg>
         </div>
         <div class="lp-chip-float" aria-hidden="true">

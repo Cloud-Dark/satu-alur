@@ -1,7 +1,8 @@
 /**
- * Flow scene — "satu alur" in clay. A soft, flattened ribbon follows a gentle
- * S-curve; six pearl beads mark the stages (one in turmeric) and small seeds
- * glide along it. Matte materials, hemisphere + directional light, transparent
+ * Growth scene — "tumbuh dalam satu alur" in clay. Six rounded pillars (the six
+ * stages) rise step by step on a soft plinth, joined by one thin flow line
+ * across their tops. A turmeric seed hops from stage to stage; each pillar
+ * glows softly as it lands. Matte materials, soft lights, transparent
  * background. Used in the landing hero.
  *
  * mountFlowScene(container, { highlight }) -> Promise<cleanup>
@@ -16,13 +17,12 @@ import { cssVar } from '../ui/theme.js'
 import { prefersReducedMotion } from '../ui/reveal.js'
 
 const NOOP = () => {}
-const STAGE_T = [0.075, 0.245, 0.415, 0.585, 0.755, 0.925]
-const SEEDS = 72
-const SEGMENTS = 360
-const RADIAL = 28
-const LUT = 720
-const WIDTH = 0.46 // half-width of the ribbon
-const THICK = 0.17 // half-thickness of the ribbon
+const STEPS = 6
+const HEIGHTS = [0.9, 1.45, 2.05, 2.7, 3.4, 4.2]
+const PILLAR = 1.05 // footprint of each pillar
+const HOP = 0.85 // seconds per hop
+const REST = 0.55 // pause on each pillar
+const SEED_R = 0.3
 
 function webglAvailable() {
   try {
@@ -36,23 +36,18 @@ function webglAvailable() {
 async function loadThree() {
   // Named destructuring keeps the dynamic import tree-shakeable.
   const {
-    WebGLRenderer, Scene, PerspectiveCamera, Vector3, Color, Group, Object3D,
-    CatmullRomCurve3, BufferGeometry, Float32BufferAttribute, Mesh, InstancedMesh,
-    SphereGeometry, TubeGeometry, MeshStandardMaterial, MeshPhysicalMaterial,
-    HemisphereLight, DirectionalLight, DynamicDrawUsage,
+    WebGLRenderer, Scene, PerspectiveCamera, Vector3, Color, Group, Shape, ExtrudeGeometry,
+    CatmullRomCurve3, Mesh, SphereGeometry, TubeGeometry, CylinderGeometry, TorusGeometry,
+    MeshStandardMaterial, MeshPhysicalMaterial, HemisphereLight, DirectionalLight,
   } = await import('three')
   return {
-    WebGLRenderer, Scene, PerspectiveCamera, Vector3, Color, Group, Object3D,
-    CatmullRomCurve3, BufferGeometry, Float32BufferAttribute, Mesh, InstancedMesh,
-    SphereGeometry, TubeGeometry, MeshStandardMaterial, MeshPhysicalMaterial,
-    HemisphereLight, DirectionalLight, DynamicDrawUsage,
+    WebGLRenderer, Scene, PerspectiveCamera, Vector3, Color, Group, Shape, ExtrudeGeometry,
+    CatmullRomCurve3, Mesh, SphereGeometry, TubeGeometry, CylinderGeometry, TorusGeometry,
+    MeshStandardMaterial, MeshPhysicalMaterial, HemisphereLight, DirectionalLight,
   }
 }
 
-const smoothstep = (a, b, x) => {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
-  return t * t * (3 - 2 * t)
-}
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2)
 
 export async function mountFlowScene(container, opts = {}) {
   if (!container || !webglAvailable()) return NOOP
@@ -66,10 +61,9 @@ export async function mountFlowScene(container, opts = {}) {
   if (!container.isConnected) return NOOP
 
   const {
-    WebGLRenderer, Scene, PerspectiveCamera, Vector3, Color, Group, Object3D,
-    CatmullRomCurve3, BufferGeometry, Float32BufferAttribute, Mesh, InstancedMesh,
-    SphereGeometry, TubeGeometry, MeshStandardMaterial, MeshPhysicalMaterial,
-    HemisphereLight, DirectionalLight, DynamicDrawUsage,
+    WebGLRenderer, Scene, PerspectiveCamera, Vector3, Color, Group,
+    CatmullRomCurve3, Mesh, SphereGeometry, TubeGeometry, CylinderGeometry, TorusGeometry,
+    MeshStandardMaterial, MeshPhysicalMaterial, HemisphereLight, DirectionalLight, Shape, ExtrudeGeometry,
   } = T
 
   let renderer
@@ -90,8 +84,7 @@ export async function mountFlowScene(container, opts = {}) {
   container.appendChild(canvas)
 
   const scene = new Scene()
-  const camera = new PerspectiveCamera(30, 1, 0.1, 100)
-  camera.position.set(0, 0, 20)
+  const camera = new PerspectiveCamera(28, 1, 0.1, 100)
   const world = new Group()
   scene.add(world)
 
@@ -99,158 +92,107 @@ export async function mountFlowScene(container, opts = {}) {
   const track = (x) => { disposables.push(x); return x }
 
   // ---- Lights: soft sky/ground fill + a warm key and a cool rim ----
-  const hemi = new HemisphereLight(0xffffff, 0xdcebe3, 1.6)
-  const key = new DirectionalLight(0xfff4e2, 2.1)
-  key.position.set(-4, 6, 8)
-  const rim = new DirectionalLight(0xffffff, 0.7)
-  rim.position.set(6, -2, -4)
+  const hemi = new HemisphereLight(0xffffff, 0xdcebe3, 1.7)
+  const key = new DirectionalLight(0xfff4e2, 2.6)
+  key.position.set(-5, 9, 7)
+  const rim = new DirectionalLight(0xffffff, 0.8)
+  rim.position.set(7, 3, -6)
   scene.add(hemi, key, rim)
 
-  // ---- The flow: a gentle S, descending left-to-right ----
-  const curve = new CatmullRomCurve3([
-    new Vector3(-4.7, 3.3, -0.8),
-    new Vector3(-2.2, 3.9, 0.3),
-    new Vector3(1.2, 3.5, 0.7),
-    new Vector3(3.0, 1.9, 0.2),
-    new Vector3(1.4, 0.2, -0.5),
-    new Vector3(-1.4, -0.4, 0.1),
-    new Vector3(-2.6, -2.0, 0.6),
-    new Vector3(-0.6, -3.5, 0.3),
-    new Vector3(2.4, -3.8, -0.2),
-    new Vector3(4.8, -3.0, -0.8),
-  ], false, 'centripetal')
+  // ---- Layout: pillars on a gentle arc, rising left to right ----
+  const positions = HEIGHTS.map((h, i) => {
+    const t = i / (STEPS - 1)
+    const x = -3.4 + t * 6.8
+    const z = Math.sin(t * Math.PI) * -1.3 + 0.6
+    return new Vector3(x, 0, z)
+  })
+  const topOf = (i) => new Vector3(positions[i].x, HEIGHTS[i] + SEED_R, positions[i].z)
 
-  // Sampled frames (parallel-transported, so no flips through the S bends).
-  const frames = curve.computeFrenetFrames(LUT, false)
-  const lutP = curve.getSpacedPoints(LUT)
-  const twistAt = (t) => Math.sin(t * Math.PI * 2 + 0.4) * 0.32
-  const taperAt = (t) => Math.max(0.03, Math.pow(smoothstep(0, 0.09, t) * smoothstep(1, 0.91, t), 0.7))
+  // Plinth: a soft, wide disc the composition stands on.
+  const plinthMat = track(new MeshStandardMaterial({ roughness: 0.9 }))
+  const plinth = new Mesh(track(new CylinderGeometry(5.1, 5.25, 0.32, 96, 1)), plinthMat)
+  plinth.scale.set(1, 1, 0.62)
+  plinth.position.set(0, -0.16, -0.2)
+  world.add(plinth)
 
-  // Build the ribbon: an elliptical cross-section swept along the curve,
-  // gently twisting and tapering to a point at both ends (like a brushstroke).
-  function ribbonGeometry() {
-    const verts = []
-    const norms = []
-    const index = []
-    const P = new Vector3()
-    for (let i = 0; i <= SEGMENTS; i++) {
-      const t = i / SEGMENTS
-      const k = Math.round(t * LUT)
-      curve.getPointAt(t, P)
-      const n = frames.normals[k]
-      const b = frames.binormals[k]
-      const tw = twistAt(t)
-      const c = Math.cos(tw)
-      const s = Math.sin(tw)
-      // Rotated cross-section axes U (wide) and V (thin).
-      const ux = n.x * c + b.x * s, uy = n.y * c + b.y * s, uz = n.z * c + b.z * s
-      const vx = -n.x * s + b.x * c, vy = -n.y * s + b.y * c, vz = -n.z * s + b.z * c
-      const taper = taperAt(t)
-      const A = WIDTH * taper
-      const B = THICK * (0.3 + 0.7 * taper)
-      for (let j = 0; j <= RADIAL; j++) {
-        const phi = (j / RADIAL) * Math.PI * 2
-        const cu = Math.cos(phi)
-        const sv = Math.sin(phi)
-        verts.push(
-          P.x + ux * cu * A + vx * sv * B,
-          P.y + uy * cu * A + vy * sv * B,
-          P.z + uz * cu * A + vz * sv * B,
-        )
-        // Analytic ellipse normal.
-        let nx = ux * (cu / A) + vx * (sv / B)
-        let ny = uy * (cu / A) + vy * (sv / B)
-        let nz = uz * (cu / A) + vz * (sv / B)
-        const len = Math.hypot(nx, ny, nz) || 1
-        nx /= len; ny /= len; nz /= len
-        norms.push(nx, ny, nz)
-      }
-    }
-    const row = RADIAL + 1
-    for (let i = 0; i < SEGMENTS; i++) {
-      for (let j = 0; j < RADIAL; j++) {
-        const a = i * row + j
-        const bq = (i + 1) * row + j
-        index.push(a, bq, a + 1, bq, bq + 1, a + 1)
-      }
-    }
-    const g = new BufferGeometry()
-    g.setAttribute('position', new Float32BufferAttribute(verts, 3))
-    g.setAttribute('normal', new Float32BufferAttribute(norms, 3))
-    g.setIndex(index)
+  // Pillars: rounded clay blocks (a rounded square extruded upward with a soft bevel).
+  const BEVEL = 0.14
+  function pillarGeometry(h) {
+    const a = PILLAR / 2 - BEVEL
+    const r = 0.16
+    const sh = new Shape()
+    sh.moveTo(-a + r, -a)
+    sh.lineTo(a - r, -a)
+    sh.quadraticCurveTo(a, -a, a, -a + r)
+    sh.lineTo(a, a - r)
+    sh.quadraticCurveTo(a, a, a - r, a)
+    sh.lineTo(-a + r, a)
+    sh.quadraticCurveTo(-a, a, -a, a - r)
+    sh.lineTo(-a, -a + r)
+    sh.quadraticCurveTo(-a, -a, -a + r, -a)
+    const g = new ExtrudeGeometry(sh, {
+      depth: Math.max(0.01, h - BEVEL * 2),
+      bevelEnabled: true,
+      bevelThickness: BEVEL,
+      bevelSize: BEVEL,
+      bevelSegments: 5,
+      curveSegments: 10,
+    })
+    g.rotateX(-Math.PI / 2)
+    g.translate(0, BEVEL - h / 2, 0)
+    g.computeVertexNormals()
     return g
   }
-
-  const ribbonMat = track(new MeshPhysicalMaterial({ roughness: 0.72, metalness: 0, clearcoat: 0.25, clearcoatRoughness: 0.6, sheen: 0.4, sheenRoughness: 0.8 }))
-  const ribbon = new Mesh(track(ribbonGeometry()), ribbonMat)
-  world.add(ribbon)
-
-  // A faint echo of the flow behind the ribbon adds depth.
-  const echoCurve = new CatmullRomCurve3(curve.points.map((p) => new Vector3(p.x * 1.06 + 0.5, p.y * 1.04 - 0.25, p.z - 1.6)), false, 'centripetal')
-  const echoMat = track(new MeshStandardMaterial({ roughness: 0.9, transparent: true, opacity: 0.45 }))
-  world.add(new Mesh(track(new TubeGeometry(echoCurve, 260, 0.035, 8, false)), echoMat))
-
-  // ---- Six pearl beads ----
-  const pearlGeo = track(new SphereGeometry(0.34, 48, 32))
-  const pearlMat = track(new MeshPhysicalMaterial({ roughness: 0.38, clearcoat: 0.8, clearcoatRoughness: 0.25, sheen: 0.5, sheenRoughness: 0.5 }))
-  const accentMat = track(new MeshPhysicalMaterial({ roughness: 0.45, clearcoat: 0.6, clearcoatRoughness: 0.3 }))
-  const pearls = STAGE_T.map((t, i) => {
-    const m = new Mesh(pearlGeo, i === highlight ? accentMat : pearlMat)
-    const p = curve.getPointAt(t)
-    const k = Math.round(t * LUT)
-    m.userData = { base: p.clone(), bob: frames.binormals[k].clone(), phase: i * 1.1 }
-    m.position.copy(p)
-    if (i === highlight) m.scale.setScalar(1.18)
+  const pillarMats = HEIGHTS.map(() => track(new MeshPhysicalMaterial({ roughness: 0.62, clearcoat: 0.2, clearcoatRoughness: 0.7, sheen: 0.35, sheenRoughness: 0.8 })))
+  const pillars = HEIGHTS.map((h, i) => {
+    const g = track(pillarGeometry(h))
+    const m = new Mesh(g, pillarMats[i])
+    m.position.set(positions[i].x, h / 2, positions[i].z)
+    m.userData = { glow: 0 }
     world.add(m)
     return m
   })
 
-  // ---- Seeds gliding along the flow (instanced, lit like clay) ----
-  const seedGeo = track(new SphereGeometry(0.055, 14, 10))
-  const seedMat = track(new MeshStandardMaterial({ roughness: 0.6 }))
-  const seedAccentMat = track(new MeshStandardMaterial({ roughness: 0.55 }))
-  const accentEvery = 9
-  const nAccent = Math.ceil(SEEDS / accentEvery)
-  const seedsA = new InstancedMesh(seedGeo, seedMat, SEEDS - nAccent)
-  const seedsB = new InstancedMesh(seedGeo, seedAccentMat, nAccent)
-  seedsA.instanceMatrix.setUsage(DynamicDrawUsage)
-  seedsB.instanceMatrix.setUsage(DynamicDrawUsage)
-  seedsA.frustumCulled = false
-  seedsB.frustumCulled = false
-  world.add(seedsA, seedsB)
-  const seedData = Array.from({ length: SEEDS }, () => ({
-    t0: Math.random(),
-    speed: 0.012 + Math.random() * 0.018,
-    ang: Math.random() * Math.PI * 2,
-    r: 1.25 + Math.random() * 0.9,
-    size: 0.55 + Math.random() * 0.8,
-    wob: Math.random() * Math.PI * 2,
-  }))
-  const dummy = new Object3D()
+  // The flow: one thin line running across the pillar tops.
+  const flowPts = []
+  flowPts.push(new Vector3(positions[0].x - 1.0, HEIGHTS[0] * 0.55, positions[0].z + 0.4))
+  positions.forEach((p, i) => flowPts.push(new Vector3(p.x, HEIGHTS[i] + 0.05, p.z)))
+  flowPts.push(new Vector3(positions[STEPS - 1].x + 0.9, HEIGHTS[STEPS - 1] + 0.9, positions[STEPS - 1].z - 0.3))
+  const flowCurve = new CatmullRomCurve3(flowPts, false, 'centripetal')
+  const flowMat = track(new MeshStandardMaterial({ roughness: 0.5 }))
+  world.add(new Mesh(track(new TubeGeometry(flowCurve, 220, 0.045, 10, false)), flowMat))
 
-  function placeSeeds(time) {
-    let a = 0
-    let b = 0
-    for (let i = 0; i < SEEDS; i++) {
-      const s = seedData[i]
-      const t = (((s.t0 + time * s.speed) % 1) + 1) % 1
-      const k = Math.min(LUT, Math.round(t * LUT))
-      const p = lutP[k]
-      const n = frames.normals[k]
-      const bn = frames.binormals[k]
-      const ang = s.ang + time * 0.35 + Math.sin(time * 0.8 + s.wob) * 0.2
-      const r = s.r * WIDTH * (0.6 + 0.4 * taperAt(t))
-      const cu = Math.cos(ang) * r
-      const sv = Math.sin(ang) * r * 0.75
-      dummy.position.set(p.x + n.x * cu + bn.x * sv, p.y + n.y * cu + bn.y * sv, p.z + n.z * cu + bn.z * sv)
-      dummy.scale.setScalar(s.size * Math.max(0.001, Math.sin(t * Math.PI)))
-      dummy.updateMatrix()
-      if (i % accentEvery === 0) seedsB.setMatrixAt(b++, dummy.matrix)
-      else seedsA.setMatrixAt(a++, dummy.matrix)
-    }
-    seedsA.instanceMatrix.needsUpdate = true
-    seedsB.instanceMatrix.needsUpdate = true
-  }
+  // Stage markers: small rings on each pillar top.
+  const ringGeo = track(new TorusGeometry(0.27, 0.035, 10, 48))
+  const ringMat = track(new MeshStandardMaterial({ roughness: 0.4 }))
+  pillars.forEach((p, i) => {
+    const r = new Mesh(ringGeo, ringMat)
+    r.rotation.x = Math.PI / 2
+    r.position.set(positions[i].x, HEIGHTS[i] + 0.02, positions[i].z)
+    world.add(r)
+  })
+
+  // The seed that hops from stage to stage.
+  const seedMat = track(new MeshPhysicalMaterial({ roughness: 0.4, clearcoat: 0.7, clearcoatRoughness: 0.25 }))
+  const seed = new Mesh(track(new SphereGeometry(SEED_R, 48, 32)), seedMat)
+  world.add(seed)
+
+  // A few floating pearls for depth.
+  const pearlMat = track(new MeshPhysicalMaterial({ roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.3 }))
+  const pearlGeo = track(new SphereGeometry(1, 32, 24))
+  const pearls = [
+    { p: new Vector3(-3.6, 3.4, -1.6), s: 0.26, ph: 0 },
+    { p: new Vector3(-1.2, 4.6, -2.4), s: 0.16, ph: 1.7 },
+    { p: new Vector3(1.6, 5.3, -1.8), s: 0.2, ph: 3.1 },
+    { p: new Vector3(4.6, 1.6, 0.9), s: 0.14, ph: 4.4 },
+  ].map(({ p, s, ph }) => {
+    const m = new Mesh(pearlGeo, pearlMat)
+    m.scale.setScalar(s)
+    m.position.copy(p)
+    m.userData = { base: p.clone(), ph }
+    world.add(m)
+    return m
+  })
 
   // ---- Colours from tokens ----
   const parse = (name, fallback) => {
@@ -258,37 +200,94 @@ export async function mountFlowScene(container, opts = {}) {
     try { c.setStyle(cssVar(name) || fallback) } catch { c.setStyle(fallback) }
     return c
   }
+  const pillarBase = []
+  const accent = new Color()
   function applyColors() {
     const dark = document.documentElement.dataset.theme === 'dark'
-    ribbonMat.color.copy(dark ? parse('--brand-500', '#6fbb98') : parse('--brand-600', '#1b5a48').lerp(parse('--brand-500', '#2b7560'), 0.7))
-    ribbonMat.sheenColor.copy(parse('--brand-300', '#8fbfab'))
-    echoMat.color.copy(parse('--brand-300', '#8fbfab'))
-    echoMat.opacity = dark ? 0.55 : 0.5
-    pearlMat.color.copy(dark ? parse('--text', '#e9efeb') : parse('--surface', '#ffffff'))
-    pearlMat.sheenColor.copy(parse('--accent-100', '#fbeacb'))
-    const accent = parse('--accent', '#e7a13a')
-    accentMat.color.copy(accent)
-    accentMat.emissive.copy(accent).multiplyScalar(dark ? 0.18 : 0.08)
-    seedMat.color.copy(dark ? parse('--brand-600', '#a6dcc3') : parse('--brand-500', '#2b7560'))
-    seedAccentMat.color.copy(accent)
+    const light = dark ? parse('--brand-300', '#3f7d66') : parse('--brand-300', '#8fbfab')
+    const deep = dark ? parse('--brand-500', '#6fbb98') : parse('--brand', '#134235')
+    pillarBase.length = 0
+    pillarMats.forEach((m, i) => {
+      const c = light.clone().lerp(deep, i / (STEPS - 1))
+      pillarBase.push(c)
+      m.color.copy(c)
+      m.sheenColor.copy(parse('--brand-100', '#dcebe3'))
+    })
+    accent.copy(parse('--accent', '#e7a13a'))
+    seedMat.color.copy(accent)
+    seedMat.emissive.copy(accent).multiplyScalar(dark ? 0.2 : 0.08)
+    plinthMat.color.copy(dark ? parse('--surface-2', '#17241f') : parse('--surface', '#ffffff'))
+    flowMat.color.copy(dark ? parse('--brand-600', '#a6dcc3') : parse('--brand-500', '#2b7560'))
+    ringMat.color.copy(dark ? parse('--text', '#e9efeb') : parse('--surface', '#ffffff'))
+    pearlMat.color.copy(dark ? parse('--text-2', '#c9d4ce') : parse('--surface', '#ffffff'))
     hemi.color.set(dark ? 0xdfeee6 : 0xffffff)
-    hemi.groundColor.copy(dark ? parse('--brand-100', '#1d3a30') : parse('--brand-100', '#dcebe3'))
-    hemi.intensity = dark ? 1.25 : 1.9
-    key.intensity = dark ? 2.4 : 2.8
+    hemi.groundColor.copy(parse('--brand-100', '#dcebe3'))
+    hemi.intensity = dark ? 1.2 : 1.8
+    key.intensity = dark ? 2.3 : 2.7
   }
   applyColors()
 
-  // ---- Sizing: keep the whole S in frame for any aspect ratio ----
-  let baseZ = 20
+  // ---- Seed choreography ----
+  const cycle = STEPS * (HOP + REST) + 0.6
+  const tmpA = new Vector3()
+  const tmpB = new Vector3()
+  function placeSeed(time) {
+    const t = time % cycle
+    const slot = Math.floor(t / (HOP + REST))
+    const local = t - slot * (HOP + REST)
+    pillars.forEach((p) => { p.userData.glow *= 0.94 })
+    if (slot >= STEPS) {
+      // Fade out above the last pillar, then restart at the first.
+      const k = Math.min(1, (t - STEPS * (HOP + REST)) / 0.6)
+      seed.position.copy(topOf(STEPS - 1)).add(tmpA.set(0, k * 0.8, 0))
+      seed.scale.setScalar(Math.max(0.001, 1 - k))
+      return
+    }
+    seed.scale.setScalar(1)
+    if (slot === 0 && local < HOP) {
+      // Grow in on the first pillar.
+      const k = easeInOut(local / HOP)
+      seed.position.copy(topOf(0)).add(tmpA.set(0, (1 - k) * 0.6, 0))
+      seed.scale.setScalar(Math.max(0.001, k))
+      if (k > 0.95) pillars[0].userData.glow = 1
+      return
+    }
+    if (local < HOP && slot > 0) {
+      const k = easeInOut(local / HOP)
+      tmpA.copy(topOf(slot - 1))
+      tmpB.copy(topOf(slot))
+      seed.position.lerpVectors(tmpA, tmpB, k)
+      seed.position.y += Math.sin(k * Math.PI) * 1.1
+      seed.scale.set(1 - Math.sin(k * Math.PI) * 0.06, 1 + Math.sin(k * Math.PI) * 0.08, 1 - Math.sin(k * Math.PI) * 0.06)
+      if (k > 0.97) pillars[slot].userData.glow = 1
+    } else {
+      // Resting: a small squash on landing.
+      const r = (local - HOP) / REST
+      const squash = Math.max(0, 1 - r * 3) * 0.12
+      seed.position.copy(topOf(slot))
+      seed.position.y -= squash * SEED_R
+      seed.scale.set(1 + squash, 1 - squash, 1 + squash)
+    }
+  }
+  function applyGlow() {
+    pillarMats.forEach((m, i) => {
+      const g = pillars[i].userData.glow
+      m.color.copy(pillarBase[i]).lerp(accent, g * 0.22)
+      m.emissive.copy(accent).multiplyScalar(g * 0.1)
+    })
+  }
+
+  // ---- Sizing: keep the whole composition in frame for any aspect ratio ----
+  let dist = 18
   function resize() {
     const w = Math.max(1, container.clientWidth)
     const h = Math.max(1, container.clientHeight)
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
-    const halfW = 5.6
-    const halfH = 4.7
-    baseZ = Math.min(Math.max(halfW / (tanHalf * camera.aspect), halfH / tanHalf, 10), 44)
+    const halfW = 6.6
+    const halfH = 5.0
+    dist = Math.min(Math.max(halfW / (tanHalf * camera.aspect), halfH / tanHalf, 10), 44)
     camera.updateProjectionMatrix()
   }
 
@@ -298,33 +297,35 @@ export async function mountFlowScene(container, opts = {}) {
   let visible = true
   let start = performance.now()
   let elapsed = 0
+  const target = new Vector3(0.5, -0.9, 0)
 
   function pose(time, px, py) {
-    world.position.y = Math.sin(time * 0.5) * 0.14
-    world.rotation.y = Math.sin(time * 0.21) * 0.16 + px * 0.22
-    world.rotation.x = Math.sin(time * 0.17) * 0.05 + py * 0.12
-    world.rotation.z = Math.sin(time * 0.13) * 0.025
-    pearls.forEach((m, i) => {
-      const { base, bob, phase } = m.userData
-      const o = Math.sin(time * 1.1 + phase) * 0.06
-      m.position.set(base.x + bob.x * o, base.y + bob.y * o, base.z + bob.z * o)
-      if (i === highlight) m.scale.setScalar(1.18 + Math.sin(time * 1.6) * 0.04)
+    world.rotation.y = -0.22 + Math.sin(time * 0.18) * 0.08 + px * 0.14
+    world.position.y = Math.sin(time * 0.45) * 0.06
+    pearls.forEach((m) => {
+      const { base, ph } = m.userData
+      m.position.set(base.x, base.y + Math.sin(time * 0.9 + ph) * 0.18, base.z)
     })
-    camera.position.set(px * 0.6, -py * 0.35, baseZ)
-    camera.lookAt(0, 0, 0)
+    const elev = 0.32 - py * 0.06
+    camera.position.set(Math.sin(px * 0.1) * dist, target.y + Math.sin(elev) * dist, Math.cos(elev) * dist)
+    camera.lookAt(target)
   }
 
   function frame(time) {
     pointer.x += (pointer.tx - pointer.x) * 0.045
     pointer.y += (pointer.ty - pointer.y) * 0.045
     pose(time, pointer.x, pointer.y)
-    placeSeeds(time)
+    placeSeed(time)
+    applyGlow()
     renderer.render(scene, camera)
   }
 
   function renderStatic() {
     pose(0, 0, 0)
-    placeSeeds(6)
+    seed.position.copy(topOf(highlight))
+    seed.scale.setScalar(1)
+    pillars.forEach((p, i) => { p.userData.glow = i === highlight ? 0.8 : 0 })
+    applyGlow()
     renderer.render(scene, camera)
   }
 
@@ -384,8 +385,6 @@ export async function mountFlowScene(container, opts = {}) {
     document.removeEventListener('visibilitychange', onVisibility)
     window.removeEventListener('themechange', onTheme)
     window.removeEventListener('pointermove', onPointer)
-    seedsA.dispose()
-    seedsB.dispose()
     disposables.forEach((d) => d.dispose())
     renderer.dispose()
     canvas.remove()
