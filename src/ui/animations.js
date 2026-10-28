@@ -1,89 +1,40 @@
 /**
- * Animation & visual effects utilities for Satu Alur
- * AntiSlop-compliant — semua warna menggunakan TOKENS
+ * Motion + feedback helpers. Every effect respects prefers-reduced-motion
+ * and reads colours from tokens.css (no raw hex here).
  */
 
-import { TOKENS } from './antislop.js'
+const reducedMotion = () =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
 
-export function createParticleBackground(container) {
-  const canvas = document.createElement('canvas')
-  canvas.className = 'particle-canvas'
-  container.prepend(canvas)
-
-  const ctx = canvas.getContext('2d')
-  let particles = []
-  let animationId = null
-
-  function resize() {
-    canvas.width = container.clientWidth
-    canvas.height = container.clientHeight
-  }
-  resize()
-  window.addEventListener('resize', resize)
-
-  // Warm orange & brown tones only
-  const colors = [
-    TOKENS.colors.primary,
-    TOKENS.colors.secondary,
-    TOKENS.colors.accent.sand,
-    TOKENS.colors.accent.terracotta,
-  ]
-
-  for (let i = 0; i < 30; i++) {
-    particles.push({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      r: Math.random() * 2 + 0.5,
-      dx: (Math.random() - 0.5) * 0.3,
-      dy: (Math.random() - 0.5) * 0.3,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      alpha: Math.random() * 0.3 + 0.1,
-    })
-  }
-
-  function animate() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-    particles.forEach(p => {
-      p.x += p.dx
-      p.y += p.dy
-      if (p.x < 0 || p.x > canvas.width) p.dx *= -1
-      if (p.y < 0 || p.y > canvas.height) p.dy *= -1
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
-      ctx.fillStyle = p.color
-      ctx.globalAlpha = p.alpha
-      ctx.fill()
-    })
-    ctx.globalAlpha = 1
-    animationId = requestAnimationFrame(animate)
-  }
-  animate()
-
-  return () => {
-    cancelAnimationFrame(animationId)
-    window.removeEventListener('resize', resize)
-  }
+/** Fades/lifts an element in. Safe to call on detached nodes. */
+export function animateEntrance(element, delay = 0) {
+  if (!element || reducedMotion()) return
+  element.animate(
+    [
+      { opacity: 0, transform: 'translateY(8px)' },
+      { opacity: 1, transform: 'none' },
+    ],
+    { duration: 420, delay, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'backwards' },
+  )
 }
 
-export function animateEntrance(element, delay = 0) {
-  element.style.opacity = '0'
-  element.style.transform = 'translateY(10px)'
-  element.style.transition = 'opacity 0.5s cubic-bezier(0.16,1,0.3,1), transform 0.5s cubic-bezier(0.16,1,0.3,1)'
-  setTimeout(() => {
-    element.style.opacity = '1'
-    element.style.transform = 'none'
-  }, delay)
+/** Staggers the direct children of `parent`. */
+export function staggerChildren(parent, { step = 40, start = 0, max = 12 } = {}) {
+  if (!parent) return
+  Array.from(parent.children).slice(0, max).forEach((child, i) => animateEntrance(child, start + i * step))
 }
 
 export function pulseEffect(element) {
-  element.style.animation = 'pulse-glow 2s infinite'
+  if (!element || reducedMotion()) return
+  element.animate([{ opacity: 1 }, { opacity: 0.4 }, { opacity: 1 }], { duration: 900, iterations: 2 })
 }
 
+/**
+ * Toast notification (styles live in tokens.css: .toast-stack/.toast).
+ * type: 'info' | 'success' | 'error'
+ */
 export function showToast(message, type = 'info', duration = 3200) {
-  if (!message || message.length < 3) {
-    console.warn('[AntiSlop] Toast message terlalu pendek:', message)
-    return
-  }
+  if (!message || String(message).trim().length < 3) return
 
   let stack = document.querySelector('.toast-stack')
   if (!stack) {
@@ -106,9 +57,11 @@ export function showToast(message, type = 'info', duration = 3200) {
   }, duration)
 }
 
+/** Types text into an element. Returns a cancel function. */
 export function typewriterEffect(element, text, speed = 30) {
-  if (!text || text.length < 2) {
-    console.warn('[AntiSlop] Typewriter text terlalu pendek')
+  if (!element || !text) return () => {}
+  if (reducedMotion()) {
+    element.textContent = text
     return () => {}
   }
   element.textContent = ''
@@ -119,4 +72,12 @@ export function typewriterEffect(element, text, speed = 30) {
     if (i >= text.length) clearInterval(timer)
   }, speed)
   return () => clearInterval(timer)
+}
+
+/**
+ * Kept for backwards compatibility. The editorial design has no particle
+ * backdrop, so this is a no-op that returns a cleanup function.
+ */
+export function createParticleBackground() {
+  return () => {}
 }

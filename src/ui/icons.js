@@ -51,6 +51,13 @@ const PATHS = {
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   plug: '<path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8z"/>',
   activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  chevronLeft: '<path d="m15 18-6-6 6-6"/>',
+  panelLeft: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>',
+  terminal: '<path d="m4 17 6-5-6-5"/><path d="M12 19h8"/>',
+  pencil: '<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/>',
+  flag: '<path d="M4 22V4"/><path d="M4 4h13l-2 4 2 4H4"/>',
+  minus: '<path d="M5 12h14"/>',
+  receipt: '<path d="M5 2h14v20l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
 }
 
 export function iconHTML(name, { size = 18, stroke = 1.75, className = '' } = {}) {
