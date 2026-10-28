@@ -191,29 +191,29 @@ E2E hanya berjalan di mode mock. Jangan arahkan ke produksi karena alurnya menul
 
 ## 14. Radar peluang
 
-Fitur ini masih dalam pengerjaan (`src/stages/radar.js`, `src/ai/radar-engine.js`, migrasi `0005_opportunity_states.sql`). E2E saat ini hanya smoke test ([radar](../../tests/e2e/radar.spec.cjs)). Otomasi lengkap: **TODO**.
+Fitur ini masih dalam pengerjaan (`src/stages/radar.js`, `src/ai/radar-engine.js`, migrasi `0005_opportunity_states.sql`). Mesin deteksi sudah punya unit test dari tim fitur ([radar-engine.test.mjs](../../tests/radar-engine.test.mjs)). E2E saat ini hanya smoke test ([radar](../../tests/e2e/radar.spec.cjs)). E2E per kasus: **TODO**.
 
 | ID | Judul | Prasyarat | Langkah | Data uji | Hasil yang diharapkan | Prioritas | Otomatis? | Status | Catatan |
 |----|-------|-----------|---------|----------|-----------------------|-----------|-----------|--------|---------|
 | TC-RAD-01 | Menu dan tampilan awal | masuk | Klik "Radar peluang" di grup Pertumbuhan | - | Tab Radar, Minggu ini, Rekomendasi AI, Prediksi. Kartu peluang dengan skor tampil, tanpa error | P1 | [radar](../../tests/e2e/radar.spec.cjs) (smoke) | _PENDING_ | |
-| TC-RAD-02 | Jenis peluang dan bukti | DEMO:ac | Buka beberapa kartu | - | Tiap kartu punya jenis (Layanan berulang, Risiko churn, Upsell, Cross-sell, Penawaran tertunda, Tawarkan ulang, Musiman) dan bukti baris data asli (tanggal, nilai). Tidak ada angka tanpa sumber | P1 | TODO | _PENDING_ | |
-| TC-RAD-03 | Layanan berulang jatuh tempo | DEMO:ac | Cari kartu "Jatuh tempo" untuk pelanggan servis AC | - | Pelanggan dengan servis terakhir ±3 bulan lalu muncul dengan perkiraan tanggal | P2 | TODO | _PENDING_ | |
+| TC-RAD-02 | Jenis peluang dan bukti | DEMO:ac | Buka beberapa kartu | - | Tiap kartu punya jenis (Layanan berulang, Risiko churn, Upsell, Cross-sell, Penawaran tertunda, Tawarkan ulang, Musiman) dan bukti baris data asli (tanggal, nilai). Tidak ada angka tanpa sumber | P1 | Unit: [radar-engine](../../tests/radar-engine.test.mjs) (mesin); E2E TODO | _PENDING_ | |
+| TC-RAD-03 | Layanan berulang jatuh tempo | DEMO:ac | Cari kartu "Jatuh tempo" untuk pelanggan servis AC | - | Pelanggan dengan servis terakhir ±3 bulan lalu muncul dengan perkiraan tanggal | P2 | Unit: [radar-engine](../../tests/radar-engine.test.mjs) (`due`); E2E TODO | _PENDING_ | |
 | TC-RAD-04 | Filter dan urutan | ada kartu | Filter per jenis, urutkan Skor/Nilai/Terbaru | - | Daftar berubah sesuai filter/urutan, dengan paging 12 per halaman | P2 | TODO | _PENDING_ | |
-| TC-RAD-05 | Tandai selesai, tunda, abaikan | ada kartu | Pakai aksi pada 3 kartu, lalu muat ulang | - | Status bertahan setelah dimuat ulang (D1 `opportunity_states`). Tunda kembali setelah 30 hari | P1 | TODO | _PENDING_ | Memakai kuota tulis |
+| TC-RAD-05 | Tandai selesai, tunda, abaikan | ada kartu | Pakai aksi pada 3 kartu, lalu muat ulang | - | Status bertahan setelah dimuat ulang (D1 `opportunity_states`). Tunda kembali setelah 30 hari | P1 | Unit: [radar-engine](../../tests/radar-engine.test.mjs) (`applyStates`); E2E TODO | _PENDING_ | Memakai kuota tulis |
 | TC-RAD-06 | Pesan tindak lanjut AI | ada kartu | Minta AI menulis pesan WhatsApp | - | Pesan Indonesia tanpa emoji, merujuk bukti kartu, dan tidak dikirim otomatis | P2 | TODO | _PENDING_ | |
-| TC-RAD-07 | Akun kosong | LIVE akun baru | Buka Radar | - | State kosong yang jelas, tanpa kartu karangan | P2 | TODO | _PENDING_ | |
-| TC-RAD-08 | Musiman | DEMO:dinding | Lihat kartu Musiman | - | Jendela Jul–Okt (kemarau) dan pra-Lebaran disebut berdasarkan riwayat | P3 | TODO | _PENDING_ | Spec §7 |
+| TC-RAD-07 | Akun kosong | LIVE akun baru | Buka Radar | - | State kosong yang jelas, tanpa kartu karangan | P2 | Unit: [radar-engine](../../tests/radar-engine.test.mjs) (akun kosong); E2E TODO | _PENDING_ | |
+| TC-RAD-08 | Musiman | DEMO:dinding | Lihat kartu Musiman | - | Jendela Jul–Okt (kemarau) dan pra-Lebaran disebut berdasarkan riwayat | P3 | Unit: [radar-engine](../../tests/radar-engine.test.mjs) (`season`); E2E TODO | _PENDING_ | Spec §7 |
 
 ## 15. Pencari prospek
 
-Fitur ini masih dalam pengerjaan (`src/stages/leads.js`, `src/leads/`, `worker/leads.js`, migrasi `0006_leads.sql`). Pencari prospek memakai OpenStreetMap (atau Google Places bila dikonfigurasi) dan tidak pernah mengirim pesan ke prospek. E2E saat ini hanya smoke test ([leads](../../tests/e2e/leads.spec.cjs)). Otomasi lengkap: **TODO**.
+Fitur ini masih dalam pengerjaan (`src/stages/leads.js`, `src/leads/`, `worker/leads.js`, migrasi `0006_leads.sql`). Pencari prospek memakai OpenStreetMap (atau Google Places bila dikonfigurasi) dan tidak pernah mengirim pesan ke prospek. Pemetaan OSM dan skor sudah punya unit test dari tim fitur ([leads.test.mjs](../../tests/leads.test.mjs)). E2E saat ini hanya smoke test ([leads](../../tests/e2e/leads.spec.cjs)). E2E per kasus: **TODO**.
 
 | ID | Judul | Prasyarat | Langkah | Data uji | Hasil yang diharapkan | Prioritas | Otomatis? | Status | Catatan |
 |----|-------|-----------|---------|----------|-----------------------|-----------|-----------|--------|---------|
 | TC-LDS-01 | Menu dan peta | masuk | Klik "Pencari prospek" | - | Peta tampil (bawaan Jabodetabek) dengan kontrol radius dan kriteria | P1 | [leads](../../tests/e2e/leads.spec.cjs) (smoke) | _PENDING_ | |
 | TC-LDS-02 | Pilih titik: klik peta, cari alamat, lokasi saya | - | Coba tiga cara memilih titik | `Jl. Asia Afrika Bandung` | Titik berpindah. Pencarian alamat dibatasi 1 permintaan/detik (debounce). Lokasi di luar Indonesia ditolak dengan pesan | P2 | TODO | _PENDING_ | |
-| TC-LDS-03 | Cari prospek | titik + radius | Pilih chip kriteria (mis. hotel, klinik), radius 5 km, klik Cari | - | Daftar usaha dengan jarak, skor, dan estimasi nilai (berdasarkan rata-rata pekerjaan + konversi akun). Penjelasan skor transparan | P1 | TODO | _PENDING_ | |
-| TC-LDS-04 | Batas radius, kata kunci, dan kuota | - | Isi radius di luar 0,5–40 km, lebih dari 8 kata kunci atau kata kunci < 2 karakter, lalu cari lebih dari 20× dalam 1 jam | - | Nilai ditolak atau dibatasi dengan pesan Indonesia. Pencarian ke-21 per jam ditolak (hasil dari cache tidak dihitung) | P3 | TODO | _PENDING_ | Batas di [16_CONFIG_REFERENCE.md](../16_CONFIG_REFERENCE.md#batas--penyimpanan) |
+| TC-LDS-03 | Cari prospek | titik + radius | Pilih chip kriteria (mis. hotel, klinik), radius 5 km, klik Cari | - | Daftar usaha dengan jarak, skor, dan estimasi nilai (berdasarkan rata-rata pekerjaan + konversi akun). Penjelasan skor transparan | P1 | Unit: [leads](../../tests/leads.test.mjs) (skor, estimasi nilai); E2E TODO | _PENDING_ | |
+| TC-LDS-04 | Batas radius, kata kunci, dan kuota | - | Isi radius di luar 0,5–40 km, lebih dari 8 kata kunci atau kata kunci < 2 karakter, lalu cari lebih dari 20× dalam 1 jam | - | Nilai ditolak atau dibatasi dengan pesan Indonesia. Pencarian ke-21 per jam ditolak (hasil dari cache tidak dihitung) | P3 | Unit: [leads](../../tests/leads.test.mjs) (validasi kata kunci); E2E TODO | _PENDING_ | Batas di [16_CONFIG_REFERENCE.md](../16_CONFIG_REFERENCE.md#batas--penyimpanan) |
 | TC-LDS-05 | Simpan prospek dan status | ada hasil | Simpan 1 prospek, ubah status Baru → Dihubungi → Penawaran → Ditolak | - | Tersimpan di D1 `leads` dan tetap ada setelah dimuat ulang. Hasil pencarian yang tidak disimpan tidak ikut tersimpan | P1 | TODO | _PENDING_ | Memakai kuota tulis |
 | TC-LDS-06 | Draf penawaran AI menjadi alur | prospek tersimpan | Buat draf penawaran AI, lalu jadikan permintaan | - | Muncul permintaan baru + draf penawaran di tahap 01/02 yang lulus aturan harga | P1 | TODO | _PENDING_ | |
 | TC-LDS-07 | Tidak ada pengiriman otomatis | - | Periksa seluruh aksi | - | Tidak ada tombol yang mengirim email/WA ke prospek (MVP) | P1 | TODO | _PENDING_ | |
@@ -297,7 +297,7 @@ Angka kunci berasal dari `seeds/demo-lean-summary.json`. Untuk AC, Cleaning, Lis
 
 | Tanggal | Lingkungan | Unit | E2E | Catatan |
 |---------|------------|------|-----|---------|
-| 2026-10-29 | ENV-MOCK (lokal, Vite port 5199) | lihat laporan run (`npm run test:unit`) | lihat laporan run (`npm run test:e2e`) | Isi ulang setiap kali suite dijalankan |
+| 2026-10-29 | ENV-MOCK (lokal, Vite port 5199) | 139 test: 138 lulus, 0 gagal, 1 TODO (BUG-02). Termasuk 36 test Radar/Prospek dari tim fitur | 11 spec, 221 cek lulus, 0 gagal, 1 KNOWN-BUG (BUG-01). Radar/Prospek baru smoke | Isi baris baru setiap kali suite dijalankan |
 
 ## 23. Temuan
 

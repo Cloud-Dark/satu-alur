@@ -63,21 +63,21 @@ Status: _PENDING_ | Bukti: _TBD_ | Catatan: _TBD_
 
 ### UAT-03 Penawaran AI (FR-011)
 
-Langkah: pilih permintaan, hasilkan penawaran, amati streaming, uji tombol Batal pada satu percobaan, lalu simpan hasil yang valid.
+Langkah: pilih permintaan, hasilkan penawaran, amati streaming, uji tombol Hentikan pada satu percobaan, lalu simpan hasil yang valid.
 
-Hasil diharapkan: teks tampil bertahap; Batal menghentikan dan menampilkan "Dibatalkan"; hasil tervalidasi (harga/scope/terms) dan tersimpan berstatus `draft`. Catat model yang dipakai dan lama respons.
+Hasil diharapkan: teks tampil bertahap; Hentikan menghentikan dan menampilkan "Dihentikan"; hasil tervalidasi (harga/scope/terms) dan tersimpan berstatus `approved`. Catat model yang dipakai dan lama respons.
 
 Status: _PENDING_ | Model: _TBD_ | Bukti: _TBD_ | Catatan: _TBD_
 
 ### UAT-04 Penugasan (FR-013)
 
-Prasyarat: ada penawaran berstatus `approved`. Karena belum ada layar persetujuan (R-009), ubah status lewat prosedur yang disepakati: _TBD_ (mis. `wrangler d1 execute --remote` atau panggilan `/api/db` dengan token akun A). Catat prosedur yang dipakai.
+Prasyarat: ada penawaran berstatus `approved` (penawaran yang disimpan di UAT-03 otomatis `approved`; penawaran `draft` dapat disetujui lewat tombol "Setujui" di daftar Penawaran).
 
 Langkah: pilih penawaran, isi nama pekerja dan jadwal, simpan.
 
 Hasil diharapkan: penugasan berstatus `assigned` muncul di daftar.
 
-Status: _PENDING_ | Prosedur persetujuan: _TBD_ | Bukti: _TBD_ | Catatan: _TBD_
+Status: _PENDING_ | Bukti: _TBD_ | Catatan: _TBD_
 
 ### UAT-05 Penyelesaian (FR-014)
 

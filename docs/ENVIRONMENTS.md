@@ -24,10 +24,10 @@ Lembar ringkas untuk tim (QA, analis bisnis, pengembang): lokasi aplikasi, cara 
 | Worker | `satu-alur` (`main = worker/index.js`, `compatibility_date = 2025-09-01`) |
 | Aset | `./dist` lewat binding `ASSETS`, fallback SPA. Hanya `/api/*` yang dijalankan Worker lebih dulu |
 | D1 | nama `satu-alur-db`, binding `DB`, `database_id = 085c9a7a-64c5-4ced-b0f3-3158870d64f4` (pengenal, bukan rahasia) |
-| Migrasi | `migrations/0001`–`0004` sudah ada di repo. `0005_opportunity_states.sql` (Radar peluang) dan `0006_leads.sql` (Pencari prospek) sedang dikerjakan. Status penerapan di remote: _TBD_, cek dengan `npx wrangler d1 migrations list satu-alur-db --remote` |
+| Migrasi | Remote (per 2026-10-28): `0001`–`0003` sudah diterapkan. `0004` (hapus indeks FK), `0005_opportunity_states.sql` (Radar peluang) dan `0006_leads.sql` (Pencari prospek) dijadwalkan diterapkan 2026-10-29 setelah kuota tulis harian pulih. Cek dengan `npx wrangler d1 migrations list satu-alur-db --remote` |
 | Workers AI | binding `AI`. Model (daftar tetap di `worker/index.js`): `@cf/meta/llama-3.3-70b-instruct-fp8-fast` (bawaan, urutan pertama) dan `@cf/meta/llama-3.1-8b-instruct-fast` |
 | Batas Worker | Body auth/db 256 KB, chat 512 KB. OTP berlaku 10 menit, 5 percobaan, 5 kode per email per 10 menit. Sesi 30 hari. Maks 5.000 baris per kueri, 100 baris per insert. `max_tokens` ≤ 4096 |
-| Seed yang termuat | _TBD_ (seed penuh `demo.sql` atau lean `demo-lean.part1..3`; angka laundry/mall/fm/rs berbeda). Tanyakan ke lead sebelum memakai kunci jawaban di [uat/2026-10-29_test-cases.md](uat/2026-10-29_test-cases.md#21-skenario-bisnis-dengan-9-akun-demo) |
+| Seed yang termuat | Seed **penuh** `seeds/demo.sql` (diterapkan 2026-10-28; 39.182 baris di 9 akun demo, terverifikasi lewat hitungan baris). Kunci jawaban di [uat/2026-10-29_test-cases.md](uat/2026-10-29_test-cases.md#21-skenario-bisnis-dengan-9-akun-demo) memakai angka seed penuh. Seed lean hanya ada di D1 lokal pengembang |
 
 ### Variabel (`[vars]` di `wrangler.toml`)
 

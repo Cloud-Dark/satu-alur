@@ -263,6 +263,8 @@ test('advisor memory: save, load (oldest first), clear per agent (mock D1)', asy
   await mod.advisor.saveMessage({ agent: 'keuangan', role: 'user', content: 'Q1' })
   await new Promise((r) => setTimeout(r, 5))
   await mod.advisor.saveMessage({ agent: 'keuangan', role: 'assistant', content: 'A1', model: 'm', latency_ms: 10 })
+  // Mock ids are random, so ordering only holds across distinct timestamps (D1 ids are monotonic).
+  await new Promise((r) => setTimeout(r, 5))
   await mod.advisor.saveMessage({ agent: 'pemasaran', role: 'user', content: 'Q2' })
   let { rows } = await mod.advisor.loadMessages()
   const mine = rows.filter((r) => ['Q1', 'A1', 'Q2'].includes(r.content))

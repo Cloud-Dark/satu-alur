@@ -54,9 +54,11 @@ module.exports = async function combobox(t) {
   t.check(Boolean(pick), 'search is case-insensitive')
 
   // Enter selects and writes back to the native select
-  const changed = p.evaluate(() => new Promise((res) => document.querySelector('select[name="request_id"]').addEventListener('change', () => res(true), { once: true })))
+  // register the listener (awaited) before pressing Enter, so the key cannot win the race
+  await p.evaluate(() => { window.__comboChanged = 0; document.querySelector('select[name="request_id"]').addEventListener('change', () => { window.__comboChanged++ }, { once: true }) })
   await p.keyboard.press('Enter')
-  t.check(await Promise.race([changed, new Promise((r) => setTimeout(() => r(false), 2000))]), 'Enter dispatches change on the native select')
+  await p.waitForFunction(() => window.__comboChanged > 0, null, { timeout: 2000 }).catch(() => {})
+  t.check(await p.evaluate(() => window.__comboChanged) === 1, 'Enter dispatches change on the native select')
   t.check(await p.locator('.combo-pop').count() === 0 || !(await p.isVisible('.combo-pop')), 'list closes after choosing')
   t.check(norm(await trigger.textContent()) === norm(pick), 'trigger shows the chosen label', `${await trigger.textContent()} vs ${pick}`)
   t.check(Boolean(await native.inputValue()), 'native select has a value')
@@ -64,8 +66,10 @@ module.exports = async function combobox(t) {
 
   // Escape and outside click close without changing the value
   const before = await native.inputValue()
-  await p.keyboard.press('Enter')
+  await trigger.focus()
+  await p.keyboard.press('ArrowDown') // ArrowDown (not Enter) so a stray key can never submit the wizard
   await p.waitForSelector('.combo-pop:not([hidden])')
+  await p.waitForTimeout(100)
   await p.keyboard.press('ArrowDown')
   await p.keyboard.press('Escape')
   await p.waitForTimeout(150)

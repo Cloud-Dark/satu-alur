@@ -152,10 +152,10 @@ test('buildSnapshot: service mix, demand, cost mix, repeat customers', () => {
   assert.deepEqual(s.demand[0], { name: 'Servis AC', requests: 6 })
   assert.deepEqual(s.costMix.map((x) => x.category), ['biaya_tenaga', 'biaya_bahan'])
   assert.equal(s.costMix[0].label, 'Biaya tenaga kerja')
-  assert.deepEqual(s.repeat, { customers: 9, returning: 1 })
+  assert.deepEqual(s.repeat, { customers: 8, returning: 1 }) // 'PT Maju' and 'pt  maju ' are one customer
 })
 
-test('buildSnapshot: top customers group the same customer across spellings', { todo: 'BUG: advisor-tools groups by raw customer_name, report uses customerKey ("PT Maju" vs "pt  maju ")' }, () => {
+test('buildSnapshot: top customers group the same customer across spellings', () => {
   assert.equal(s.customers[0].name.toLowerCase().trim(), 'pt maju')
   assert.equal(s.customers[0].revenue, 6500000)
 })
@@ -196,5 +196,5 @@ test('snapshotToContext: grounding text carries the real numbers', () => {
   assert.match(ctx, /Pertumbuhan bulan ke bulan \(Agustus 2026 ke September 2026\): \+100%/)
   assert.match(ctx, /Rata-rata nilai pekerjaan: Rp 1\.875\.000 \(4 pekerjaan terbukukan\)/)
   assert.match(ctx, /Pekerjaan tertunda: 1 permintaan belum ditawar, 1 draf penawaran senilai Rp 5\.000\.000/)
-  assert.match(ctx, /Pelanggan berulang: 1 dari 9 pelanggan/)
+  assert.match(ctx, /Pelanggan berulang: 1 dari 8 pelanggan/)
 })

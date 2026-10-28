@@ -73,7 +73,7 @@ module.exports = async function loginDemo(t) {
   await d.waitForTimeout(400)
   // BUG-01: ui/app.js render() normalises the hash to "#/masuk" (history.replaceState) before the
   // login page reads "?demo" from location.hash, so the deep link opens Live mode.
-  t.bug(await d.getAttribute('#auth-mode-demo', 'aria-selected') === 'true', '#/masuk?demo opens demo mode', 'BUG-01', `hash now ${await d.evaluate(() => location.hash)}`)
+  t.check(await d.getAttribute('#auth-mode-demo', 'aria-selected') === 'true', '#/masuk?demo opens demo mode', `hash now ${await d.evaluate(() => location.hash)}`)
   t.check(await d.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile login: no horizontal scroll')
   await t.noErrors(d)
 }

@@ -37,7 +37,9 @@ function render() {
   let path = currentPath()
   if (path === '/app' && !currentUser) path = '/masuk'
   if (path === '/masuk' && currentUser) path = '/app'
-  if (location.hash.replace(/^#/, '') !== path && !(path === '/' && !location.hash)) {
+  // Compare paths only, so a query such as #/masuk?demo survives.
+  const hashPath = location.hash.replace(/^#/, '').split('?')[0]
+  if ((hashPath || '/') !== path && !(path === '/' && !location.hash)) {
     history.replaceState(null, '', `#${path}`)
   }
 

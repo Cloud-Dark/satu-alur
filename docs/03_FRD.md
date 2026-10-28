@@ -55,10 +55,11 @@ Sumber: `src/stages/offer.js`, `src/ai/agent.js`, `src/domain/rules.js`.
 
 Kriteria penerimaan:
 - Pengguna memilih satu permintaan dan menekan tombol hasilkan; AI dipanggil lewat `POST /api/llm/chat` dengan streaming (SSE).
-- Teks dari AI tampil bertahap; tombol Batal menghentikan stream dan menampilkan "Dibatalkan".
-- Hasil harus JSON dengan `scope`, `price`, `terms`, `notes`; bila bukan JSON valid, tampil error "Respons AI bukan JSON yang valid".
+- Teks dari AI tampil bertahap; tombol Hentikan menghentikan stream dan menampilkan "Dihentikan".
+- Worker memakai JSON mode Workers AI dengan skema `scope`, `price`, `terms`, `notes`; klien memperbaiki JSON yang sedikit rusak dan membuang key di luar skema. Bila tetap tidak terbaca, tampil error "Respons AI bukan JSON yang valid".
 - Validasi domain: harga antara Rp10.000 dan Rp1.000.000.000; `scope` dan `terms` minimal 10 karakter. Hasil tidak valid menampilkan daftar kesalahan.
-- Menekan Simpan membuat baris `offers` berstatus `draft` dengan `ai_proposal_json`, `validated_price`, `validated_scope`.
+- Harga final boleh diubah sebelum disimpan. Menekan Simpan membuat baris `offers` berstatus `approved` dengan `ai_proposal_json`, `validated_price`, `validated_scope`.
+- Penawaran berstatus `draft`/`pending_approval` (mis. dari data lama atau Pencari prospek) dapat disetujui lewat tombol "Setujui" di daftar setelah lolos validasi domain; penawaran `rejected` tampil sebagai "Ditolak".
 - Bila tidak ada model tersedia, tampil "Model AI tidak tersedia".
 - Daftar model berasal dari `GET /api/llm/models`; model pertama dipakai sebagai bawaan.
 
