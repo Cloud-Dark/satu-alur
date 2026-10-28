@@ -65,6 +65,8 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 
 ### Fixed
 
+- Hemat kuota D1: paging data memakai keyset (`id > last`) sehingga D1 hanya membaca baris yang dikirim (sebelumnya OFFSET/sort membaca 3–6× lebih banyak); migrasi `0004_drop_unused_fk_indexes.sql` menghapus 4 indeks relasi yang tidak dipakai query sehingga setiap insert hanya 2 tulisan (sebelumnya 3).
+
 - Error D1 "daily row write limit" (paket Free) kini dikembalikan sebagai 503 dengan pesan jelas, bukan 500 generik.
 
 - Data hanya memuat 1.000 baris terbaru per tabel sehingga total dashboard dan "Perlu tindakan" salah untuk akun besar; kini dimuat per halaman.

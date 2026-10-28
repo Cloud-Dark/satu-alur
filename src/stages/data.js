@@ -44,17 +44,22 @@ function cachedTable(name) {
   return promise
 }
 
-/** Loads every row of a table in pages (stable id order), newest first. */
+/**
+ * Loads every row of a table, newest first. Pages by id (keyset: id > last)
+ * instead of OFFSET, so D1 only reads the rows it returns.
+ */
 async function fetchTable(name) {
   const rows = []
+  let last = null
   for (let page = 0; page < MAX_PAGES; page++) {
-    const from = page * PAGE
-    const { data, error } = await getCloud().database.from(name)
-      .select('*').order('id', { ascending: true }).range(from, from + PAGE - 1)
+    let q = getCloud().database.from(name).select('*')
+    if (last !== null) q = q.gt('id', last)
+    const { data, error } = await q.order('id', { ascending: true }).limit(PAGE)
     if (error) throw new Error(`Gagal memuat ${name}: ${error.message}`)
     const batch = data || []
     rows.push(...batch)
     if (batch.length < PAGE) break
+    last = batch[batch.length - 1].id
   }
   return rows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
 }
