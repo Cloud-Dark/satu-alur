@@ -1,27 +1,40 @@
 /**
- * Auth scene — "the loop".
+ * Auth scene — a calm "clay" composition for the login panel.
  *
- * Six stage nodes sit on one continuous, slightly warped orbit (the alur).
- * A few square particles travel along it; one node is "live" and pulses in the
- * signal colour. Drawn like a technical plate: thin ink lines, dotted outer
- * orbit, drop lines to a ground ring, mono node numbers projected as HTML.
+ * Soft matte shapes (spheres, two tori) float and slowly orbit around one
+ * smooth curved tube: the alur. Small beads travel along the tube. Motion
+ * follows the login state:
+ *   idle       slow float
+ *   sending    shapes gather toward the line, beads flow faster
+ *   code       a little livelier than idle
+ *   verifying  gathered, fast flow
+ *   success    gentle turmeric pulse ring + lift
+ *   error      short damped shake
  *
- *   const scene = await mountAuthScene(el, { labels: ['01', …] })
- *   scene.setState('sending')   // idle | sending | code | verifying | success | error
- *   scene()                     // cleanup (it is a function with methods)
+ *   const scene = await mountAuthScene(el)
+ *   scene.setState('sending')
+ *   scene()        // cleanup (a function with a setState method)
  *
- * Colours come from tokens. The container may define --scene-bg / --scene-line
- * (e.g. an inverted panel); otherwise --paper / --ink are used.
+ * Colours come from tokens via CSS custom properties on the container
+ * (--scene-a/-b/-c/-line/-bg), falling back to :root tokens. They are
+ * re-read on 'themechange'.
  */
 import { cssVar } from '../ui/theme.js'
 import { prefersReducedMotion } from '../ui/reveal.js'
 
-const NODE_COUNT = 6
-const RADIUS = 1.6
-const PARTICLES = 12
-const TILT = 0.5
+const STATES = {
+  idle:      { speed: 1,    gather: 0,    flow: 1,   lift: 0 },
+  sending:   { speed: 2.4,  gather: 0.38, flow: 3.4, lift: 0 },
+  code:      { speed: 1.3,  gather: 0.1,  flow: 1.5, lift: 0 },
+  verifying: { speed: 2.2,  gather: 0.46, flow: 3.8, lift: 0 },
+  success:   { speed: 1.1,  gather: 0.16, flow: 1.6, lift: 0.16 },
+  error:     { speed: 0.7,  gather: 0,    flow: 0.7, lift: 0 },
+}
 
-const SPEED = { idle: 0.028, sending: 0.11, code: 0.04, verifying: 0.13, success: 0.06, error: 0.02 }
+// Composition half-extent (world units) the camera keeps in view.
+const HALF_W = 3.1
+const HALF_H = 2.1
+const FOV = 34
 
 function noop() {}
 
@@ -34,6 +47,24 @@ function hasWebGL() {
   }
 }
 
+const lerp = (a, b, t) => a + (b - a) * t
+
+/** Named destructuring straight from the dynamic import so Rollup can tree-shake three. */
+async function loadThree() {
+  const {
+    WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, Color, Vector3,
+    SphereGeometry, TorusGeometry, TubeGeometry, CatmullRomCurve3,
+    MeshStandardMaterial, MeshBasicMaterial,
+    HemisphereLight, DirectionalLight, AmbientLight,
+  } = await import('three')
+  return {
+    WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, Color, Vector3,
+    SphereGeometry, TorusGeometry, TubeGeometry, CatmullRomCurve3,
+    MeshStandardMaterial, MeshBasicMaterial,
+    HemisphereLight, DirectionalLight, AmbientLight,
+  }
+}
+
 export async function mountAuthScene(container, opts = {}) {
   const fallback = Object.assign(() => {}, { setState: noop })
   if (!container || !hasWebGL()) {
@@ -41,24 +72,31 @@ export async function mountAuthScene(container, opts = {}) {
     return fallback
   }
 
-  let THREE
+  let three
   try {
-    THREE = await import('three')
+    three = await loadThree()
   } catch {
     container.classList.add('is-fallback')
     return fallback
   }
   if (!container.isConnected) return fallback
 
+  const {
+    WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, Color, Vector3,
+    SphereGeometry, TorusGeometry, TubeGeometry, CatmullRomCurve3,
+    MeshStandardMaterial, MeshBasicMaterial,
+    HemisphereLight, DirectionalLight, AmbientLight,
+  } = three
+
   let renderer
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' })
+    renderer = new WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'low-power' })
   } catch {
     container.classList.add('is-fallback')
     return fallback
   }
 
-  const reduced = prefersReducedMotion()
+  const reduced = opts.reducedMotion ?? prefersReducedMotion()
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75))
   renderer.setClearColor(0x000000, 0)
   const canvas = renderer.domElement
@@ -66,304 +104,262 @@ export async function mountAuthScene(container, opts = {}) {
   canvas.className = 'auth-scene-canvas'
   container.appendChild(canvas)
 
-  const scene = new THREE.Scene()
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 60)
-  const disposables = []
-  const track = (o) => { disposables.push(o); return o }
+  const scene = new Scene()
+  const camera = new PerspectiveCamera(FOV, 1, 0.1, 80)
+  camera.position.set(0, 0, 9)
+
+  const geometries = []
+  const materials = []
+  const geo = (g) => { geometries.push(g); return g }
+  const mat = (m) => { materials.push(m); return m }
 
   /* ---------- colours ---------- */
-  const col = { bg: new THREE.Color(), line: new THREE.Color(), signal: new THREE.Color() }
-  function readVar(name, fallbackName) {
-    const v = getComputedStyle(container).getPropertyValue(name).trim()
-    return v || cssVar(fallbackName)
+  const col = {
+    a: new Color('#f7f4ee'),
+    b: new Color('#8fbfab'),
+    c: new Color('#e7a13a'),
+    line: new Color('#f7f4ee'),
+    bg: new Color('#134235'),
   }
+  function readVar(name, rootName, fb) {
+    let v = ''
+    try { v = getComputedStyle(container).getPropertyValue(name).trim() } catch { /* detached */ }
+    if (!v && rootName) v = cssVar(rootName)
+    return v || fb
+  }
+  function safeSet(color, value) {
+    try { color.set(value) } catch { /* unparsable value: keep previous */ }
+  }
+
+  /* ---------- lights ---------- */
+  const hemi = new HemisphereLight(0xffffff, 0x134235, 1.25)
+  const key = new DirectionalLight(0xfff6e6, 2.1)
+  key.position.set(-3.5, 5, 6)
+  const rim = new DirectionalLight(0xffffff, 0.55)
+  rim.position.set(4, -2, 3)
+  const ambient = new AmbientLight(0xffffff, 0.25)
+  scene.add(hemi, key, rim, ambient)
+
+  /* ---------- composition ---------- */
+  const world = new Group()
+  scene.add(world)
+
+  // The line runs well past both edges so its ends are never in view.
+  const flowPts = [
+    new Vector3(-8.5, -0.7, -0.8),
+    new Vector3(-4.4, -1.15, -0.4),
+    new Vector3(-2.6, -1.4, 0.5),
+    new Vector3(-1.1, -0.35, 0.2),
+    new Vector3(0.4, 0.15, -0.3),
+    new Vector3(1.9, 1.05, 0.25),
+    new Vector3(3.2, 0.85, -0.2),
+    new Vector3(4.6, 1.25, -0.6),
+    new Vector3(8.5, 1.0, -0.9),
+  ]
+  const curve = new CatmullRomCurve3(flowPts, false, 'centripetal', 0.5)
+
+  const clay = (color) => mat(new MeshStandardMaterial({ color, roughness: 0.88, metalness: 0, flatShading: false }))
+  const matA = clay(col.a)
+  const matB = clay(col.b)
+  const matC = clay(col.c)
+  const matLine = clay(col.line)
+  const matPulse = mat(new MeshBasicMaterial({ color: col.c, transparent: true, opacity: 0, depthWrite: false }))
+
+  const tube = new Mesh(geo(new TubeGeometry(curve, 320, 0.075, 16, false)), matLine)
+  world.add(tube)
+  // A faint parallel trace gives the line some depth.
+  const tracePts = flowPts.map((p) => new Vector3(p.x, p.y - 0.34, p.z - 0.5))
+  const trace = new Mesh(geo(new TubeGeometry(new CatmullRomCurve3(tracePts, false, 'centripetal', 0.5), 240, 0.028, 8, false)), matB)
+  world.add(trace)
+
+  const sphereGeo = geo(new SphereGeometry(1, 48, 32))
+  const torusGeo = geo(new TorusGeometry(1, 0.34, 28, 72))
+
+  /**
+   * Floating shapes. anchor = resting position; orbit = small ellipse radius;
+   * spin = self rotation speed (tori).
+   */
+  const shapeDefs = [
+    { kind: 'sphere', r: 0.78, m: matB, anchor: [-1.35, 0.62, -0.7], orbit: 0.12, phase: 0.0 },
+    { kind: 'sphere', r: 0.44, m: matA, anchor: [1.95, -0.62, 0.35], orbit: 0.14, phase: 1.7 },
+    { kind: 'sphere', r: 0.25, m: matC, anchor: [0.3, 1.05, 0.85], orbit: 0.1, phase: 3.1, accent: true },
+    { kind: 'torus', r: 0.42, m: matA, anchor: [1.15, 1.35, -0.5], orbit: 0.1, phase: 2.2, spin: [0.35, 0.22], tilt: [1.1, 0.3] },
+    { kind: 'torus', r: 0.27, m: matB, anchor: [-2.45, -0.55, 0.6], orbit: 0.12, phase: 4.4, spin: [-0.25, 0.3], tilt: [0.6, -0.5] },
+    { kind: 'sphere', r: 0.13, m: matA, anchor: [-0.25, -1.25, 0.9], orbit: 0.16, phase: 5.1 },
+    { kind: 'sphere', r: 0.1, m: matC, anchor: [2.75, 0.2, 0.7], orbit: 0.16, phase: 0.8 },
+    { kind: 'sphere', r: 0.16, m: matB, anchor: [-3.1, 1.15, -0.3], orbit: 0.14, phase: 2.9 },
+  ]
+  const shapes = shapeDefs.map((d) => {
+    const mesh = new Mesh(d.kind === 'torus' ? torusGeo : sphereGeo, d.m)
+    mesh.scale.setScalar(d.r)
+    if (d.tilt) mesh.rotation.set(d.tilt[0], d.tilt[1], 0)
+    world.add(mesh)
+    return { ...d, mesh, anchorV: new Vector3(...d.anchor), baseScale: d.r }
+  })
+  const accentShape = shapes.find((s) => s.accent)
+  const bigShape = shapes[0]
+
+  // Satellites orbiting the big sphere on a tilted ring.
+  const satellites = [0, 1].map((i) => {
+    const mesh = new Mesh(sphereGeo, i === 0 ? matA : matC)
+    mesh.scale.setScalar(i === 0 ? 0.085 : 0.07)
+    world.add(mesh)
+    return { mesh, radius: i === 0 ? 1.12 : 1.3, speed: i === 0 ? 0.55 : -0.4, phase: i * 2.4 }
+  })
+
+  // Beads travelling along the flow.
+  const beads = [0, 1, 2, 3, 4, 5].map((i) => {
+    const mesh = new Mesh(sphereGeo, i % 3 === 1 ? matC : matA)
+    const base = i % 3 === 1 ? 0.13 : 0.1
+    mesh.scale.setScalar(base)
+    world.add(mesh)
+    return { mesh, base, offset: i / 6 }
+  })
+
+  // Success pulse ring around the accent sphere.
+  const pulse = new Mesh(geo(new TorusGeometry(1, 0.035, 12, 96)), matPulse)
+  pulse.visible = false
+  world.add(pulse)
+
+  /* ---------- colours applied ---------- */
   function readColors() {
-    col.bg.set(readVar('--scene-bg', '--paper') || '#f3efe6')
-    col.line.set(readVar('--scene-line', '--ink') || '#16150f')
-    col.signal.set(cssVar('--signal') || '#c6f24e')
+    safeSet(col.a, readVar('--scene-a', '--bg', '#f7f4ee'))
+    safeSet(col.b, readVar('--scene-b', '--brand-300', '#8fbfab'))
+    safeSet(col.c, readVar('--scene-c', '--accent', '#e7a13a'))
+    safeSet(col.line, readVar('--scene-line', '--bg', '#f7f4ee'))
+    safeSet(col.bg, readVar('--scene-bg', '--brand', '#134235'))
+    matA.color.copy(col.a)
+    matB.color.copy(col.b)
+    matC.color.copy(col.c)
+    matLine.color.copy(col.line)
+    matPulse.color.copy(col.c)
+    hemi.groundColor.copy(col.bg)
   }
   readColors()
 
-  /* ---------- geometry ---------- */
-  const world = new THREE.Group()
-  const ring = new THREE.Group()
-  world.add(ring)
-  scene.add(world)
-  world.rotation.x = TILT
-
-  // Node positions: a warped orbit, alternating height and radius.
-  const nodePos = []
-  for (let i = 0; i < NODE_COUNT; i++) {
-    const a = (i / NODE_COUNT) * Math.PI * 2 - Math.PI / 2
-    const r = RADIUS * (i % 2 ? 0.9 : 1.05)
-    nodePos.push(new THREE.Vector3(Math.cos(a) * r, (i % 2 ? -0.16 : 0.2), Math.sin(a) * r))
-  }
-  const curve = new THREE.CatmullRomCurve3(nodePos, true, 'centripetal', 0.5)
-
-  // Main loop: a thin tube so the line has real weight.
-  const tubeGeo = track(new THREE.TubeGeometry(curve, 360, 0.014, 6, true))
-  const tubeMat = track(new THREE.MeshBasicMaterial({ color: col.line }))
-  ring.add(new THREE.Mesh(tubeGeo, tubeMat))
-
-  // Ghost loop: offset copy, faint — reads as motion trace.
-  const ghostPts = curve.getSpacedPoints(300).map((p) => p.clone().multiplyScalar(1.12).setY(p.y * 0.6 - 0.02))
-  const ghostGeo = track(new THREE.BufferGeometry().setFromPoints(ghostPts))
-  const ghostMat = track(new THREE.LineDashedMaterial({ color: col.line, transparent: true, opacity: 0.32, dashSize: 0.05, gapSize: 0.06 }))
-  const ghost = new THREE.Line(ghostGeo, ghostMat)
-  ghost.computeLineDistances()
-  ring.add(ghost)
-
-  // Outer dotted orbit.
-  const outerPts = []
-  for (let i = 0; i < 160; i++) {
-    const a = (i / 160) * Math.PI * 2
-    outerPts.push(new THREE.Vector3(Math.cos(a) * 2.2, 0, Math.sin(a) * 2.2))
-  }
-  const outerGeo = track(new THREE.BufferGeometry().setFromPoints(outerPts))
-  const outerMat = track(new THREE.PointsMaterial({ color: col.line, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.55 }))
-  ring.add(new THREE.Points(outerGeo, outerMat))
-
-  // Tick marks on the outer orbit (every 15deg, longer every 60deg).
-  const tickPts = []
-  for (let i = 0; i < 24; i++) {
-    const a = (i / 24) * Math.PI * 2 - Math.PI / 2
-    const len = i % 4 === 0 ? 0.18 : 0.07
-    tickPts.push(new THREE.Vector3(Math.cos(a) * 2.2, 0, Math.sin(a) * 2.2))
-    tickPts.push(new THREE.Vector3(Math.cos(a) * (2.2 + len), 0, Math.sin(a) * (2.2 + len)))
-  }
-  const tickGeo = track(new THREE.BufferGeometry().setFromPoints(tickPts))
-  const faintMat = track(new THREE.LineBasicMaterial({ color: col.line, transparent: true, opacity: 0.45 }))
-  ring.add(new THREE.LineSegments(tickGeo, faintMat))
-
-  // Hub: small inner ring + spokes to each node.
-  const hubPts = []
-  for (let i = 0; i <= 64; i++) {
-    const a = (i / 64) * Math.PI * 2
-    hubPts.push(new THREE.Vector3(Math.cos(a) * 0.32, 0, Math.sin(a) * 0.32))
-  }
-  const hubGeo = track(new THREE.BufferGeometry().setFromPoints(hubPts))
-  ring.add(new THREE.Line(hubGeo, faintMat))
-  const spokePts = []
-  nodePos.forEach((p) => {
-    const d = new THREE.Vector3(p.x, 0, p.z).normalize()
-    spokePts.push(d.clone().multiplyScalar(0.32), new THREE.Vector3(p.x, p.y, p.z).multiplyScalar(0.94))
-  })
-  const spokeGeo = track(new THREE.BufferGeometry().setFromPoints(spokePts))
-  const spokeMat = track(new THREE.LineDashedMaterial({ color: col.line, transparent: true, opacity: 0.3, dashSize: 0.04, gapSize: 0.05 }))
-  const spokes = new THREE.LineSegments(spokeGeo, spokeMat)
-  spokes.computeLineDistances()
-  ring.add(spokes)
-
-  // Ground ring + drop lines (depth cue).
-  const GROUND = -0.95
-  const groundPts = hubPts.map((p) => new THREE.Vector3(p.x * 5.4, GROUND, p.z * 5.4))
-  const groundGeo = track(new THREE.BufferGeometry().setFromPoints(groundPts))
-  const groundMat = track(new THREE.LineBasicMaterial({ color: col.line, transparent: true, opacity: 0.18 }))
-  ring.add(new THREE.Line(groundGeo, groundMat))
-  const dropPts = []
-  nodePos.forEach((p) => dropPts.push(p.clone(), new THREE.Vector3(p.x, GROUND, p.z)))
-  const dropGeo = track(new THREE.BufferGeometry().setFromPoints(dropPts))
-  const dropMat = track(new THREE.LineDashedMaterial({ color: col.line, transparent: true, opacity: 0.35, dashSize: 0.03, gapSize: 0.05 }))
-  const drops = new THREE.LineSegments(dropGeo, dropMat)
-  drops.computeLineDistances()
-  ring.add(drops)
-  const footGeo = track(new THREE.BufferGeometry().setFromPoints(nodePos.map((p) => new THREE.Vector3(p.x, GROUND, p.z))))
-  const footMat = track(new THREE.PointsMaterial({ color: col.line, size: 4, sizeAttenuation: false, transparent: true, opacity: 0.5 }))
-  ring.add(new THREE.Points(footGeo, footMat))
-
-  // Nodes: filled octahedron (occludes the line) + ink edges.
-  const nodeGeo = track(new THREE.OctahedronGeometry(0.12, 0))
-  const nodeEdgeGeo = track(new THREE.EdgesGeometry(nodeGeo))
-  const nodeEdgeMat = track(new THREE.LineBasicMaterial({ color: col.line }))
-  const nodes = nodePos.map((p) => {
-    const mat = track(new THREE.MeshBasicMaterial({ color: col.bg }))
-    const g = new THREE.Group()
-    g.position.copy(p)
-    g.add(new THREE.Mesh(nodeGeo, mat))
-    g.add(new THREE.LineSegments(nodeEdgeGeo, nodeEdgeMat))
-    ring.add(g)
-    return { group: g, mat, lit: 0 }
-  })
-
-  // Pulse halo (billboarded square ring) around the live node.
-  const haloPts = []
-  for (let i = 0; i <= 48; i++) {
-    const a = (i / 48) * Math.PI * 2
-    haloPts.push(new THREE.Vector3(Math.cos(a) * 0.2, Math.sin(a) * 0.2, 0))
-  }
-  const haloGeo = track(new THREE.BufferGeometry().setFromPoints(haloPts))
-  const haloMat = track(new THREE.LineBasicMaterial({ color: col.signal, transparent: true, opacity: 0.9 }))
-  const halo = new THREE.Line(haloGeo, haloMat)
-  scene.add(halo)
-  const halo2Mat = track(new THREE.LineBasicMaterial({ color: col.signal, transparent: true, opacity: 0.6 }))
-  const halo2 = new THREE.Line(haloGeo, halo2Mat)
-  scene.add(halo2)
-
-  // Particles travelling the loop.
-  const LUT = curve.getSpacedPoints(720)
-  const pPos = new Float32Array(PARTICLES * 3)
-  const pGeo = track(new THREE.BufferGeometry())
-  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3))
-  const pMat = track(new THREE.PointsMaterial({ color: col.line, size: 6, sizeAttenuation: false }))
-  ring.add(new THREE.Points(pGeo, pMat))
-  const pOffsets = Array.from({ length: PARTICLES }, (_, i) => i / PARTICLES + (Math.sin(i * 12.9898) * 0.5 + 0.5) * 0.04)
-  // A single lead particle in signal colour.
-  const leadPos = new Float32Array(3)
-  const leadGeo = track(new THREE.BufferGeometry())
-  leadGeo.setAttribute('position', new THREE.BufferAttribute(leadPos, 3))
-  const leadMat = track(new THREE.PointsMaterial({ color: col.signal, size: 9, sizeAttenuation: false }))
-  ring.add(new THREE.Points(leadGeo, leadMat))
-
-  function samplePoint(t, out, offset = 0) {
-    const f = ((t % 1) + 1) % 1
-    const p = LUT[Math.floor(f * (LUT.length - 1))]
-    out[offset] = p.x; out[offset + 1] = p.y; out[offset + 2] = p.z
-  }
-
-  /* ---------- HTML labels ---------- */
-  const labelLayer = document.createElement('div')
-  labelLayer.className = 'auth-scene-labels'
-  labelLayer.setAttribute('aria-hidden', 'true')
-  const labelTexts = opts.labels || nodePos.map((_, i) => String(i + 1).padStart(2, '0'))
-  const labels = labelTexts.map((t) => {
-    const s = document.createElement('span')
-    s.textContent = t
-    labelLayer.appendChild(s)
-    return s
-  })
-  container.appendChild(labelLayer)
-
-  /* ---------- state ---------- */
-  let state = 'idle'
-  let activeIndex = 0
-  let speed = SPEED.idle
-  let targetSpeed = SPEED.idle
-  let flow = 0
-  let spin = 0
-  let jolt = 0
-  let successAt = -1
-  let width = 1
-  let height = 1
-  const pointer = { x: 0, y: 0, tx: 0, ty: 0 }
-  const tmp = new THREE.Vector3()
-
-  function applyColors() {
-    tubeMat.color.copy(state === 'success' ? col.signal : col.line)
-    ;[ghostMat, outerMat, faintMat, spokeMat, groundMat, dropMat, footMat, nodeEdgeMat, pMat].forEach((m) => m.color.copy(col.line))
-    haloMat.color.copy(col.signal)
-    halo2Mat.color.copy(col.signal)
-    leadMat.color.copy(col.signal)
-    nodes.forEach((n) => n.mat.color.copy(col.bg))
-  }
-
-  function layout() {
-    const rect = container.getBoundingClientRect()
-    width = Math.max(1, Math.round(rect.width))
-    height = Math.max(1, Math.round(rect.height))
-    renderer.setSize(width, height, false)
-    camera.aspect = width / height
-    // Fit: the orbit needs ~5.4 units across and ~3.3 tall.
-    //  - tall panel (desktop): orbit in the upper half, statement below.
-    //  - wide band (mobile header): orbit fills the height, pushed right so
-    //    the logo and status line keep clear space on the left.
-    const aspect = camera.aspect
-    const tall = aspect < 1.25
-    const band = aspect > 1.6
-    const t = 2 * Math.tan(((camera.fov * Math.PI) / 180) / 2)
-    let dist
-    if (band) dist = 3.3 / (t * 0.98)
-    else dist = Math.max(3.3 / (t * (tall ? 0.5 : 0.86)), 5.4 / (t * aspect * 0.94))
-    camera.position.set(0, 0, dist)
-    camera.lookAt(0, 0, 0)
-    const xOff = band ? -width * 0.2 : 0
-    const yOff = tall ? height * 0.2 : band ? -height * 0.03 : 0
-    camera.setViewOffset(width, height, xOff, yOff, width, height)
+  /* ---------- sizing ---------- */
+  function fit(w, hgt) {
+    const aspect = w / Math.max(1, hgt)
+    camera.aspect = aspect
+    const t = Math.tan((FOV * Math.PI) / 360)
+    // Wide strips (mobile band) crop tighter so the shapes stay legible.
+    const pad = aspect > 2 ? 0.1 : 1.2
+    const dist = Math.max(HALF_H / t, HALF_W / (t * aspect)) + pad
+    camera.position.z = dist
     camera.updateProjectionMatrix()
   }
-
-  function setActive(i) {
-    activeIndex = ((i % NODE_COUNT) + NODE_COUNT) % NODE_COUNT
+  function resize() {
+    const w = Math.max(1, Math.round(container.clientWidth))
+    const hgt = Math.max(1, Math.round(container.clientHeight))
+    renderer.setSize(w, hgt, false)
+    fit(w, hgt)
   }
 
-  function frame(time, dt) {
-    speed += (targetSpeed - speed) * Math.min(1, dt * 3)
-    flow += speed * dt
-    spin += dt * (state === 'sending' || state === 'verifying' ? 0.18 : 0.05)
-    jolt *= Math.pow(0.02, dt)
-
-    pointer.x += (pointer.tx - pointer.x) * Math.min(1, dt * 2.5)
-    pointer.y += (pointer.ty - pointer.y) * Math.min(1, dt * 2.5)
-    ring.rotation.y = spin + Math.sin(time * 38) * jolt * 0.08
-    world.rotation.x = TILT + pointer.y * 0.12
-    world.rotation.z = pointer.x * -0.06
-    world.position.x = pointer.x * 0.08
-
-    for (let i = 0; i < PARTICLES; i++) samplePoint(flow + pOffsets[i], pPos, i * 3)
-    pGeo.attributes.position.needsUpdate = true
-    samplePoint(flow * 1.0 + 0.5, leadPos, 0)
-    leadGeo.attributes.position.needsUpdate = true
-
-    // Node colours: live node in signal; on success a sweep lights all.
-    nodes.forEach((n, i) => {
-      let target = i === activeIndex ? 1 : 0
-      if (successAt >= 0 && time - successAt > i * 0.09) target = 1
-      n.lit += (target - n.lit) * Math.min(1, dt * 8)
-      n.mat.color.copy(col.bg).lerp(col.signal, n.lit)
-      n.group.rotation.y = time * 0.6 + i
-      const s = 1 + n.lit * 0.25
-      n.group.scale.setScalar(s)
-    })
-
-    // Halo follows the live node in world space, faces camera.
-    nodes[activeIndex].group.getWorldPosition(tmp)
-    const period = state === 'sending' || state === 'verifying' ? 0.7 : 1.7
-    const ph = (time % period) / period
-    const ph2 = ((time + period / 2) % period) / period
-    halo.position.copy(tmp); halo2.position.copy(tmp)
-    halo.quaternion.copy(camera.quaternion); halo2.quaternion.copy(camera.quaternion)
-    halo.scale.setScalar(1 + ph * 1.8); haloMat.opacity = 0.95 * (1 - ph)
-    halo2.scale.setScalar(1 + ph2 * 1.8); halo2Mat.opacity = 0.6 * (1 - ph2)
-  }
-
-  function placeLabels() {
-    world.updateMatrixWorld()
-    nodes.forEach((n, i) => {
-      n.group.getWorldPosition(tmp)
-      tmp.y += 0.24
-      tmp.project(camera)
-      const x = (tmp.x * 0.5 + 0.5) * width
-      const y = (-tmp.y * 0.5 + 0.5) * height
-      labels[i].style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`
-      labels[i].classList.toggle('is-live', i === activeIndex || (successAt >= 0))
-    })
-  }
-
-  function renderOnce() {
-    renderer.render(scene, camera)
-    placeLabels()
-  }
-
-  /* ---------- loop ---------- */
+  /* ---------- animation ---------- */
+  let state = 'idle'
+  const cur = { ...STATES.idle }
+  let t = 2.2 // scene time (advances with speed)
+  let flowT = 0
+  let shakeLeft = 0
+  let pulseT = -1
   let raf = 0
   let last = 0
-  let elapsed = 0
   let visible = true
-  let inView = true
   let disposed = false
+  const tmp = new Vector3()
+  const center = new Vector3(0.2, 0.1, 0.1)
 
-  function tick(now) {
+  function update(dt) {
+    const target = STATES[state] || STATES.idle
+    const k = 1 - Math.exp(-dt * 3)
+    cur.speed = lerp(cur.speed, target.speed, k)
+    cur.gather = lerp(cur.gather, target.gather, k)
+    cur.flow = lerp(cur.flow, target.flow, k)
+    cur.lift = lerp(cur.lift, target.lift, k)
+    t += dt * cur.speed
+    flowT = (flowT + dt * 0.028 * cur.flow) % 1
+
+    for (const s of shapes) {
+      tmp.copy(s.anchorV).lerp(center, cur.gather)
+      const ph = s.phase
+      s.mesh.position.set(
+        tmp.x + Math.cos(t * 0.42 + ph) * s.orbit,
+        tmp.y + Math.sin(t * 0.55 + ph) * s.orbit * 0.9 + cur.lift * (1 + s.r),
+        tmp.z + Math.sin(t * 0.35 + ph) * s.orbit * 0.6,
+      )
+      if (s.spin) {
+        s.mesh.rotation.x = s.tilt[0] + t * s.spin[0]
+        s.mesh.rotation.y = s.tilt[1] + t * s.spin[1]
+      }
+      s.mesh.scale.setScalar(s.baseScale)
+    }
+
+    const bp = bigShape.mesh.position
+    for (const sat of satellites) {
+      const a = t * sat.speed + sat.phase
+      sat.mesh.position.set(
+        bp.x + Math.cos(a) * sat.radius,
+        bp.y + Math.sin(a) * sat.radius * 0.32,
+        bp.z + Math.sin(a) * sat.radius,
+      )
+    }
+
+    for (const b of beads) {
+      const u = (flowT + b.offset) % 1
+      const p = curve.getPointAt(u)
+      if (p) b.mesh.position.copy(p)
+      const edge = Math.min(u, 1 - u) // fade in/out at the ends via scale
+      const s = Math.max(0.02, Math.min(1, edge * 12))
+      b.mesh.scale.setScalar(b.base * s)
+    }
+
+    // Success: turmeric pulse.
+    if (pulseT >= 0 && accentShape) {
+      pulseT += dt
+      const p = Math.min(1, pulseT / 1.4)
+      const ease = 1 - Math.pow(1 - p, 3)
+      pulse.visible = true
+      pulse.position.copy(accentShape.mesh.position)
+      pulse.scale.setScalar(0.3 + ease * 1.5)
+      matPulse.opacity = 0.75 * (1 - p)
+      accentShape.mesh.scale.setScalar(accentShape.baseScale * (1 + 0.32 * Math.sin(Math.PI * Math.min(1, pulseT / 0.7))))
+      if (p >= 1) {
+        pulseT = state === 'success' ? 0 : -1 // keep breathing while in success
+        if (pulseT < 0) pulse.visible = false
+      }
+    }
+
+    // Error: damped shake.
+    if (shakeLeft > 0) {
+      shakeLeft = Math.max(0, shakeLeft - dt)
+      const amp = 0.09 * (shakeLeft / 0.5)
+      world.position.x = Math.sin(shakeLeft * 55) * amp
+    } else {
+      world.position.x = 0
+    }
+
+    world.rotation.y = Math.sin(t * 0.12) * 0.16
+    world.rotation.x = Math.sin(t * 0.09 + 1) * 0.05
+  }
+
+  function render() {
+    renderer.render(scene, camera)
+  }
+
+  function frame(now) {
     raf = 0
     if (disposed) return
-    const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016
+    const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016)
     last = now
-    elapsed += dt
-    frame(elapsed, dt)
-    renderOnce()
+    update(dt)
+    render()
     schedule()
   }
+  function running() {
+    return !disposed && !reduced && visible && document.visibilityState !== 'hidden'
+  }
   function schedule() {
-    if (reduced || disposed || raf || !visible || !inView) return
-    raf = requestAnimationFrame(tick)
+    if (!raf && running()) raf = requestAnimationFrame(frame)
   }
   function stop() {
     if (raf) cancelAnimationFrame(raf)
@@ -371,79 +367,72 @@ export async function mountAuthScene(container, opts = {}) {
     last = 0
   }
   function staticFrame() {
-    // Reduced motion: a composed still. Snap state instantly.
-    speed = targetSpeed
-    nodes.forEach((n, i) => { n.lit = i === activeIndex || successAt >= 0 ? 1 : 0 })
-    frame(elapsed + 0.0001, 0)
-    nodes.forEach((n, i) => {
-      n.mat.color.copy(col.bg).lerp(col.signal, i === activeIndex || successAt >= 0 ? 1 : 0)
-    })
-    halo.scale.setScalar(1.5); haloMat.opacity = 0.7
-    halo2Mat.opacity = 0
-    renderOnce()
+    update(0)
+    render()
   }
 
+  /* ---------- observers & events ---------- */
   const ro = new ResizeObserver(() => {
-    layout()
-    if (reduced) staticFrame()
-    else if (!raf) renderOnce()
+    if (disposed) return
+    resize()
+    if (!running()) render()
   })
   ro.observe(container)
 
   const io = 'IntersectionObserver' in window
-    ? new IntersectionObserver(([e]) => {
-      inView = e.isIntersecting
-      if (inView) schedule(); else stop()
+    ? new IntersectionObserver((entries) => {
+      visible = entries.some((e) => e.isIntersecting)
+      if (visible) schedule()
+      else stop()
     })
     : null
   io?.observe(container)
 
   const onVisibility = () => {
-    visible = document.visibilityState === 'visible'
-    if (visible) schedule(); else stop()
+    if (document.visibilityState === 'hidden') stop()
+    else schedule()
   }
   document.addEventListener('visibilitychange', onVisibility)
 
-  const onPointer = (e) => {
-    pointer.tx = (e.clientX / window.innerWidth) * 2 - 1
-    pointer.ty = (e.clientY / window.innerHeight) * 2 - 1
-  }
-  if (!reduced) window.addEventListener('pointermove', onPointer, { passive: true })
-
   const onTheme = () => {
-    // Wait a frame so container-level variables have recomputed.
+    // Token values change after the attribute flips; read on the next frame.
     requestAnimationFrame(() => {
       if (disposed) return
       readColors()
-      applyColors()
-      if (reduced || !raf) staticFrame()
+      if (!running()) render()
     })
   }
   window.addEventListener('themechange', onTheme)
 
-  const onContextLost = (e) => { e.preventDefault(); stop(); container.classList.add('is-fallback') }
-  canvas.addEventListener('webglcontextlost', onContextLost)
-
-  layout()
-  applyColors()
-  if (reduced) staticFrame()
-  else {
-    renderOnce()
-    schedule()
+  const onLost = (e) => {
+    e.preventDefault()
+    stop()
+    container.classList.add('is-fallback')
+    container.classList.remove('is-ready')
   }
+  canvas.addEventListener('webglcontextlost', onLost)
+
+  resize()
+  staticFrame()
   container.classList.add('is-ready')
+  schedule()
 
   function setState(next) {
-    if (disposed || !SPEED[next]) return
+    if (!STATES[next] || disposed) return
+    const prev = state
     state = next
-    targetSpeed = SPEED[next]
-    if (next === 'idle') { setActive(0); successAt = -1 }
-    if (next === 'sending') setActive(0)
-    if (next === 'code' || next === 'verifying') setActive(1)
-    if (next === 'error') jolt = 1
-    if (next === 'success') successAt = elapsed
-    tubeMat.color.copy(next === 'success' ? col.signal : col.line)
-    if (reduced) staticFrame()
+    if (next === 'error') shakeLeft = 0.5
+    if (next === 'success' && prev !== 'success') pulseT = 0
+    if (reduced) {
+      // Static: jump straight to the target pose.
+      Object.assign(cur, STATES[next])
+      shakeLeft = 0
+      pulseT = -1
+      pulse.visible = false
+      staticFrame()
+    } else {
+      schedule()
+    }
   }
 
   function cleanup() {
@@ -453,16 +442,16 @@ export async function mountAuthScene(container, opts = {}) {
     ro.disconnect()
     io?.disconnect()
     document.removeEventListener('visibilitychange', onVisibility)
-    window.removeEventListener('pointermove', onPointer)
     window.removeEventListener('themechange', onTheme)
-    canvas.removeEventListener('webglcontextlost', onContextLost)
-    disposables.forEach((d) => d.dispose?.())
+    canvas.removeEventListener('webglcontextlost', onLost)
+    geometries.forEach((g) => g.dispose())
+    materials.forEach((m) => m.dispose())
+    scene.clear()
     renderer.dispose()
-    renderer.forceContextLoss?.()
+    try { renderer.forceContextLoss() } catch { /* already lost */ }
     canvas.remove()
-    labelLayer.remove()
     container.classList.remove('is-ready')
   }
-  cleanup.setState = setState
-  return cleanup
+
+  return Object.assign(cleanup, { setState })
 }

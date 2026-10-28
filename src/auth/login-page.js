@@ -1,8 +1,12 @@
 /**
  * Login page (#/masuk) — passwordless email OTP in two steps.
- *   01 Email  -> sendEmailCode(email)
- *   02 Kode   -> submitEmailOtp(email, code) -> ctx.onSignedIn(user)
- * Left: framed Three.js "loop" panel. Right: the form on paper.
+ *   1 Email  -> sendEmailCode(email)
+ *   2 Kode   -> submitEmailOtp(email, code) -> ctx.onSignedIn(user)
+ *
+ * Design system v2 "Tumbuh": a rounded deep-green panel with a calm clay
+ * Three.js composition and a serif statement on the left, the form in a
+ * white surface card on the cream canvas on the right. On small screens the
+ * panel becomes a compact band above the card.
  */
 import '../styles/auth.css'
 import { sendEmailCode, submitEmailOtp } from './auth.js'
@@ -11,22 +15,39 @@ import { themeToggleButton } from '../ui/theme.js'
 import { icon, iconHTML } from '../ui/icons.js'
 import { prefersReducedMotion } from '../ui/reveal.js'
 
-const STAGES = ['Permintaan', 'Penawaran AI', 'Penugasan', 'Penyelesaian', 'Pembukuan', 'Laporan AI']
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
 const COPY = {
   email: {
-    title: 'Masuk ke Satu Alur.',
+    title: 'Masuk ke <em>Satu Alur</em>.',
     helper: 'Masukkan email kerja Anda. Kami kirim kode 6 digit, tanpa kata sandi. Akun baru dibuat otomatis saat pertama masuk.',
     status: 'Menunggu email',
   },
   code: {
-    title: 'Cek kotak masuk Anda.',
+    title: 'Cek <em>kotak masuk</em> Anda.',
+    helper: 'Masukkan kodenya di bawah. Kode yang dikirim sebelumnya otomatis tidak berlaku.',
     status: 'Menunggu kode',
   },
 }
+
+const POINTS = [
+  { icon: 'lock', text: 'Masuk dengan kode sekali pakai, tanpa kata sandi.' },
+  { icon: 'layers', text: 'Enam tahap kerja, dari permintaan sampai laporan.' },
+  { icon: 'sparkles', text: 'AI membantu menyusun penawaran dan laporan.' },
+]
+
+/* Static flow drawing, shown when WebGL is unavailable. */
+const FALLBACK_SVG = `<svg class="auth-scene-fallback" viewBox="0 0 400 300" fill="none" aria-hidden="true" focusable="false">
+  <path class="f-line" d="M-10 220C60 250 110 120 190 150S300 70 410 90" stroke-width="7" stroke-linecap="round"/>
+  <circle class="f-b" cx="130" cy="110" r="52"/>
+  <circle class="f-a" cx="300" cy="190" r="30"/>
+  <circle class="f-c" cx="214" cy="78" r="15"/>
+  <circle class="f-ring" cx="290" cy="62" r="24" stroke-width="12"/>
+  <circle class="f-c" cx="190" cy="150" r="7"/>
+  <circle class="f-a" cx="62" cy="226" r="6"/>
+</svg>`
 
 function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag)
@@ -60,52 +81,61 @@ export function renderLoginPage(root, ctx = {}) {
   let successTimer = 0
   let scene = null
   let disposed = false
+  const timers = new Set()
+  const later = (fn, ms) => {
+    const id = setTimeout(() => { timers.delete(id); fn() }, ms)
+    timers.add(id)
+    return id
+  }
 
-  /* ================= Left: stage panel ================= */
-  const sceneBox = h('div', { class: 'auth-scene dot-grid', 'aria-hidden': 'true' })
+  /* ================= Panel (left / top band) ================= */
+  const sceneBox = h('div', { class: 'auth-scene', 'aria-hidden': 'true', html: FALLBACK_SVG })
   const statusText = h('span', { class: 'auth-status-text', text: COPY.email.status })
-  const stagePanel = h('aside', { class: 'auth-stage', 'aria-label': 'Satu Alur' },
+  const stagePanel = h('aside', { class: 'auth-stage', 'aria-label': 'Tentang Satu Alur' },
+    h('div', { class: 'auth-stage-glow', 'aria-hidden': 'true' }),
     sceneBox,
     h('div', { class: 'auth-stage-top' },
-      logoLink({ size: 30 }),
-      h('span', { class: 'auth-stage-meta mono', 'aria-hidden': 'true' }, 'SA / 0', h('b', {}, '1'), ' — Akses'),
+      logoLink({ size: 32 }),
+      h('p', { class: 'auth-status' },
+        h('span', { class: 'pulse-dot', 'aria-hidden': 'true' }),
+        h('span', { class: 'sr-only' }, 'Status: '),
+        statusText,
+      ),
     ),
     h('div', { class: 'auth-stage-bottom' },
-      h('p', { class: 'kicker auth-stage-kicker' }, 'Satu alur · enam tahap'),
-      h('p', { class: 'auth-statement' }, 'Masuk ke alur kerja Anda', h('span', { class: 'auth-dot' }, '.')),
-      h('ol', { class: 'auth-stage-list mono', 'aria-label': 'Enam tahap alur kerja' },
-        STAGES.map((s, i) => h('li', {}, h('span', { class: 'n' }, String(i + 1).padStart(2, '0')), ' ', s)),
-      ),
-      h('p', { class: 'auth-status mono' },
-        h('span', { class: 'live-dot', 'aria-hidden': 'true' }),
-        h('span', { class: 'auth-status-label' }, 'Sistem aktif'),
-        h('span', { class: 'auth-status-sep', 'aria-hidden': 'true' }, '/'),
-        statusText,
+      h('p', { class: 'auth-statement display' }, 'Selamat datang di ', h('em', {}, 'alur'), ' kerja Anda.'),
+      h('p', { class: 'auth-stage-lead' }, 'Permintaan, penawaran, penugasan, sampai laporan. Semuanya tertata dalam satu tempat.'),
+      h('ul', { class: 'auth-points' },
+        POINTS.map((p) => h('li', {},
+          h('span', { class: 'auth-point-icon', html: iconHTML(p.icon, { size: 16, stroke: 1.9 }) }),
+          h('span', {}, p.text),
+        )),
       ),
     ),
   )
 
-  /* ================= Right: form column ================= */
+  /* ================= Top bar ================= */
   const backLink = h('a', { href: '#/', class: 'auth-back' }, icon('arrowLeft', { size: 16 }), h('span', {}, 'Kembali ke beranda'))
   backLink.addEventListener('click', (e) => {
     if (typeof ctx.navigate === 'function') { e.preventDefault(); ctx.navigate('/') }
   })
   const themeBtn = themeToggleButton()
+  const bar = h('header', { class: 'auth-bar' }, backLink, themeBtn)
 
-  const title = h('h1', { class: 'auth-title', id: 'auth-title', tabindex: '-1', text: COPY.email.title })
+  /* ================= Card ================= */
+  const title = h('h1', { class: 'auth-title display', id: 'auth-title', tabindex: '-1', html: COPY.email.title })
   const helper = h('p', { class: 'auth-helper', text: COPY.email.helper })
 
+  const checkSVG = iconHTML('check', { size: 13, stroke: 3 })
   const stepEmailItem = h('li', { class: 'auth-step', 'data-step': 'email', 'aria-current': 'step' },
-    h('span', { class: 'auth-step-n mono' }, h('span', { class: 'num' }, '01'), h('span', { class: 'ok', html: iconHTML('check', { size: 14, stroke: 2.5 }) })),
+    h('span', { class: 'auth-step-n' }, h('span', { class: 'num' }, '1'), h('span', { class: 'ok', html: checkSVG })),
     h('span', { class: 'auth-step-label' }, 'Email'),
   )
   const stepCodeItem = h('li', { class: 'auth-step', 'data-step': 'code' },
-    h('span', { class: 'auth-step-n mono' }, h('span', { class: 'num' }, '02'), h('span', { class: 'ok', html: iconHTML('check', { size: 14, stroke: 2.5 }) })),
+    h('span', { class: 'auth-step-n' }, h('span', { class: 'num' }, '2'), h('span', { class: 'ok', html: checkSVG })),
     h('span', { class: 'auth-step-label' }, 'Kode'),
   )
-  const stepper = h('ol', { class: 'auth-steps', 'aria-label': 'Langkah masuk' },
-    stepEmailItem, h('li', { class: 'auth-steps-rail', 'aria-hidden': 'true' }), stepCodeItem,
-  )
+  const stepper = h('ol', { class: 'auth-steps', 'aria-label': 'Langkah masuk' }, stepEmailItem, stepCodeItem)
 
   /* ---- Step 1: email ---- */
   const emailInput = h('input', {
@@ -115,8 +145,9 @@ export function renderLoginPage(root, ctx = {}) {
   })
   const emailHint = h('p', { class: 'auth-field-hint', id: 'auth-email-hint', text: 'Kode berlaku sekali pakai.' })
   const emailError = h('p', { class: 'auth-field-error', id: 'auth-email-error', hidden: true })
-  const sendBtn = h('button', { type: 'submit', class: 'btn btn-signal btn-lg auth-primary' },
-    h('span', { class: 'auth-btn-label' }, 'Kirim kode'), h('span', { class: 'auth-btn-icon', html: iconHTML('arrowRight', { size: 18, stroke: 2 }) }),
+  const btnIcon = () => h('span', { class: 'auth-btn-icon', 'aria-hidden': 'true', html: iconHTML('arrowRight', { size: 18, stroke: 2 }) })
+  const sendBtn = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
+    h('span', { class: 'auth-btn-label' }, 'Kirim kode'), btnIcon(),
   )
   const emailForm = h('form', { class: 'auth-form auth-form-email', novalidate: true, 'aria-labelledby': 'auth-title' },
     h('div', { class: 'auth-field' },
@@ -131,29 +162,34 @@ export function renderLoginPage(root, ctx = {}) {
   /* ---- Step 2: code ---- */
   const sentTo = h('strong', { class: 'auth-sent-to' })
   const changeEmailBtn = h('button', { type: 'button', class: 'auth-link' }, 'Ganti email')
-  const sentLine = h('p', { class: 'auth-sent' }, 'Kode 6 digit dikirim ke ', sentTo, '. ', changeEmailBtn)
+  const sentLine = h('p', { class: 'auth-sent' },
+    h('span', { class: 'auth-sent-icon', html: iconHTML('mail', { size: 16 }) }),
+    h('span', { class: 'auth-sent-text' }, 'Kode 6 digit dikirim ke ', sentTo, '. '),
+    changeEmailBtn,
+  )
 
   const digits = Array.from({ length: CODE_LENGTH }, (_, i) => h('input', {
     class: 'auth-digit', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '1',
     autocomplete: i === 0 ? 'one-time-code' : 'off', 'aria-label': `Digit ${i + 1} dari ${CODE_LENGTH}`,
     name: i === 0 ? 'code' : null, enterkeyhint: i === CODE_LENGTH - 1 ? 'go' : 'next',
   }))
+  digits.forEach((d, i) => d.style.setProperty('--k', String(i)))
   const otpGroup = h('div', { class: 'auth-otp', role: 'group', 'aria-labelledby': 'auth-code-label' },
     digits.slice(0, 3), h('span', { class: 'auth-otp-sep', 'aria-hidden': 'true' }), digits.slice(3),
   )
 
-  const demoDigits = h('span', { class: 'auth-demo-code mono tnum', 'aria-label': '' })
-  const fillBtn = h('button', { type: 'button', class: 'btn btn-ink btn-sm auth-demo-fill' }, 'Isi otomatis')
+  const demoDigits = h('span', { class: 'auth-demo-code tnum', 'aria-label': '' })
+  const fillBtn = h('button', { type: 'button', class: 'btn btn-accent btn-sm auth-demo-fill' }, 'Isi otomatis')
   const demoBox = h('div', { class: 'auth-demo', hidden: true },
-    h('div', { class: 'auth-demo-head' },
-      h('span', { class: 'auth-demo-tag mono' }, 'Mode demo'),
-      h('span', { class: 'auth-demo-note' }, 'Email tidak dikirim. Kode Anda:'),
+    h('span', { class: 'auth-demo-icon', 'aria-hidden': 'true', html: iconHTML('info', { size: 18 }) }),
+    h('div', { class: 'auth-demo-main' },
+      h('p', { class: 'auth-demo-note' }, h('strong', {}, 'Mode demo.'), ' Email tidak dikirim. Kode Anda:'),
+      h('div', { class: 'auth-demo-body' }, demoDigits, fillBtn),
     ),
-    h('div', { class: 'auth-demo-body' }, demoDigits, fillBtn),
   )
 
-  const verifyBtn = h('button', { type: 'submit', class: 'btn btn-signal btn-lg auth-primary' },
-    h('span', { class: 'auth-btn-label' }, 'Masuk'), h('span', { class: 'auth-btn-icon', html: iconHTML('arrowRight', { size: 18, stroke: 2 }) }),
+  const verifyBtn = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
+    h('span', { class: 'auth-btn-label' }, 'Masuk'), btnIcon(),
   )
   const resendBtn = h('button', { type: 'button', class: 'auth-link auth-resend', disabled: true }, 'Kirim ulang')
   const codeForm = h('form', { class: 'auth-form auth-form-code', novalidate: true, hidden: true, 'aria-labelledby': 'auth-title' },
@@ -166,38 +202,40 @@ export function renderLoginPage(root, ctx = {}) {
     verifyBtn,
     h('div', { class: 'auth-row' },
       resendBtn,
-      h('span', { class: 'auth-row-note mono' }, 'Tidak masuk? Cek folder spam.'),
+      h('span', { class: 'auth-row-note' }, 'Tidak masuk? Cek folder spam.'),
     ),
   )
 
   const message = h('p', { class: 'auth-msg', 'aria-live': 'polite', role: 'status' })
 
-  const formCol = h('main', { class: 'auth-main', id: 'konten' },
-    h('header', { class: 'auth-bar' }, backLink, themeBtn),
-    h('div', { class: 'auth-body' },
-      h('div', { class: 'auth-panel' },
-        h('p', { class: 'kicker auth-kicker' }, 'Masuk / Daftar'),
-        title,
-        helper,
-        stepper,
-        emailForm,
-        codeForm,
-        message,
-      ),
-    ),
-    h('footer', { class: 'auth-foot' },
-      h('p', {}, 'Email Anda hanya dipakai untuk masuk dan pemberitahuan akun. Tanpa kata sandi, tanpa spam.'),
-      h('p', { class: 'mono' }, '© 2026 Satu Alur'),
+  const card = h('div', { class: 'auth-card surface' },
+    h('p', { class: 'eyebrow auth-eyebrow' }, 'Masuk atau daftar'),
+    title,
+    helper,
+    stepper,
+    emailForm,
+    codeForm,
+    message,
+    h('p', { class: 'auth-privacy' },
+      h('span', { html: iconHTML('shield', { size: 14 }) }),
+      'Email Anda hanya dipakai untuk masuk dan pemberitahuan akun.',
     ),
   )
+  const main = h('main', { class: 'auth-main', id: 'konten' }, card)
+  const foot = h('footer', { class: 'auth-foot' },
+    h('p', {}, 'Tanpa kata sandi, tanpa spam.'),
+    h('p', {}, '© 2026 Satu Alur'),
+  )
 
-  const page = h('div', { class: 'auth', 'data-step': 'email' }, stagePanel, formCol)
+  const page = h('div', { class: 'auth', 'data-step': 'email' }, stagePanel, bar, main, foot)
   if (!reduced) page.classList.add('is-entering')
   root.replaceChildren(page)
 
   // Stagger index for the entrance animation.
-  ;[...formCol.querySelectorAll('.auth-bar, .auth-kicker, .auth-title, .auth-helper, .auth-steps, .auth-form-email, .auth-foot')]
+  ;[bar, ...card.querySelectorAll('.auth-eyebrow, .auth-title, .auth-helper, .auth-steps, .auth-form-email, .auth-privacy'), foot]
     .forEach((el, i) => el.style.setProperty('--i', String(i)))
+  ;[...stagePanel.querySelectorAll('.auth-stage-top, .auth-statement, .auth-stage-lead, .auth-points li')]
+    .forEach((el, i) => el.style.setProperty('--i', String(i + 1)))
 
   /* ================= Behaviour ================= */
   function setStatus(text) { statusText.textContent = text }
@@ -224,6 +262,11 @@ export function renderLoginPage(root, ctx = {}) {
     emailError.hidden = !text
     emailInput.setAttribute('aria-invalid', text ? 'true' : 'false')
     emailInput.setAttribute('aria-describedby', text ? 'auth-email-error auth-email-hint' : 'auth-email-hint')
+    if (text) {
+      emailInput.parentElement.classList.remove('is-shaking')
+      void emailInput.offsetWidth
+      emailInput.parentElement.classList.add('is-shaking')
+    }
   }
 
   function goTo(next, { focus = true } = {}) {
@@ -236,25 +279,25 @@ export function renderLoginPage(root, ctx = {}) {
     stepCodeItem.toggleAttribute('aria-current', next === 'code')
     if (next === 'code') stepCodeItem.setAttribute('aria-current', 'step')
     stepEmailItem.classList.toggle('is-done', next === 'code')
-    title.textContent = COPY[next].title
+    title.innerHTML = COPY[next].title
+    helper.textContent = COPY[next].helper
+    setStatus(COPY[next].status)
     if (next === 'email') {
-      helper.textContent = COPY.email.helper
-      setStatus(COPY.email.status)
       setSceneState('idle')
       stopResend()
       if (focus) emailInput.focus()
     } else {
-      helper.textContent = 'Masukkan kodenya di bawah. Kode yang dikirim sebelumnya otomatis tidak berlaku.'
-      setStatus(COPY.code.status)
       setSceneState('code')
       if (focus) digits[0].focus()
     }
-    // Replay the swap animation.
-    const active = next === 'email' ? emailForm : codeForm
+    // Replay the swap animation (form + heading).
     if (!reduced) {
-      active.classList.remove('is-swapping')
-      void active.offsetWidth
-      active.classList.add('is-swapping')
+      const active = next === 'email' ? emailForm : codeForm
+      for (const el of [active, title, helper]) {
+        el.classList.remove('is-swapping')
+        void el.offsetWidth
+        el.classList.add('is-swapping')
+      }
     }
   }
 
@@ -357,7 +400,7 @@ export function renderLoginPage(root, ctx = {}) {
       pendingEmail = resend ? pendingEmail : ''
       setStatus(resend ? COPY.code.status : COPY.email.status)
       setSceneState('error')
-      setTimeout(() => !disposed && setSceneState(resend ? 'code' : 'idle'), 600)
+      later(() => !disposed && setSceneState(resend ? 'code' : 'idle'), 600)
       say(err?.message || 'Gagal mengirim kode. Coba lagi.', 'error')
       if (resend) { resendBtn.disabled = false; resendBtn.textContent = 'Kirim ulang kode' }
     } finally {
@@ -469,11 +512,13 @@ export function renderLoginPage(root, ctx = {}) {
     say('')
     setBusy(verifyBtn, true, 'Memverifikasi…')
     digits.forEach((d) => { d.readOnly = true })
+    otpGroup.classList.add('is-busy')
     setStatus('Memverifikasi')
     setSceneState('verifying')
     try {
       const result = await submitEmailOtp(email, value)
       if (disposed) return
+      otpGroup.classList.remove('is-busy')
       page.classList.add('is-success')
       verifyBtn.classList.remove('is-loading')
       verifyBtn.classList.add('is-success')
@@ -489,11 +534,12 @@ export function renderLoginPage(root, ctx = {}) {
       }, reduced ? 250 : 900)
     } catch (err) {
       if (disposed) return
+      otpGroup.classList.remove('is-busy')
       setBusy(verifyBtn, false, 'Masuk')
       digits.forEach((d) => { d.readOnly = false })
       setStatus(COPY.code.status)
       setSceneState('error')
-      setTimeout(() => !disposed && step === 'code' && setSceneState('code'), 600)
+      later(() => !disposed && step === 'code' && setSceneState('code'), 600)
       say(err?.message || 'Kode salah. Periksa lagi lalu coba ulang.', 'error')
       shake()
       digits.forEach((d) => { d.value = '' })
@@ -509,7 +555,7 @@ export function renderLoginPage(root, ctx = {}) {
 
   /* ================= Scene ================= */
   import('../three/auth-scene.js')
-    .then(({ mountAuthScene }) => mountAuthScene(sceneBox, { labels: STAGES.map((_, i) => String(i + 1).padStart(2, '0')) }))
+    .then(({ mountAuthScene }) => mountAuthScene(sceneBox))
     .then((cleanup) => {
       if (disposed) { cleanup?.(); return }
       scene = cleanup
@@ -522,13 +568,15 @@ export function renderLoginPage(root, ctx = {}) {
   if (window.matchMedia?.('(pointer: fine)').matches) {
     requestAnimationFrame(() => { if (!disposed && step === 'email') emailInput.focus({ preventScroll: true }) })
   }
-  const enterTimer = setTimeout(() => page.classList.remove('is-entering'), 1400)
+  const enterTimer = setTimeout(() => page.classList.remove('is-entering'), 1600)
 
   return () => {
     disposed = true
     stopResend()
     clearTimeout(successTimer)
     clearTimeout(enterTimer)
+    timers.forEach(clearTimeout)
+    timers.clear()
     window.removeEventListener('mock-otp-sent', onMockOtp)
     if (typeof scene === 'function') scene()
     scene = null
