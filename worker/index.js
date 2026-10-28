@@ -39,7 +39,7 @@ const JSON_HINT =
 // Whitelisted tables -> columns. `json` columns are stored as TEXT JSON.
 const TABLES = {
   requests: {
-    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'created_at'],
+    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'created_at'],
   },
   offers: {
     columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'created_at'],
@@ -49,6 +49,14 @@ const TABLES = {
   assignments: {
     columns: ['id', 'owner_id', 'offer_id', 'worker_name', 'scheduled_at', 'status', 'created_at'],
     fks: { offer_id: 'offers' },
+  },
+  workers: {
+    columns: ['id', 'owner_id', 'name', 'phone', 'address', 'skills', 'lat', 'lng', 'zone', 'status', 'created_at'],
+    json: ['skills'],
+  },
+  assignment_workers: {
+    columns: ['id', 'owner_id', 'assignment_id', 'worker_id', 'created_at'],
+    fks: { assignment_id: 'assignments', worker_id: 'workers' },
   },
   completions: {
     columns: ['id', 'owner_id', 'assignment_id', 'notes', 'photos_path', 'status', 'completed_at', 'created_at'],
