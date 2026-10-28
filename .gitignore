@@ -38,3 +38,7 @@ src/cloud.config.js
 
 # Spec files (user-provided)
 spec/
+
+# Cloudflare
+.wrangler/
+.dev.vars

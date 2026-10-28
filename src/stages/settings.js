@@ -5,11 +5,11 @@
 
 import * as Components from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
+import { isUsingMockCloud } from '../cloud.js'
 
 const STORAGE_KEYS = {
   mcp: 'satualur_settings_mcp',
   agent: 'satualur_settings_agent',
-  cloud: 'satualur_settings_cloud',
 }
 
 const DEFAULT_AGENT_PROMPTS = {
@@ -72,16 +72,6 @@ function getAgentSettings() {
   })
 }
 
-function getCloudSettings() {
-  return loadSettings(STORAGE_KEYS.cloud, {
-    resourceId: '',
-    endpoint: '',
-    oauthRelayBaseUrl: '',
-    publishableKey: '',
-    enabled: false,
-  })
-}
-
 let currentTab = 'mcp'
 
 export function render(container) {
@@ -91,7 +81,7 @@ export function render(container) {
   const tabDefs = [
     { key: 'mcp', label: 'MCP Connectors' },
     { key: 'agent', label: 'Agent Skills' },
-    { key: 'cloud', label: 'WorkBuddy Cloud' },
+    { key: 'cloud', label: 'Cloud' },
   ]
   tabDefs.forEach(t => {
     const btn = Components.el('button', {
@@ -300,52 +290,17 @@ function renderAgentTab(container) {
 
 /* ---- Cloud Tab ---- */
 function renderCloudTab(container) {
-  const settings = getCloudSettings()
-
   const cloudCard = Components.el('div', { className: 'form-card card-accent-orange' },
-    Components.el('h3', { className: 'form-title' }, 'WorkBuddy Cloud Configuration'),
-    Components.el('p', { className: 'form-subtitle' }, 'Konfigurasi endpoint WorkBuddy Cloud Service. Isi setelah aktivasi cloud berhasil.')
+    Components.el('h3', { className: 'form-title' }, 'Cloud'),
+    Components.el('p', { className: 'form-subtitle' }, 'Satu Alur berjalan di Cloudflare Workers + D1. Data dan AI diakses lewat API same-origin (/api), tanpa konfigurasi tambahan di browser.')
   )
 
-  const cloudToggle = createToggle('cloud-enabled', 'Aktifkan Cloud', settings.enabled, (v) => {
-    settings.enabled = v
-    saveSettings(STORAGE_KEYS.cloud, settings)
-  })
-
-  const cloudFields = Components.el('div', {},
-    createField('Resource ID', 'cloud-resource', settings.resourceId, 'text', (v) => {
-      settings.resourceId = v
-      saveSettings(STORAGE_KEYS.cloud, settings)
-    }),
-    createField('Endpoint', 'cloud-endpoint', settings.endpoint, 'text', (v) => {
-      settings.endpoint = v
-      saveSettings(STORAGE_KEYS.cloud, settings)
-    }, 'Contoh: https://serviceops-ai.workbuddy.link'),
-    createField('OAuth Relay Base URL', 'cloud-oauth', settings.oauthRelayBaseUrl, 'text', (v) => {
-      settings.oauthRelayBaseUrl = v
-      saveSettings(STORAGE_KEYS.cloud, settings)
-    }),
-    createField('Publishable Key', 'cloud-key', settings.publishableKey, 'text', (v) => {
-      settings.publishableKey = v
-      saveSettings(STORAGE_KEYS.cloud, settings)
-    })
+  const mode = isUsingMockCloud() ? 'Mock lokal (dev, data di browser)' : 'Cloudflare Worker + D1'
+  const statusBox = Components.el('div', { style: 'margin-top:16px;padding:16px;background:var(--primary-soft);border:1px solid rgba(230,126,34,0.2);border-radius:var(--radius-sm);' },
+    Components.el('p', { style: 'margin:0;font-size:0.85rem;color:var(--text-muted);' }, `Mode aktif: ${mode}`)
   )
 
-  const guideBox = Components.el('div', { style: 'margin-top:16px;padding:16px;background:var(--primary-soft);border:1px solid rgba(230,126,34,0.2);border-radius:var(--radius-sm);' },
-    Components.el('p', { style: 'margin:0 0 8px;font-size:0.85rem;color:var(--text-muted);' },
-      'Cara mendapatkan konfigurasi: Aktifkan WorkBuddy Cloud Service, lalu salin publicConfig yang diberikan ke field di atas.'
-    ),
-    Components.el('button', {
-      type: 'button',
-      className: 'btn-secondary',
-      onClick: () => showToast('Aktivasi cloud dilakukan dari menu WorkBuddy.', 'info'),
-    }, 'Buka Panduan Aktivasi')
-  )
-
-  cloudCard.appendChild(cloudToggle)
-  cloudCard.appendChild(cloudFields)
-  cloudCard.appendChild(guideBox)
-
+  cloudCard.appendChild(statusBox)
   container.appendChild(cloudCard)
 }
 

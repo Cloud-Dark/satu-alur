@@ -92,7 +92,7 @@ function renderLogin() {
   window.addEventListener('mock-otp-sent', (ev) => {
     if (ev.detail.email === emailInput.value.trim()) {
       otpDisplay.style.display = 'block'
-      otpDisplay.innerHTML = `<strong>Mode Prototype &mdash; Kode OTP:</strong><br><span style="font-size:1.4rem;letter-spacing:4px;font-weight:700;color:var(--primary);">${ev.detail.code}</span>`
+      otpDisplay.innerHTML = `<strong>Mode Demo &mdash; Kode OTP:</strong><br><span style="font-size:1.4rem;letter-spacing:4px;font-weight:700;color:var(--primary);">${ev.detail.code}</span>`
     }
   })
 
@@ -177,10 +177,10 @@ function renderDashboard() {
   })
   sidebar.appendChild(navList)
 
-  // Bottom of sidebar — prototype badge
+  // Bottom of sidebar — demo badge
   if (isMock) {
     sidebar.appendChild(Components.el('div', { className: 'sidebar-footer' },
-      Components.el('span', { style: 'font-size:0.75rem;color:var(--text-muted);' }, 'Mode Prototype'),
+      Components.el('span', { style: 'font-size:0.75rem;color:var(--text-muted);' }, 'Mode Demo'),
       Components.el('span', { style: 'font-size:0.7rem;color:var(--text-dim);display:block;' }, 'Data lokal di browser')
     ))
   }
