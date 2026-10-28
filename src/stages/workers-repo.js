@@ -40,14 +40,16 @@ export async function removeWorker(worker, links) {
 
 export async function createTeamAssignment({ offerId, scheduledAt, workers }) {
   if (!workers?.length) throw new Error('Pilih minimal satu petugas.')
+  const unique = [...new Map(workers.map((w) => [w.id, w])).values()]
   const [assignment] = check(await db().from('assignments').insert({
-    offer_id: offerId, scheduled_at: scheduledAt, status: 'assigned', worker_name: joinWorkerNames(workers),
-  }))
+    offer_id: offerId, scheduled_at: scheduledAt, status: 'assigned', worker_name: joinWorkerNames(unique),
+  })) || []
+  if (!assignment) throw new Error('Penugasan gagal dibuat.')
   const { error } = await db().from('assignment_workers').insert(
-    workers.map((w) => ({ assignment_id: assignment.id, worker_id: w.id })))
+    unique.map((w) => ({ assignment_id: assignment.id, worker_id: w.id })))
   if (error) {
-    await db().from('assignments').delete().eq('id', assignment.id)
-    throw new Error(error.message)
+    const { error: rollbackError } = await db().from('assignments').delete().eq('id', assignment.id)
+    throw new Error(rollbackError ? `${error.message}; rollback gagal: ${rollbackError.message}` : error.message)
   }
   return assignment
 }

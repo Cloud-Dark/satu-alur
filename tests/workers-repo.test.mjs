@@ -43,11 +43,11 @@ test('workers repository and seed', async () => {
     const original = cloud.database.from
     cloud.database.from = (table) => {
       const builder = original(table)
-      if (table === 'assignment_workers') builder.insert = () => ({ then: (r) => r({ data: null, error: { message: 'x' } }) })
+      if (table === 'assignment_workers') builder.insert = () => ({ then: (r) => r({ data: null, error: { message: 'link-fail' } }) })
       return builder
     }
     try {
-      await assert.rejects(repo.createTeamAssignment({ offerId: 2007, scheduledAt: 'x', workers: [a] }), /x/)
+      await assert.rejects(repo.createTeamAssignment({ offerId: 2007, scheduledAt: 'x', workers: [a] }), /link-fail/)
     } finally { cloud.database.from = original }
     const { data: left } = await cloud.database.from('assignments').select('*').eq('offer_id', 2007)
     assert.equal(left.length, 0)
@@ -59,5 +59,19 @@ test('workers repository and seed', async () => {
     mock.createMockWorkBuddyCloud()
     assert.equal((await repo.loadWorkers()).length, 6)
     assert.ok((await repo.loadLinks()).length >= 6)
+
+    const legacy = JSON.parse(storage.getItem('satualur_mock_v1'))
+    legacy.workers = [{ id: 'w1', name: 'Budi Santoso', zones: ['Depok'], status: 'available' }, { id: 'w2', name: 'Agus Wijaya', zones: [], status: 'on_job' }]
+    legacy.assignment_workers = []
+    legacy.assignments.find((x) => x.id === 3001).worker_name = 'Ahmad & Team'
+    storage.setItem('satualur_mock_v1', JSON.stringify(legacy))
+    mock.createMockWorkBuddyCloud()
+    const ws = await repo.loadWorkers()
+    assert.equal(ws.length, 6)
+    assert.ok(ws.every((w) => typeof w.id === 'number'))
+    const ls = (await repo.loadLinks()).filter((l) => l.assignment_id === 3001)
+    assert.equal(ls.length, 2)
+    const { data: [a3001] } = await cloud.database.from('assignments').select('*').eq('id', 3001)
+    assert.equal(a3001.worker_name, ls.map((l) => ws.find((w) => w.id === l.worker_id).name).join(', '))
   } finally { await server.close() }
 })

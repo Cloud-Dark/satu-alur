@@ -668,6 +668,11 @@ function addSeedWorkers(state, daysAgo) {
   const have = new Set((state.assignments || []).map((a) => a.id))
   state.assignment_workers = SEED_LINKS.filter(([a]) => have.has(a))
     .map(([assignment_id, worker_id], i) => ({ id: 7001 + i, owner_id: 'anon', assignment_id, worker_id, created_at: daysAgo(10) }))
+  for (const a of state.assignments || []) {
+    const names = state.assignment_workers.filter((l) => l.assignment_id === a.id)
+      .map((l) => state.workers.find((w) => w.id === l.worker_id).name)
+    if (names.length) a.worker_name = names.join(', ')
+  }
 }
 
 /**
@@ -678,8 +683,9 @@ export function seedDemoData() {
   const now = new Date()
   const daysAgo = (d) => new Date(now.getTime() - d * 86400000).toISOString()
   if (state._seeded) {
-    // Older seeded states predate the workers tables.
-    if (!state.workers?.length) { addSeedWorkers(state, daysAgo); saveState(state) }
+    // Older seeded states have no workers, or legacy ones (string ids, old statuses).
+    const legacy = !state.workers?.length || state.workers.some((w) => typeof w.id !== 'number' || !['active', 'inactive'].includes(w.status))
+    if (legacy) { addSeedWorkers(state, daysAgo); saveState(state) }
     return
   }
 
