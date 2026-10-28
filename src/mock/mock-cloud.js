@@ -23,6 +23,7 @@ function ensureTable(name) {
 }
 function persist() {
   saveState(_state)
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('satualur:db-write'))
 }
 
 let _session = null

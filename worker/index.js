@@ -20,7 +20,7 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_INSERT_ROWS = 100;
 const MAX_IN_VALUES = 100;
 const MAX_FILTERS = 20;
-const MAX_LIMIT = 1000;
+const MAX_LIMIT = 5000;
 
 const LLM_MODELS = [
   { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B Instruct (fast)', disabled: false },

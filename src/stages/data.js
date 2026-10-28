@@ -22,8 +22,27 @@ export const isRevenue = (entry) => entry.category === 'pendapatan'
 export const ledgerDate = (entry) => entry.posted_at || entry.created_at
 const key = (v) => (v == null ? '' : String(v))
 
-const PAGE = 1000 // server-side cap per request
-const MAX_PAGES = 50
+const PAGE = 5000 // matches the Worker's per-request cap
+const MAX_PAGES = 20
+const CACHE_MS = 15000
+
+// Shell counters and the active stage load the same tables at the same time;
+// share in-flight and very recent loads. Any write clears the cache.
+const cache = new Map() // table -> { at, promise }
+function invalidate() { cache.clear() }
+if (typeof window !== 'undefined') {
+  window.addEventListener('satualur:db-write', invalidate)
+  window.addEventListener('satualur:data-changed', invalidate)
+}
+
+function cachedTable(name) {
+  const hit = cache.get(name)
+  if (hit && Date.now() - hit.at < CACHE_MS) return hit.promise
+  const promise = fetchTable(name)
+  cache.set(name, { at: Date.now(), promise })
+  promise.catch(() => { if (cache.get(name)?.promise === promise) cache.delete(name) })
+  return promise
+}
 
 /** Loads every row of a table in pages (stable id order), newest first. */
 async function fetchTable(name) {
@@ -42,7 +61,7 @@ async function fetchTable(name) {
 
 /** Fetches the given tables in parallel and returns a joined model. */
 export async function loadFlow(tables = TABLES) {
-  const results = await Promise.all(tables.map(fetchTable))
+  const results = await Promise.all(tables.map(cachedTable))
   const raw = Object.fromEntries(tables.map((t, i) => [t, results[i]]))
   return buildModel(raw)
 }

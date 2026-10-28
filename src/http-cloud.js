@@ -151,7 +151,13 @@ const httpDatabase = {
 
       // Awaitable: satu panggilan POST /api/db
       then(resolve, reject) {
-        return request('/api/db', { method: 'POST', body: q }).then(resolve, reject)
+        const pending = request('/api/db', { method: 'POST', body: q })
+        if (q.action !== 'select') {
+          pending.then((res) => {
+            if (!res?.error) window.dispatchEvent(new CustomEvent('satualur:db-write', { detail: { table } }))
+          })
+        }
+        return pending.then(resolve, reject)
       },
     }
     return builder
