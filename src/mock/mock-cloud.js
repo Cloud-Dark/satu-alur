@@ -652,20 +652,41 @@ const mockLLM = {
   }
 }
 
+const SEED_WORKERS = [
+  { id: 6001, name: 'Budi Santoso', phone: '0812-3456-7890', skills: ['ac', 'cleaning'], zone: 'Jakarta Selatan', address: 'Jl. Fatmawati No.15, Jakarta Selatan', lat: -6.2673, lng: 106.7976, status: 'active', age: 60 },
+  { id: 6002, name: 'Agus Wijaya', phone: '0821-9876-5432', skills: ['waterproofing', 'roof'], zone: 'Jakarta Pusat', address: 'Jl. Salemba Raya No.42, Jakarta Pusat', lat: -6.1965, lng: 106.8478, status: 'active', age: 55 },
+  { id: 6003, name: 'Siti Rahayu', phone: '0838-1234-5678', skills: ['cleaning', 'carpet', 'sofa'], zone: 'Tangerang', address: 'Jl. MH Thamrin No.8, Tangerang', lat: -6.1777, lng: 106.6296, status: 'active', age: 90 },
+  { id: 6004, name: 'Dedi Kurniawan', phone: '0856-7890-1234', skills: ['ac', 'electrical'], zone: 'Jakarta Selatan', address: 'Jl. Sisingamangaraja No.22, Jakarta Selatan', lat: -6.2436, lng: 106.8006, status: 'inactive', age: 45 },
+  { id: 6005, name: 'Rina Puspita', phone: '0877-4567-8901', skills: ['pool', 'garden'], zone: 'Bogor', address: 'Jl. Pajajaran No.55, Bogor', lat: -6.5942, lng: 106.7892, status: 'active', age: 70 },
+  { id: 6006, name: 'Eko Prasetyo', phone: '0813-5678-9012', skills: ['pest', 'cleaning'], zone: 'Surabaya', address: 'Jl. Darmo Permai Selatan No.12, Surabaya', lat: -7.2905, lng: 112.7271, status: 'active', age: 40 },
+]
+// [assignment_id, worker_id]; inactive 6004 only on an old completed job.
+const SEED_LINKS = [[3001, 6001], [3001, 6003], [3002, 6002], [3003, 6005], [3004, 6004], [3005, 6006], [3006, 6005]]
+
+function addSeedWorkers(state, daysAgo) {
+  state.workers = SEED_WORKERS.map(({ age, ...w }) => ({ owner_id: 'anon', ...w, created_at: daysAgo(age) }))
+  const have = new Set((state.assignments || []).map((a) => a.id))
+  state.assignment_workers = SEED_LINKS.filter(([a]) => have.has(a))
+    .map(([assignment_id, worker_id], i) => ({ id: 7001 + i, owner_id: 'anon', assignment_id, worker_id, created_at: daysAgo(10) }))
+}
+
 /**
  * Seed realistic demo data for teammate demonstration
  */
 export function seedDemoData() {
   const state = loadState()
-  if (state._seeded) return
-
   const now = new Date()
   const daysAgo = (d) => new Date(now.getTime() - d * 86400000).toISOString()
+  if (state._seeded) {
+    // Older seeded states predate the workers tables.
+    if (!state.workers?.length) { addSeedWorkers(state, daysAgo); saveState(state) }
+    return
+  }
 
   // --- Requests ---
   state.requests = [
-    { id: 1001, customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
-    { id: 1002, customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
+    { id: 1001, customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', requested_at: daysAgo(14), location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
+    { id: 1002, customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', requested_at: daysAgo(12), location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
     { id: 1003, customer_name: 'Kost exclusive 99', service_type: 'Pembersihan Kolam Renang', location: 'Depok', description: 'Perawatan rutin kolam renang bulanan, termasuk pengecekan pH dan backwash.', created_at: daysAgo(10) },
     { id: 1004, customer_name: 'PT Sinar Abadi', service_type: 'Pest Control', location: 'Tangerang', description: 'Pengendalian hama rayap dan kecoa untuk gudang 500m2.', created_at: daysAgo(8) },
     { id: 1005, customer_name: 'Apartemen GreenView', service_type: 'Pembersihan Kaca Gedung', location: 'Jakarta Pusat', description: 'Pembersihan kaca eksterior 12 lantai menggunakan gondola.', created_at: daysAgo(6) },
@@ -687,12 +708,12 @@ export function seedDemoData() {
 
   // --- Assignments ---
   state.assignments = [
-    { id: 3001, offer_id: 2001, worker_name: 'Ahmad & Team', scheduled_at: daysAgo(11), status: 'done', created_at: daysAgo(12) },
-    { id: 3002, offer_id: 2002, worker_name: 'Budi Santoso', scheduled_at: daysAgo(9), status: 'done', created_at: daysAgo(10) },
-    { id: 3003, offer_id: 2003, worker_name: 'Candra Pool Service', scheduled_at: daysAgo(8), status: 'done', created_at: daysAgo(9) },
-    { id: 3004, offer_id: 2004, worker_name: 'Dedi Pest Control', scheduled_at: daysAgo(5), status: 'done', created_at: daysAgo(7) },
-    { id: 3005, offer_id: 2001, worker_name: 'Eko Maintenance', scheduled_at: daysAgo(3), status: 'assigned', created_at: daysAgo(4) },
-    { id: 3006, offer_id: 2003, worker_name: 'Fajar Pool Service', scheduled_at: daysAgo(2), status: 'assigned', created_at: daysAgo(3) },
+    { id: 3001, offer_id: 2001, worker_name: 'Budi Santoso, Siti Rahayu', scheduled_at: daysAgo(11), status: 'done', created_at: daysAgo(12) },
+    { id: 3002, offer_id: 2002, worker_name: 'Agus Wijaya', scheduled_at: daysAgo(9), status: 'done', created_at: daysAgo(10) },
+    { id: 3003, offer_id: 2003, worker_name: 'Rina Puspita', scheduled_at: daysAgo(8), status: 'done', created_at: daysAgo(9) },
+    { id: 3004, offer_id: 2004, worker_name: 'Dedi Kurniawan', scheduled_at: daysAgo(5), status: 'done', created_at: daysAgo(7) },
+    { id: 3005, offer_id: 2001, worker_name: 'Eko Prasetyo', scheduled_at: daysAgo(3), status: 'assigned', created_at: daysAgo(4) },
+    { id: 3006, offer_id: 2003, worker_name: 'Rina Puspita', scheduled_at: daysAgo(2), status: 'assigned', created_at: daysAgo(3) },
   ]
 
   // --- Completions ---
@@ -719,15 +740,7 @@ export function seedDemoData() {
     { id: 5012, completion_id: 4004, amount: 650000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(3), created_at: daysAgo(3) },
   ]
 
-  // --- Workers (for Field Team) ---
-  state.workers = [
-    { id: 'w1', name: 'Budi Santoso', phone: '0812-3456-7890', email: 'budi@satualur.id', skills: ['ac', 'cleaning'], zones: ['Jakarta Selatan', 'Depok'], rating: 4.9, completed: 156, onTime: 97, status: 'available', address: 'Jl. Fatmawati No.15, Jakarta Selatan', lat: -6.2673, lng: 106.7976, maxJobs: 4, created_at: daysAgo(60) },
-    { id: 'w2', name: 'Agus Wijaya', phone: '0821-9876-5432', email: 'agus@satualur.id', skills: ['waterproofing', 'roof'], zones: ['Jakarta Pusat', 'Jakarta Timur'], rating: 4.7, completed: 98, onTime: 92, status: 'on_job', address: 'Jl. Salemba Raya No.42, Jakarta Pusat', lat: -6.1965, lng: 106.8478, maxJobs: 3, created_at: daysAgo(55) },
-    { id: 'w3', name: 'Siti Rahayu', phone: '0838-1234-5678', email: 'siti@satualur.id', skills: ['cleaning', 'carpet', 'sofa'], zones: ['Tangerang', 'Bekasi'], rating: 4.8, completed: 203, onTime: 95, status: 'available', address: 'Jl. MH Thamrin No.8, Tangerang', lat: -6.1777, lng: 106.6296, maxJobs: 5, created_at: daysAgo(90) },
-    { id: 'w4', name: 'Dedi Kurniawan', phone: '0856-7890-1234', email: 'dedi@satualur.id', skills: ['ac', 'electrical'], zones: ['Jakarta Selatan', 'Jakarta Barat'], rating: 4.5, completed: 74, onTime: 88, status: 'off_duty', address: 'Jl. Sisingamangaraja No.22, Jakarta Selatan', lat: -6.2436, lng: 106.8006, maxJobs: 4, created_at: daysAgo(45) },
-    { id: 'w5', name: 'Rina Puspita', phone: '0877-4567-8901', email: 'rina@satualur.id', skills: ['pool', 'garden'], zones: ['Bogor', 'Depok'], rating: 4.9, completed: 112, onTime: 96, status: 'available', address: 'Jl. Pajajaran No.55, Bogor', lat: -6.5942, lng: 106.7892, maxJobs: 3, created_at: daysAgo(70) },
-    { id: 'w6', name: 'Eko Prasetyo', phone: '0813-5678-9012', email: 'eko@satualur.id', skills: ['pest', 'cleaning'], zones: ['Surabaya', 'Sidoarjo'], rating: 4.6, completed: 67, onTime: 90, status: 'available', address: 'Jl. Darmo Permai Selatan No.12, Surabaya', lat: -7.2905, lng: 112.7271, maxJobs: 4, created_at: daysAgo(40) },
-  ]
+  addSeedWorkers(state, daysAgo)
 
   state.users = [{ id: 'demo-user', email: 'demo@satualur.id', name: 'Demo User', created_at: daysAgo(30) }]
   state._seeded = true
