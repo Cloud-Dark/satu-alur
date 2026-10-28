@@ -1,4 +1,6 @@
 /** 03 — Penugasan: assign an approved offer to a worker with AI matching, map, and team management. */
+import { loadWorkers, loadLinks, saveWorker, removeWorker } from './workers-repo.js'
+import { SKILL_LABELS, workerState, completedCount, hasHistory } from '../domain/workers.js'
 import { getCloud } from '../cloud.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
@@ -23,13 +25,6 @@ function haversine(lat1, lng1, lat2, lng2) {
   const dLng = (lng2 - lng1) * Math.PI / 180
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
-
-const SKILL_LABELS = {
-  ac: 'Service AC', cleaning: 'Cleaning', waterproofing: 'Waterproofing',
-  roof: 'Roof Repair', carpet: 'Cuci Karpet', sofa: 'Cuci Sofa',
-  electrical: 'Listrik', pool: 'Kolam Renang', garden: 'Taman',
-  pest: 'Pest Control',
 }
 
 const STATUS_LABELS = {
@@ -68,26 +63,33 @@ export async function render(container, ctx = {}) {
 
   let flow = null
   let workers = []
+  let links = []
 
-  async function init() {
+  async function load() {
     try {
-      flow = await loadFlow()
-      const { data, error } = await getCloud().database.from('workers').select('*')
-      workers = (data || []).sort((a, b) => b.completed - a.completed)
-    } catch (err) { /* silent */ }
+      ;[flow, workers, links] = await Promise.all([loadFlow(), loadWorkers(), loadLinks()])
+      status.hide()
+    } catch (err) {
+      status.show('danger', `Gagal memuat data: ${err.message}`)
+    }
+    draw()
   }
-  await init()
+  async function reload() {
+    await load()
+    notifyDataChanged()
+  }
 
   function draw() {
     host.replaceChildren()
+    if (!flow) return
     switch (currentTab) {
       case 'assign': renderAssign(host, ctx, flow, workers); break
-      case 'team': renderTeam(host, workers); break
+      case 'team': renderTeam(host, { workers, assignments: flow.assignments, completions: flow.completions, links, reload, status }); break
       case 'map': renderMap(host, flow, workers); break
       case 'performance': renderPerformance(host, workers); break
     }
   }
-  draw()
+  await load()
 }
 
 /* ================================================================ Tab: Assign */
@@ -351,272 +353,104 @@ function renderAssign(target, ctx, flow, workers) {
 }
 
 /* ================================================================ Tab: Team */
-function renderTeam(target, workers) {
-  let editingWorker = null
-  let localWorkers = [...workers]
+const PHONE_RE = /^[+()\d\s.-]{6,32}$/
+const STATE_TAG = { available: ['Tersedia', 'ok'], on_job: ['Dalam tugas', 'warn'], inactive: ['Nonaktif', 'neutral'] }
 
-  // Modal overlay
-  function createModal(title, content) {
-    const overlay = el('div', { style: 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;padding:20px;' })
-    const box = el('div', { style: 'background:var(--bg-surface);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-lg);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;' })
-    const head = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;padding:20px 24px;border-bottom:1px solid var(--border);' },
-      el('h3', { style: 'margin:0;font-size:1.1rem;' }, title),
-      C.button({ label: '✕', variant: 'ghost', size: 'sm', onClick: () => overlay.remove() }),
-    )
-    const body = el('div', { style: 'padding:24px;' }, content)
-    box.appendChild(head)
-    box.appendChild(body)
-    overlay.appendChild(box)
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
-    document.body.appendChild(overlay)
-    return overlay
-  }
+function renderTeam(target, { workers, assignments, completions, links, reload, status }) {
+  const dialog = el('dialog', { className: 'panel' })
+  dialog.addEventListener('close', () => dialog.replaceChildren())
 
-  // Form Tambah / Edit
   function openWorkerForm(worker = null) {
-    editingWorker = worker
     const isEdit = !!worker
-    const form = el('form', { className: 'form', style: 'display:flex;flex-direction:column;gap:14px;' })
-
-    const fields = {
-      name: el('input', { className: 'input', placeholder: 'Nama lengkap', value: worker?.name || '' }),
-      phone: el('input', { className: 'input', placeholder: 'No. HP', value: worker?.phone || '' }),
-      email: el('input', { className: 'input', placeholder: 'Email', value: worker?.email || '' }),
-      address: el('input', { className: 'input', placeholder: 'Alamat (untuk geocoding)', value: worker?.address || '' }),
-      lat: el('input', { className: 'input', placeholder: 'Latitude', value: worker?.lat || '' }),
-      lng: el('input', { className: 'input', placeholder: 'Longitude', value: worker?.lng || '' }),
-      skills: el('input', { className: 'input', placeholder: 'Skill (pisah koma): ac, cleaning, waterproofing', value: (worker?.skills || []).join(', ') }),
-      zones: el('input', { className: 'input', placeholder: 'Zona (pisah koma): Jakarta Selatan, Depok', value: (worker?.zones || []).join(', ') }),
-      rating: el('input', { className: 'input', placeholder: 'Rating 0-5', value: worker?.rating || '4.5' }),
-      maxJobs: el('input', { className: 'input', placeholder: 'Max job per hari', value: worker?.maxJobs || '4' }),
-      status: C.select({ options: [{ value: 'available', label: 'Tersedia' }, { value: 'on_job', label: 'Dalam Tugas' }, { value: 'off_duty', label: 'Off Duty' }, { value: 'sick', label: 'Sakit' }], value: worker?.status || 'available' }),
-    }
-
-    form.appendChild(el('label', {}, 'Nama', fields.name))
-    form.appendChild(el('label', {}, 'No. HP', fields.phone))
-    form.appendChild(el('label', {}, 'Email', fields.email))
-    form.appendChild(el('div', { className: 'form-row' },
-      el('label', {}, 'Alamat', fields.address),
-      el('label', {}, 'Lat', fields.lat),
-      el('label', {}, 'Lng', fields.lng),
-    ))
-    form.appendChild(el('div', { className: 'form-row' },
-      el('label', {}, 'Skill', fields.skills),
-      el('label', {}, 'Zona', fields.zones),
-    ))
-    form.appendChild(el('div', { className: 'form-row' },
-      el('label', {}, 'Rating', fields.rating),
-      el('label', {}, 'Max Job/Hari', fields.maxJobs),
-      el('label', {}, 'Status', fields.status.wrap),
-    ))
-
-    const saveBtn = C.button({ label: isEdit ? 'Simpan Perubahan' : 'Tambah Petugas', icon: 'check', variant: 'primary', type: 'submit' })
-    const delBtn = isEdit ? C.button({ label: 'Hapus', icon: 'trash', variant: 'danger', onClick: () => {
-      if (confirm(`Yakin hapus ${worker.name}?`)) {
-        localWorkers = localWorkers.filter((w) => w.id !== worker.id)
-        overlay.remove()
-        renderWorkerCards(localWorkers)
-        showToast(`${worker.name} dihapus.`, 'success')
-      }
-    } }) : null
-
-    form.appendChild(el('div', { className: 'form-actions', style: 'margin-top:8px;' }, saveBtn, delBtn || ''))
-
-    const overlay = createModal(isEdit ? 'Edit Petugas' : 'Tambah Petugas Baru', form)
-
-    form.addEventListener('submit', (e) => {
-      e.preventDefault()
-      const newWorker = {
-        id: worker?.id || 'w' + Date.now(),
-        name: fields.name.value.trim(),
-        phone: fields.phone.value.trim(),
-        email: fields.email.value.trim(),
-        address: fields.address.value.trim(),
-        lat: parseFloat(fields.lat.value) || -6.2,
-        lng: parseFloat(fields.lng.value) || 106.8,
-        skills: fields.skills.value.split(',').map((s) => s.trim()).filter(Boolean),
-        zones: fields.zones.value.split(',').map((s) => s.trim()).filter(Boolean),
-        rating: parseFloat(fields.rating.value) || 4.5,
-        maxJobs: parseInt(fields.maxJobs.value) || 4,
-        status: fields.status.input.value,
-        completed: worker?.completed || 0,
-        onTime: worker?.onTime || 95,
-      }
-      if (!newWorker.name) { showToast('Nama wajib diisi.', 'danger'); return }
-
-      if (isEdit) {
-        const idx = localWorkers.findIndex((w) => w.id === worker.id)
-        if (idx >= 0) localWorkers[idx] = newWorker
-      } else {
-        localWorkers.push(newWorker)
-      }
-      overlay.remove()
-      renderWorkerCards(localWorkers)
-      showToast(isEdit ? `${newWorker.name} diperbarui.` : `${newWorker.name} ditambahkan.`, 'success')
+    const name = C.field({ label: 'Nama', name: 'name', required: true, value: worker?.name || '' })
+    const phone = C.field({ label: 'No. HP', name: 'phone', type: 'tel', value: worker?.phone || '' })
+    const address = C.field({ label: 'Alamat', name: 'address', value: worker?.address || '', hint: 'Dipakai untuk menentukan zona dan jarak.' })
+    const boxes = Object.entries(SKILL_LABELS).map(([key, label]) => {
+      const input = el('input', { type: 'checkbox', value: key })
+      input.checked = !!worker?.skills?.includes(key)
+      return { input, wrap: el('label', { className: 'check-row' }, input, ` ${label}`) }
     })
+    const statusSel = isEdit ? C.select({ label: 'Status', name: 'status', options: [{ value: 'active', label: 'Aktif' }, { value: 'inactive', label: 'Nonaktif' }], value: worker.status }) : null
+    const msg = C.message()
+    const submit = C.button({ label: isEdit ? 'Simpan perubahan' : 'Tambah petugas', icon: 'check', variant: 'primary', type: 'submit' })
+    const cancel = C.button({ label: 'Batal', variant: 'ghost', onClick: () => dialog.close() })
+    const form = el('form', { className: 'form' },
+      name.wrap, phone.wrap, address.wrap,
+      el('fieldset', { className: 'field' }, el('legend', { className: 'field-label' }, 'Keahlian'), ...boxes.map((b) => b.wrap)),
+      statusSel?.wrap, msg,
+      el('div', { className: 'form-actions' }, submit, cancel),
+    )
+    form.noValidate = true
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      msg.hide()
+      const fields = {
+        name: name.input.value.trim(), phone: phone.input.value.trim(), address: address.input.value.trim(),
+        skills: boxes.filter((b) => b.input.checked).map((b) => b.input.value),
+      }
+      if (!fields.name) { msg.show('danger', 'Nama wajib diisi.'); return }
+      if (fields.phone && !PHONE_RE.test(fields.phone)) { msg.show('danger', 'Nomor HP tidak valid.'); return }
+      fields.status = isEdit ? statusSel.input.value : 'active'
+      if (isEdit) fields.id = worker.id
+      const restore = C.setBusy(submit, 'Menyimpan…')
+      try {
+        await saveWorker(fields, worker || undefined)
+        dialog.close()
+        showToast(isEdit ? `${fields.name} diperbarui.` : `${fields.name} ditambahkan.`, 'success')
+        await reload()
+      } catch (err) {
+        msg.show('danger', err.message)
+        restore()
+      }
+    })
+    dialog.replaceChildren(el('h2', { className: 'panel-title' }, isEdit ? 'Edit petugas' : 'Tambah petugas'), form)
+    dialog.showModal()
   }
 
-  // Bulk Import Modal
-  function openBulkImport() {
-    const textarea = el('textarea', { className: 'input', style: 'min-height:200px;font-family:monospace;font-size:0.85rem;', placeholder: '[\n  {"name":"Ahmad","phone":"0812...","skills":["ac"],"zones":["Jakarta"],"status":"available"},\n  ...\n]' })
-    const form = el('form', { className: 'form' },
-      el('p', { className: 'text-body', style: 'font-size:0.85rem;margin-bottom:12px;' }, 'Paste JSON array petugas. Format: name, phone, email, skills[], zones[], status, address, lat, lng, rating, maxJobs.'),
-      textarea,
-      el('div', { className: 'form-actions', style: 'margin-top:12px;' },
-        C.button({ label: 'Import', icon: 'upload', variant: 'primary', type: 'submit' }),
-        C.button({ label: 'Contoh Data', icon: 'file', variant: 'soft', onClick: () => {
-          textarea.value = JSON.stringify([
-            { name: 'Ahmad Fauzi', phone: '0812-1111-2222', email: 'ahmad@satualur.id', skills: ['ac', 'electrical'], zones: ['Jakarta Selatan', 'Depok'], status: 'available', address: 'Jl. Fatmawati', lat: -6.2673, lng: 106.7976, rating: 4.7, maxJobs: 4 },
-            { name: 'Maya Sari', phone: '0822-3333-4444', email: 'maya@satualur.id', skills: ['cleaning', 'sofa'], zones: ['Tangerang'], status: 'available', address: 'Jl. Thamrin', lat: -6.1777, lng: 106.6296, rating: 4.9, maxJobs: 5 },
-          ], null, 2)
-        } }),
+  async function act(label, run, done) {
+    try { await run(); showToast(done, 'success'); await reload() }
+    catch (err) { status.show('danger', `${label}: ${err.message}`) }
+  }
+
+  function removeAction(w) {
+    const history = hasHistory(w.id, links)
+    const verb = history ? 'Nonaktifkan' : 'Hapus'
+    return C.button({ label: verb, icon: history ? 'x' : 'trash', variant: 'ghost', size: 'sm', onClick: () => {
+      if (!window.confirm(`${verb} ${w.name}?`)) return
+      act(`${verb} gagal`, () => removeWorker(w, links), history ? `${w.name} dinonaktifkan.` : `${w.name} dihapus.`)
+    } })
+  }
+
+  function card(w) {
+    const state = workerState(w, assignments, links)
+    const [stateLabel, tone] = STATE_TAG[state]
+    const inactive = state === 'inactive'
+    return el('article', { className: 'workspace-entry' },
+      el('div', { className: 'workspace-entry-head' }, el('strong', {}, w.name), C.tag(stateLabel, tone)),
+      el('p', { className: 'muted small' }, [w.phone, w.zone].filter(Boolean).join(' · ') || 'Belum ada kontak'),
+      el('div', {}, ...(w.skills || []).map((s) => C.tag(SKILL_LABELS[s] || s))),
+      el('p', { className: 'muted small' }, `${completedCount(w.id, links, completions)} job selesai`),
+      el('div', { className: 'form-actions' },
+        C.button({ label: 'Edit', icon: 'edit', variant: 'soft', size: 'sm', onClick: () => openWorkerForm(w) }),
+        inactive
+          ? C.button({ label: 'Aktifkan', icon: 'check', variant: 'soft', size: 'sm', onClick: () => act('Aktifkan gagal', () => saveWorker({ id: w.id, name: w.name, phone: w.phone, address: w.address, skills: w.skills, status: 'active' }, w), `${w.name} diaktifkan.`) })
+          : null,
+        removeAction(w),
       ),
     )
-    const overlay = createModal('Import Bulk Petugas (JSON)', form)
-    form.addEventListener('submit', (e) => {
-      e.preventDefault()
-      try {
-        const data = JSON.parse(textarea.value.trim())
-        const arr = Array.isArray(data) ? data : [data]
-        let added = 0
-        arr.forEach((item) => {
-          if (item.name) {
-            localWorkers.push({
-              id: 'w' + Date.now() + '_' + added,
-              name: item.name,
-              phone: item.phone || '',
-              email: item.email || '',
-              skills: item.skills || [],
-              zones: item.zones || [],
-              status: item.status || 'available',
-              address: item.address || '',
-              lat: item.lat || -6.2,
-              lng: item.lng || 106.8,
-              rating: item.rating || 4.5,
-              maxJobs: item.maxJobs || 4,
-              completed: item.completed || 0,
-              onTime: item.onTime || 95,
-            })
-            added++
-          }
-        })
-        overlay.remove()
-        renderWorkerCards(localWorkers)
-        showToast(`${added} petugas berhasil diimport.`, 'success')
-      } catch (err) {
-        showToast('JSON tidak valid: ' + err.message, 'danger')
-      }
-    })
   }
 
-  // Inject Query Modal
-  function openInjectQuery() {
-    const textarea = el('textarea', { className: 'input', style: 'min-height:180px;font-family:monospace;font-size:0.85rem;', placeholder: "-- Contoh: UPDATE workers SET status='available' WHERE zone='Jakarta'\n-- atau perintah custom lainnya" })
-    const form = el('form', { className: 'form' },
-      el('p', { className: 'text-body', style: 'font-size:0.85rem;margin-bottom:12px;' }, 'Jalankan perintah manipulasi data petugas. Hati-hati, tidak ada undo!'),
-      textarea,
-      el('div', { className: 'form-actions', style: 'margin-top:12px;' },
-        C.button({ label: 'Jalankan', icon: 'play', variant: 'primary', type: 'submit' }),
-        C.button({ label: 'Contoh Query', icon: 'file', variant: 'soft', onClick: () => {
-          textarea.value = `// JavaScript expression untuk manipulasi array localWorkers:
-localWorkers.forEach(w => {
-  if (w.zones.includes('Jakarta Selatan')) {
-    w.status = 'available'
-    w.maxJobs = 5
-  }
-})
-// Tulis expression valid, hasil akan di-eval.`
-        } }),
-      ),
-    )
-    const overlay = createModal('Inject Query (Advanced)', form)
-    form.addEventListener('submit', (e) => {
-      e.preventDefault()
-      try {
-        const code = textarea.value.trim()
-        // Safe-ish eval with localWorkers in scope
-        const fn = new Function('localWorkers', code)
-        fn(localWorkers)
-        overlay.remove()
-        renderWorkerCards(localWorkers)
-        showToast('Query berhasil dijalankan.', 'success')
-      } catch (err) {
-        showToast('Error: ' + err.message, 'danger')
-      }
-    })
-  }
+  const byName = [...workers].sort((a, b) => a.name.localeCompare(b.name))
+  const active = byName.filter((w) => w.status === 'active')
+  const inactive = byName.filter((w) => w.status !== 'active')
 
-  const filterRow = el('div', { className: 'form-row', style: 'margin-bottom:16px;' },
-    el('input', { className: 'input', placeholder: 'Cari nama petugas...', id: 'worker-search', style: 'flex:1;' }),
-    C.select({ id: 'skill-filter', options: [{ value: '', label: 'Semua Skill' }, ...Object.entries(SKILL_LABELS).map(([k, v]) => ({ value: k, label: v }))], value: '', onChange: () => filterWorkers() }),
-    C.select({ id: 'status-filter', options: [{ value: '', label: 'Semua Status' }, { value: 'available', label: 'Tersedia' }, { value: 'on_job', label: 'Dalam Tugas' }, { value: 'off_duty', label: 'Off Duty' }], value: '', onChange: () => filterWorkers() }),
+  target.append(
+    dialog,
+    el('div', { className: 'form-actions' }, C.button({ label: 'Tambah petugas', icon: 'plus', variant: 'primary', onClick: () => openWorkerForm() })),
+    C.panel({ title: 'Tim petugas', meta: `${active.length} aktif` },
+      active.length ? active.map(card) : C.emptyState({ title: 'Belum ada petugas aktif', iconName: 'users', body: 'Tambahkan petugas untuk mulai menugaskan pekerjaan.' })),
+    inactive.length ? C.panel({ title: 'Nonaktif', meta: `${inactive.length} petugas` }, inactive.map(card)) : null,
   )
-
-  const grid = el('div', { className: 'cards-grid' })
-  target.appendChild(el('div', { className: 'form-actions', style: 'margin-bottom:16px;' },
-    C.button({ label: 'Tambah Petugas', icon: 'plus', variant: 'primary', onClick: () => openWorkerForm() }),
-    C.button({ label: 'Import Bulk JSON', icon: 'upload', variant: 'soft', onClick: () => openBulkImport() }),
-    C.button({ label: 'Inject Query', icon: 'terminal', variant: 'soft', onClick: () => openInjectQuery() }),
-  ))
-  target.appendChild(filterRow)
-  target.appendChild(grid)
-
-  function renderWorkerCards(list) {
-    grid.replaceChildren()
-    list.forEach((w) => {
-      const st = STATUS_LABELS[w.status] || STATUS_LABELS.available
-      const card = el('article', { className: 'card card-hover' },
-        el('div', { className: 'card-accent-row' },
-          C.tag(st.label, st.color),
-          C.tag(`${w.rating} ★`, 'warning'),
-        ),
-        el('div', { style: 'display:flex;align-items:center;gap:12px;margin:12px 0;' },
-          el('div', { style: 'width:48px;height:48px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0;' }, w.avatar || w.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()),
-          el('div', { style: 'min-width:0;' },
-            el('h3', { className: 'card-title', style: 'margin:0;font-size:1rem;' }, w.name),
-            el('p', { className: 'muted small', style: 'margin:2px 0 0;' }, w.phone),
-          ),
-        ),
-        el('div', { style: 'display:flex;flex-wrap:wrap;gap:4px;margin:8px 0;' },
-          ...(w.skills || []).map((s) => C.tag(SKILL_LABELS[s] || s, 'soft')),
-        ),
-        el('div', { className: 'deflist' },
-          el('dt', {}, '📍 Zona'), el('dd', {}, (w.zones || []).join(', ')),
-          el('dt', {}, '✅ Selesai'), el('dd', {}, `${w.completed} job`),
-          el('dt', {}, '⏰ On-time'), el('dd', {}, `${w.onTime}%`),
-          el('dt', {}, '📅 Max/hari'), el('dd', {}, `${w.maxJobs} job`),
-        ),
-        el('div', { className: 'form-actions', style: 'margin-top:12px;padding-top:12px;border-top:1px solid var(--border);' },
-          C.button({ label: 'Edit', icon: 'edit', variant: 'soft', size: 'sm', onClick: () => openWorkerForm(w) }),
-          C.button({ label: 'Hapus', icon: 'trash', variant: 'ghost', size: 'sm', onClick: () => {
-            if (confirm(`Yakin hapus ${w.name}?`)) {
-              localWorkers = localWorkers.filter((x) => x.id !== w.id)
-              renderWorkerCards(localWorkers)
-              showToast(`${w.name} dihapus.`, 'success')
-            }
-          } }),
-        ),
-      )
-      grid.appendChild(card)
-    })
-  }
-
-  renderWorkerCards(localWorkers)
-
-  function filterWorkers() {
-    const search = (document.getElementById('worker-search')?.value || '').toLowerCase()
-    const skill = document.getElementById('skill-filter')?.value || ''
-    const statusVal = document.getElementById('status-filter')?.value || ''
-    const filtered = localWorkers.filter((w) => {
-      if (search && !w.name.toLowerCase().includes(search)) return false
-      if (skill && !w.skills?.includes(skill)) return false
-      if (statusVal && w.status !== statusVal) return false
-      return true
-    })
-    renderWorkerCards(filtered)
-  }
-
-  document.getElementById('worker-search')?.addEventListener('input', filterWorkers)
 }
 
 /* ================================================================ Tab: Map */
