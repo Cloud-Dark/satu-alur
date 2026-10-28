@@ -93,7 +93,8 @@ export async function mountApp(root) {
       const next = session?.user ?? null
       const changed = (next?.id ?? null) !== (currentUser?.id ?? null)
       currentUser = next
-      if (changed) render()
+      // The login page shows its own success state and navigates via ctx.onSignedIn.
+      if (changed && !(next && currentPath() === '/masuk')) render()
     })
   } catch (e) {
     console.warn('Auth state observer error:', e.message)

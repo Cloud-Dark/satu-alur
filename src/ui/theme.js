@@ -28,6 +28,11 @@ export function themeToggleButton() {
   btn.type = 'button'
   btn.className = 'icon-btn theme-toggle'
   const sync = () => {
+    if (btn.dataset.mounted && !btn.isConnected) {
+      window.removeEventListener('themechange', sync)
+      return
+    }
+    if (btn.isConnected) btn.dataset.mounted = '1'
     const dark = getTheme() === 'dark'
     btn.replaceChildren(icon(dark ? 'sun' : 'moon'))
     btn.setAttribute('aria-label', dark ? 'Gunakan mode terang' : 'Gunakan mode gelap')
