@@ -11,6 +11,8 @@ import * as StageComplete from '../stages/complete.js'
 import * as StageBookkeeping from '../stages/bookkeeping.js'
 import * as StageReport from '../stages/report.js'
 import * as StageSettings from '../stages/settings.js'
+import * as StageAIAssistant from '../stages/ai-assistant.js'
+import * as StageSocialMedia from '../stages/social-media.js'
 
 const navItems = [
   { key: 'dashboard', label: 'Dashboard', module: StageDashboard, icon: '🏠' },
@@ -20,6 +22,8 @@ const navItems = [
   { key: 'complete', label: 'Penyelesaian', module: StageComplete, icon: '✅' },
   { key: 'bookkeeping', label: 'Pembukuan', module: StageBookkeeping, icon: '📊' },
   { key: 'report', label: 'Laporan', module: StageReport, icon: '📈' },
+  { key: 'social-media', label: 'Social Media', module: StageSocialMedia, icon: '📱' },
+  { key: 'ai-assistant', label: 'AI Superpowers', module: StageAIAssistant, icon: '🦸' },
 ]
 
 let currentUser = null
