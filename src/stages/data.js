@@ -22,10 +22,22 @@ export const isRevenue = (entry) => entry.category === 'pendapatan'
 export const ledgerDate = (entry) => entry.posted_at || entry.created_at
 const key = (v) => (v == null ? '' : String(v))
 
+const PAGE = 1000 // server-side cap per request
+const MAX_PAGES = 50
+
+/** Loads every row of a table in pages (stable id order), newest first. */
 async function fetchTable(name) {
-  const { data, error } = await getCloud().database.from(name).select('*').order('created_at', { ascending: false })
-  if (error) throw new Error(`Gagal memuat ${name}: ${error.message}`)
-  return data || []
+  const rows = []
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const from = page * PAGE
+    const { data, error } = await getCloud().database.from(name)
+      .select('*').order('id', { ascending: true }).range(from, from + PAGE - 1)
+    if (error) throw new Error(`Gagal memuat ${name}: ${error.message}`)
+    const batch = data || []
+    rows.push(...batch)
+    if (batch.length < PAGE) break
+  }
+  return rows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')))
 }
 
 /** Fetches the given tables in parallel and returns a joined model. */
@@ -88,12 +100,13 @@ export function buildModel({ requests = [], offers = [], assignments = [], compl
     if (compls.length) return { key: 'done', label: 'Selesai', tone: 'ok' }
     if (assigns.length) return { key: 'assigned', label: 'Ditugaskan', tone: 'brand' }
     if (offs.some((o) => o.status === 'approved')) return { key: 'offered', label: 'Ditawarkan', tone: 'brand' }
+    if (offs.every((o) => o.status === 'rejected')) return { key: 'rejected', label: 'Ditolak', tone: 'danger' }
     return { key: 'draft', label: 'Draf penawaran', tone: 'warn' }
   }
 
   // Work queues ("perlu tindakan")
   m.requestsWithoutOffer = () => requests.filter((r) => m.offersOf(r.id).length === 0)
-  m.draftOffers = () => offers.filter((o) => o.status !== 'approved')
+  m.draftOffers = () => offers.filter((o) => o.status !== 'approved' && o.status !== 'rejected')
   m.approvedWithoutAssignment = () => offers.filter((o) => o.status === 'approved' && m.assignmentsOf(o.id).length === 0)
   m.activeAssignments = () => assignments.filter((a) => a.status !== 'done' && m.completionsOf(a.id).length === 0)
   m.completionsWithoutLedger = () => completions.filter((c) => m.ledgerOf(c.id).length === 0)
@@ -116,6 +129,17 @@ export function totals(entries) {
     else cost += amt
   }
   return { revenue, cost, profit: revenue - cost }
+}
+
+/** Grouping key for "the same customer" across requests (name, case-insensitive). */
+export function customerKey(r) {
+  return String(r?.customer_name || '').trim().toLowerCase().replace(/\s+/g, ' ') || 'x'
+}
+
+/** YYYY-MM-DD in the viewer's local timezone (not UTC). */
+export function localDate(d) {
+  const x = new Date(d)
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
 }
 
 /** Display name for a request (falls back gracefully). */

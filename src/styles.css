@@ -823,6 +823,7 @@ body.scroll-lock { overflow: hidden; }
 .mix-seg { flex-basis: 0; min-width: 8px; border-radius: var(--r-pill); transform-origin: left center; animation: grow-x 800ms var(--ease) both; }
 .mix-new { background: var(--line-strong); }
 .mix-draft { background: var(--accent); }
+.mix-rejected { background: var(--danger); opacity: 0.7; }
 .mix-offered { background: var(--brand-100); }
 .mix-assigned { background: var(--brand-300); }
 .mix-done { background: var(--brand-500); }

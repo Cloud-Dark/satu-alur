@@ -396,7 +396,7 @@ export async function render(container, ctx = {}) {
           },
         },
         { label: 'Harga', align: 'right', render: (o) => el('span', { className: 'tnum' }, C.rupiah(o.validated_price)) },
-        { label: 'Status', render: (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn')) },
+        { label: 'Status', render: (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : o.status === 'rejected' ? C.tag('Ditolak', 'danger') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn')) },
         { label: 'Dibuat', className: 'col-date', render: (o) => el('time', { className: 'tnum', datetime: o.created_at, title: C.formatDateTime(o.created_at) }, C.formatDate(o.created_at)) },
         {
           label: 'Aksi',

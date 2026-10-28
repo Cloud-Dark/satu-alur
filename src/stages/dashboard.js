@@ -570,7 +570,7 @@ function renderComposition(m) {
 
 function renderStatusMix(m) {
   const ORDER = [
-    ['new', 'Baru'], ['draft', 'Draf penawaran'], ['offered', 'Ditawarkan'],
+    ['new', 'Baru'], ['draft', 'Draf penawaran'], ['rejected', 'Ditolak'], ['offered', 'Ditawarkan'],
     ['assigned', 'Ditugaskan'], ['done', 'Selesai'], ['booked', 'Terbukukan'],
   ]
   const counts = new Map(ORDER.map(([k]) => [k, 0]))

@@ -3,7 +3,7 @@ import * as C from '../ui/components.js'
 import { explainReport } from '../ai/agent.js'
 import { showToast } from '../ui/animations.js'
 import { resolveModel, abortable } from './offer.js'
-import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from './data.js'
+import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel, customerKey, localDate } from './data.js'
 
 const { el } = C
 const DAY = 86400000
@@ -140,8 +140,10 @@ export async function render(container, ctx = {}) {
     const byCust = new Map()
     for (const l of entries.filter(isRevenue)) {
       const req = flow.requestOfLedger(l)
-      const k = req ? String(req.id) : 'x'
-      const cur = byCust.get(k) || { name: customerLabel(req), service: req?.service_type, amount: 0 }
+      const k = customerKey(req)
+      const cur = byCust.get(k) || { name: customerLabel(req), services: new Set(), amount: 0 }
+      if (req?.service_type) cur.services.add(req.service_type)
+      cur.service = [...cur.services].slice(0, 2).join(', ') + (cur.services.size > 2 ? ` +${cur.services.size - 2}` : '')
       cur.amount += Number(l.amount) || 0
       byCust.set(k, cur)
     }
@@ -156,8 +158,8 @@ export async function render(container, ctx = {}) {
 
     report = {
       period: r.label,
-      period_start: r.from.toISOString().slice(0, 10),
-      period_end: new Date(r.to.getTime() - 1).toISOString().slice(0, 10),
+      period_start: localDate(r.from),
+      period_end: localDate(r.to.getTime() - 1),
       total_revenue: t.revenue,
       total_cost: t.cost,
       net_profit: t.profit,
