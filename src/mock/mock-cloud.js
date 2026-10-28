@@ -244,6 +244,8 @@ const mockDatabase = {
         return resolve({ data: null, error: { message: 'Filter diperlukan untuk update/delete.' } })
       }
       if (builder._update) {
+        const bad = ['id', 'owner_id'].find((c) => c in builder._update)
+        if (bad) return resolve({ data: null, error: { message: `Kolom tidak boleh diubah: ${bad}` } })
         let affected = 0
         ensureTable(table).forEach((row, i) => {
           if (filters.every(f => {

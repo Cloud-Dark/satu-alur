@@ -18,7 +18,7 @@ export async function loadLinks() {
 }
 
 export async function saveWorker(fields, previous) {
-  const row = { ...fields }
+  const { id, owner_id, created_at, ...row } = fields
   if (fields.address !== previous?.address) {
     const geo = await geocode(fields.address)
     row.lat = geo?.lat ?? null
@@ -26,7 +26,7 @@ export async function saveWorker(fields, previous) {
     row.zone = geo?.zone ?? null
   }
   const table = db().from('workers')
-  check(await (fields.id ? table.update(row).eq('id', fields.id) : table.insert(row)))
+  check(await (id ? table.update(row).eq('id', id) : table.insert(row)))
 }
 
 export async function removeWorker(worker, links) {

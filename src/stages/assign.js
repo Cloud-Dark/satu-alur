@@ -90,12 +90,16 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
 
   const pickList = el('div', { className: 'worker-pick' })
   const count = C.field({ label: 'Jumlah', name: 'recommend_n', type: 'number', value: '1', attrs: { min: '1' } })
-  const recommend = C.button({ label: 'Pilih rekomendasi', icon: 'check', variant: 'soft', onClick: () => {
+  const applyRecommend = () => {
     const n = Math.max(1, parseInt(count.input.value, 10) || 1)
     checked.clear()
     pickRecommended(scored, n).forEach((w) => checked.add(w.id))
     drawPick()
-  } })
+  }
+  const recommend = C.button({ label: 'Pilih rekomendasi', icon: 'check', variant: 'soft', onClick: applyRecommend })
+  count.input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); applyRecommend() }
+  })
   const summary = el('div', { className: 'muted small' })
   const picker = el('div', { className: 'field' },
     el('span', { className: 'field-label' }, 'Petugas'),
@@ -312,7 +316,7 @@ const PHONE_RE = /^[+()\d\s.-]{6,32}$/
 const STATE_TAG = { available: ['Tersedia', 'ok'], on_job: ['Dalam tugas', 'warn'], inactive: ['Nonaktif', 'neutral'] }
 
 function renderTeam(target, { workers, assignments, completions, links, reload, status }) {
-  const dialog = el('dialog', { className: 'panel' })
+  const dialog = el('dialog', { className: 'panel', 'aria-labelledby': 'worker-dialog-title' })
   dialog.addEventListener('close', () => dialog.replaceChildren())
 
   function openWorkerForm(worker = null) {
@@ -358,7 +362,7 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
         restore()
       }
     })
-    dialog.replaceChildren(el('h2', { className: 'panel-title' }, isEdit ? 'Edit petugas' : 'Tambah petugas'), form)
+    dialog.replaceChildren(el('h2', { className: 'panel-title', id: 'worker-dialog-title' }, isEdit ? 'Edit petugas' : 'Tambah petugas'), form)
     dialog.showModal()
   }
 
@@ -430,7 +434,7 @@ function renderMap(target, { workers, assignments, links }) {
   const minLng = Math.min(...lngs) - padLng
   const maxLng = Math.max(...lngs) + padLng
   // el() builds HTML-namespace nodes, so the SVG is assembled as a string (names escaped).
-  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   let body = ''
   for (let i = 0; i <= 5; i++) {
     body += `<line class="worker-map-grid" x1="0" y1="${(H / 5) * i}" x2="${W}" y2="${(H / 5) * i}"/><line class="worker-map-grid" x1="${(W / 5) * i}" y1="0" x2="${(W / 5) * i}" y2="${H}"/>`

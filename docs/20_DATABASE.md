@@ -70,6 +70,7 @@ Semua tabel domain memiliki `owner_id TEXT NOT NULL` (indeks `idx_<tabel>_owner_
 | `location` | TEXT | |
 | `description` | TEXT | |
 | `status` | TEXT NOT NULL DEFAULT `'draft'` | |
+| `requested_at` | TEXT | Jadwal yang diminta klien (ISO); migrasi 0003 |
 | `created_at` | TEXT NOT NULL | |
 
 Catatan: tidak ada kolom `phone`, padahal formulir Permintaan mengirimkannya (R-015 di [10_RISK_REGISTER.md](10_RISK_REGISTER.md)).
@@ -98,6 +99,36 @@ Catatan: tidak ada kolom `phone`, padahal formulir Permintaan mengirimkannya (R-
 | `scheduled_at` | TEXT | ISO 8601 |
 | `status` | TEXT NOT NULL DEFAULT `'pending'` | |
 | `created_at` | TEXT NOT NULL | |
+
+### workers
+
+| Kolom | Tipe | Catatan |
+|-------|------|---------|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `owner_id` | TEXT NOT NULL | |
+| `name` | TEXT NOT NULL | |
+| `phone` | TEXT | |
+| `address` | TEXT | |
+| `skills` | TEXT | JSON array kunci keahlian, mis. `["ac","cleaning"]` |
+| `lat` | REAL | Dari geocode(); boleh NULL |
+| `lng` | REAL | Dari geocode(); boleh NULL |
+| `zone` | TEXT | Dari geocode(); boleh NULL |
+| `status` | TEXT NOT NULL DEFAULT `'active'` | `active` \| `inactive` |
+| `created_at` | TEXT NOT NULL | |
+
+### assignment_workers
+
+Satu penugasan, banyak petugas.
+
+| Kolom | Tipe | Catatan |
+|-------|------|---------|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `owner_id` | TEXT NOT NULL | |
+| `assignment_id` | INTEGER NOT NULL | FK `assignments(id)` |
+| `worker_id` | INTEGER NOT NULL | FK `workers(id)` |
+| `created_at` | TEXT NOT NULL | |
+
+Unik pada (`assignment_id`, `worker_id`).
 
 ### completions
 
