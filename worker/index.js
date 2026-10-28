@@ -61,6 +61,16 @@ const TABLES = {
     columns: ['id', 'owner_id', 'period_start', 'period_end', 'summary_json', 'explanation_html', 'status', 'created_at'],
     json: ['summary_json'],
   },
+  social_contents: {
+    columns: ['id', 'owner_id', 'kind', 'platform', 'title', 'body', 'meta_json', 'status', 'created_at'],
+    json: ['meta_json'],
+  },
+  social_schedules: {
+    columns: ['id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'created_at'],
+  },
+  ai_messages: {
+    columns: ['id', 'owner_id', 'agent', 'role', 'content', 'model', 'latency_ms', 'error', 'created_at'],
+  },
 };
 // Columns the client may never set directly.
 const PROTECTED_COLUMNS = new Set(['id', 'owner_id']);

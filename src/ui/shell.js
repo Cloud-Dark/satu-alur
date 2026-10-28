@@ -18,6 +18,8 @@ import * as StageComplete from '../stages/complete.js'
 import * as StageBookkeeping from '../stages/bookkeeping.js'
 import * as StageReport from '../stages/report.js'
 import * as StageSettings from '../stages/settings.js'
+import * as StageSocial from '../stages/social.js'
+import * as StageAdvisor from '../stages/advisor.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
@@ -34,6 +36,10 @@ export const STAGES = [
     action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
   { key: 'report', num: '06', label: 'Laporan', icon: 'chart', module: StageReport,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
+  { key: 'social', group: 'growth', label: 'Media sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocial,
+    action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
+  { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,
+    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 ]
 
 const STAGE_KEY = 'satualur_stage'
@@ -75,7 +81,8 @@ export function renderShell(root, ctx) {
 
   const navItem = (s) => {
     const count = el('span', { className: 'flow-count tnum', hidden: true })
-    const isStage = s.key !== 'dashboard'
+    const isStage = s.key !== 'dashboard' && !s.group
+    const sub = isStage ? `Tahap ${s.num}` : s.sub
     const b = el('button', {
       type: 'button',
       className: `flow-item ${isStage ? 'is-stage' : ''}`.trim(),
@@ -85,7 +92,7 @@ export function renderShell(root, ctx) {
       el('span', { className: 'flow-node', 'aria-hidden': 'true' }, icon(s.icon, { size: 16 })),
       el('span', { className: 'flow-label' },
         el('span', { className: 'flow-name' }, s.label),
-        isStage ? el('span', { className: 'flow-step tnum' }, `Tahap ${s.num}`) : null,
+        sub ? el('span', { className: 'flow-step tnum' }, sub) : null,
       ),
       count,
       el('span', { className: 'flow-dot', 'aria-hidden': 'true' }),
@@ -118,13 +125,17 @@ export function renderShell(root, ctx) {
     try { await ctx.signOut() } finally { signOutBtn.disabled = false }
   })
 
-  const [dash, ...flow] = STAGES
+  const [dash, ...rest] = STAGES
+  const flow = rest.filter((s) => !s.group)
+  const growth = rest.filter((s) => s.group === 'growth')
   const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': 'Navigasi alur' },
     el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
     el('nav', { className: 'side-nav', 'aria-label': 'Tahap alur' },
       el('ol', { className: 'flow-list flow-list-top' }, navItem(dash)),
       el('div', { className: 'side-label' }, el('span', {}, 'Alur kerja'), el('span', { className: 'side-label-count tnum' }, '6 tahap')),
       el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
+      el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
+      el('ol', { className: 'flow-list flow-list-growth' }, growth.map(navItem)),
     ),
     el('div', { className: 'side-foot' },
       settingsBtn,
@@ -312,7 +323,7 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    crumbNum.textContent = stage.key === 'dashboard' ? 'Satu Alur' : `Tahap ${stage.num}`
+    crumbNum.textContent = stage.key === 'dashboard' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
     const a = stage.action
     const b = button({
