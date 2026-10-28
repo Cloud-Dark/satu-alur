@@ -30,11 +30,11 @@ export const PLATFORMS = [
 export const META_PLATFORM = { value: 'meta', label: 'Meta (FB & IG)' }
 
 export const CONTENT_TYPES = [
-  { value: 'caption', label: 'Caption posting', ask: 'caption posting' },
-  { value: 'script', label: 'Naskah video pendek', ask: 'naskah video pendek (hook, isi per adegan, penutup)' },
+  { value: 'caption', label: 'Caption', ask: 'caption posting' },
+  { value: 'script', label: 'Naskah video', ask: 'naskah video pendek (hook, isi per adegan, penutup)' },
   { value: 'story', label: 'Seri story', ask: 'seri story 3–5 slide (teks per slide)' },
   { value: 'ad_copy', label: 'Copy iklan', ask: 'copy iklan (headline, teks utama, ajakan)' },
-  { value: 'image_prompt', label: 'Prompt gambar AI', ask: 'prompt untuk generator gambar AI beserta caption pendek' },
+  { value: 'image_prompt', label: 'Prompt gambar', ask: 'prompt untuk generator gambar AI beserta caption pendek' },
 ]
 
 export const TONES = [
@@ -46,8 +46,8 @@ export const TONES = [
 ]
 
 export const POST_TYPES = [
-  { value: 'organic', label: 'Posting organik' },
-  { value: 'ads', label: 'Iklan berbayar' },
+  { value: 'organic', label: 'Organik' },
+  { value: 'ads', label: 'Iklan' },
   { value: 'story', label: 'Story / Reels' },
 ]
 
