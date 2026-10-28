@@ -16,7 +16,7 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "satu-alur-db"
-database_id = "6a8aca39-5a93-487d-954c-5df4b762d3dd"
+database_id = "085c9a7a-64c5-4ced-b0f3-3158870d64f4"
 migrations_dir = "migrations"
 
 [vars]
