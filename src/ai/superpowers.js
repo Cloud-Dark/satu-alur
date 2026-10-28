@@ -14,21 +14,27 @@ const MAX_HISTORY = 20
 
 function loadMemory() {
   try {
-    return JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}')
+    const memory = JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}')
+    return memory && typeof memory === 'object' && !Array.isArray(memory) ? memory : {}
   } catch { return {} }
 }
 
 function saveMemory(memory) {
-  localStorage.setItem(MEMORY_KEY, JSON.stringify(memory))
+  try { localStorage.setItem(MEMORY_KEY, JSON.stringify(memory)) } catch { /* storage penuh atau diblokir */ }
 }
 
+let fallbackSessionId = null
 function getSessionId() {
-  let sid = sessionStorage.getItem('satualur_session_id')
-  if (!sid) {
-    sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
-    sessionStorage.setItem('satualur_session_id', sid)
+  try {
+    let sid = sessionStorage.getItem('satualur_session_id')
+    if (!sid) {
+      sid = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
+      sessionStorage.setItem('satualur_session_id', sid)
+    }
+    return sid
+  } catch {
+    return fallbackSessionId ||= 'sess_' + crypto.randomUUID()
   }
-  return sid
 }
 
 export function getConversationHistory(agent = 'default') {
@@ -128,6 +134,27 @@ registerTool('format_rupiah', {
   }
 }, async ({ amount }) => {
   return { formatted: 'Rp' + Number(amount).toLocaleString('id-ID') }
+})
+
+registerTool('calculate_distance', {
+  description: 'Menghitung jarak antara dua koordinat (lat/lng) dalam kilometer menggunakan formula Haversine',
+  parameters: {
+    type: 'object',
+    properties: {
+      lat1: { type: 'number', description: 'Latitude titik 1' },
+      lng1: { type: 'number', description: 'Longitude titik 1' },
+      lat2: { type: 'number', description: 'Latitude titik 2' },
+      lng2: { type: 'number', description: 'Longitude titik 2' },
+    },
+    required: ['lat1', 'lng1', 'lat2', 'lng2']
+  }
+}, async ({ lat1, lng1, lat2, lng2 }) => {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return { distance_km: Math.round(distance * 100) / 100, estimated_drive_minutes: Math.round(distance * 3) }
 })
 
 registerTool('generate_hashtags', {
@@ -265,6 +292,26 @@ Aturan:
     temperature: 0.8,
     tools: ['get_date', 'format_rupiah', 'count_database'],
   },
+  pertumbuhan: {
+    name: 'Asisten Pertumbuhan',
+    description: 'AI Business Development — temukan peluang dan tingkatkan keberhasilan bisnis',
+    systemPrompt: `Anda adalah AI Business Development untuk platform Satu Alur.
+Tugas Anda:
+1. **Deteksi Peluang**: Identifikasi hot lead, upsell, cross-sell, dan partnership dari data bisnis
+2. **Rekomendasi Tindakan**: Sarankan next step dengan probabilitas keberhasilan
+3. **Prediksi Keberhasilan**: Hitung success probability berdasarkan faktor-faktor bisnis
+4. **Generate Komunikasi**: Buat draft email, WhatsApp, proposal untuk customer
+5. **Retention Strategy**: Identifikasi churn risk dan buat win-back sequence
+
+Aturan:
+- Gunakan bahasa Indonesia profesional namun persuasif
+- Selalu sertakan estimasi ROI/profit
+- Berikan timeline yang realistis
+- Format Rupiah untuk semua angka keuangan
+- Jelaskan reasoning di balik setiap rekomendasi`,
+    temperature: 0.6,
+    tools: ['calculator', 'format_rupiah', 'count_database', 'get_date'],
+  },
 }
 
 export function getAgents() {
@@ -272,9 +319,9 @@ export function getAgents() {
 }
 
 // ---- Smart Retry with Fallback ----
-async function* smartStream({ modelId, messages, options = {} }) {
+async function* smartStream({ modelId, messages, options = {}, signal }) {
   const cloud = getCloud()
-  const models = getModels()
+  const models = getModels().length ? getModels() : await loadModels()
   const primaryModel = modelId || pickDefaultModel()?.id
   const fallbackModels = models
     .filter(m => m.id !== primaryModel && !m.disabled)
@@ -284,22 +331,27 @@ async function* smartStream({ modelId, messages, options = {} }) {
   let lastError = null
 
   for (let attempt = 0; attempt < candidates.length; attempt++) {
+    signal?.throwIfAborted()
     const model = candidates[attempt]
+    let emitted = false
     try {
       const stream = cloud.llm.chat.completions.create({
         model,
         messages,
         stream: true,
         ...options,
+        signal,
       })
 
       for await (const chunk of stream) {
+        signal?.throwIfAborted()
+        if (chunk.choices?.[0]?.delta?.content) emitted = true
         yield { type: 'chunk', chunk, model }
       }
       return
     } catch (err) {
       lastError = err
-      if (err.name === 'AbortError') throw err
+      if (err.name === 'AbortError' || emitted) throw err
       // Exponential backoff before retry
       if (attempt < candidates.length - 1) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000)
@@ -315,15 +367,18 @@ async function* smartStream({ modelId, messages, options = {} }) {
 const ANALYTICS_KEY = 'satualur_ai_analytics'
 
 export function trackAnalytics(event) {
-  const data = JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '[]')
+  const data = getAnalytics()
   data.push({ ...event, timestamp: Date.now() })
   // Keep last 100 events
   if (data.length > 100) data.shift()
-  localStorage.setItem(ANALYTICS_KEY, JSON.stringify(data))
+  try { localStorage.setItem(ANALYTICS_KEY, JSON.stringify(data)) } catch { /* analytics bersifat opsional */ }
 }
 
 export function getAnalytics() {
-  return JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '[]')
+  try {
+    const data = JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '[]')
+    return Array.isArray(data) ? data : []
+  } catch { return [] }
 }
 
 export function getAnalyticsSummary() {
@@ -357,34 +412,30 @@ export async function* chatWithAgent({ agentKey, message, modelId, signal, useMe
 
     messages.push({ role: 'user', content: message })
 
-    // If tools enabled, inject tool descriptions into system prompt
+    signal?.throwIfAborted()
+    if (useTools && agent.tools?.length) {
+      messages[0].content += '\nJika perlu memakai tool, keluarkan satu blok ```tool\n{"tool":"nama","parameters":{}}\n```. Tool tersedia: ' + JSON.stringify(agent.tools.map(name => ({ name, ...TOOLS[name].spec })))
+    }
+
     const options = {
       temperature: agent.temperature ?? 0.7,
       max_tokens: 4000,
     }
-    if (agent.responseFormat) {
+    if (agent.responseFormat && !useMemory) {
       options.response_format = agent.responseFormat
     }
 
     let fullText = ''
-    const streamedChunks = []
 
-    for await (const { type, chunk } of smartStream({ modelId, messages, options })) {
+    for await (const { type, chunk } of smartStream({ modelId, messages, options, signal })) {
       if (type === 'chunk') {
-        if (signal?.aborted) throw new Error('AbortError')
+        signal?.throwIfAborted()
         const delta = chunk.choices?.[0]?.delta?.content
         if (delta) {
           fullText += delta
-          streamedChunks.push(delta)
           yield { type: 'text', delta, full: fullText }
         }
       }
-    }
-
-    // Save to memory
-    if (useMemory) {
-      appendToHistory(agentKey, 'user', message)
-      appendToHistory(agentKey, 'assistant', fullText)
     }
 
     // Try tool calling if enabled and text contains tool call markers
@@ -398,13 +449,23 @@ export async function* chatWithAgent({ agentKey, message, modelId, signal, useMe
           { role: 'assistant', content: fullText },
           { role: 'system', content: `Hasil tool: ${JSON.stringify(toolResult)}\nBerikan respons akhir berdasarkan hasil tool.` }
         ]
-        for await (const { type: t, chunk } of smartStream({ modelId, messages: toolMessages, options })) {
+        for await (const { type: t, chunk } of smartStream({ modelId, messages: toolMessages, options, signal })) {
           if (t === 'chunk') {
             const delta = chunk.choices?.[0]?.delta?.content
-            if (delta) yield { type: 'text', delta, full: fullText + delta }
+            if (delta) {
+              fullText += delta
+              yield { type: 'text', delta, full: fullText }
+            }
           }
         }
       }
+    }
+
+    signal?.throwIfAborted()
+    // Save to memory
+    if (useMemory) {
+      appendToHistory(agentKey, 'user', message)
+      appendToHistory(agentKey, 'assistant', fullText)
     }
 
     const latency = Math.round(performance.now() - startTime)

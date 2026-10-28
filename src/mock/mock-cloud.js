@@ -608,6 +608,12 @@ function schemaJson(responseFormat) {
   const rf = responseFormat || {}
   const schema = rf.json_schema?.schema || rf.json_schema || { type: 'object', properties: { hasil: { type: 'string' } } }
   return JSON.stringify(sampleFromSchema(schema, 'hasil'), null, 2)
+        const sysMsg = system
+        if (sysMsg.includes('social media') || sysMsg.includes('media sosial')) return mockStreamSocial(lastUserText(messages))
+        if (sysMsg.includes('pertumbuhan') || sysMsg.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
+        if (sysMsg.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
+        if (sysMsg.includes('Asisten AI') || sysMsg.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
+        return mockStreamExplain(parseReport(userMsg))
 }
 
 const lastUserText = (messages) => [...messages].reverse().find(m => m.role === 'user')?.content || ''
@@ -629,6 +635,12 @@ const mockLLM = {
         if (isOffer) return mockStreamOffer(JSON.parse(userMsg.replace('Permintaan jasa:\n', '')))
         if (response_format?.type === 'json_schema' || response_format?.type === 'json_object') {
           return streamText(schemaJson(response_format), { step: 10, delay: 14 })
+        const sysMsg = system
+        if (sysMsg.includes('social media') || sysMsg.includes('media sosial')) return mockStreamSocial(lastUserText(messages))
+        if (sysMsg.includes('pertumbuhan') || sysMsg.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
+        if (sysMsg.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
+        if (sysMsg.includes('Asisten AI') || sysMsg.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
+        return mockStreamExplain(parseReport(userMsg))
         }
         const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
         const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]

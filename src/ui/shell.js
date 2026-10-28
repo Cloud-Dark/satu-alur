@@ -23,6 +23,11 @@ import * as StageAdvisor from '../stages/advisor.js'
 import * as StageRadar from '../stages/radar.js'
 import * as StageLeads from '../stages/leads.js'
 
+import * as StageAIAssistant from '../stages/ai-assistant.js'
+import * as StageSocialMedia from '../stages/social-media.js'
+import * as StagePortfolio from '../stages/portfolio.js'
+import * as StagePertumbuhan from '../stages/pertumbuhan.js'
+
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request', primary: true } },
@@ -46,6 +51,15 @@ export const STAGES = [
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
   { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
+
+  { key: 'social-media', label: 'Social Media', icon: 'message', module: StageSocialMedia,
+    action: { label: 'Asisten AI', icon: 'bot', to: 'ai-assistant' } },
+  { key: 'ai-assistant', label: 'AI Superpowers', icon: 'bot', module: StageAIAssistant,
+    action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
+  { key: 'portfolio', label: 'Industri & Portofolio', icon: 'building', module: StagePortfolio,
+    action: { label: 'Ringkasan', icon: 'home', to: 'dashboard' } },
+  { key: 'pertumbuhan', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
+    action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
 ]
 
 const STAGE_KEY = 'satualur_stage'
