@@ -55,6 +55,7 @@ module.exports = async function office(t) {
     const st = JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}')
     st.users = [...(st.users || []),
       { id: 'u-pemilik', email: 'pemilik@usaha.id', name: 'pemilik', created_at: '2026-10-01T00:00:00Z' },
+      { id: 'u-staff', email: 'lama@staff.satualur.internal', name: 'lama', created_at: '2026-10-05T00:00:00Z' },
       { id: 'u-demo', email: 'demo-ac@satualur.id', name: 'Budi', created_at: '2026-09-01T00:00:00Z' }]
     localStorage.setItem('satualur_mock_v1', JSON.stringify(st))
   })

@@ -20,11 +20,14 @@ test('validateCustomer: accepts a good body and normalises blanks', () => {
 test('validateCustomer: bad status', () => {
   fails({ ...base, status: 'gratis' }, /Status/)
   fails({ ...base, status: undefined }, /Status/)
+  fails({ ...base, status: ['active'] }, /Status/)
 })
 
 test('validateCustomer: period_end must be a real YYYY-MM-DD date', () => {
   fails({ ...base, period_end: '31-12-2026' }, /Berlaku sampai/)
   fails({ ...base, period_end: '2026-02-30' }, /Berlaku sampai/)
+  fails({ ...base, period_end: 20261231 }, /Tanggal tidak valid\./)
+  fails({ ...base, period_end: {} }, /Tanggal tidak valid\./)
   fails({ ...base, period_end: '2026-13-01' }, /Berlaku sampai/)
   assert.equal(validateCustomer({ ...base, period_end: '2028-02-29' }).period_end, '2028-02-29')
 })

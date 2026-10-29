@@ -78,7 +78,7 @@ export async function adminListCustomers({ q = '', page = 1 } = {}) {
 export async function adminGetCustomer(id) {
   if (isUsingMockCloud()) {
     if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pelanggan. Coba lagi.')
-    const u = mockUsers().find((x) => x.id === id)
+    const u = mockUsers().find((x) => x.id === id) // mockUsers() already drops staff
     if (!u) throw new Error('Pelanggan tidak ditemukan.')
     return (await withPlans([u]))[0]
   }

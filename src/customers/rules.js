@@ -25,10 +25,11 @@ function realDate(s) {
 
 export function validateCustomer(body) {
   const b = body && typeof body === 'object' ? body : {}
-  if (!Object.hasOwn(CUSTOMER_STATUS_LABEL, b.status)) fail('Status tidak dikenal.')
+  if (typeof b.status !== 'string' || !Object.hasOwn(CUSTOMER_STATUS_LABEL, b.status)) fail('Status tidak dikenal.')
   let plan = b.plan_id
   if (plan === '' || plan === undefined) plan = null
   if (plan !== null && (!Number.isInteger(plan) || plan < 1)) fail('Paket tidak valid.')
+  if (b.period_end !== undefined && b.period_end !== null && typeof b.period_end !== 'string') fail('Tanggal tidak valid.')
   const end = str(b.period_end)
   if (end && !realDate(end)) fail('Berlaku sampai harus tanggal yang valid (YYYY-MM-DD).')
   return {

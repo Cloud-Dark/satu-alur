@@ -43,7 +43,7 @@ export async function handleAdminCustomers(request, env, deps) {
 export async function handleAdminCustomerGet(request, env, deps, params) {
   await requireAdmin(request, env, deps);
   const row = await findUser(env, params.userId);
-  if (!row) throw new deps.HttpError(404, 'Pelanggan tidak ditemukan.');
+  if (!row || String(row.email).endsWith(STAFF_EMAIL_SUFFIX)) throw new deps.HttpError(404, 'Pelanggan tidak ditemukan.');
   return deps.ok(toCustomer(row, deps.DEMO_EMAILS));
 }
 
