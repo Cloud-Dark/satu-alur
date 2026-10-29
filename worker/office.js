@@ -68,9 +68,9 @@ export async function handleRequestCreate(request, env, deps) {
 
 export async function handleRequestList(request, env, { authenticate, ok }) {
   const { user } = await authenticate(request, env);
-  // has_campaign only: the campaign itself is read through GET /api/office/requests/:id/campaign (projection).
+  // has_campaign only, and never for a draft (staff-only): the campaign itself is read through GET /api/office/requests/:id/campaign (projection).
   const { results } = await env.DB.prepare(
-    `${REQUEST_SELECT}, EXISTS (SELECT 1 FROM campaigns c WHERE c.request_id = r.id) AS has_campaign
+    `${REQUEST_SELECT}, EXISTS (SELECT 1 FROM campaigns c WHERE c.request_id = r.id AND c.status != 'draft') AS has_campaign
      FROM service_requests r LEFT JOIN influencers i ON i.id = r.influencer_id
      WHERE r.owner_id = ? ORDER BY r.created_at DESC, r.id DESC`,
   ).bind(user.id).all();

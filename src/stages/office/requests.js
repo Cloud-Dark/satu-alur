@@ -42,7 +42,7 @@ function requestCard(r, onSaved, ctx, setDirty) {
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
   let camp = null
-  if (r.kind === 'collab') {
+  if (r.kind === 'collab' && (r.campaign_id || r.status !== 'done')) {
     camp = C.button({ label: r.campaign_id ? 'Lihat kampanye' : 'Buat kampanye', icon: 'users', variant: 'soft', size: 'sm' })
     camp.addEventListener('click', async () => {
       if (r.campaign_id) { openCampaignEditor(ctx, r.campaign_id, camp, setDirty, onSaved); return }

@@ -51,7 +51,7 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
   // Each row keeps a snapshot of its saved values; a row is dirty when its inputs differ (a new deliverable row always is).
   const snap = (row) => JSON.stringify([...row.querySelectorAll('input, select, textarea')].map((n) => n.value))
   const snaps = new WeakMap()
-  const mark = (row) => { snaps.set(row, snap(row)); return row }
+  const mark = (row, saved = snap(row)) => { snaps.set(row, saved); return row }
   const rowDirty = (row) => row.classList.contains('is-new') || snaps.get(row) !== snap(row)
   const listsDirty = (except) => [...lists.querySelectorAll('.ag-inf, .ag-del, .ag-add')].some((r) => r !== except && rowDirty(r))
   let headBase = null
@@ -62,17 +62,30 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
   dialog.addEventListener('cancel', (e) => { if (dirty() && !confirm(LEAVE_MSG)) e.preventDefault() })
   dialog.addEventListener('close', () => { setDirty(false); if (!ctx.signal.aborted) onClosed() })
   cancel.addEventListener('click', () => { if (!dirty() || confirm(LEAVE_MSG)) close() })
+  // Enter inside a row saves that row (its [data-save] button), never the campaign header.
+  lists.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return
+    const btn = e.target.closest('.ag-inf, .ag-del, .ag-add')?.querySelector('[data-save]')
+    if (!btn) return
+    e.preventDefault()
+    if (!btn.disabled) btn.click()
+  })
 
   let catalogue = []
   let run = 0
+  let pendingRedraw = false // a structural redraw a later no-redraw load must not cancel
   // Re-reads the campaign: title and summary always, the lists only when `redraw`; the header form is filled only the first time.
   async function load({ redraw = true } = {}) {
+    redraw = redraw || pendingRedraw
+    pendingRedraw = redraw
     const mine = ++run
     let c
     try {
       [c, catalogue] = await Promise.all([Agency.adminGetCampaign(id), headBase === null ? Social.adminListInfluencers() : catalogue])
     } catch (e) {
       if (mine !== run || !dialog.open) return
+      // A refresh after a row/header save failed: keep the lists (and their unsaved edits), just say so.
+      if (!redraw) { showToast(e.message, 'error'); return }
       const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
       again.addEventListener('click', () => { lists.replaceChildren(C.skeletonRows(3)); load() })
       lists.replaceChildren(C.errorState(e.message), again)
@@ -94,8 +107,9 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
     const m = campaignMoney(c, c.influencers)
     summary.textContent = `Biaya klien ${m.fee === null ? '—' : C.rupiah(m.fee)} · Bayaran ${C.rupiah(m.payout)} · Margin ${m.margin === null ? '—' : C.rupiah(m.margin)}`
     if (redraw) {
+      pendingRedraw = false
       drawLists(c)
-      lists.querySelectorAll('.ag-inf, .ag-del, .ag-add').forEach(mark)
+      lists.querySelectorAll('.ag-inf, .ag-del, .ag-add').forEach((r) => mark(r))
     }
     touch()
   }
@@ -107,7 +121,7 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
     if (free.length) {
       const sel = C.select({ label: 'Tambah influencer', id: `ag-add-inf-${uid}-${++seq}`, options: free.map((i) => ({ value: i.id, label: i.name })) })
       const pay = C.field({ label: 'Bayaran (Rp)', id: `ag-add-pay-${uid}-${seq}`, type: 'number', attrs: { min: '0', step: '1' } })
-      const btn = C.button({ label: 'Tambahkan', icon: 'plus', variant: 'soft', size: 'sm' })
+      const btn = C.button({ label: 'Tambahkan', icon: 'plus', variant: 'soft', size: 'sm', 'data-save': '' })
       const err = errLine()
       add = el('div', { className: 'ag-add' }, el('div', { className: 'of-row of-row-wrap' }, sel.wrap, pay.wrap, btn), err)
       btn.addEventListener('click', () => structural(add, btn, err, () => Agency.adminAssignInfluencer(id, { influencer_id: Number(sel.input.value), payout_idr: pay.input.value.trim() }), 'Influencer ditambahkan.'))
@@ -139,15 +153,18 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
 
   function infRow(i) {
     const pay = C.field({ label: 'Bayaran (Rp)', id: `ag-pay-${uid}-${i.influencer_id}-${++seq}`, type: 'number', value: i.payout_idr ?? '', attrs: { min: '0', step: '1' } })
-    const keep = C.button({ label: 'Simpan bayaran', variant: 'soft', size: 'sm' })
+    const keep = C.button({ label: 'Simpan bayaran', variant: 'soft', size: 'sm', 'data-save': '' })
     const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus ${i.name} dari kampanye` })
     const err = errLine()
     const row = el('div', { className: 'ag-inf' },
       el('div', { className: 'workspace-entry-head' }, el('strong', {}, i.name), i.visible === 0 ? C.tag('Disembunyikan', 'neutral') : null,
         el('span', { className: 'muted small' }, [i.niche, i.city].filter(Boolean).join(' · '))),
       el('div', { className: 'of-row of-row-wrap' }, pay.wrap, keep, rm), err)
-    keep.addEventListener('click', () => act(keep, err, () => Agency.adminAssignInfluencer(id, { influencer_id: i.influencer_id, payout_idr: pay.input.value.trim() }),
-      'Bayaran tersimpan.', () => { mark(row); load({ redraw: false }) }))
+    keep.addEventListener('click', () => {
+      const sent = snap(row) // what is saved; edits typed during the request keep the row dirty
+      act(keep, err, () => Agency.adminAssignInfluencer(id, { influencer_id: i.influencer_id, payout_idr: pay.input.value.trim() }),
+        'Bayaran tersimpan.', () => { mark(row, sent); touch(); load({ redraw: false }) })
+    })
     rm.addEventListener('click', () => structural(row, rm, err, () => Agency.adminRemoveInfluencer(id, i.influencer_id), 'Influencer dihapus dari kampanye.'))
     return row
   }
@@ -167,7 +184,7 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
     const link = C.field({ label: 'Tautan', id: `${rid}-l`, type: 'url', value: d?.link ?? '', placeholder: 'https://', hint: 'Wajib saat status Tayang.', attrs: { maxlength: '300' } })
     const note = C.textarea({ label: 'Catatan', id: `${rid}-n`, rows: 2, value: d?.note ?? '', hint: 'Hanya terlihat oleh tim Satu Alur.', attrs: { maxlength: '500' } })
     const err = errLine()
-    const keep = C.button({ label: 'Simpan', variant: 'soft', size: 'sm' })
+    const keep = C.button({ label: 'Simpan', variant: 'soft', size: 'sm', 'data-save': '' })
     const drop = C.button({ label: d ? 'Hapus' : 'Batal', variant: 'ghost', size: 'sm' })
     const row = el('div', { className: `ag-del${d ? '' : ' is-new'}` },
       el('div', { className: 'of-row of-row-wrap' }, kind.wrap, due.wrap, st.wrap), link.wrap, note.wrap, err, el('div', { className: 'of-row-actions' }, keep, drop))
@@ -175,9 +192,18 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
       const body = { influencer_id: i.influencer_id, kind: kind.input.value, due_date: due.input.value, status: st.input.value, link: link.input.value, note: note.input.value }
       let clean
       try { clean = validateDeliverable(body) } catch (ex) { err.textContent = ex.message; return }
-      // Only this row is redrawn, from the values just saved (a new row becomes a saved one with its id).
+      const sent = snap(row)
       act(keep, err, () => (d ? Agency.adminUpdateDeliverable(d.id, body) : Agency.adminAddDeliverable(id, body)), 'Konten tersimpan.', (res) => {
-        row.replaceWith(mark(delRow(i, { ...d, ...clean, id: d ? d.id : res.id })))
+        const saved = { ...d, ...clean, id: d ? d.id : res.id }
+        // Untouched since sending: redraw just this row from the saved values. Edited meanwhile: keep the
+        // typed values, record the id and the sent snapshot, so the row stays dirty.
+        if (snap(row) === sent) row.replaceWith(mark(delRow(i, saved)))
+        else {
+          d = saved
+          row.classList.remove('is-new')
+          drop.querySelector('.btn-label').textContent = 'Hapus'
+          mark(row, sent)
+        }
         touch()
       })
     })
@@ -193,10 +219,12 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
     headErr.textContent = ''
     let clean
     try { clean = validateCampaign(gatherHead()) } catch (ex) { headErr.textContent = ex.message; return }
+    const sent = JSON.stringify(gatherHead())
     const restore = C.setBusy(save, 'Menyimpan…')
     try {
       await Agency.adminUpdateCampaign(id, clean)
-      headBase = JSON.stringify(gatherHead())
+      headBase = sent
+      touch()
       showToast('Kampanye tersimpan.', 'success')
       load({ redraw: false }) // title + summary only; unsaved row edits stay
     } catch (ex) { headErr.textContent = ex.message } finally { restore() }

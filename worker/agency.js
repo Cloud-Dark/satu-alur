@@ -6,7 +6,7 @@
 import { requireAdmin } from './office.js';
 import {
   validateCampaign, validateDeliverable, validatePayout, campaignProjection, CAMPAIGN_STATUS_LABEL,
-  CAMPAIGN_NOT_FOUND, REQUEST_NOT_FOUND, DELIVERABLE_NOT_FOUND, DUPLICATE_CAMPAIGN, COLLAB_ONLY, INFLUENCER_MISSING,
+  CAMPAIGN_NOT_FOUND, REQUEST_NOT_FOUND, REQUEST_DONE, DELIVERABLE_NOT_FOUND, DUPLICATE_CAMPAIGN, COLLAB_ONLY, INFLUENCER_MISSING,
   INFLUENCER_HIDDEN, NOT_ASSIGNED, REMOVE_BLOCKED,
 } from '../src/agency/rules.js';
 
@@ -51,16 +51,19 @@ export async function handleAdminCampaignCreate(request, env, deps) {
   const admin = await requireAdmin(request, env, deps);
   const body = await readJson(request);
   const rid = /^\d+$/.test(String(body.request_id ?? '')) ? Number(body.request_id) : null;
-  const req = rid && await env.DB.prepare('SELECT id, owner_id, kind, influencer_id FROM service_requests WHERE id = ?').bind(rid).first();
+  const req = rid && await env.DB.prepare('SELECT id, owner_id, kind, status, influencer_id FROM service_requests WHERE id = ?').bind(rid).first();
   if (!req) throw new HttpError(404, REQUEST_NOT_FOUND);
   if (req.kind !== 'collab') throw new HttpError(400, COLLAB_ONLY);
+  if (req.status === 'done') throw new HttpError(400, REQUEST_DONE);
   const v = validated(HttpError, () => validateCampaign(body));
   const now = new Date().toISOString();
   const stmts = [
+    // Guarded again inside the batch: a request closed since the read above gets no campaign.
     env.DB.prepare(
-      'INSERT INTO campaigns (request_id, owner_id, title, brief, status, start_date, end_date, client_fee_idr, created_at, updated_at, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(req.id, req.owner_id, v.title, v.brief, v.status, v.start_date, v.end_date, v.client_fee_idr, now, now, admin.name),
-    env.DB.prepare("UPDATE service_requests SET status = 'in_progress', updated_at = ? WHERE id = ?").bind(now, req.id),
+      `INSERT INTO campaigns (request_id, owner_id, title, brief, status, start_date, end_date, client_fee_idr, created_at, updated_at, updated_by)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM service_requests WHERE id = ? AND status != 'done')`,
+    ).bind(req.id, req.owner_id, v.title, v.brief, v.status, v.start_date, v.end_date, v.client_fee_idr, now, now, admin.name, req.id),
+    env.DB.prepare("UPDATE service_requests SET status = 'in_progress', updated_at = ? WHERE id = ? AND changes() = 1").bind(now, req.id),
   ];
   // The requested influencer comes along only while still visible in the catalogue.
   if (req.influencer_id) {
@@ -77,6 +80,7 @@ export async function handleAdminCampaignCreate(request, env, deps) {
     if (/UNIQUE/i.test(String(err?.message))) throw new HttpError(400, DUPLICATE_CAMPAIGN);
     throw err;
   }
+  if (!res[0].meta.changes) throw new HttpError(400, REQUEST_DONE);
   return ok({ id: res[0].meta.last_row_id });
 }
 
@@ -211,14 +215,15 @@ export async function handleAdminDeliverableDelete(request, env, deps, params) {
 
 // ------------------------------------------------------------------ business
 
-// Owner-scoped through the request. A foreign request, a missing one and one without a campaign all give the same 404.
+// Owner-scoped through the request. A foreign request, a missing one, one without a campaign and a draft campaign
+// (staff-only until it is set to Berjalan or later) all give the same 404.
 export async function handleRequestCampaign(request, env, deps, params) {
   const { authenticate, ok, HttpError } = deps;
   const { user } = await authenticate(request, env);
   const rid = idParam(params.id, HttpError, CAMPAIGN_NOT_FOUND);
   const c = await env.DB.prepare(
     `SELECT c.id, c.title, c.status, c.start_date, c.end_date FROM campaigns c
-     JOIN service_requests r ON r.id = c.request_id WHERE r.id = ? AND r.owner_id = ?`,
+     JOIN service_requests r ON r.id = c.request_id WHERE r.id = ? AND r.owner_id = ? AND c.status != 'draft'`,
   ).bind(rid, user.id).first();
   if (!c) throw new HttpError(404, CAMPAIGN_NOT_FOUND);
   const [infs, dels] = await Promise.all([

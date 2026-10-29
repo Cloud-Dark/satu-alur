@@ -96,7 +96,8 @@ test('agency client demo mode: rules, owner scoping, projection', async () => {
     const { id } = await agency.adminCreateCampaign({ request_id: collab.id, title: 'Promo kedai', client_fee_idr: 5000000 })
     await assert.rejects(agency.adminCreateCampaign({ request_id: collab.id, title: 'lagi' }), { message: 'Permintaan ini sudah punya kampanye.' })
     assert.equal((await social.listMyRequests()).find((r) => r.id === collab.id).status, 'in_progress')
-    assert.equal((await social.listMyRequests()).find((r) => r.id === collab.id).has_campaign, true)
+    assert.equal((await social.listMyRequests()).find((r) => r.id === collab.id).has_campaign, false, 'a draft is hidden from the business')
+    await assert.rejects(agency.getRequestCampaign(collab.id), { message: 'Kampanye tidak ditemukan.' }, 'a draft reads like a missing campaign')
     assert.equal((await social.adminListRequests()).find((r) => r.id === collab.id).campaign_id, id)
 
     let c = await agency.adminGetCampaign(id)
@@ -116,6 +117,8 @@ test('agency client demo mode: rules, owner scoping, projection', async () => {
     await agency.adminUpdateDeliverable(d1.id, { status: 'published', link: 'https://instagram.com/p/abc' })
     await assert.rejects(agency.adminRemoveInfluencer(id, aulia.id), { message: 'Hapus atau pindahkan konten influencer ini terlebih dahulu.' })
 
+    await agency.adminUpdateCampaign(id, { status: 'active' })
+    assert.equal((await social.listMyRequests()).find((r) => r.id === collab.id).has_campaign, true)
     const p = await agency.getRequestCampaign(collab.id)
     assert.deepEqual(Object.keys(p), ['title', 'status', 'start_date', 'end_date', 'influencers', 'deliverables'])
     assert.equal(p.deliverables[0].link, 'https://instagram.com/p/abc')
@@ -130,10 +133,17 @@ test('agency client demo mode: rules, owner scoping, projection', async () => {
     await agency.adminDeleteDeliverable(d1.id)
     await agency.adminRemoveInfluencer(id, aulia.id)
     assert.equal((await agency.adminGetCampaign(id)).influencers.length, 0)
-    const list = await agency.adminListCampaigns({ status: 'draft' })
-    assert.equal(list.total, 1)
-    await agency.adminUpdateCampaign(id, { status: 'active' })
-    assert.equal((await agency.adminListCampaigns({ status: 'draft' })).total, 0)
+    assert.equal((await agency.adminListCampaigns({ status: 'active' })).total, 1)
+    await agency.adminUpdateCampaign(id, { status: 'completed' })
+    assert.equal((await agency.adminListCampaigns({ status: 'active' })).total, 0)
+
+    // a closed (done) request gets no campaign
+    await cloud.auth.signOut()
+    await cloud.auth.demoLogin({ email: 'demo@satualur.id' })
+    await social.sendRequest({ kind: 'collab', influencer_id: (await social.listInfluencers())[0].id, payload: { campaign: 'Lain', budget_range: 'x', timing: 'y' } })
+    const done = (await social.listMyRequests()).find((r) => r.payload.campaign === 'Lain')
+    await social.adminUpdateRequest(done.id, { status: 'done' })
+    await assert.rejects(agency.adminCreateCampaign({ request_id: done.id, title: 'x' }), { message: 'Permintaan ini sudah selesai.' })
   } finally {
     await server.close()
   }

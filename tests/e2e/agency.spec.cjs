@@ -105,8 +105,24 @@ module.exports = async function agency(t) {
   await aulia.getByRole('button', { name: 'Hapus Aulia Rahma dari kampanye' }).click()
   await s.waitForTimeout(300)
   t.check(askedRemove && await bima.getByLabel('Bayaran (Rp)').inputValue() === '555000' && await dlg.locator('.ag-inf').count() === 2, 'remove with another row unsaved: asks first; cancel keeps everything')
+  // a failed refresh after a save keeps the rows and their unsaved values, and says so in a toast
+  const second = dels.nth(1)
+  await second.getByLabel('Catatan').fill('draf belum disimpan')
+  await s.evaluate(() => localStorage.setItem('satualur_agency_fail', '1'))
   await bima.getByRole('button', { name: 'Simpan bayaran' }).click()
-  await s.getByText('Bayaran tersimpan.').first().waitFor({ timeout: 8000 })
+  await s.getByText('Gagal memuat kampanye. Coba lagi.').first().waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await s.getByText('Gagal memuat kampanye. Coba lagi.').count() >= 1 && await second.getByLabel('Catatan').inputValue() === 'draf belum disimpan'
+    && await dlg.locator('.ag-inf').count() === 2 && await dlg.locator('.ag-del').count() === 2, 'failed refresh after a save: toast, rows and unsaved values kept')
+  await s.evaluate(() => localStorage.removeItem('satualur_agency_fail'))
+  await second.getByLabel('Catatan').fill('')
+  // Enter in a row saves that row, not the campaign header
+  await dlg.getByLabel('Brief').fill('Brief belum disimpan')
+  await bima.getByLabel('Bayaran (Rp)').fill('600000')
+  await bima.getByLabel('Bayaran (Rp)').press('Enter')
+  await s.waitForTimeout(600)
+  const stored = await s.evaluate(() => { const a = JSON.parse(localStorage.getItem('satualur_agency_demo_v1')); return { brief: a.campaigns[0].brief, pay: a.links.find((l) => l.influencer_id === 2)?.payout_idr } })
+  t.check(stored.pay === 600000 && stored.brief === 'Brief baru' && await s.getByRole('dialog').count() === 1, 'Enter in a payout row saves that row only (header untouched, editor open)', JSON.stringify(stored))
+  await dlg.getByLabel('Brief').fill('Brief baru')
   const first = dels.first()
   await pick(first.locator('select[data-k=status]'), 'published')
   await first.getByRole('button', { name: 'Simpan' }).click()
@@ -145,6 +161,22 @@ module.exports = async function agency(t) {
   await s.locator('.ag-campaign', { hasText: 'Promosi kedai A' }).waitFor({ timeout: 8000 }).catch(() => {})
   t.check(await s.locator('.ag-campaign', { hasText: 'Promosi kedai A' }).count() === 1, 'Kampanye section lists the campaign')
 
+  // while the campaign is a draft the business sees nothing
+  await kolaborasi(a)
+  await a.locator('.sm-request', { hasText: 'Promosi kedai A' }).waitFor({ timeout: 8000 })
+  await a.waitForTimeout(300)
+  t.check(await a.getByRole('button', { name: 'Lihat progres' }).count() === 0, 'draft campaign: business sees no "Lihat progres"')
+  // staff sets it to Berjalan
+  await s.locator('.ag-campaign', { hasText: 'Promosi kedai A' }).click()
+  const dlg2 = s.getByRole('dialog')
+  await dlg2.getByLabel('Judul').waitFor({ timeout: 8000 })
+  await dlg2.locator('.ag-inf').first().waitFor({ timeout: 8000 })
+  await pick(dlg2.locator('select[id^="ag-status-"]'), 'active')
+  await dlg2.getByRole('button', { name: 'Simpan kampanye' }).click()
+  await s.waitForFunction(() => JSON.parse(localStorage.getItem('satualur_agency_demo_v1')).campaigns[0].status === 'active', null, { timeout: 8000 }).catch(() => {})
+  await dlg2.getByRole('button', { name: 'Tutup' }).click()
+  await dlg2.waitFor({ state: 'hidden' })
+
   // business A: Lihat progres shows the projection, never money or notes
   await kolaborasi(a)
   const mine = a.locator('.sm-request', { hasText: 'Promosi kedai A' })
@@ -152,7 +184,7 @@ module.exports = async function agency(t) {
   const prog = mine.locator('.sm-progress')
   await prog.locator('.ag-check li').first().waitFor({ timeout: 8000 }).catch(() => {})
   const text = await prog.textContent()
-  t.check(text.includes('Promosi kedai A') && text.includes('Draf') && text.includes('Aulia Rahma'), 'progress: title, status and influencer name', text.slice(0, 200))
+  t.check(text.includes('Promosi kedai A') && text.includes('Berjalan') && text.includes('Aulia Rahma'), 'progress: title, status and influencer name', text.slice(0, 200))
   t.check(await prog.locator('.ag-check li').count() === 2 && text.includes('Tayang') && text.includes('Direncanakan'), 'progress: checklist with both statuses')
   const link = prog.getByRole('link', { name: 'Lihat konten ↗' })
   t.check(await link.count() === 1 && await link.getAttribute('href') === LINK && await link.getAttribute('rel') === 'noopener noreferrer' && await link.getAttribute('target') === '_blank', 'progress: the published link opens safely in a new tab')

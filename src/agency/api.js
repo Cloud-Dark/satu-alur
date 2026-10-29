@@ -9,7 +9,7 @@ import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import {
   validateCampaign, validateDeliverable, validatePayout, positiveId, campaignProjection, CAMPAIGN_STATUS_LABEL,
-  CAMPAIGN_NOT_FOUND, REQUEST_NOT_FOUND, DELIVERABLE_NOT_FOUND, DUPLICATE_CAMPAIGN, COLLAB_ONLY, INFLUENCER_MISSING,
+  CAMPAIGN_NOT_FOUND, REQUEST_NOT_FOUND, REQUEST_DONE, DELIVERABLE_NOT_FOUND, DUPLICATE_CAMPAIGN, COLLAB_ONLY, INFLUENCER_MISSING,
   INFLUENCER_HIDDEN, NOT_ASSIGNED, REMOVE_BLOCKED,
 } from './rules.js'
 
@@ -87,6 +87,7 @@ export async function adminCreateCampaign(body) {
     const r = (s.requests || []).find((x) => x.id === Number(body?.request_id))
     if (!r) throw new Error(REQUEST_NOT_FOUND)
     if (r.kind !== 'collab') throw new Error(COLLAB_ONLY)
+    if (r.status === 'done') throw new Error(REQUEST_DONE)
     const v = validateCampaign(body)
     if (a.campaigns.some((c) => c.request_id === r.id)) throw new Error(DUPLICATE_CAMPAIGN)
     const at = nowIso()
@@ -206,7 +207,8 @@ export async function getRequestCampaign(requestId) {
     let rid
     try { rid = positiveId(String(requestId), '') } catch { throw new Error(CAMPAIGN_NOT_FOUND) }
     const r = (s.requests || []).find((x) => x.id === rid && x.owner_id === u.id)
-    const c = r && a.campaigns.find((x) => x.request_id === r.id)
+    // A draft is staff-only: it reads exactly like a missing campaign.
+    const c = r && a.campaigns.find((x) => x.request_id === r.id && x.status !== 'draft')
     if (!c) throw new Error(CAMPAIGN_NOT_FOUND)
     return campaignProjection(c, linksOf(a, s, c.id), deliverablesOf(a, c.id))
   })

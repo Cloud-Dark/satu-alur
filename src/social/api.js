@@ -8,6 +8,7 @@ import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { PLATFORMS, validateScheduleAt, igEligibility } from './rules.js'
 import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer, publicInfluencer } from '../office/rules.js'
+import { AGENCY_KEY } from '../agency/api.js'
 
 const TOKEN_KEY = 'satualur_token'
 const DEMO_KEY = 'satualur_social_demo_v1'
@@ -262,11 +263,12 @@ async function sessionUser() {
   if (!u) throw new Error('Belum masuk.')
   return u
 }
-const campaignIdOf = (rid) => {
+const campaignOf = (rid) => {
   let a = null
-  try { a = JSON.parse(localStorage.getItem('satualur_agency_demo_v1')) } catch { /* none yet */ }
-  return (a?.campaigns || []).find((c) => c.request_id === rid)?.id ?? null
+  try { a = JSON.parse(localStorage.getItem(AGENCY_KEY)) } catch { /* none yet */ }
+  return (a?.campaigns || []).find((c) => c.request_id === rid) ?? null
 }
+const campaignIdOf = (rid) => campaignOf(rid)?.id ?? null
 
 export async function sendRequest(body) {
   if (isUsingMockCloud()) {
@@ -292,7 +294,7 @@ export async function listMyRequests() {
   if (isUsingMockCloud()) {
     const u = await sessionUser()
     return demo((s) => s.requests.filter((r) => r.owner_id === u.id)
-      .map(({ business_name, business_email, owner_id, ...r }) => ({ ...r, has_campaign: campaignIdOf(r.id) !== null })).sort(newestFirst))
+      .map(({ business_name, business_email, owner_id, ...r }) => ({ ...r, has_campaign: (campaignOf(r.id)?.status ?? 'draft') !== 'draft' })).sort(newestFirst))
   }
   return call('/api/office/requests')
 }
