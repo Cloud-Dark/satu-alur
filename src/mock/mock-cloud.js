@@ -111,7 +111,7 @@ const mockAuth = {
   },
 
   async getSession() {
-    if (_session) return { data: _session, error: null }
+    if (_session) return { data: { ..._session, is_admin: true }, error: null } // demo user is an admin
     return { data: null, error: { message: 'Belum masuk.' } }
   },
 
