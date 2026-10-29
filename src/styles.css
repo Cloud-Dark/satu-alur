@@ -1519,3 +1519,9 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .worker-pin-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); display: inline-block; }
 .worker-pin-dot.is-available { background: var(--success); }
 .worker-pin-dot.is-on_job { background: var(--warning); }
+
+.sm-inf-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); }
+.sm-inf-card { display: grid; gap: var(--s-2); align-content: start; padding: var(--s-4); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.sm-inf-card p { margin: 0; overflow-wrap: anywhere; }
+.sm-inf-photo { width: 4rem; height: 4rem; border-radius: 50%; object-fit: cover; }
+.sm-inf-initials { display: grid; place-items: center; background: var(--line); color: var(--brand); font-weight: 600; }

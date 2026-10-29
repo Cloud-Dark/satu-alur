@@ -140,6 +140,36 @@ module.exports = async function socialMedia(t) {
   t.check(await p.locator('.workspace-library .workspace-entry').count() >= 1, 'brainstorm result saved to the library')
   await t.noErrors(p)
 
+  // Kolaborasi: influencer cards + request dialog
+  await tab('Kolaborasi').click()
+  await p.waitForSelector('.sm-inf-card')
+  t.check(await p.locator('.sm-inf-card').count() === 6, 'Kolaborasi shows 6 influencer cards')
+  const kolab = await p.locator('.workspace-stack').first().textContent()
+  t.check(!kolab.includes('mailto:') && !(await p.locator('a[href^="mailto:"]').count()) && !/Rp\d/.test(kolab), 'Kolaborasi has no mailto or old prices')
+  await p.locator('.sm-inf-card').first().getByRole('button', { name: 'Ajukan kolaborasi' }).click()
+  const cd = p.getByRole('dialog', { name: /Aulia Rahma/ })
+  await cd.getByRole('button', { name: 'Kirim permintaan' }).click()
+  t.check(await cd.locator('.field-error').first().textContent() === 'Ceritakan kampanye Anda.', 'collab dialog shows the validator message')
+  await cd.getByLabel('Ceritakan kampanye Anda').fill('Promosi kedai baru')
+  await cd.getByLabel('Kisaran anggaran').fill('Rp2-5 juta')
+  await cd.getByLabel('Waktu kampanye').fill('Desember 2026')
+  await cd.getByRole('button', { name: 'Kirim permintaan' }).click()
+  await cd.waitFor({ state: 'hidden' })
+  await p.locator('.sm-request', { hasText: 'Baru' }).first().waitFor({ timeout: 8000 })
+  t.check(await p.locator('.sm-request', { hasText: 'Aulia Rahma' }).count() === 1, 'Permintaan saya (collab) lists the request as Baru')
+
+  // Iklan: request form
+  await tab('Iklan').click()
+  t.check(await p.locator('.sm-request').count() === 0, 'Iklan lists only ads requests')
+  await p.getByRole('button', { name: 'Ajukan iklan' }).click()
+  t.check(await p.locator('#ads-req-err').textContent() === 'Layanan yang diiklankan wajib diisi.', 'empty Layanan shows the validator message')
+  t.check(await p.locator('.sm-request').count() === 0, 'nothing sent on invalid ads form')
+  await p.fill('#ads-req-service', 'Servis AC')
+  await p.fill('#ads-req-budget', '50000')
+  await p.getByRole('button', { name: 'Ajukan iklan' }).click()
+  await p.locator('.sm-request', { hasText: 'Baru' }).first().waitFor({ timeout: 8000 })
+  t.check(await p.locator('.sm-request').count() === 1, 'Permintaan saya (ads) lists the request as Baru')
+
   // WIB device: a picked local time is stored as its UTC instant and shown back as the same local time
   const q = await t.page({ timezoneId: 'Asia/Jakarta' })
   await loginLive(q, t.base)
