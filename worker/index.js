@@ -20,6 +20,7 @@ import {
 } from './office.js';
 import { handleSiteGet, handleSitePut } from './site.js';
 import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
+import { handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut } from './customers.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -890,6 +891,9 @@ const ROUTES = {
   'GET /api/office/admin/payment': (req, env) => handleAdminPaymentGet(req, env, ROUTE_DEPS),
   'PUT /api/office/admin/payment': (req, env) => handleAdminPaymentPut(req, env, ROUTE_DEPS),
   'POST /api/office/admin/payment/test': (req, env) => handleAdminPaymentTest(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/customers': (req, env) => handleAdminCustomers(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/customers/:userId': (req, env, params) => handleAdminCustomerGet(req, env, ROUTE_DEPS, params),
+  'PUT /api/office/admin/customers/:userId': (req, env, params) => handleAdminCustomerPut(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 

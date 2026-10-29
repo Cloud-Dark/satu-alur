@@ -130,3 +130,17 @@ CREATE TABLE IF NOT EXISTS payment_settings (
   updated_at TEXT NOT NULL,
   updated_by TEXT
 );
+
+-- One row per business account (users.id): plan, status and staff notes. Staff-only; never in TABLES.
+-- status: trial | active | past_due | cancelled. period_end: YYYY-MM-DD or NULL.
+CREATE TABLE IF NOT EXISTS customer_accounts (
+  owner_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  plan_id INTEGER REFERENCES subscription_plans(id),
+  status TEXT NOT NULL DEFAULT 'trial',
+  period_end TEXT,
+  company TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);

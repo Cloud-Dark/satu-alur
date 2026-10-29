@@ -49,6 +49,15 @@ module.exports = async function office(t) {
 
   // staff sign-in lands on Kantor Satu Alur
   const p = await t.page()
+  // customers section (later): mock users live per browser context, so seed a business user and a shared demo account before signing in
+  await p.goto(t.base, { waitUntil: 'load' })
+  await p.evaluate(() => {
+    const st = JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}')
+    st.users = [...(st.users || []),
+      { id: 'u-pemilik', email: 'pemilik@usaha.id', name: 'pemilik', created_at: '2026-10-01T00:00:00Z' },
+      { id: 'u-demo', email: 'demo-ac@satualur.id', name: 'Budi', created_at: '2026-09-01T00:00:00Z' }]
+    localStorage.setItem('satualur_mock_v1', JSON.stringify(st))
+  })
   await staffLogin(p, t.base, 'staff', 'rahasia-staf-123')
   await p.waitForFunction(() => location.pathname === '/' && location.hash.startsWith('#/app'), null, { timeout: 10000 })
   await p.waitForSelector('.app-shell')
@@ -82,7 +91,7 @@ module.exports = async function office(t) {
     t.check(await p.getByRole('heading', { name: h, exact: true }).count() === 1, `nav heading "${h}"`)
   }
   t.check(await p.getByRole('button', { name: 'Landing page' }).getAttribute('aria-current') === 'page', 'landing is the default section')
-  t.check(!(await p.getByRole('button', { name: 'Payment gateway', exact: true }).isDisabled()) && await p.getByRole('button', { name: /Pelanggan & layanan/ }).isDisabled(), 'Payment gateway is enabled; Pelanggan stays Segera')
+  t.check(!(await p.getByRole('button', { name: 'Payment gateway', exact: true }).isDisabled()) && await p.getByRole('button', { name: /^Pelanggan & mitra$/ }).isEnabled() && await p.getByRole('button', { name: /^Pengaduan CS/ }).isDisabled(), 'Payment gateway and Pelanggan & mitra are enabled; Pengaduan CS stays Segera')
   await sec('Influencer')
   await p.getByRole('button', { name: 'Tambah influencer' }).click()
   const dlg = p.getByRole('dialog', { name: 'Tambah influencer' })
@@ -302,6 +311,44 @@ module.exports = async function office(t) {
   await tes.click()
   await p.locator('.note-danger', { hasText: 'Server key ditolak Midtrans.' }).waitFor({ timeout: 8000 })
   t.check(true, 'Tes koneksi with a wrong key: rejected (danger note)')
+
+  await p.waitForSelector('.app-shell')
+  await goStage(p, 'office')
+  await sec('Pelanggan & mitra')
+  await p.locator('.of-cust').first().waitFor({ timeout: 8000 })
+  t.check(await p.locator('.of-cust').count() === 3 && await p.locator('.of-cust', { hasText: 'staff.satualur.internal' }).count() === 0, 'customers: three business users listed, no staff account', await p.locator('.of-cust').allTextContents())
+  t.check(await p.locator('.of-cust', { hasText: 'demo-ac@satualur.id' }).locator('.tag', { hasText: 'Demo' }).count() === 1, 'customers: shared demo account is tagged Demo')
+  await p.getByLabel('Cari pelanggan').fill('pemilik@usaha')
+  await p.waitForFunction(() => document.querySelectorAll('.of-cust').length === 1, null, { timeout: 8000 }).catch(() => {})
+  const row = p.locator('.of-cust', { hasText: 'pemilik@usaha.id' })
+  t.check(await row.count() === 1 && (await row.textContent()).includes('Belum diatur'), 'customers: search finds the business user, status Belum diatur')
+  await row.click()
+  const cu = p.getByRole('dialog', { name: 'Kelola pelanggan' })
+  await cu.getByLabel('Perusahaan').fill('Usaha Pemilik')
+  // the enhanced selects keep a native <select> underneath; drive that one
+  const pick = (d, id, text) => d.locator(`select[id^="${id}"]`).evaluate((sel, tx) => {
+    sel.value = [...sel.options].find((o) => o.textContent === tx).value
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+  }, text)
+  await pick(cu, 'of-cu-plan', 'UKM')
+  await pick(cu, 'of-cu-status', 'Aktif')
+  await cu.getByLabel('Berlaku sampai').fill('2027-03-31')
+  await cu.getByRole('button', { name: 'Simpan' }).click()
+  await cu.waitFor({ state: 'hidden' })
+  await p.waitForFunction(() => /Aktif/.test(document.querySelector('.of-cust')?.textContent || ''), null, { timeout: 8000 }).catch(() => {})
+  t.check((await row.textContent()).includes('Aktif') && (await row.textContent()).includes('UKM'), 'customers: list shows Aktif and UKM after saving')
+  await row.click()
+  const cu2 = p.getByRole('dialog', { name: 'Kelola pelanggan' })
+  t.check(await cu2.getByLabel('Perusahaan').inputValue() === 'Usaha Pemilik' && await cu2.getByLabel('Berlaku sampai').inputValue() === '2027-03-31' && await cu2.locator('select[id^="of-cu-status"]').inputValue() === 'active', 'customers: reopened dialog shows the saved values')
+  t.check(await cu2.getByText(/Terakhir diubah .* oleh staff/).count() === 1, 'customers: dialog shows "Terakhir diubah ... oleh staff"')
+  await cu2.getByLabel('Catatan internal').fill('belum disimpan')
+  p.once('dialog', (d) => d.dismiss())
+  await cu2.getByRole('button', { name: 'Batal' }).click()
+  await p.waitForTimeout(300)
+  t.check(await cu2.isVisible(), 'customers: dirty dialog asks before Batal')
+  p.once('dialog', (d) => d.accept())
+  await cu2.getByRole('button', { name: 'Batal' }).click()
+  await cu2.waitFor({ state: 'hidden' })
 
   await p.evaluate(() => { location.hash = '#/app' })
   await p.waitForSelector('.app-shell')
