@@ -1458,6 +1458,42 @@ body.scroll-lock { overflow: hidden; }
   .wiz-bar-fill, .wiz-num, .wiz-step-li + .wiz-step-li::before { transition: none; }
 }
 
+/* Ruang kerja AI dan pemasaran memakai token Tumbuh yang sama. */
+.workspace-grid { grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); }
+.workspace-stack { display: grid; gap: var(--s-5); min-width: 0; }
+.workspace-tabs { display: flex; flex-wrap: wrap; width: fit-content; max-width: 100%; margin-bottom: var(--s-5); }
+.workspace-tabs .seg-btn { white-space: normal; }
+.workspace-output { display: grid; gap: var(--s-4); min-width: 0; }
+.workspace-entry { display: grid; gap: var(--s-3); padding: var(--s-4) 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.workspace-entry:last-child { border-bottom: 0; padding-bottom: 0; }
+.workspace-entry:first-child { padding-top: 0; }
+.workspace-entry p { margin: 0; overflow-wrap: anywhere; }
+.workspace-entry-head { display: flex; gap: var(--s-3); justify-content: space-between; align-items: center; flex-wrap: wrap; }
+.workspace-entry-title { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-md); }
+.workspace-entry-title svg { color: var(--brand); }
+.workspace-preview { white-space: pre-wrap; max-height: 180px; overflow-y: auto; font-size: var(--fs-sm); line-height: 1.7; }
+.workspace-tags { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.workspace-tags .btn { max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.assistant-panel .panel-body { padding: 0; }
+.assistant-messages { height: clamp(320px, 52vh, 620px); overflow-y: auto; padding: var(--s-6); display: flex; flex-direction: column; gap: var(--s-5); }
+.assistant-messages > .empty { margin: auto 0; }
+.assistant-message { display: flex; gap: var(--s-3); align-items: flex-start; min-width: 0; }
+.assistant-message > div { min-width: 0; flex: 1; }
+.assistant-avatar { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; background: var(--brand-50); color: var(--brand); border-radius: var(--r-sm); }
+.assistant-author { display: block; margin-bottom: var(--s-2); font-size: var(--fs-xs); color: var(--text-muted); }
+.assistant-message-text { line-height: 1.75; overflow-wrap: anywhere; font-size: var(--fs-sm); }
+.assistant-message-text pre { max-width: 100%; overflow-x: auto; }
+.assistant-message.is-user { padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
+.assistant-message.is-user .assistant-message-text { white-space: pre-wrap; }
+.assistant-composer { padding: var(--s-5) var(--s-6); border-top: 1px solid var(--line); }
+@media (max-width: 1070px) { .workspace-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 640px) {
+  .assistant-messages { padding: var(--s-4); height: 380px; }
+  .assistant-composer { padding: var(--s-4); }
+  .workspace-tabs { width: 100%; border-radius: var(--r-lg); }
+  .workspace-tabs .seg-btn { flex: 1 1 auto; min-height: 42px; }
+}
+
 /* Petugas: checkbox rows, worker picker and the Tim dialog */
 .check-row { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; cursor: pointer; }
 .check-row input { flex-shrink: 0; }

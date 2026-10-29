@@ -51,11 +51,11 @@ export const STAGES = [
   { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 
-  { key: 'social-media', label: 'Social Media', icon: 'message', module: StageSocialMedia,
+  { key: 'social-media', group: 'growth', label: 'Social Media', icon: 'message', module: StageSocialMedia,
     action: { label: 'Asisten AI', icon: 'bot', to: 'ai-assistant' } },
-  { key: 'ai-assistant', label: 'AI Superpowers', icon: 'bot', module: StageAIAssistant,
+  { key: 'ai-assistant', group: 'growth', label: 'AI Superpowers', icon: 'bot', module: StageAIAssistant,
     action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
-  { key: 'pertumbuhan', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
+  { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
 ]
 

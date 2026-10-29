@@ -119,6 +119,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
 
   const listBody = el('div', {}, C.skeletonRows(5))
   const listPanel = C.panel({ title: 'Daftar penugasan', meta: 'memuat…', className: 'list-panel' }, listBody)
+  const pg = C.pager({ key: 'assignments', label: 'daftar penugasan', onChange: () => drawList(), scrollTarget: listPanel })
 
   target.appendChild(el('div', { className: 'stage-grid' },
     C.panel({ title: 'Tugaskan petugas', meta: 'Rekomendasi otomatis', raised: true, className: 'form-panel' }, form),
@@ -264,6 +265,10 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
   async function loadList() {
     if (!flow) return
     fillOffers()
+    drawList()
+  }
+
+  function drawList() {
     const active = flow.activeAssignments().length
     listPanel.querySelector('.panel-meta').textContent = `${flow.assignments.length} baris · ${active} aktif`
     if (!flow.assignments.length) {
@@ -273,7 +278,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
     const now = Date.now()
     listBody.replaceChildren(C.dataTable({
       caption: 'Daftar penugasan',
-      rows: flow.assignments,
+      rows: pg.slice(flow.assignments),
       columns: [
         { label: 'Pelanggan', render: (a) => { const r = flow.requestOfAssignment(a); return C.cellStack(customerLabel(r), r?.service_type) } },
         {
@@ -304,7 +309,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
           },
         },
       ],
-    }))
+    }), pg.root)
   }
 
   fillOffers()

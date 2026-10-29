@@ -5,6 +5,7 @@
 import { test, before, after, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'vite'
+import { fileURLToPath } from 'node:url'
 import './helpers/setup.mjs'
 
 let server
@@ -16,7 +17,7 @@ let realDatabase
 before(async () => {
   server = await createServer({
     configFile: false,
-    root: new URL('..', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)),
     logLevel: 'silent',
     server: { middlewareMode: true, hmr: false, ws: false },
     appType: 'custom',
