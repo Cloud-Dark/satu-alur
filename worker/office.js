@@ -4,10 +4,18 @@
  */
 
 import { isAdminUser } from './social.js';
-import { validateServiceRequest, validateInfluencer, REQUEST_STATUSES } from '../src/office/rules.js';
+import { validateServiceRequest, validateInfluencer, publicInfluencer, REQUEST_STATUSES } from '../src/office/rules.js';
 
-const INFLUENCER_PUBLIC = 'id, name, photo_key, niche, city, ig_followers, tiktok_followers, bio';
-const INFLUENCER_FIELDS = ['name', 'photo_key', 'niche', 'city', 'ig_followers', 'tiktok_followers', 'bio', 'visible'];
+const INFLUENCER_FIELDS = ['name', 'photo_key', 'niche', 'city', 'ig_followers', 'tiktok_followers', 'bio', 'visible',
+  'handle_ig', 'handle_tiktok', 'handle_youtube', 'contact_phone', 'contact_email', 'rates', 'internal_notes'];
+
+// Admin shape: rates_json becomes a `rates` array.
+function adminInfluencer(row) {
+  const { rates_json, ...rest } = row;
+  let rates = [];
+  try { rates = JSON.parse(rates_json || '[]'); } catch { /* keep empty */ }
+  return { ...rest, rates };
+}
 const REQUEST_SELECT = `SELECT r.id, r.kind, r.influencer_id, i.name AS influencer_name, r.payload_json,
   r.status, r.admin_note, r.created_at, r.updated_at`;
 
@@ -40,8 +48,8 @@ function withPayload({ payload_json, ...rest }) {
 
 export async function handleInfluencers(request, env, { authenticate, ok }) {
   await authenticate(request, env);
-  const { results } = await env.DB.prepare(`SELECT ${INFLUENCER_PUBLIC} FROM influencers WHERE visible = 1 ORDER BY name`).all();
-  return ok(results);
+  const { results } = await env.DB.prepare('SELECT * FROM influencers WHERE visible = 1 ORDER BY name').all();
+  return ok(results.map(publicInfluencer));
 }
 
 export async function handleRequestCreate(request, env, deps) {
@@ -70,7 +78,7 @@ export async function handleRequestList(request, env, { authenticate, ok }) {
 export async function handleAdminInfluencers(request, env, deps) {
   await requireAdmin(request, env, deps);
   const { results } = await env.DB.prepare('SELECT * FROM influencers ORDER BY name').all();
-  return deps.ok(results);
+  return deps.ok(results.map(adminInfluencer));
 }
 
 export async function handleAdminInfluencerCreate(request, env, deps) {
@@ -79,8 +87,9 @@ export async function handleAdminInfluencerCreate(request, env, deps) {
   const body = await readJson(request);
   const v = validated(HttpError, () => validateInfluencer(body));
   const r = await env.DB.prepare(
-    'INSERT INTO influencers (name, photo_key, niche, city, ig_followers, tiktok_followers, bio, visible) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).bind(v.name, v.photo_key, v.niche, v.city, v.ig_followers, v.tiktok_followers, v.bio, v.visible).run();
+    'INSERT INTO influencers (name, photo_key, niche, city, ig_followers, tiktok_followers, bio, visible, handle_ig, handle_tiktok, handle_youtube, contact_phone, contact_email, rates_json, internal_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).bind(v.name, v.photo_key, v.niche, v.city, v.ig_followers, v.tiktok_followers, v.bio, v.visible,
+    v.handle_ig, v.handle_tiktok, v.handle_youtube, v.contact_phone, v.contact_email, JSON.stringify(v.rates), v.internal_notes).run();
   return ok({ id: r.meta.last_row_id });
 }
 
@@ -91,12 +100,13 @@ export async function handleAdminInfluencerUpdate(request, env, deps, params) {
   const body = await readJson(request);
   const cur = await env.DB.prepare('SELECT * FROM influencers WHERE id = ?').bind(id).first();
   if (!cur) throw new HttpError(404, 'Data tidak ditemukan.');
-  const merged = { ...cur };
+  const merged = adminInfluencer(cur);
   for (const f of INFLUENCER_FIELDS) if (body[f] !== undefined) merged[f] = body[f];
   const v = validated(HttpError, () => validateInfluencer(merged));
   await env.DB.prepare(
-    'UPDATE influencers SET name = ?, photo_key = ?, niche = ?, city = ?, ig_followers = ?, tiktok_followers = ?, bio = ?, visible = ? WHERE id = ?',
-  ).bind(v.name, v.photo_key, v.niche, v.city, v.ig_followers, v.tiktok_followers, v.bio, v.visible, id).run();
+    'UPDATE influencers SET name = ?, photo_key = ?, niche = ?, city = ?, ig_followers = ?, tiktok_followers = ?, bio = ?, visible = ?, handle_ig = ?, handle_tiktok = ?, handle_youtube = ?, contact_phone = ?, contact_email = ?, rates_json = ?, internal_notes = ? WHERE id = ?',
+  ).bind(v.name, v.photo_key, v.niche, v.city, v.ig_followers, v.tiktok_followers, v.bio, v.visible,
+    v.handle_ig, v.handle_tiktok, v.handle_youtube, v.contact_phone, v.contact_email, JSON.stringify(v.rates), v.internal_notes, id).run();
   return ok(null);
 }
 

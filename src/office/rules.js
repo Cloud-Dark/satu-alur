@@ -78,10 +78,35 @@ export function validateInfluencer(body) {
   const msg = 'Jumlah pengikut harus bilangan bulat 0 atau lebih.'
   const visible = b.visible === undefined ? 1 : Number(b.visible)
   if (visible !== 0 && visible !== 1) fail('Status tampil harus 0 atau 1.')
+  const handle = (v, label) => { const h = short(v, label).replace(/^@+/, ''); if (h.length > 60) fail(`${label} maksimal 60 karakter.`); return h }
+  const contact_phone = str(b.contact_phone)
+  if (contact_phone.length > 30) fail('Telepon maksimal 30 karakter.')
+  const contact_email = str(b.contact_email)
+  if (contact_email.length > 120) fail('Email maksimal 120 karakter.')
+  if (contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact_email)) fail('Email tidak valid.')
+  const internal_notes = str(b.internal_notes)
+  if (internal_notes.length > 2000) fail('Catatan internal maksimal 2000 karakter.')
+  if (b.rates !== undefined && b.rates !== null && !Array.isArray(b.rates)) fail('Format tarif tidak valid.')
+  const rates = (b.rates || []).map((r) => ({ deliverable: str(r?.deliverable), price: r?.price_idr }))
+    .filter((r) => r.deliverable || (r.price !== undefined && r.price !== null && r.price !== ''))
+    .map((r) => {
+      if (!r.deliverable) fail('Jenis konten tarif wajib diisi.')
+      if (r.deliverable.length > 40) fail('Jenis konten tarif maksimal 40 karakter.')
+      const price_idr = optInt(r.price, 0, 1_000_000_000, 'Harga tarif harus bilangan bulat 0 sampai 1.000.000.000.')
+      if (price_idr === null) fail('Harga tarif harus bilangan bulat 0 sampai 1.000.000.000.')
+      return { deliverable: r.deliverable, price_idr }
+    })
+  if (rates.length > 8) fail('Maksimal 8 tarif.')
   return {
     name, niche, city, bio, photo_key,
+    handle_ig: handle(b.handle_ig, 'Handle Instagram'), handle_tiktok: handle(b.handle_tiktok, 'Handle TikTok'), handle_youtube: handle(b.handle_youtube, 'Handle YouTube'),
+    contact_phone, contact_email, rates, internal_notes,
     ig_followers: optInt(b.ig_followers, 0, Number.MAX_SAFE_INTEGER, msg) ?? 0,
     tiktok_followers: optInt(b.tiktok_followers, 0, Number.MAX_SAFE_INTEGER, msg) ?? 0,
     visible,
   }
 }
+
+const PUBLIC_INFLUENCER = ['id', 'name', 'photo_key', 'niche', 'city', 'ig_followers', 'tiktok_followers', 'bio']
+// The only influencer keys businesses may see; staff-only fields (contacts, rates, notes) never pass through.
+export const publicInfluencer = (row) => Object.fromEntries(PUBLIC_INFLUENCER.map((k) => [k, row[k]]))

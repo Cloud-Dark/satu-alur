@@ -1,6 +1,36 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { validateServiceRequest, validateInfluencer } from '../src/office/rules.js'
+import { validateServiceRequest, validateInfluencer, publicInfluencer } from '../src/office/rules.js'
+
+const base = { name: 'A', niche: 'n', city: 'c' }
+
+test('validateInfluencer cleans staff-only fields and enforces their limits', () => {
+  const r = validateInfluencer({ ...base, handle_ig: ' @aulia ', handle_tiktok: '@@tt', contact_phone: ' 0812 ', contact_email: 'a@b.id',
+    rates: [{ deliverable: ' Reel ', price_idr: 500000 }, { deliverable: '', price_idr: '' }], internal_notes: ' catatan ' })
+  assert.equal(r.handle_ig, 'aulia')
+  assert.equal(r.handle_tiktok, 'tt')
+  assert.equal(r.handle_youtube, '')
+  assert.equal(r.contact_phone, '0812')
+  assert.deepEqual(r.rates, [{ deliverable: 'Reel', price_idr: 500000 }])
+  assert.equal(r.internal_notes, 'catatan')
+  assert.deepEqual(validateInfluencer(base).rates, [])
+  assert.throws(() => validateInfluencer({ ...base, contact_email: 'bukan-email' }), /Email tidak valid/)
+  const row = { deliverable: 'x', price_idr: 1 }
+  assert.equal(validateInfluencer({ ...base, rates: Array(8).fill(row) }).rates.length, 8)
+  assert.throws(() => validateInfluencer({ ...base, rates: Array(9).fill(row) }), /Maksimal 8 tarif/)
+  assert.throws(() => validateInfluencer({ ...base, rates: [{ deliverable: 'x', price_idr: -1 }] }), /Harga tarif/)
+  assert.throws(() => validateInfluencer({ ...base, rates: [{ deliverable: 'x', price_idr: 1.5 }] }), /Harga tarif/)
+  assert.throws(() => validateInfluencer({ ...base, rates: [{ deliverable: 'x', price_idr: 1000000001 }] }), /Harga tarif/)
+  assert.throws(() => validateInfluencer({ ...base, rates: 'x' }), { message: 'Format tarif tidak valid.' })
+  assert.throws(() => validateInfluencer({ ...base, handle_ig: 'x'.repeat(61) }), /maksimal 60/)
+  assert.throws(() => validateInfluencer({ ...base, contact_phone: 'x'.repeat(31) }), /maksimal 30/)
+  assert.throws(() => validateInfluencer({ ...base, internal_notes: 'x'.repeat(2001) }), /maksimal 2000/)
+})
+
+test('publicInfluencer returns exactly the catalogue keys, never staff-only ones', () => {
+  const row = { id: 1, ...validateInfluencer({ ...base, handle_ig: 'a', contact_phone: '08', contact_email: 'a@b.id', rates: [{ deliverable: 'x', price_idr: 5 }], internal_notes: 'n' }), created_at: 't' }
+  assert.deepEqual(Object.keys(publicInfluencer(row)), ['id', 'name', 'photo_key', 'niche', 'city', 'ig_followers', 'tiktok_followers', 'bio'])
+})
 
 test('valid collab and ads requests pass', () => {
   const c = validateServiceRequest({ kind: 'collab', influencer_id: 3, payload: { campaign: 'Promo AC', budget_range: '1-5jt', timing: 'Bulan depan' } })

@@ -75,6 +75,14 @@ CREATE TABLE IF NOT EXISTS influencers (
   tiktok_followers INTEGER,
   bio TEXT,
   visible INTEGER NOT NULL DEFAULT 1,
+  -- Staff-only: never selected by the public catalogue route.
+  handle_ig TEXT,
+  handle_tiktok TEXT,
+  handle_youtube TEXT,
+  contact_phone TEXT,
+  contact_email TEXT,
+  rates_json TEXT,
+  internal_notes TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 

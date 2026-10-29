@@ -7,7 +7,7 @@
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { PLATFORMS, validateScheduleAt, igEligibility } from './rules.js'
-import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer } from '../office/rules.js'
+import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer, publicInfluencer } from '../office/rules.js'
 
 const TOKEN_KEY = 'satualur_token'
 const DEMO_KEY = 'satualur_social_demo_v1'
@@ -245,14 +245,13 @@ export async function listSchedules() {
 }
 
 /* ------------------------------------------------------------------ office */
-const PUBLIC_FIELDS = ['id', 'name', 'photo_key', 'niche', 'city', 'ig_followers', 'tiktok_followers', 'bio']
 const byName = (a, b) => a.name.localeCompare(b.name)
 const newestFirst = (a, b) => (b.created_at < a.created_at ? -1 : b.created_at > a.created_at ? 1 : b.id - a.id)
 
 export async function listInfluencers() {
   if (isUsingMockCloud()) {
     return demo((s) => s.influencers.filter((i) => i.visible === 1).sort(byName)
-      .map((i) => Object.fromEntries(PUBLIC_FIELDS.map((f) => [f, i[f]]))))
+      .map(publicInfluencer))
   }
   return call('/api/office/influencers')
 }

@@ -119,6 +119,27 @@ module.exports = async function office(t) {
   await kolaborasi()
   t.check(await p.locator('.sm-inf-card').count() === 7, 'Kolaborasi shows 7 cards after adding Rina')
 
+  // staff-only fields: saved, reopened, and never shown to businesses
+  await goStage(p, 'office')
+  await p.getByRole('button', { name: 'Ubah Rina' }).click()
+  const pr = p.getByRole('dialog', { name: 'Ubah Rina' })
+  await pr.getByLabel('Instagram', { exact: true }).fill('@rinamakan')
+  await pr.getByLabel('Telepon / WhatsApp').fill('081234567890')
+  await pr.getByRole('button', { name: 'Tambah tarif' }).click()
+  await pr.getByLabel('Jenis konten 1').fill('Reel')
+  await pr.getByLabel('Harga (Rp) 1').fill('750000')
+  await pr.getByRole('button', { name: 'Simpan' }).click()
+  await pr.waitFor({ state: 'hidden' })
+  await p.locator('.of-inf', { hasText: 'Rina' }).getByText('1 tarif', { exact: false }).waitFor({ timeout: 8000 })
+  t.check(await p.locator('.of-inf', { hasText: 'Rina' }).textContent().then((x) => x.includes('IG @rinamakan')), 'list card shows the handle')
+  await p.getByRole('button', { name: 'Ubah Rina' }).click()
+  const pr2 = p.getByRole('dialog', { name: 'Ubah Rina' })
+  t.check(await pr2.getByLabel('Telepon / WhatsApp').inputValue() === '081234567890' && await pr2.getByLabel('Harga (Rp) 1').inputValue() === '750000' && await pr2.getByLabel('Instagram', { exact: true }).inputValue() === 'rinamakan', 'reopened editor shows the saved phone, handle and rate')
+  await pr2.getByRole('button', { name: 'Batal' }).click()
+  await kolaborasi()
+  const html = await p.content()
+  t.check(await p.locator('.sm-inf-card', { hasText: 'Rina' }).count() === 1 && !html.includes('081234567890') && !html.includes('750000') && !html.includes('rinamakan'), 'business Kolaborasi DOM has no phone, rate or handle')
+
   // hide Rina
   await goStage(p, 'office')
   await p.getByRole('button', { name: 'Ubah Rina' }).click()
