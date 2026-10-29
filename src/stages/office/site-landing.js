@@ -80,10 +80,10 @@ export async function draw(host, ctx, setDirty) {
       const f = C.field({ label: `Poin ${i + 1}`, id: `of-ld-pt${i}-${id}`, value: p, attrs: { maxlength: '60' } })
       f.input.addEventListener('input', () => { state.points[i] = f.input.value; redraw(); touch() })
       const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus poin ${i + 1}` })
-      rm.addEventListener('click', () => { state.points.splice(i, 1); rebuild(`[id^=of-ld-pt${Math.max(0, Math.min(i, state.points.length - 1))}-]`) })
+      rm.addEventListener('click', () => { state.points.splice(i, 1); rebuild(state.points.length ? `[id^=of-ld-pt${Math.min(i, state.points.length - 1)}-]` : '.of-add-point') })
       return el('div', { className: 'of-row' }, f.wrap, rm)
     })
-    const addPoint = C.button({ label: 'Tambah poin', icon: 'plus', variant: 'soft', size: 'sm', disabled: state.points.length >= MAX_POINTS })
+    const addPoint = C.button({ label: 'Tambah poin', icon: 'plus', variant: 'soft', size: 'sm', className: 'of-add-point', disabled: state.points.length >= MAX_POINTS })
     addPoint.addEventListener('click', () => { state.points.push(''); rebuild(`[id^=of-ld-pt${state.points.length - 1}-]`) })
 
     const faqs = state.faqs.map((fq, i) => {

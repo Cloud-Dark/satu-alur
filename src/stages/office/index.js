@@ -28,7 +28,6 @@ function stored() {
 export async function render(container, ctx) {
   let current = stored()
   let dirty = false
-  const setDirty = (d) => { dirty = d }
   const host = el('div', { className: 'of-content' })
 
   const buttons = {}
@@ -52,7 +51,10 @@ export async function render(container, ctx) {
     }
     select.value = current
     dirty = false
-    ITEMS.find((i) => i.key === current).draw(host, ctx, setDirty)
+    // Each section draws into its own box; a slow load from a section we left lands in a detached box.
+    const box = el('div')
+    host.replaceChildren(box)
+    ITEMS.find((i) => i.key === current).draw(box, ctx, (d) => { if (box.parentNode === host) dirty = d })
   }
   function go(key) {
     if (key === current) return

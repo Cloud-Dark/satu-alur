@@ -149,6 +149,16 @@ module.exports = async function office(t) {
   await p.getByRole('button', { name: 'Simpan' }).waitFor({ timeout: 8000 })
   t.check(await p.getByLabel('Judul', { exact: true }).count() === 1, 'Coba lagi loads the form')
 
+  // slow landing load must not paint over another section
+  await p.evaluate(() => localStorage.setItem('satualur_site_delay', '1500'))
+  await sec('Tentang kami')
+  await sec('Landing page')
+  await sec('Influencer')
+  await p.getByRole('button', { name: 'Tambah influencer' }).waitFor({ timeout: 8000 })
+  await p.waitForTimeout(2200)
+  t.check(await p.getByRole('button', { name: 'Tambah influencer' }).count() === 1 && await p.getByRole('button', { name: 'Simpan' }).count() === 0, 'slow load of a left section does not replace the current one')
+  await p.evaluate(() => localStorage.removeItem('satualur_site_delay'))
+
   // landing editor
   await goStage(p, 'office')
   await sec('Landing page')

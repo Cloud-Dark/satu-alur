@@ -69,6 +69,7 @@ export function drawLegal(host, ctx, setDirty) {
   select.addEventListener('change', () => {
     if (dirty && !confirm(LEAVE_MSG)) { select.value = current; return }
     current = select.value
+    set(false)
     drawDoc(sub, ctx, set, current)
   })
   host.replaceChildren(el('div', { className: 'field of-legal-pick' }, el('label', { className: 'field-label', htmlFor: id }, 'Dokumen'), select), sub)

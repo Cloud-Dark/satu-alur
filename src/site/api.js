@@ -37,6 +37,9 @@ const loadDemo = () => { try { return JSON.parse(localStorage.getItem(DEMO_KEY))
 /** Admin read: { value | null, updated_at, updated_by }. { value: null } means no row yet; a failed load throws. */
 export async function loadSite(key) {
   if (isUsingMockCloud()) {
+    // test seam: localStorage satualur_site_delay = ms to wait before loading (demo mode)
+    const wait = Number(localStorage.getItem('satualur_site_delay')) || 0
+    if (wait) await new Promise((r) => setTimeout(r, wait))
     if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat konten. Coba lagi.')
     const row = loadDemo()[key]
     return { value: row?.value ?? null, updated_at: row?.updated_at ?? null, updated_by: row?.updated_by ?? null }
