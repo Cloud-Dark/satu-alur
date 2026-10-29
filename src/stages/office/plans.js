@@ -6,6 +6,7 @@ import { validatePlan, formatPrice } from '../../business/plan-rules.js'
 import { renderPlanCard } from '../../business/plan-card.js'
 import { PRICING_TIERS } from '../../landing/pricing.js'
 import { stampLine } from './site-landing.js'
+import { LEAVE_MSG } from './site-doc.js'
 
 const { el } = C
 const PERIOD_OPTIONS = [{ value: 'month', label: 'Per bulan' }, { value: 'year', label: 'Per tahun' }, { value: 'once', label: 'Sekali bayar' }, { value: 'custom', label: 'Kustom (tanpa akhiran)' }]
@@ -27,7 +28,7 @@ const fromTier = (t, i) => {
   }
 }
 
-function planDialog(ctx, plan, nextSort, opener, onSaved) {
+function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   const id = ++seq
   const v = plan || { slug: '', name: '', tagline: '', price_idr: 0, period: 'month', period_label: '', recommended: 0, badge: '', limits: [], features: [], cta_label: 'Pilih paket', cta_kind: 'signup', active: 1 }
   const f = (label, key, extra = {}) => C.field({ label, id: `of-pl-${key}-${id}`, value: v[key] ?? '', ...extra })
@@ -57,6 +58,8 @@ function planDialog(ctx, plan, nextSort, opener, onSaved) {
     features: [...featureRows.children].map((r) => r.querySelector('input').value),
     cta_label: ctaLabel.input.value, cta_kind: ctaKind.input.value, active: act.inputs.on.checked ? 1 : 0,
   })
+  let base = null // snapshot of the untouched form; null while it is still being filled
+  const touch = () => { redraw(); if (base !== null) setDirty(JSON.stringify(gather()) !== base) }
   const redraw = () => { const g = gather(); preview.replaceChildren(renderPlanCard({ ...g, price_idr: Number.isNaN(g.price_idr) ? null : g.price_idr })) }
 
   function addRow(box, kind, vals = {}) {
@@ -72,7 +75,7 @@ function planDialog(ctx, plan, nextSort, opener, onSaved) {
       const a = C.field({ label: `Fitur ${n}`, id: rid, value: vals.text || '', attrs: { maxlength: '100' } })
       row = el('div', { className: 'of-row' }, a.wrap, rm)
     }
-    rm.addEventListener('click', () => { row.remove(); renumber(); redraw(); syncAdd() })
+    rm.addEventListener('click', () => { row.remove(); renumber(); touch(); syncAdd() })
     box.append(row)
   }
   // Labels are numbered; keep them in step after a removal.
@@ -90,15 +93,15 @@ function planDialog(ctx, plan, nextSort, opener, onSaved) {
   const addLimit = C.button({ label: 'Tambah batas', icon: 'plus', variant: 'soft', size: 'sm' })
   const addFeature = C.button({ label: 'Tambah fitur', icon: 'plus', variant: 'soft', size: 'sm' })
   const syncAdd = () => { addLimit.disabled = limitRows.children.length >= 6; addFeature.disabled = featureRows.children.length >= 12 }
-  addLimit.addEventListener('click', () => { addRow(limitRows, 'limit'); syncAdd(); limitRows.lastChild.querySelector('input').focus() })
-  addFeature.addEventListener('click', () => { addRow(featureRows, 'feature'); syncAdd(); featureRows.lastChild.querySelector('input').focus() })
+  addLimit.addEventListener('click', () => { addRow(limitRows, 'limit'); syncAdd(); touch(); limitRows.lastChild.querySelector('input').focus() })
+  addFeature.addEventListener('click', () => { addRow(featureRows, 'feature'); syncAdd(); touch(); featureRows.lastChild.querySelector('input').focus() })
   v.limits.forEach((l) => addRow(limitRows, 'limit', l))
   v.features.forEach((t) => addRow(featureRows, 'feature', { text: t }))
   syncAdd()
 
   const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary', type: 'submit' })
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
-  const { form, close } = C.modal({
+  const { dialog, form, close } = C.modal({
     title: plan ? `Ubah ${plan.name}` : 'Tambah paket', wide: true, opener, actions: [cancel, save],
     children: [name.wrap, el('div', { className: 'form-row' }, slug.wrap, tagline.wrap), el('div', { className: 'form-row' }, price.wrap, period.wrap), periodLabel.wrap,
       el('div', { className: 'form-row' }, rec.wrap, badge.wrap), el('div', { className: 'form-row' }, ctaLabel.wrap, ctaKind.wrap),
@@ -107,9 +110,14 @@ function planDialog(ctx, plan, nextSort, opener, onSaved) {
       act.wrap, el('h3', { className: 'field-label' }, 'Pratinjau kartu'), preview, err],
   })
   redraw()
-  form.addEventListener('input', redraw)
-  form.addEventListener('change', redraw)
-  cancel.addEventListener('click', close)
+  base = JSON.stringify(gather())
+  form.addEventListener('input', touch)
+  form.addEventListener('change', touch)
+  // Unsaved edits ask first, like leaving the section does (Escape fires `cancel`, Batal calls it too).
+  const dirty = () => base !== null && JSON.stringify(gather()) !== base
+  dialog.addEventListener('cancel', (e) => { if (dirty() && !confirm(LEAVE_MSG)) e.preventDefault() })
+  dialog.addEventListener('close', () => setDirty(false))
+  cancel.addEventListener('click', () => { if (!dirty() || confirm(LEAVE_MSG)) close() })
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     err.textContent = ''
@@ -119,6 +127,7 @@ function planDialog(ctx, plan, nextSort, opener, onSaved) {
     try {
       if (plan) await adminUpdatePlan(plan.id, clean)
       else await adminCreatePlan(clean)
+      base = null
       close()
       showToast('Paket tersimpan.', 'success')
       if (!ctx.signal.aborted) onSaved()
@@ -126,7 +135,7 @@ function planDialog(ctx, plan, nextSort, opener, onSaved) {
   })
 }
 
-export function draw(host, ctx) {
+export function draw(host, ctx, setDirty) {
   let run = 0
   async function load() {
     const mine = ++run
@@ -142,9 +151,9 @@ export function draw(host, ctx) {
     if (ctx.signal.aborted || mine !== run) return
     const nextSort = rows.reduce((m, p) => Math.max(m, p.sort), 0) + 1
     const add = C.button({ label: 'Tambah paket', icon: 'plus', variant: 'primary', size: 'sm' })
-    add.addEventListener('click', () => planDialog(ctx, null, nextSort, add, load))
+    add.addEventListener('click', () => planDialog(ctx, null, nextSort, add, load, setDirty))
 
-    // Reorder = swap `sort` between neighbours (two PATCHes).
+    // Reorder = one request that rewrites `sort` as 1..n.
     const move = async (i, j) => {
       try {
         const ids = rows.map((r) => r.id);
@@ -160,7 +169,7 @@ export function draw(host, ctx) {
         b.addEventListener('click', fn)
         return b
       }
-      const edit = btn('Ubah', false, () => planDialog(ctx, p, nextSort, edit, load))
+      const edit = btn('Ubah', false, () => planDialog(ctx, p, nextSort, edit, load, setDirty))
       return el('article', { className: 'workspace-entry of-plan' },
         el('div', { className: 'workspace-entry-head' }, el('strong', {}, p.name),
           p.recommended ? C.tag('Rekomendasi', 'ok') : null, p.active ? null : C.tag('Nonaktif', 'neutral')),

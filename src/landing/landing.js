@@ -702,6 +702,13 @@ export function renderLanding(root, ctx = {}) {
     // The built-in copy says "three plans" and "draft prices"; neither is true of live plans.
     page.querySelector('#lp-price-lede').textContent = 'Pilih paket sesuai tahap usaha Anda. Pindah paket kapan saja.'
     page.querySelector('#lp-draft-note').remove()
+    // "Kontak penjualan Enterprise" and "Mulai gratis" only make sense when such a plan exists.
+    if (!plans.some((p) => p.cta_kind === 'contact')) {
+      page.querySelector('#lp-contact-note').remove()
+      page.querySelector('.lp-tiers').querySelectorAll('[aria-describedby="lp-contact-note"]').forEach((a) => a.removeAttribute('aria-describedby'))
+      page.querySelector('#harga .lp-note')?.remove()
+    }
+    if (!plans.some((p) => p.price_idr === 0)) page.querySelector('#lp-price-title').textContent = 'Pilih paket Anda.'
   }).catch(() => {})
 
   /* --- Counters (real counts only: stages, AI agents, data flows) --- */

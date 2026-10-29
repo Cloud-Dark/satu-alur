@@ -110,7 +110,7 @@ export async function handleAdminPlanUpdate(request, env, deps, params) {
 const PAY_COLS = 'provider, mode, client_key, server_key_enc, server_key_last4, webhook_token_enc, updated_at, updated_by';
 
 // The only shape that leaves the server: flags + last4, never a key or its ciphertext.
-function toPayment(row) {
+export function toPayment(row) {
   if (!row) return { provider: 'none', mode: 'sandbox', client_key: '', server_key_set: false, server_key_last4: '', webhook_token_set: false, updated_at: null, updated_by: null };
   return {
     provider: row.provider, mode: row.mode, client_key: row.client_key,

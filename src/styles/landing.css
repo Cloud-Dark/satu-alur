@@ -826,7 +826,9 @@ html.lp-lock { overflow: hidden; }
 .lp-tiers {
   margin-top: clamp(40px, 6vw, 64px);
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Any number of plans: columns of 260-380px, centred, wrapping to new rows. */
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 380px));
+  justify-content: center;
   gap: 20px;
   align-items: stretch;
 }

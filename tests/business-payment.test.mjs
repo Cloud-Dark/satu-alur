@@ -2,7 +2,21 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { validatePaymentSettings, testGateway } from '../src/business/payment.js'
 
-const stub = (status, calls = []) => async (url, init) => { calls.push({ url, init }); return new Response('{}', { status }) }
+import { toPayment } from '../worker/business.js'
+
+test('toPayment: output carries flags and last4 only, never a key or ciphertext', () => {
+  const row = { provider: 'xendit', mode: 'sandbox', client_key: 'pk', server_key: 'SECRET', server_key_enc: 'CIPHER', server_key_last4: 'ABCD',
+    webhook_token: 'HOOK', webhook_token_enc: 'CIPHER2', updated_at: 't', updated_by: 'u' }
+  const out = toPayment(row)
+  assert.equal(out.server_key_set, true)
+  assert.equal(out.webhook_token_set, true)
+  assert.equal(out.server_key_last4, 'ABCD')
+  for (const k of Object.keys(out)) assert.ok(!/^(server_key|webhook_token)$|_enc$/.test(k), `leaked field ${k}`)
+  assert.ok(!JSON.stringify(out).match(/SECRET|CIPHER|HOOK/))
+  assert.equal(toPayment({ ...row, server_key_enc: null }).server_key_last4, '')
+})
+
+const stub =(status, calls = []) => async (url, init) => { calls.push({ url, init }); return new Response('{}', { status }) }
 const basic = (k) => `Basic ${btoa(`${k}:`)}`
 
 test('testGateway: Midtrans sandbox URL + Basic auth; 404 means connected', async () => {

@@ -31,11 +31,12 @@ function render(host, ctx, setDirty, row) {
   const mode = radios('Mode', 'mode', MODES)
   const warn = C.message()
   const off = { autocomplete: 'off', maxlength: '200', spellcheck: 'false' }
+  const secret = { ...off, autocomplete: 'new-password', 'data-1p-ignore': '', 'data-lpignore': 'true' }
   const client = C.field({ label: 'Client key', id: `of-pay-client-${id}`, value: row.client_key, hint: 'Kunci publik dari dashboard penyedia.', attrs: off })
-  const server = C.field({ label: 'Server key', id: `of-pay-server-${id}`, type: 'password', attrs: off,
+  const server = C.field({ label: 'Server key', id: `of-pay-server-${id}`, type: 'password', attrs: secret,
     placeholder: row.server_key_set ? `Tersimpan (…${row.server_key_last4}). ${KEEP}` : undefined, hint: 'Disimpan terenkripsi dan tidak pernah ditampilkan lagi.' })
   const clear = row.server_key_set ? C.choiceGroup({ legend: 'Server key tersimpan', name: `of-pay-clear-${id}`, options: [{ value: 'on', label: 'Hapus server key' }] }) : null
-  const hook = C.field({ label: 'Webhook token', id: `of-pay-hook-${id}`, type: 'password', attrs: off,
+  const hook = C.field({ label: 'Webhook token', id: `of-pay-hook-${id}`, type: 'password', attrs: secret,
     placeholder: row.webhook_token_set ? `Tersimpan. ${KEEP}` : undefined, hint: 'Dipakai Xendit untuk memverifikasi callback.' })
 
   const stamp = el('p', { className: 'muted small', role: 'status' }, stampLine(row))

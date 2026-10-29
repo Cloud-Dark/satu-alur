@@ -157,7 +157,7 @@ export async function adminTestPayment() {
   return testGateway({ provider: p.provider, mode: p.mode, serverKey: p.server_key_set ? 'demo' : '' }, fake)
 }
 
-/** Patch any fields of a plan (also used to reorder via `sort` and to deactivate via `active: 0`). */
+/** Patch any fields of a plan (also how a plan is deactivated: `active: 0`; reordering goes through adminReorderPlans). */
 export async function adminUpdatePlan(id, patch) {
   if (isUsingMockCloud()) return mockWrite(patch, id)
   const row = await call(`/api/office/admin/plans/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch })
