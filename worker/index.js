@@ -11,6 +11,7 @@ import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.
 import {
   handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
   handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
+  handleSocialPublish, handleSocialSchedule, handleSocialScheduleCancel, runCron,
 } from './social.js';
 import { isAdmin } from '../src/social/rules.js';
 
@@ -860,6 +861,9 @@ const ROUTES = {
   'GET /api/social/oauth/pages': (req, env) => handleSocialOauthPages(req, env, ROUTE_DEPS),
   'POST /api/social/oauth/pick': (req, env) => handleSocialOauthPick(req, env, ROUTE_DEPS),
   'POST /api/social/media': (req, env) => handleSocialMediaUpload(req, env, ROUTE_DEPS),
+  'POST /api/social/publish': (req, env) => handleSocialPublish(req, env, ROUTE_DEPS),
+  'POST /api/social/schedule': (req, env) => handleSocialSchedule(req, env, ROUTE_DEPS),
+  'DELETE /api/social/schedule/:id': (req, env, params) => handleSocialScheduleCancel(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 
@@ -908,5 +912,8 @@ export default {
       }
     }
     return env.ASSETS.fetch(request);
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runCron(env));
   },
 };
