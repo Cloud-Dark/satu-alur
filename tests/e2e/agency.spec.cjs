@@ -77,6 +77,8 @@ module.exports = async function agency(t) {
   await dlg.getByRole('button', { name: 'Tambahkan' }).click()
   await dlg.locator('.ag-inf', { hasText: 'Bima Pratama' }).waitFor({ timeout: 8000 })
   t.check(await dlg.locator('.ag-inf').count() === 2, 'second influencer added')
+  const bima = dlg.locator('.ag-inf', { hasText: 'Bima Pratama' })
+  await bima.getByLabel('Bayaran (Rp)').fill('555000') // left unsaved while other rows save
 
   // two deliverables for Aulia; published needs a link
   for (const kind of ['reel', 'story']) {
@@ -89,6 +91,22 @@ module.exports = async function agency(t) {
   }
   const dels = dlg.locator('.ag-group', { hasText: 'Aulia Rahma' }).locator('.ag-del')
   t.check(await dels.count() === 2, 'two deliverables listed under Aulia Rahma', await dels.count())
+  t.check(await bima.getByLabel('Bayaran (Rp)').inputValue() === '555000', 'unsaved payout in another row survives deliverable saves')
+  // header save keeps unsaved rows (a new deliverable row and the unsaved payout)
+  await dlg.getByRole('button', { name: 'Tambah konten untuk Aulia Rahma' }).click()
+  await dlg.getByLabel('Brief').fill('Brief baru')
+  await dlg.getByRole('button', { name: 'Simpan kampanye' }).click()
+  await s.waitForTimeout(600)
+  t.check(await dlg.locator('.ag-del.is-new').count() === 1 && await bima.getByLabel('Bayaran (Rp)').inputValue() === '555000', 'header save keeps unsaved row edits')
+  await dlg.locator('.ag-del.is-new').getByRole('button', { name: 'Batal' }).click()
+  // a structural change (remove an influencer) asks first while another row has unsaved edits
+  let askedRemove = false
+  s.once('dialog', (d) => { askedRemove = true; d.dismiss() })
+  await aulia.getByRole('button', { name: 'Hapus Aulia Rahma dari kampanye' }).click()
+  await s.waitForTimeout(300)
+  t.check(askedRemove && await bima.getByLabel('Bayaran (Rp)').inputValue() === '555000' && await dlg.locator('.ag-inf').count() === 2, 'remove with another row unsaved: asks first; cancel keeps everything')
+  await bima.getByRole('button', { name: 'Simpan bayaran' }).click()
+  await s.getByText('Bayaran tersimpan.').first().waitFor({ timeout: 8000 })
   const first = dels.first()
   await pick(first.locator('select[data-k=status]'), 'published')
   await first.getByRole('button', { name: 'Simpan' }).click()

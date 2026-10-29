@@ -51,8 +51,9 @@ function requestCard(r, onSaved, ctx, setDirty) {
       const story = String(r.payload?.campaign || '').trim()
       try {
         const { id: cid } = await adminCreateCampaign({ request_id: r.id, title: (story.split('\n')[0].slice(0, 120).trim() || `Kolaborasi ${r.influencer_name || ''}`.trim()), brief: story.slice(0, 3000) })
+        restore() // enabled again so focus can return to it when the editor closes (the list then reloads)
         showToast('Kampanye dibuat.', 'success')
-        if (!signal.aborted) openCampaignEditor(ctx, cid, null, setDirty, onSaved)
+        if (!signal.aborted) openCampaignEditor(ctx, cid, camp, setDirty, onSaved)
       } catch (ex) { err.textContent = ex.message; restore() }
     })
   }

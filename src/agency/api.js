@@ -52,8 +52,10 @@ function mock(fn) {
   const a = loadAgency()
   const s = read(SOCIAL_KEY, {})
   const out = fn(a, s)
-  localStorage.setItem(AGENCY_KEY, JSON.stringify(a))
-  localStorage.setItem(SOCIAL_KEY, JSON.stringify(s))
+  try {
+    localStorage.setItem(AGENCY_KEY, JSON.stringify(a))
+    localStorage.setItem(SOCIAL_KEY, JSON.stringify(s))
+  } catch { /* private mode: state stays in this call only, like social's saveDemo */ }
   return out
 }
 const failRead = () => { if (localStorage.getItem('satualur_agency_fail') === '1') throw new Error('Gagal memuat kampanye. Coba lagi.') }

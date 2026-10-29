@@ -19,8 +19,9 @@ let seq = 0
 function errLine() { return el('p', { className: 'field-error', role: 'alert' }) }
 
 /**
- * Wide editor for one campaign. The header saves with "Simpan kampanye"; influencer and deliverable rows save on their own
- * and redraw the lists. Closing with unsaved edits asks first. onClosed runs after it closes.
+ * Wide editor for one campaign. The header saves with "Simpan kampanye"; each influencer or deliverable row saves on its own
+ * and only that row (and the summary) is redrawn, so unsaved edits elsewhere stay. Adding or removing an influencer redraws
+ * the lists and asks first when another row has unsaved edits. Closing with unsaved edits asks first. onClosed runs after it closes.
  */
 export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {}) {
   const uid = ++seq
@@ -47,10 +48,14 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
 
   const gatherHead = () => ({ title: title.input.value, brief: brief.input.value, status: status.input.value,
     start_date: start.input.value, end_date: end.input.value, client_fee_idr: fee.input.value.trim() })
-  const snapLists = () => JSON.stringify([...lists.querySelectorAll('input, select, textarea')].map((n) => n.value))
+  // Each row keeps a snapshot of its saved values; a row is dirty when its inputs differ (a new deliverable row always is).
+  const snap = (row) => JSON.stringify([...row.querySelectorAll('input, select, textarea')].map((n) => n.value))
+  const snaps = new WeakMap()
+  const mark = (row) => { snaps.set(row, snap(row)); return row }
+  const rowDirty = (row) => row.classList.contains('is-new') || snaps.get(row) !== snap(row)
+  const listsDirty = (except) => [...lists.querySelectorAll('.ag-inf, .ag-del, .ag-add')].some((r) => r !== except && rowDirty(r))
   let headBase = null
-  let listBase = null
-  const dirty = () => headBase !== null && (JSON.stringify(gatherHead()) !== headBase || snapLists() !== listBase)
+  const dirty = () => headBase !== null && (JSON.stringify(gatherHead()) !== headBase || listsDirty())
   const touch = () => setDirty(dirty())
   form.addEventListener('input', touch)
   form.addEventListener('change', touch)
@@ -60,8 +65,8 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
 
   let catalogue = []
   let run = 0
-  // Re-reads the campaign and redraws the summary and lists; the header form is filled only the first time.
-  async function load() {
+  // Re-reads the campaign: title and summary always, the lists only when `redraw`; the header form is filled only the first time.
+  async function load({ redraw = true } = {}) {
     const mine = ++run
     let c
     try {
@@ -88,8 +93,10 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
     titleEl.textContent = c.title
     const m = campaignMoney(c, c.influencers)
     summary.textContent = `Biaya klien ${m.fee === null ? '—' : C.rupiah(m.fee)} · Bayaran ${C.rupiah(m.payout)} · Margin ${m.margin === null ? '—' : C.rupiah(m.margin)}`
-    drawLists(c)
-    listBase = snapLists()
+    if (redraw) {
+      drawLists(c)
+      lists.querySelectorAll('.ag-inf, .ag-del, .ag-add').forEach(mark)
+    }
     touch()
   }
 
@@ -102,8 +109,8 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
       const pay = C.field({ label: 'Bayaran (Rp)', id: `ag-add-pay-${uid}-${seq}`, type: 'number', attrs: { min: '0', step: '1' } })
       const btn = C.button({ label: 'Tambahkan', icon: 'plus', variant: 'soft', size: 'sm' })
       const err = errLine()
-      btn.addEventListener('click', () => act(btn, err, () => Agency.adminAssignInfluencer(id, { influencer_id: Number(sel.input.value), payout_idr: pay.input.value.trim() }), 'Influencer ditambahkan.'))
       add = el('div', { className: 'ag-add' }, el('div', { className: 'of-row of-row-wrap' }, sel.wrap, pay.wrap, btn), err)
+      btn.addEventListener('click', () => structural(add, btn, err, () => Agency.adminAssignInfluencer(id, { influencer_id: Number(sel.input.value), payout_idr: pay.input.value.trim() }), 'Influencer ditambahkan.'))
     } else add = el('p', { className: 'muted small' }, 'Semua influencer aktif di katalog sudah ada di kampanye ini.')
 
     lists.replaceChildren(
@@ -114,15 +121,20 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
         : [el('p', { className: 'muted small' }, 'Tambahkan influencer untuk merencanakan konten.')]))
   }
 
-  // Runs one row action; success → toast + reload, failure → the row's error line.
-  async function act(btn, err, fn, done) {
+  // Runs one row action; success → toast + after(result), failure → the row's error line.
+  async function act(btn, err, fn, done, after) {
     err.textContent = ''
     const restore = C.setBusy(btn)
     try {
-      await fn()
+      const res = await fn()
       showToast(done, 'success')
-      load()
+      after(res)
     } catch (ex) { err.textContent = ex.message } finally { restore() }
+  }
+  // Adding/removing an influencer changes the groups, so the lists are redrawn: ask first if another row has unsaved edits.
+  function structural(row, btn, err, fn, done) {
+    if (listsDirty(row) && !confirm(LEAVE_MSG)) return
+    act(btn, err, fn, done, () => load())
   }
 
   function infRow(i) {
@@ -130,12 +142,14 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
     const keep = C.button({ label: 'Simpan bayaran', variant: 'soft', size: 'sm' })
     const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus ${i.name} dari kampanye` })
     const err = errLine()
-    keep.addEventListener('click', () => act(keep, err, () => Agency.adminAssignInfluencer(id, { influencer_id: i.influencer_id, payout_idr: pay.input.value.trim() }), 'Bayaran tersimpan.'))
-    rm.addEventListener('click', () => act(rm, err, () => Agency.adminRemoveInfluencer(id, i.influencer_id), 'Influencer dihapus dari kampanye.'))
-    return el('div', { className: 'ag-inf' },
+    const row = el('div', { className: 'ag-inf' },
       el('div', { className: 'workspace-entry-head' }, el('strong', {}, i.name), i.visible === 0 ? C.tag('Disembunyikan', 'neutral') : null,
         el('span', { className: 'muted small' }, [i.niche, i.city].filter(Boolean).join(' · '))),
       el('div', { className: 'of-row of-row-wrap' }, pay.wrap, keep, rm), err)
+    keep.addEventListener('click', () => act(keep, err, () => Agency.adminAssignInfluencer(id, { influencer_id: i.influencer_id, payout_idr: pay.input.value.trim() }),
+      'Bayaran tersimpan.', () => { mark(row); load({ redraw: false }) }))
+    rm.addEventListener('click', () => structural(row, rm, err, () => Agency.adminRemoveInfluencer(id, i.influencer_id), 'Influencer dihapus dari kampanye.'))
+    return row
   }
 
   function group(i, dels) {
@@ -159,12 +173,17 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
       el('div', { className: 'of-row of-row-wrap' }, kind.wrap, due.wrap, st.wrap), link.wrap, note.wrap, err, el('div', { className: 'of-row-actions' }, keep, drop))
     keep.addEventListener('click', () => {
       const body = { influencer_id: i.influencer_id, kind: kind.input.value, due_date: due.input.value, status: st.input.value, link: link.input.value, note: note.input.value }
-      try { validateDeliverable(body) } catch (ex) { err.textContent = ex.message; return }
-      act(keep, err, () => (d ? Agency.adminUpdateDeliverable(d.id, body) : Agency.adminAddDeliverable(id, body)), 'Konten tersimpan.')
+      let clean
+      try { clean = validateDeliverable(body) } catch (ex) { err.textContent = ex.message; return }
+      // Only this row is redrawn, from the values just saved (a new row becomes a saved one with its id).
+      act(keep, err, () => (d ? Agency.adminUpdateDeliverable(d.id, body) : Agency.adminAddDeliverable(id, body)), 'Konten tersimpan.', (res) => {
+        row.replaceWith(mark(delRow(i, { ...d, ...clean, id: d ? d.id : res.id })))
+        touch()
+      })
     })
     drop.addEventListener('click', () => {
       if (!d) { row.remove(); touch(); return }
-      if (confirm('Hapus konten ini?')) act(drop, err, () => Agency.adminDeleteDeliverable(d.id), 'Konten dihapus.')
+      if (confirm('Hapus konten ini?')) act(drop, err, () => Agency.adminDeleteDeliverable(d.id), 'Konten dihapus.', () => { row.remove(); touch() })
     })
     return row
   }
@@ -179,7 +198,7 @@ export function openCampaignEditor(ctx, id, opener, setDirty, onClosed = () => {
       await Agency.adminUpdateCampaign(id, clean)
       headBase = JSON.stringify(gatherHead())
       showToast('Kampanye tersimpan.', 'success')
-      load()
+      load({ redraw: false }) // title + summary only; unsaved row edits stay
     } catch (ex) { headErr.textContent = ex.message } finally { restore() }
   })
   load()
