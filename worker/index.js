@@ -703,35 +703,58 @@ async function handleChat(request, env) {
 // cannot satisfy JSON mode.
 async function structuredChat(env, model, params, schema) {
   const { stream: _stream, ...rest } = params;
-  let text = '';
-  try {
-    const out = await env.AI.run(model, { ...rest, response_format: { type: 'json_schema', json_schema: schema } });
-    const r = out?.response;
-    text = typeof r === 'string' ? r : r && typeof r === 'object' ? JSON.stringify(r, null, 2) : '';
-  } catch (e) {
-    console.warn('JSON mode failed, falling back to hinted stream', e);
-  }
-  if (!text) {
-    let aiStream;
-    try {
-      aiStream = await env.AI.run(model, { ...params, messages: [{ role: 'system', content: JSON_HINT }, ...params.messages] });
-    } catch (e) {
-      console.error('AI.run failed', e);
-      return fail(502, 'Layanan AI tidak tersedia.');
-    }
-    if (aiStream instanceof ReadableStream) return sseResponse(translateStream(aiStream));
-    text = typeof aiStream?.response === 'string' ? aiStream.response : '';
-  }
+  const keepAlive = new TextEncoder().encode(': keepalive\n\n');
+  // Open the SSE response right away and send comment keep-alives while the
+  // non-streaming JSON-mode call runs, so proxies and clients don't drop a
+  // long generation (e.g. ranking dozens of leads).
   const out = new ReadableStream({
     async start(c) {
+      const timer = setInterval(() => { try { c.enqueue(keepAlive) } catch { /* closed */ } }, 5000);
+      const finish = () => {
+        clearInterval(timer);
+        c.enqueue(sse({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
+        c.enqueue(sse('[DONE]'));
+        c.close();
+      };
+      c.enqueue(keepAlive);
+      let text = '';
+      try {
+        const res = await env.AI.run(model, { ...rest, response_format: { type: 'json_schema', json_schema: schema } });
+        const r = res?.response;
+        text = typeof r === 'string' ? r : r && typeof r === 'object' ? JSON.stringify(r, null, 2) : '';
+      } catch (e) {
+        console.warn('JSON mode failed, falling back to hinted stream', e);
+      }
+      if (!text) {
+        try {
+          const aiStream = await env.AI.run(model, { ...params, messages: [{ role: 'system', content: JSON_HINT }, ...params.messages] });
+          if (aiStream instanceof ReadableStream) {
+            clearInterval(timer);
+            const reader = translateStream(aiStream).getReader();
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              c.enqueue(value);
+            }
+            c.close();
+            return;
+          }
+          text = typeof aiStream?.response === 'string' ? aiStream.response : '';
+        } catch (e) {
+          console.error('AI.run failed', e);
+          clearInterval(timer);
+          c.enqueue(sse({ error: { message: 'Layanan AI tidak tersedia.' } }));
+          c.enqueue(sse('[DONE]'));
+          c.close();
+          return;
+        }
+      }
       const STEP = 24;
       for (let i = 0; i < text.length; i += STEP) {
         c.enqueue(sse({ choices: [{ delta: { content: text.slice(i, i + STEP) }, finish_reason: null }] }));
         await new Promise((r) => setTimeout(r, 12));
       }
-      c.enqueue(sse({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
-      c.enqueue(sse('[DONE]'));
-      c.close();
+      finish();
     },
   });
   return sseResponse(out);

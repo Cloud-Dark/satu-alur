@@ -17,12 +17,17 @@
  * in the Cache API (no D1 writes) with an in-memory fallback.
  */
 import {
-  validateKeywords, roundSearch, cacheKeyOf, buildOverpassQuery, leadsFromOverpass, inIndonesia,
+  validateKeywords, roundSearch, cacheKeyOf, buildOverpassQuery, leadsFromOverpass, inIndonesia, specForKeyword,
   haversineKm, cleanPhone, cleanWebsite, dedupeLeads, MIN_RADIUS_KM, MAX_RADIUS_KM, MAX_RESULTS, OVERPASS_TIMEOUT_S,
 } from '../src/leads/osm.js';
 
 const USER_AGENT = 'SatuAlur/0.1 (lead finder for Indonesian service businesses; https://github.com/Cloud-Dark/satu-alur)';
 const OVERPASS_DEFAULT = 'https://overpass-api.de/api/interpreter';
+// Public mirrors tried in order when the main instance is busy or rejects us.
+const OVERPASS_MIRRORS = ['https://overpass.kumi.systems/api/interpreter'];
+// After a failure, skip Overpass for a few minutes and go straight to the fallback.
+const OVERPASS_COOLDOWN_MS = 5 * 60 * 1000;
+let overpassDownUntil = 0;
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const GOOGLE_TEXT_SEARCH = 'https://places.googleapis.com/v1/places:searchText';
 
@@ -130,12 +135,76 @@ async function fetchWithTimeout(url, init, ms) {
   }
 }
 
+// Nominatim special phrases for the preset keywords (free text is searched as typed).
+const NOMINATIM_PHRASES = {
+  hotel: 'hotel', restoran: 'restaurant', rumah_sakit: 'hospital', klinik: 'clinic', sekolah: 'school',
+  mall: 'mall', kantor: 'office', pabrik: 'factory', gudang: 'warehouse', kost: 'kost', apotek: 'pharmacy',
+  supermarket: 'supermarket', bank: 'bank', spbu: 'fuel', gym: 'fitness centre', salon: 'salon', laundry: 'laundry',
+};
+
+async function nominatimGet(params) {
+  const wait = lastNominatimAt + 1100 - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, Math.min(wait, 1100)));
+  lastNominatimAt = Date.now();
+  const res = await fetchWithTimeout(`${NOMINATIM_URL}?${new URLSearchParams(params)}`, {
+    headers: { 'user-agent': USER_AGENT, accept: 'application/json', referer: 'https://satu-alur.apipedia.workers.dev/' },
+  }, 10000);
+  if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Fallback when every Overpass instance fails: Nominatim search bounded to the
+ * radius box, converted to Overpass-shaped elements so the same normaliser,
+ * keyword matching and dedupe apply.
+ */
+async function searchNominatimPlaces(search) {
+  const r = roundSearch(search);
+  const dLat = r.radiusKm / 111;
+  const dLon = r.radiusKm / (111 * Math.max(0.2, Math.cos((r.lat * Math.PI) / 180)));
+  const viewbox = [r.lon - dLon, r.lat + dLat, r.lon + dLon, r.lat - dLat].map((v) => v.toFixed(5)).join(',');
+  const queries = [];
+  for (const kw of r.keywords.slice(0, 4)) {
+    const spec = specForKeyword(kw);
+    const phrase = spec ? NOMINATIM_PHRASES[spec.key] : null;
+    queries.push(kw);
+    if (phrase && phrase !== kw) queries.push(phrase);
+  }
+  const elements = [];
+  for (const q of [...new Set(queries)]) {
+    let rows = [];
+    try {
+      rows = await nominatimGet({ format: 'jsonv2', q, viewbox, bounded: '1', countrycodes: 'id', limit: '40', extratags: '1', addressdetails: '1', 'accept-language': 'id' });
+    } catch (e) {
+      console.warn('Nominatim fallback query failed', q, e);
+      continue;
+    }
+    for (const p of rows || []) {
+      const a = p.address || {};
+      elements.push({
+        type: p.osm_type, id: p.osm_id, lat: Number(p.lat), lon: Number(p.lon),
+        tags: {
+          ...(p.extratags || {}),
+          name: p.name || String(p.display_name || '').split(',')[0],
+          [p.category]: p.type,
+          'addr:street': a.road, 'addr:housenumber': a.house_number, 'addr:village': a.village,
+          'addr:suburb': a.suburb || a.neighbourhood, 'addr:city': a.city || a.town || a.county, 'addr:postcode': a.postcode,
+        },
+      });
+    }
+  }
+  const results = leadsFromOverpass({ elements }, { origin: { lat: r.lat, lon: r.lon }, radiusKm: r.radiusKm, keywords: r.keywords });
+  return { results, truncated: false };
+}
+
 async function searchOverpass(env, search, HttpError) {
+  if (Date.now() < overpassDownUntil) throw new HttpError(503, 'Overpass sedang tidak tersedia.');
   const r = roundSearch(search);
   const query = buildOverpassQuery({ lat: r.lat, lon: r.lon, radiusKm: r.radiusKm, keywords: r.keywords, limit: 250 });
-  const endpoints = [env.OVERPASS_URL || OVERPASS_DEFAULT];
+  const endpoints = [...new Set([env.OVERPASS_URL || OVERPASS_DEFAULT, ...OVERPASS_MIRRORS])];
   let lastErr = null;
-  for (const url of endpoints) {
+  let busy = false;
+  for (const [i, url] of endpoints.entries()) {
     let res;
     try {
       res = await fetchWithTimeout(url, {
@@ -146,16 +215,18 @@ async function searchOverpass(env, search, HttpError) {
           'user-agent': USER_AGENT,
         },
         body: `data=${encodeURIComponent(query)}`,
-      }, (OVERPASS_TIMEOUT_S + 5) * 1000);
+      }, i === 0 ? 15000 : 10000);
     } catch (e) {
       lastErr = e;
       continue;
     }
     if (res.status === 429 || res.status === 503 || res.status === 504) {
-      throw new HttpError(503, 'Server OpenStreetMap (Overpass) sedang sibuk. Coba lagi beberapa menit lagi atau perkecil radius.');
+      busy = true;
+      lastErr = new Error(`Overpass HTTP ${res.status} at ${url}`);
+      continue;
     }
     if (!res.ok) {
-      lastErr = new Error(`Overpass HTTP ${res.status}`);
+      lastErr = new Error(`Overpass HTTP ${res.status} at ${url}`);
       continue;
     }
     let payload;
@@ -171,6 +242,8 @@ async function searchOverpass(env, search, HttpError) {
     return { results, truncated: (payload.elements || []).length >= 250 };
   }
   console.error('Overpass unreachable', lastErr);
+  overpassDownUntil = Date.now() + OVERPASS_COOLDOWN_MS;
+  if (busy) throw new HttpError(503, 'Server OpenStreetMap (Overpass) sedang sibuk. Coba lagi beberapa menit lagi atau perkecil radius.');
   throw new HttpError(502, 'OpenStreetMap (Overpass) tidak dapat dihubungi saat ini. Coba lagi nanti.');
 }
 
@@ -249,9 +322,23 @@ export async function handleLeadSearch(request, env, { authenticate, readJson, o
   await rateLimit(user.id, 'search', SEARCHES_PER_HOUR, HttpError);
 
   const r = roundSearch(search);
-  const { results, truncated } = search.source === 'google' ? await searchGoogle(env, search, HttpError) : await searchOverpass(env, search, HttpError);
+  let viaFallback = false;
+  let found;
+  if (search.source === 'google') {
+    found = await searchGoogle(env, search, HttpError);
+  } else {
+    try {
+      found = await searchOverpass(env, search, HttpError);
+    } catch (e) {
+      if (!(e instanceof HttpError) || (e.status !== 502 && e.status !== 503)) throw e;
+      found = await searchNominatimPlaces(search);
+      viaFallback = true;
+    }
+  }
+  const { results, truncated } = found;
   const data = {
     source: search.source,
+    via: viaFallback ? 'nominatim' : search.source === 'google' ? 'google' : 'overpass',
     attribution: search.source === 'google' ? 'Data © Google' : '© OpenStreetMap contributors (ODbL)',
     center: { lat: r.lat, lon: r.lon },
     radius_km: r.radiusKm,

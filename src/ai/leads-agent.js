@@ -15,7 +15,7 @@ import { parseModelJson } from './agent.js'
 import { heuristicRank, mergeRanking } from '../leads/scoring.js'
 
 export const LEADS_MARKER = '[agent:leads]'
-export const AI_RANK_LIMIT = 40
+export const AI_RANK_LIMIT = 25
 
 const RANK_SCHEMA = {
   type: 'object',
