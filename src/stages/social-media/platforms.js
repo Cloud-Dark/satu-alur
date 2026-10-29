@@ -3,7 +3,7 @@ export const PLATFORM_LABEL = { facebook: 'Facebook', instagram: 'Instagram' }
 export const RECONNECT = 'Hubungkan ulang akun di tab Akun.'
 
 export function connectedPlatforms(account) {
-  return account ? ['facebook', ...(account.ig_username ? ['instagram'] : [])] : []
+  return account ? ['facebook', ...(account.ig_connected ? ['instagram'] : [])] : []
 }
 
 // Reason a platform cannot be chosen, or '' when it can. `ig` is the igEligibility() result for the content.

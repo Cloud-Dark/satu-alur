@@ -12,8 +12,9 @@ module.exports = async function socialMedia(t) {
 
   // OAuth return: query is shown as a message, opens Akun, then stripped
   await p.evaluate(() => { location.hash = '#/social-media?social_error=Izin%20ditolak%20Meta' })
-  await p.locator('.note-danger', { hasText: 'Izin ditolak Meta' }).waitFor({ timeout: 8000 }).catch(() => {})
-  t.check(await p.locator('.note-danger', { hasText: 'Izin ditolak Meta' }).count() === 1, 'social_error shown as danger message')
+  await p.locator('.note-danger', { hasText: 'Koneksi gagal, coba lagi.' }).waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await p.locator('.note-danger', { hasText: 'Koneksi gagal, coba lagi.' }).count() === 1, 'unknown social_error shown as a generic danger message')
+  t.check(await p.locator('.note-danger', { hasText: 'Izin ditolak Meta' }).count() === 0, 'unknown social_error text is not echoed')
   const hash = await p.evaluate(() => location.hash)
   t.check(!hash.includes('social_error'), 'query stripped from hash', hash)
   t.check(await tab('Akun').getAttribute('aria-checked') === 'true', 'Akun tab opened by social_error')

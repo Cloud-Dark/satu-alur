@@ -7,6 +7,9 @@ import * as Schedule from './social-media/schedule.js'
 import * as Ads from './social-media/ads.js'
 import * as Collab from './social-media/collab.js'
 
+// The URL is attacker-controllable: only echo the messages the OAuth callback itself sends.
+const CALLBACK_ERRORS = ['Koneksi dibatalkan.', 'Integrasi Meta belum dikonfigurasi.', 'Sesi koneksi kedaluwarsa, coba lagi.']
+
 const { el } = C
 const TABS = [
   { value: 'account', label: 'Akun' }, { value: 'content', label: 'Konten' }, { value: 'schedule', label: 'Jadwal' },
@@ -69,7 +72,7 @@ export async function render(container, ctx = {}) {
   if (ctx.signal?.aborted) return
   draw()
   if (back.connected) status.show('ok', 'Akun berhasil terhubung.')
-  else if (back.error) status.show('danger', back.error)
+  else if (back.error) status.show('danger', CALLBACK_ERRORS.includes(back.error) || back.error.startsWith('Gagal terhubung ke Meta:') ? back.error : 'Koneksi gagal, coba lagi.')
   try {
     await loadModels()
     if (!ctx.signal?.aborted) modelId = pickDefaultModel()?.id
