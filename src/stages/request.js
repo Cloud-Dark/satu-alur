@@ -83,7 +83,7 @@ export async function render(container, ctx = {}) {
   const pg = C.pager({ key: 'requests', label: 'daftar permintaan', onChange: () => drawList(), scrollTarget: listPanel })
 
   container.replaceChildren(
-    C.pageHeader({ num: '01', label: 'Permintaan', title: 'Permintaan masuk', em: 'masuk', description: 'Catat kebutuhan pelanggan. Status setiap permintaan mengikuti seberapa jauh ia sudah bergerak di alur.' }),
+    C.pageHeader({ title: 'Permintaan masuk' }),
     el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
   )
 

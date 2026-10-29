@@ -5,7 +5,7 @@
 import { logoLink } from './brand.js'
 import { themeToggleButton } from './theme.js'
 import { icon } from './icons.js'
-import { el, button } from './components.js'
+import { el, button, infoTip } from './components.js'
 import { animateView } from './animations.js'
 import { isUsingMockCloud } from '../cloud.js'
 import { loadFlow } from '../stages/data.js'
@@ -24,27 +24,38 @@ import * as StageRadar from '../stages/radar.js'
 import * as StageLeads from '../stages/leads.js'
 
 export const STAGES = [
-  { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
+  { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home',
+    hint: 'Ringkasan alur kerja dan keuangan, dihitung langsung dari data Anda.', module: StageDashboard,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request', primary: true } },
-  { key: 'request', num: '01', label: 'Permintaan', icon: 'inbox', module: StageRequest,
+  { key: 'request', num: '01', label: 'Permintaan', icon: 'inbox',
+    hint: 'Catat kebutuhan pelanggan. Statusnya ikut bergerak sesuai tahap alur.', module: StageRequest,
     action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'offer', num: '02', label: 'Penawaran', icon: 'sparkles', module: StageOffer,
+  { key: 'offer', num: '02', label: 'Penawaran', icon: 'sparkles',
+    hint: 'AI menyusun ruang lingkup dan harga, lalu aturan bisnis memeriksanya sebelum disimpan.', module: StageOffer,
     action: { label: 'Ke penugasan', iconRight: 'arrowRight', to: 'assign' } },
-  { key: 'assign', num: '03', label: 'Penugasan', icon: 'users', module: StageAssign,
+  { key: 'assign', num: '03', label: 'Penugasan', icon: 'users',
+    hint: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.', module: StageAssign,
     action: { label: 'Ke penyelesaian', iconRight: 'arrowRight', to: 'complete' } },
-  { key: 'complete', num: '04', label: 'Penyelesaian', icon: 'checkCircle', module: StageComplete,
+  { key: 'complete', num: '04', label: 'Penyelesaian', icon: 'checkCircle',
+    hint: 'Tutup penugasan yang sudah dikerjakan agar siap dibukukan.', module: StageComplete,
     action: { label: 'Ke pembukuan', iconRight: 'arrowRight', to: 'bookkeeping' } },
-  { key: 'bookkeeping', num: '05', label: 'Pembukuan', icon: 'ledger', module: StageBookkeeping,
+  { key: 'bookkeeping', num: '05', label: 'Pembukuan', icon: 'ledger',
+    hint: 'Catat pendapatan dan biaya tiap pekerjaan. Saldo dihitung berjalan.', module: StageBookkeeping,
     action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
-  { key: 'report', num: '06', label: 'Laporan', icon: 'chart', module: StageReport,
+  { key: 'report', num: '06', label: 'Laporan', icon: 'chart',
+    hint: 'Angka periode terpilih dari buku besar, plus penjelasan AI.', module: StageReport,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
-  { key: 'radar', group: 'growth', label: 'Radar peluang', sub: 'Peluang dari transaksi', icon: 'radar', module: StageRadar,
+  { key: 'radar', group: 'growth', label: 'Radar peluang', sub: 'Peluang dari transaksi', icon: 'radar',
+    hint: 'Peluang dari transaksi Anda sendiri: layanan rutin jatuh tempo, pelanggan yang menghilang, penawaran tertahan, dan musim ramai.', module: StageRadar,
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
-  { key: 'leads', group: 'growth', label: 'Pencari prospek', sub: 'Peta & radius', icon: 'mapPin', module: StageLeads,
+  { key: 'leads', group: 'growth', label: 'Pencari prospek', sub: 'Peta & radius', icon: 'mapPin',
+    hint: 'Pilih titik dan radius, tentukan jenis usaha. AI menilai kecocokannya dan membantu menyusun penawaran. Tidak ada pesan yang dikirim otomatis.', module: StageLeads,
     action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'social', group: 'growth', label: 'Media sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocial,
+  { key: 'social', group: 'growth', label: 'Media sosial', sub: 'Konten & jadwal', icon: 'megaphone',
+    hint: 'Tulis konten per platform, atur jadwal unggah, dan hubungkan akun media sosial Anda.', module: StageSocial,
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
-  { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,
+  { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot',
+    hint: 'Penasihat AI yang membaca angka bisnis Anda. Percakapan tersimpan di perangkat ini.', module: StageAdvisor,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 ]
 
@@ -116,12 +127,6 @@ export function renderShell(root, ctx) {
     type: 'button', className: 'icon-btn side-close', 'aria-label': 'Tutup menu', title: 'Tutup menu',
   }, icon('x'))
 
-  const modeBadge = el('div', { className: `mode-badge ${isMock ? 'is-demo' : 'is-live'}` },
-    el('span', { className: 'pulse-dot mode-dot', 'aria-hidden': 'true' }),
-    el('span', { className: 'mode-text' }, isMock ? 'Mode demo · data lokal' : 'Terhubung · Cloudflare D1'),
-  )
-  modeBadge.title = isMock ? 'Data tersimpan lokal di browser ini' : 'Terhubung ke Cloudflare Worker + D1'
-
   const settingsBtn = el('button', { type: 'button', className: 'side-row', title: 'Pengaturan' },
     icon('settings'), el('span', { className: 'side-row-label' }, 'Pengaturan'))
 
@@ -145,7 +150,6 @@ export function renderShell(root, ctx) {
     ),
     el('div', { className: 'side-foot' },
       settingsBtn,
-      modeBadge,
       el('div', { className: 'side-user' },
         el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials(user)),
         el('span', { className: 'side-user-text' },
@@ -166,12 +170,13 @@ export function renderShell(root, ctx) {
   }, icon('menu'))
   const crumbNum = el('span', { className: 'crumb-pre' })
   const crumbTitle = el('span', { className: 'crumb-title' })
+  const crumbTip = el('span', { className: 'crumb-tip' })
   const actionSlot = el('div', { className: 'topbar-action' })
   const avatar = el('span', { className: 'avatar', role: 'img', title: user.email || '', 'aria-label': `Masuk sebagai ${user.email || 'pengguna'}` }, initials(user))
 
   const topbar = el('header', { className: 'topbar' },
     menuBtn,
-    el('div', { className: 'crumb' }, crumbNum, el('span', { className: 'crumb-sep', 'aria-hidden': 'true' }, icon('chevronRight', { size: 14 })), crumbTitle),
+    el('div', { className: 'crumb' }, crumbNum, el('span', { className: 'crumb-sep', 'aria-hidden': 'true' }, icon('chevronRight', { size: 14 })), crumbTitle, crumbTip),
     el('div', { className: 'topbar-right' }, themeToggleButton(), actionSlot, avatar),
   )
 
@@ -331,6 +336,7 @@ export function renderShell(root, ctx) {
   function setTopbar(stage) {
     crumbNum.textContent = stage.key === 'dashboard' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
+    crumbTip.replaceChildren(stage.hint ? infoTip(stage.hint, { label: `Tentang ${stage.label}` }) : '')
     const a = stage.action
     const b = button({
       label: a.label, icon: a.icon, iconRight: a.iconRight, size: 'sm',

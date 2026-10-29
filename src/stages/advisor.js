@@ -1,8 +1,11 @@
 /**
  * Pertumbuhan — Penasihat AI.
- * A multi-agent business adviser grounded in the user's own D1 data: the
+ * A multi-agent business adviser grounded in the user's own data: the
  * snapshot and growth calculator below are computed client-side and sent to
  * the model as context, so advice quotes the user's real numbers.
+ * Conversations live in localStorage (see ai/advisor.js). An answer that is
+ * still streaming runs at module level, so it finishes and is saved even if
+ * the user leaves the page; coming back re-attaches to it.
  */
 import '../styles/advisor.css'
 import * as C from '../ui/components.js'
@@ -12,7 +15,7 @@ import { getAgentParams } from './settings.js'
 import { loadFlow } from './data.js'
 import {
   AGENTS, AGENT_KEYS, AUTO, agentName, routeQuestion, describeRoute, buildMessages, toHistory,
-  streamAnswer, loadMessages, saveMessage, clearMessages, computeAnalytics,
+  streamAnswer, loadMessages, saveMessage, deleteMessage, clearMessages, computeAnalytics,
 } from '../ai/advisor.js'
 import {
   buildSnapshot, snapshotToContext, growthProjection, projectionToContext, parseTargetPct,
@@ -39,6 +42,57 @@ const AUTO_SUGGESTIONS = [
   'Pekerjaan mana yang tertahan paling lama?',
 ]
 const viewMeta = (key) => (key === AUTO ? AUTO_AGENT : AGENTS[key])
+
+/* -------------------------------------------------- Background answer */
+
+let activeJob = null
+const routes = new Map() // row id -> route info, kept across page visits
+
+/** Streams one answer and stores it, independent of any mounted page. */
+function startJob({ uid, view, agentKey, route, question, userRow, draft, request }) {
+  const ac = new AbortController()
+  const job = { uid, view, agentKey, route, question, userRow, draft, ac, full: '', done: false, outcome: null, listeners: new Set() }
+  const emit = (type) => job.listeners.forEach((fn) => { try { fn(type) } catch (e) { console.error(e) } })
+  activeJob = job
+  job.promise = (async () => {
+    let result = null
+    let failure = null
+    try {
+      const gen = streamAnswer({ ...request, signal: ac.signal })
+      for (;;) {
+        const step = await gen.next()
+        if (step.done) { result = step.value; break }
+        if (step.value.type === 'delta') { job.full = step.value.full; emit('delta') }
+        else if (step.value.type === 'retry') emit('retry')
+      }
+    } catch (err) {
+      failure = err
+    }
+    const aborted = failure?.name === 'AbortError'
+    let full = job.full
+    if (!failure) {
+      full = result.full || full
+      if (!full.trim()) failure = new Error('Jawaban kosong. Coba tanyakan lagi.')
+    }
+    const base = { ...draft, model: request.model }
+    let row = null
+    if (!failure) row = { ...base, content: full, latency_ms: result.latency, error: null }
+    else if (aborted) row = full.trim() ? { ...base, content: full, latency_ms: null, error: 'aborted' } : null
+    else row = { ...base, content: failure.partial || full || '', latency_ms: failure.latency ?? null, error: String(failure.message || 'Gagal').slice(0, 300) }
+    let unsaved = false
+    if (row) {
+      row.created_at = new Date().toISOString()
+      try { Object.assign(row, await saveMessage(row, { uid })) } catch { row.id = `tmp-${Date.now()}`; unsaved = true }
+      if (route) routes.set(row.id, route)
+    }
+    job.full = full
+    job.outcome = { failure, aborted, row, unsaved }
+    job.done = true
+    if (activeJob === job) activeJob = null
+    emit('done')
+  })()
+  return job
+}
 
 /* ------------------------------------------------------------ Markdown */
 
@@ -151,7 +205,9 @@ const seconds = (ms) => (ms == null ? '' : `${(ms / 1000).toLocaleString('id-ID'
 export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
   const savedView = store.get(PREF_AGENT)
-  let view = savedView === AUTO || AGENTS[savedView] ? savedView : AUTO
+  const uid = ctx.user?.id || null
+  const running = activeJob && activeJob.uid === uid && !activeJob.done ? activeJob : null
+  let view = running ? running.view : savedView === AUTO || AGENTS[savedView] ? savedView : AUTO
   let rows = []
   let snap = null
   let model = null
@@ -159,22 +215,10 @@ export async function render(container, ctx = {}) {
   let current = null
   let lastAuto = null
   let showCount = SHOW_STEP
-  const routes = new Map() // row id -> route info for this session
-  ctx.signal?.addEventListener('abort', () => current?.abort())
 
   /* ------------------------------------------------------------ Header */
-  const modelPill = el('span', { className: 'date-pill adv-model-pill' }, icon('bot', { size: 15 }), el('span', {}, 'Model: memuat…'))
-  const header = el('header', { className: 'page-head' },
-    el('div', { className: 'page-head-text' },
-      el('span', { className: 'step-pill adv-pill' },
-        el('span', { className: 'adv-pill-ico', 'aria-hidden': 'true' }, icon('sprout', { size: 14 })),
-        el('span', { className: 'step-text' }, 'Pertumbuhan', el('span', { 'aria-hidden': 'true' }, '·'), el('b', {}, 'Penasihat AI')),
-      ),
-      el('h1', { className: 'page-title display', tabindex: '-1' }, C.displayTitle('Penasihat bisnis', 'bisnis')),
-      el('p', { className: 'page-desc' }, 'Lima penasihat AI yang membaca angka bisnis Anda sendiri. Tanyakan cara tumbuh 1–2% per bulan, atau lebih.'),
-    ),
-    el('div', { className: 'page-head-actions' }, modelPill),
-  )
+  const modelPill = el('span', { className: 'date-pill adv-model-pill', hidden: true }, icon('bot', { size: 15 }), el('span', {}, 'AI sedang tidak tersedia'))
+  const header = C.pageHeader({ title: 'Penasihat bisnis', actions: modelPill })
 
   /* ------------------------------------------------------ Agent picker */
   const agentButtons = new Map()
@@ -454,7 +498,7 @@ export async function render(container, ctx = {}) {
       el('p', { className: 'adv-empty-title display' }, C.displayTitle(view === AUTO ? 'Apa yang ingin Anda tumbuhkan?' : `Tanya ${meta.name.toLowerCase()}`, view === AUTO ? 'tumbuhkan' : meta.name.toLowerCase())),
       el('p', { className: 'adv-empty-body' }, snap && !snap.hasData
         ? 'Data bisnis Anda belum ada, jadi saran awal bersifat umum. Setelah permintaan dan jurnal tercatat, jawaban akan memakai angka Anda.'
-        : 'Jawaban memakai snapshot bisnis Anda: pendapatan, biaya, konversi, dan pekerjaan tertunda. Percakapan tersimpan di akun Anda.'),
+        : 'Jawaban memakai snapshot bisnis Anda: pendapatan, biaya, konversi, dan pekerjaan tertunda. Percakapan tersimpan di perangkat ini.'),
       el('div', { className: 'adv-suggests' }, cards),
     )
   }
@@ -498,7 +542,6 @@ export async function render(container, ctx = {}) {
         const parts = []
         if (r.error === 'aborted') parts.push(el('span', { className: 'adv-flag' }, icon('stop', { size: 12 }), 'Dihentikan'))
         else if (r.error) parts.push(el('span', { className: 'adv-flag is-bad', title: r.error }, icon('alert', { size: 12 }), 'Terputus'))
-        if (r.model) parts.push(el('span', {}, r.model))
         if (r.latency_ms && r.error !== 'aborted') parts.push(el('span', { className: 'tnum' }, seconds(r.latency_ms)))
         foot.replaceChildren(...parts.flatMap((p, i) => (i ? [el('span', { className: 'adv-sep', 'aria-hidden': 'true' }, '·'), p] : [p])))
         foot.hidden = parts.length === 0
@@ -595,8 +638,6 @@ export async function render(container, ctx = {}) {
     const question = String(text || '').trim()
     if (!question || busy) return
     setBusy(true)
-    const ac = new AbortController()
-    current = ac
 
     await dataReady
     if (!model) {
@@ -606,16 +647,13 @@ export async function render(container, ctx = {}) {
     const agentKey = forced || (route ? route.key : view)
     if (route) lastAuto = agentKey
 
-    // 1. User turn: shown now, stored in the background.
+    // 1. User turn: stored right away so it survives leaving the page.
     let userRow = existingUser
-    let userSaved = Promise.resolve()
     if (!userRow) {
       userRow = { id: `tmp-${Date.now()}`, agent: agentKey, role: 'user', content: question, created_at: new Date().toISOString() }
       rows.push(userRow)
       appendToLog(userMsg(userRow))
-      userSaved = saveMessage(userRow)
-        .then((saved) => { Object.assign(userRow, saved) })
-        .catch(() => { userRow.unsaved = true })
+      try { Object.assign(userRow, await saveMessage(userRow, { uid })) } catch { userRow.unsaved = true }
     }
     input.value = ''
     autosize()
@@ -631,104 +669,93 @@ export async function render(container, ctx = {}) {
     status.textContent = `${agentName(agentKey)} sedang menyusun jawaban.`
 
     if (!model) {
-      ui.fail('Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.')
+      ui.fail('AI sedang tidak tersedia. Periksa koneksi lalu muat ulang halaman.')
       setBusy(false)
-      current = null
       return
     }
 
     const params = getAgentParams()
-    let full = ''
-    let frame = 0
-    const paint = () => {
-      frame = 0
-      const stick = nearBottom()
-      ui.setText(full, { caret: true })
-      if (stick) log.scrollTop = log.scrollHeight
-    }
-    let result = null
-    let failure = null
-    try {
-      const gen = streamAnswer({
+    const job = startJob({
+      uid, view, agentKey, route, question, userRow, draft,
+      request: {
         messages: buildMessages({ agentKey, context: contextFor(agentKey, question), history, question }),
         model: model.id,
         temperature: AGENTS[agentKey].temperature,
         maxTokens: Math.min(params.maxTokens || 1500, 2048),
-        signal: ac.signal,
-      })
-      for (;;) {
-        const step = await gen.next()
-        if (step.done) { result = step.value; break }
-        const ev = step.value
-        if (ev.type === 'delta') {
-          full = ev.full
-          if (!frame) frame = requestAnimationFrame(paint)
-        } else if (ev.type === 'retry') {
-          ui.typing('Koneksi terputus, mencoba sekali lagi')
-          status.textContent = 'Koneksi terputus, mencoba sekali lagi.'
-        }
-      }
-    } catch (err) {
-      failure = err
-    }
-    if (frame) cancelAnimationFrame(frame)
-    await userSaved
+      },
+    })
+    attach(job, ui)
+  }
 
-    const aborted = failure?.name === 'AbortError'
-    const stickEnd = nearBottom()
-    let assistantRow = null
-    if (!failure) {
-      full = result.full || full
-      if (!full.trim()) failure = new Error('Model mengembalikan jawaban kosong.')
+  /** Follows a running answer on this page; detaches when the page unmounts. */
+  function attach(job, ui) {
+    setBusy(true)
+    current = job.ac
+    let frame = 0
+    const paint = () => {
+      frame = 0
+      const stick = nearBottom()
+      ui.setText(job.full, { caret: true })
+      if (stick) log.scrollTop = log.scrollHeight
     }
-    if (!failure) {
-      ui.setText(full)
-      assistantRow = { ...draft, content: full, model: model.id, latency_ms: result.latency, error: null }
-      status.textContent = `Jawaban ${agentName(agentKey)} selesai.`
-    } else if (aborted) {
-      if (full.trim()) {
-        ui.setText(full)
-        assistantRow = { ...draft, content: full, model: model.id, latency_ms: null, error: 'aborted' }
-      } else {
-        ui.node.remove()
+    const onEvent = (type) => {
+      if (ctx.signal?.aborted) return
+      if (type === 'delta') { if (!frame) frame = requestAnimationFrame(paint) }
+      else if (type === 'retry') {
+        ui.typing('Koneksi terputus, mencoba sekali lagi')
+        status.textContent = 'Koneksi terputus, mencoba sekali lagi.'
+      } else if (type === 'done') {
+        job.listeners.delete(onEvent)
+        if (frame) cancelAnimationFrame(frame)
+        finishJob(job, ui)
       }
+    }
+    job.listeners.add(onEvent)
+    ctx.signal?.addEventListener('abort', () => {
+      job.listeners.delete(onEvent)
+      if (frame) cancelAnimationFrame(frame)
+    })
+    if (job.done) onEvent('done')
+  }
+
+  function finishJob(job, ui) {
+    const { failure, aborted, row, unsaved } = job.outcome
+    const stickEnd = nearBottom()
+    const name = agentName(job.agentKey)
+    if (!failure) {
+      ui.setText(row.content)
+      status.textContent = `Jawaban ${name} selesai.`
+    } else if (aborted) {
+      if (row) ui.setText(row.content)
+      else ui.node.remove()
       status.textContent = 'Jawaban dihentikan.'
     } else {
-      const partial = failure.partial || full
-      assistantRow = { ...draft, content: partial || '', model: model.id, latency_ms: failure.latency ?? null, error: String(failure.message || 'Gagal').slice(0, 300) }
-      if (partial) {
-        ui.setText(partial)
+      if (row.content) {
+        ui.setText(row.content)
         ui.node.classList.add('is-error')
       } else {
-        ui.fail(failure.message, () => {
+        ui.fail(failure.message, async () => {
           ui.node.remove()
-          ask(question, { agentKey, userRow })
+          rows = rows.filter((r) => r !== row)
+          await deleteMessage(row.id, { uid })
+          ask(job.question, { agentKey: job.agentKey, userRow: job.userRow })
         })
       }
       status.textContent = 'Penasihat gagal menjawab.'
     }
-
-    if (assistantRow) {
-      assistantRow.created_at = new Date().toISOString()
-      try {
-        Object.assign(assistantRow, await saveMessage(assistantRow))
-      } catch {
-        assistantRow.id = `tmp-${Date.now()}`
-        if (!userRow.unsaved) showToast('Jawaban tampil, tetapi gagal disimpan ke riwayat.', 'error')
-      }
-      if (route) routes.set(assistantRow.id, route)
-      rows.push(assistantRow)
-      if (!failure || aborted || assistantRow.content) ui.finish(assistantRow)
+    if (row) {
+      rows.push(row)
+      if (!failure || aborted || row.content) ui.finish(row)
     }
-    if (userRow.unsaved) showToast('Percakapan tidak tersimpan. Periksa koneksi.', 'error')
+    if (unsaved || job.userRow.unsaved) showToast('Percakapan tidak tersimpan di perangkat ini.', 'error')
     if (stickEnd) log.scrollTop = log.scrollHeight
 
-    if (current === ac) current = null
+    if (current === job.ac) current = null
     setBusy(false)
     syncAgents()
     renderChips()
     renderStats()
-    if (!ac.signal.aborted && document.activeElement === document.body) input.focus()
+    if (!job.ac.signal.aborted && document.activeElement === document.body) input.focus()
   }
 
   /* ---------------------------------------------------------- Composer */
@@ -767,7 +794,7 @@ export async function render(container, ctx = {}) {
     const keys = view === AUTO ? AGENT_KEYS : [view]
     const restore = C.setBusy(clearBtn, 'Menghapus…')
     try {
-      await clearMessages(keys)
+      await clearMessages(keys, { uid })
       rows = rows.filter((r) => !keys.includes(r.agent))
       if (view === AUTO) lastAuto = null
       restore()
@@ -983,10 +1010,10 @@ export async function render(container, ctx = {}) {
 
   const modelReady = resolveModel()
   modelReady
-    .then((m) => { model = m; modelPill.lastChild.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' })
-    .catch((err) => { modelPill.lastChild.textContent = `Model: ${err.message}` })
+    .then((m) => { model = m; modelPill.hidden = Boolean(m) })
+    .catch((err) => { modelPill.hidden = false })
 
-  const memoryReady = loadMessages()
+  const memoryReady = loadMessages({ uid })
     .then(({ rows: r }) => { rows = r })
     .catch((err) => { showToast(`Riwayat percakapan gagal dimuat: ${err.message}`, 'error') })
 
@@ -1008,4 +1035,25 @@ export async function render(container, ctx = {}) {
   drawCalc()
   renderThread()
   renderStats()
+
+  // An answer that kept streaming while the user was on another page.
+  if (running) {
+    const job = running
+    const has = (row) => rows.some((r) => r.id === row.id)
+    if (!has(job.userRow)) rows.push(job.userRow)
+    if (job.done) {
+      // Finished while this page was loading.
+      if (job.outcome.row && !has(job.outcome.row)) rows.push(job.outcome.row)
+      renderThread()
+      renderStats()
+      return
+    }
+    renderThread()
+    const ui = assistantMsg(job.draft, { route: job.route, streaming: true })
+    if (job.full) ui.setText(job.full, { caret: true })
+    else ui.typing()
+    appendToLog(ui.node)
+    status.textContent = `${agentName(job.agentKey)} sedang menyusun jawaban.`
+    attach(job, ui)
+  }
 }

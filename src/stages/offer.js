@@ -41,7 +41,7 @@ export async function render(container, ctx = {}) {
   /* -------------------------------------------- Step 2: AI compose */
   const forBox = el('div', {})
   const aiSlot = el('div', { className: 'ai-slot' })
-  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
+  const modelNote = el('span', { className: 'model-note', hidden: true })
   const redoBtn = C.button({ label: 'Susun ulang', icon: 'refresh', size: 'sm', variant: 'soft', hidden: true })
   const redoRow = el('div', { className: 'redo-row' }, modelNote, redoBtn)
 
@@ -103,13 +103,13 @@ export async function render(container, ctx = {}) {
   let focusPending = params.offerId != null
 
   container.replaceChildren(
-    C.pageHeader({ num: '02', label: 'Penawaran', title: 'Penawaran AI', em: 'AI', description: 'AI menyusun ruang lingkup dan harga. Aturan domain memeriksa hasilnya sebelum Anda menyimpan.' }),
+    C.pageHeader({ title: 'Penawaran AI' }),
     el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
   )
 
   const modelReady = resolveModel()
-    .then((mdl) => { model = mdl; modelNote.textContent = mdl ? `Model: ${mdl.id}` : 'Model: tidak tersedia' })
-    .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
+    .then((mdl) => { model = mdl; if (!mdl) { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false } })
+    .catch((err) => { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false })
 
   /* ---------------------------------------------------------- Options */
   const requestPreview = (r) => C.miniPreview({
@@ -194,7 +194,7 @@ export async function render(container, ctx = {}) {
     draft = null
     redoBtn.hidden = true
     const restore = wiz.busy('Menyusun…')
-    consoleUI = C.aiConsole({ model: model.id })
+    consoleUI = C.aiConsole({ model: 'Penyusun penawaran' })
     consoleUI.onStop(() => ac.abort())
     consoleUI.setStatus('Menulis…', true)
     consoleUI.write('')
@@ -281,7 +281,7 @@ export async function render(container, ctx = {}) {
       offerJson?.notes ? el('div', { className: 'is-wide' }, el('dt', {}, 'Catatan'), el('dd', {}, C.clampText(offerJson.notes, 2))) : null,
     )
     const rawBox = el('details', { className: 'raw-json' },
-      el('summary', {}, icon('chevronRight', { size: 14 }), 'Lihat JSON mentah'),
+      el('summary', {}, icon('chevronRight', { size: 14 }), 'Lihat data lengkap'),
       el('pre', {}, raw || JSON.stringify(offerJson, null, 2)))
 
     reviewBox.replaceChildren(

@@ -101,26 +101,34 @@ export function displayTitle(title, em) {
   return [t.slice(0, i), el('em', {}, em), t.slice(i + em.length)].filter((x) => x !== '')
 }
 
-/** Step indicator pill: six dots with the current stage filled. */
-export function stepPill(num, label, total = 6) {
-  const n = Number(num) || 0
-  return el('span', { className: 'step-pill', 'aria-label': `Tahap ${n} dari ${total}: ${label}` },
-    el('span', { className: 'step-dots', 'aria-hidden': 'true' },
-      Array.from({ length: total }, (_, i) => el('i', { className: i + 1 < n ? 'is-past' : i + 1 === n ? 'is-now' : '' }))),
-    el('span', { className: 'step-text', 'aria-hidden': 'true' }, `Tahap ${String(n).padStart(2, '0')}`, el('b', {}, label)),
+/**
+ * Page header. The visible page name and its hint live in the shell topbar
+ * (see STAGES in shell.js), so this keeps the heading for screen readers and
+ * focus, and only takes space when the page has actions.
+ */
+export function pageHeader({ title, em, actions, className = '' }) {
+  return el('header', { className: `page-head is-slim ${actions ? 'has-actions' : ''} ${className}`.trim() },
+    el('h1', { className: 'page-title sr-only', tabindex: '-1' }, displayTitle(title, em)),
+    actions ? el('div', { className: 'page-head-actions' }, actions) : null,
   )
 }
 
-/** Page header: step pill + serif title (+ italic keyword) + description. */
-export function pageHeader({ num, label, title, em, description, actions }) {
-  return el('header', { className: 'page-head' },
-    el('div', { className: 'page-head-text' },
-      num ? stepPill(num, label) : null,
-      el('h1', { className: 'page-title display', tabindex: '-1' }, displayTitle(title, em)),
-      description ? el('p', { className: 'page-desc' }, description) : null,
-    ),
-    actions ? el('div', { className: 'page-head-actions' }, actions) : null,
-  )
+let tipSeq = 0
+/**
+ * Small "i" button with a tooltip. Shows on hover and keyboard focus; a tap
+ * toggles it on touch screens. Escape closes it.
+ */
+export function infoTip(text, { label = 'Tentang halaman ini', className = '' } = {}) {
+  const id = `tip-${++tipSeq}`
+  const bubble = el('span', { className: 'info-tip-bubble', role: 'tooltip', id }, text)
+  const btn = el('button', { type: 'button', className: `info-tip ${className}`.trim(), 'aria-label': label, 'aria-describedby': id, 'aria-expanded': 'false' },
+    icon('info', { size: 16 }), bubble)
+  const set = (open) => { btn.classList.toggle('is-open', open); btn.setAttribute('aria-expanded', String(open)) }
+  btn.addEventListener('click', (e) => { e.stopPropagation(); set(!btn.classList.contains('is-open')) })
+  btn.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false) })
+  btn.addEventListener('blur', () => set(false))
+  btn.addEventListener('pointerleave', () => set(false))
+  return btn
 }
 
 /** Rounded surface panel with an optional header row. */

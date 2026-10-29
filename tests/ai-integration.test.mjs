@@ -192,6 +192,15 @@ test('social generateContent: inline hashtags move out of the body, tagged promp
   assert.equal(calls[0].response_format.type, 'json_schema')
 })
 
+test('social generateContent for Threads: one topic tag, short-post prompt', async () => {
+  const calls = fakeLLM(JSON.stringify({ title: 'AC', body: 'AC berisik? Balas di sini.', hashtags: ['#servisac', '#bekasi', '#ac'] }))
+  const { data } = await mod.social.generateContent({ platform: 'threads', type: 'caption', topic: 'Servis AC', modelId: 'm' })
+  assert.deepEqual(data.hashtags, ['#servisac'])
+  assert.match(calls[0].messages[0].content, /Threads/)
+  assert.match(calls[0].messages[0].content, /500 karakter/)
+  assert.match(calls[0].messages[0].content, /paling banyak 1 tag topik/)
+})
+
 test('social: business context block uses real aggregated data only', async () => {
   const calls = fakeLLM('{"hashtags":["#a"]}')
   await mod.social.generateHashtags({ topic: 'Cuci sofa', business: { services: [{ name: 'Cuci sofa', count: 12 }], areas: [{ name: 'Bandung' }] }, modelId: 'm' })
@@ -258,20 +267,35 @@ test('advisor streamAnswer: aborted signal stops with AbortError', async () => {
   await assert.rejects(drain(mod.advisor.streamAnswer({ messages: [], model: 'm', signal: ctrl.signal })), { name: 'AbortError' })
 })
 
-test('advisor memory: save, load (oldest first), clear per agent (mock D1)', async () => {
-  await mod.advisor.clearMessages(['keuangan', 'pemasaran'])
-  await mod.advisor.saveMessage({ agent: 'keuangan', role: 'user', content: 'Q1' })
-  await new Promise((r) => setTimeout(r, 5))
-  await mod.advisor.saveMessage({ agent: 'keuangan', role: 'assistant', content: 'A1', model: 'm', latency_ms: 10 })
-  // Mock ids are random, so ordering only holds across distinct timestamps (D1 ids are monotonic).
-  await new Promise((r) => setTimeout(r, 5))
-  await mod.advisor.saveMessage({ agent: 'pemasaran', role: 'user', content: 'Q2' })
-  let { rows } = await mod.advisor.loadMessages()
-  const mine = rows.filter((r) => ['Q1', 'A1', 'Q2'].includes(r.content))
-  assert.deepEqual(mine.map((r) => r.content), ['Q1', 'A1', 'Q2'])
-  await mod.advisor.clearMessages(['keuangan', 'tidak-ada'])
-  ;({ rows } = await mod.advisor.loadMessages())
-  assert.deepEqual(rows.filter((r) => r.agent === 'keuangan'), [])
-  assert.equal(rows.filter((r) => r.content === 'Q2').length, 1)
-  await mod.advisor.clearMessages(['pemasaran'])
+test('advisor memory: save, load (oldest first), clear per agent (localStorage, per user)', async () => {
+  const uid = 'u-mem-1'
+  await mod.advisor.saveMessage({ agent: 'keuangan', role: 'user', content: 'Q1' }, { uid })
+  await mod.advisor.saveMessage({ agent: 'keuangan', role: 'assistant', content: 'A1', model: 'm', latency_ms: 10 }, { uid })
+  await mod.advisor.saveMessage({ agent: 'pemasaran', role: 'user', content: 'Q2' }, { uid })
+  let { rows } = await mod.advisor.loadMessages({ uid })
+  assert.deepEqual(rows.map((r) => r.content), ['Q1', 'A1', 'Q2'])
+  assert.ok(localStorage.getItem(mod.advisor.memoryKey(uid)), 'stored under the per-user key')
+  assert.deepEqual((await mod.advisor.loadMessages({ uid: 'u-other' })).rows, [], 'other users see nothing')
+  await mod.advisor.clearMessages(['keuangan', 'tidak-ada'], { uid })
+  ;({ rows } = await mod.advisor.loadMessages({ uid }))
+  assert.deepEqual(rows.map((r) => r.content), ['Q2'])
+  await mod.advisor.deleteMessage(rows[0].id, { uid })
+  assert.deepEqual((await mod.advisor.loadMessages({ uid })).rows, [])
+})
+
+test('advisor memory: caps messages per agent and trims long content', async () => {
+  const uid = 'u-mem-2'
+  const { MAX_PER_AGENT, MAX_STORED_CHARS } = mod.advisor
+  for (let i = 0; i < MAX_PER_AGENT + 5; i++) await mod.advisor.saveMessage({ agent: 'konsultan', role: 'user', content: `q${i}` }, { uid })
+  await mod.advisor.saveMessage({ agent: 'keuangan', role: 'assistant', content: 'x'.repeat(MAX_STORED_CHARS + 50) }, { uid })
+  const { rows } = await mod.advisor.loadMessages({ uid })
+  const kons = rows.filter((r) => r.agent === 'konsultan')
+  assert.equal(kons.length, MAX_PER_AGENT)
+  assert.equal(kons[0].content, 'q5', 'oldest dropped first')
+  assert.equal(rows.find((r) => r.agent === 'keuangan').content.length, MAX_STORED_CHARS)
+})
+
+test('advisor memory: corrupt storage reads as empty', async () => {
+  localStorage.setItem(mod.advisor.memoryKey('u-bad'), '{not json')
+  assert.deepEqual((await mod.advisor.loadMessages({ uid: 'u-bad' })).rows, [])
 })

@@ -53,7 +53,7 @@ export async function render(container, ctx = {}) {
   const custPanel = C.panel({ title: 'Pelanggan teratas', meta: 'berdasarkan pendapatan', className: 'span-5' }, custBody)
 
   const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'primary' })
-  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
+  const modelNote = el('span', { className: 'model-note', hidden: true })
   const msg = C.message()
   const aiOut = el('div', { className: 'report-ai-out' })
   const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'Bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
@@ -64,7 +64,7 @@ export async function render(container, ctx = {}) {
   )
 
   container.replaceChildren(
-    C.pageHeader({ num: '06', label: 'Laporan', title: 'Laporan keuangan', em: 'keuangan', description: 'Angka dihitung langsung dari buku besar. Pilih periode, lalu minta AI menjelaskannya.', actions: seg }),
+    C.pageHeader({ title: 'Laporan keuangan', actions: seg }),
     periodLine,
     kpis,
     el('div', { className: 'dash-grid is-stretch' }, catPanel, custPanel),
@@ -73,8 +73,8 @@ export async function render(container, ctx = {}) {
 
   let model = null
   const modelReady = resolveModel()
-    .then((m) => { model = m; modelNote.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' })
-    .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
+    .then((m) => { model = m; if (!m) { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false } })
+    .catch((err) => { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false })
 
   let flow
   try {
@@ -197,7 +197,7 @@ export async function render(container, ctx = {}) {
     const ac = new AbortController()
     current = ac
     const restore = C.setBusy(explainBtn, 'Menganalisis…')
-    const ui = C.aiConsole({ model: model.id })
+    const ui = C.aiConsole({ model: 'Analis laporan' })
     ui.onStop(() => ac.abort())
     ui.setStatus('Menulis…', true)
     ui.write('')

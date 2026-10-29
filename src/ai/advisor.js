@@ -2,19 +2,20 @@
  * AI business adviser engine (ported from PR #3 "AI Superpowers").
  *
  * Kept from the PR, reworked: multi-agent definitions, conversation memory,
- * smart retry and analytics. Memory and analytics now live in D1
- * (`ai_messages`), so they follow the account across devices and the numbers
- * are real. Tools run client-side and deterministically (advisor-tools.js);
+ * smart retry and analytics. Memory lives in this browser's localStorage, one
+ * key per user, so it survives page changes and reloads without spending
+ * database writes. Tools run client-side and deterministically (advisor-tools.js);
  * their results are injected as context instead of parsing tool calls out of
  * model text.
  */
 import { getCloud } from '../cloud.js'
 
 export const AUTO = 'auto'
-const TABLE = 'ai_messages'
 export const HISTORY_FOR_CONTEXT = 20
 const MAX_HISTORY_CHARS = 3000
-const LOAD_LIMIT = 300
+export const MEMORY_PREFIX = 'satualur_advisor_v1:'
+export const MAX_PER_AGENT = 60
+export const MAX_STORED_CHARS = 8000
 
 const SHARED_RULES = `Aturan menjawab:
 - Bahasa Indonesia yang hangat, lugas, dan profesional. Sapa pengguna dengan "Anda". Tanpa emoji.
@@ -213,39 +214,63 @@ export async function* streamAnswer({ messages, model, temperature = 0.6, maxTok
 
 /* ---------------------------------------------------------------- Memory */
 
-/** Loads the adviser's messages (all agents), oldest first. */
-export async function loadMessages() {
-  const { data, error } = await getCloud().database.from(TABLE).select('*')
-    .in('agent', AGENT_KEYS)
-    .order('created_at', { ascending: false })
-    .limit(LOAD_LIMIT)
-  if (error) throw new Error(error.message)
-  const rows = (data || []).filter((r) => AGENT_KEYS.includes(r.agent))
-  rows.sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)) || (Number(a.id) || 0) - (Number(b.id) || 0))
-  return { rows, capped: (data || []).length >= LOAD_LIMIT }
+export const memoryKey = (uid) => `${MEMORY_PREFIX}${uid || 'anon'}`
+
+function readMemory(uid) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(memoryKey(uid)) || '[]')
+    return Array.isArray(raw) ? raw.filter((r) => r && AGENT_KEYS.includes(r.agent) && (r.role === 'user' || r.role === 'assistant')) : []
+  } catch { return [] }
 }
 
-export async function saveMessage(row) {
-  const payload = {
+/** Keeps the newest MAX_PER_AGENT messages of each agent. Returns false when storage refused the write. */
+function writeMemory(uid, rows) {
+  const keep = new Set()
+  for (const key of AGENT_KEYS) rows.filter((r) => r.agent === key).slice(-MAX_PER_AGENT).forEach((r) => keep.add(r))
+  const list = rows.filter((r) => keep.has(r))
+  try {
+    localStorage.setItem(memoryKey(uid), JSON.stringify(list))
+    return true
+  } catch {
+    return false
+  }
+}
+
+let seq = 0
+const newId = () => `m${Date.now().toString(36)}${(++seq).toString(36)}`
+
+/** Loads the adviser's messages (all agents) for one user, oldest first. */
+export async function loadMessages({ uid } = {}) {
+  return { rows: readMemory(uid) }
+}
+
+/** Appends one message to the user's memory and returns the stored row. */
+export async function saveMessage(row, { uid } = {}) {
+  const saved = {
+    id: newId(),
     agent: row.agent,
     role: row.role,
-    content: String(row.content ?? ''),
+    content: String(row.content ?? '').slice(0, MAX_STORED_CHARS),
     model: row.model ?? null,
     latency_ms: row.latency_ms ?? null,
     error: row.error ?? null,
+    created_at: row.created_at || new Date().toISOString(),
   }
-  const { data, error } = await getCloud().database.from(TABLE).insert(payload)
-  if (error) throw new Error(error.message)
-  const saved = Array.isArray(data) ? data[0] : data
-  return { created_at: new Date().toISOString(), ...payload, ...(saved || {}) }
+  const rows = readMemory(uid)
+  rows.push(saved)
+  if (!writeMemory(uid, rows)) throw new Error('Penyimpanan browser penuh atau dinonaktifkan.')
+  return saved
 }
 
-/** Deletes the conversation of the given agents (one filtered call each). */
-export async function clearMessages(agentKeys) {
-  const keys = agentKeys.filter((k) => AGENTS[k])
-  const results = await Promise.all(keys.map((k) => getCloud().database.from(TABLE).delete().eq('agent', k)))
-  const failed = results.find((r) => r?.error)
-  if (failed) throw new Error(failed.error.message)
+/** Removes one stored message (e.g. a failed answer that is being retried). */
+export async function deleteMessage(id, { uid } = {}) {
+  writeMemory(uid, readMemory(uid).filter((r) => r.id !== id))
+}
+
+/** Deletes the conversation of the given agents. */
+export async function clearMessages(agentKeys, { uid } = {}) {
+  const keys = new Set(agentKeys.filter((k) => AGENTS[k]))
+  writeMemory(uid, readMemory(uid).filter((r) => !keys.has(r.agent)))
 }
 
 /* ------------------------------------------------------------- Analytics */
