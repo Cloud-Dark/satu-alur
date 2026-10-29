@@ -229,7 +229,10 @@ function d1Store(env) {
   return {
     async listDue(nowIso, limit) {
       const { results } = await db.prepare(
-        "SELECT * FROM social_posts WHERE status = 'scheduled' AND scheduled_at <= ? ORDER BY scheduled_at LIMIT ?",
+        // Suspension cancels scheduled rows; this also skips one scheduled in a race with the suspend.
+        `SELECT * FROM social_posts WHERE status = 'scheduled' AND scheduled_at <= ?
+           AND NOT EXISTS (SELECT 1 FROM user_flags f WHERE f.user_id = social_posts.owner_id AND f.suspended = 1)
+         ORDER BY scheduled_at LIMIT ?`,
       ).bind(nowIso, limit).all();
       return results;
     },

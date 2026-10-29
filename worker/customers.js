@@ -124,14 +124,20 @@ export async function handleAdminUserSuspend(request, env, deps, params) {
        ON CONFLICT(user_id) DO UPDATE SET suspended = 1, reason = excluded.reason, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
     ).bind(target.id, reason, new Date().toISOString(), admin.name),
     env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
+    // Shown as Dibatalkan in the user's Laporan tayang; restore does not bring them back.
+    env.DB.prepare("UPDATE social_posts SET status = 'cancelled', error = 'Akun ditangguhkan.' WHERE owner_id = ? AND status = 'scheduled'").bind(target.id),
   ]);
   return deps.ok({ id: target.id, suspended: true, reason });
 }
 
 export async function handleAdminUserRestore(request, env, deps, params) {
   const { admin, target } = await adminAndTarget(request, env, deps, params);
-  await env.DB.prepare('UPDATE user_flags SET suspended = 0, updated_at = ?, updated_by = ? WHERE user_id = ?')
-    .bind(new Date().toISOString(), admin.name, target.id).run();
+  // Also drops any session created in a race with the suspend.
+  await env.DB.batch([
+    env.DB.prepare('UPDATE user_flags SET suspended = 0, updated_at = ?, updated_by = ? WHERE user_id = ?')
+      .bind(new Date().toISOString(), admin.name, target.id),
+    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
+  ]);
   return deps.ok({ id: target.id, suspended: false });
 }
 

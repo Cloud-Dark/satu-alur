@@ -398,6 +398,12 @@ module.exports = async function office(t) {
   await urow.getByRole('button', { name: 'Akhiri sesi' }).click()
   await p.getByText('Sesi pengguna diakhiri.').first().waitFor({ timeout: 8000 }).catch(() => {})
   t.check(await p.getByText('Sesi pengguna diakhiri.').count() >= 1, 'users: Akhiri sesi (after confirm) ends the sessions')
+  await p.evaluate(() => localStorage.setItem('satualur_customers_fail', '1'))
+  await sec('Pelanggan & mitra')
+  await sec('Pengguna')
+  await p.getByText('Gagal memuat pengguna. Coba lagi.').first().waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await p.getByText('Gagal memuat pengguna. Coba lagi.').count() === 1, 'users: a failed load says "Gagal memuat pengguna"')
+  await p.evaluate(() => localStorage.removeItem('satualur_customers_fail'))
 
   await p.evaluate(() => { location.hash = '#/app' })
   await p.waitForSelector('.app-shell')

@@ -149,6 +149,7 @@ const mockAuth = {
       const flag = userFlag(_session.user.id)
       if (isBlocked(flag) || (flag?.revoked_at && flag.revoked_at >= _session.created_at)) {
         _session = null
+        notifyAuth('SIGNED_OUT')
         if (isBlocked(flag)) {
           try { sessionStorage.setItem(AUTH_NOTICE_KEY, SUSPENDED_MESSAGE) } catch { /* storage unavailable */ }
           return { data: null, error: { message: SUSPENDED_MESSAGE, status: 403 } }

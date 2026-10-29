@@ -58,10 +58,10 @@ async function withPlans(rows) {
 }
 
 // Mock list: same search (fields), order and paging as the Worker.
-async function mockPage({ q, page }, fields) {
+async function mockPage({ q, page }, fields, failMessage) {
   const wait = Number(localStorage.getItem('satualur_customers_delay')) || 0
   if (wait) await new Promise((r) => setTimeout(r, wait))
-  if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pelanggan. Coba lagi.')
+  if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(failMessage)
   const needle = q.trim().toLowerCase()
   const hit = (u) => !needle || fields(u).some((s) => String(s || '').toLowerCase().includes(needle))
   const all = mockUsers().filter(hit).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
@@ -72,7 +72,7 @@ async function mockPage({ q, page }, fields) {
 export async function adminListCustomers({ q = '', page = 1 } = {}) {
   if (isUsingMockCloud()) {
     const accounts = loadAccounts()
-    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name, accounts[u.id]?.company])
+    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name, accounts[u.id]?.company], 'Gagal memuat pelanggan. Coba lagi.')
     return { items: await withPlans(rows), total, page }
   }
   try {
@@ -126,7 +126,7 @@ async function saveFlag(id, change) {
 /** { items: [{ id, email, name, created_at, active_sessions, suspended, reason, last_session_at, demo }], total, page } */
 export async function adminListUsers({ q = '', page = 1 } = {}) {
   if (isUsingMockCloud()) {
-    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name])
+    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name], 'Gagal memuat pengguna. Coba lagi.')
     const flags = loadFlags()
     // ponytail: mock sessions live in each page's memory, so the mock can't count them; always 0 here.
     const items = rows.map((u) => ({
