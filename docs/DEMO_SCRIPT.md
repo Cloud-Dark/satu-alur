@@ -165,6 +165,19 @@ Platform: Instagram, TikTok, Facebook, LinkedIn, WhatsApp (Status/Channel), X. J
 
 > "Konten ditulis untuk usaha jasa lokal dan memakai layanan yang paling sering diminta pelanggan Anda. AI dilarang mengarang angka performa atau testimoni."
 
+### Bagian 7b. Publikasi Meta dan Kantor Satu Alur (bila sudah dirilis)
+
+Mode demo: tidak memanggil Meta; akun dan hasil terbit disimulasikan. Konten yang memuat `#gagal` sengaja gagal.
+
+1. **Media sosial → Akun**: **Hubungkan Facebook & Instagram**, pilih Halaman bila ada beberapa. Tampil nama Halaman dan akun Instagram tertaut.
+2. Tab **Konten**: simpan konten, tambahkan gambar JPEG, lalu **Bagikan sekarang** ke Facebook dan/atau Instagram. Instagram wajib bergambar.
+3. Buat konten berisi `#gagal`, bagikan: baris gagal dengan pesan galat, tunjukkan bahwa yang lain tetap jalan.
+4. Tab **Jadwal → Daftar konten**: jadwalkan (**Jadwalkan tayang**, waktu WIB, minimal 1 menit ke depan), lalu **Batalkan** satu jadwal. **Laporan tayang** menampilkan hasilnya. Di produksi cron memproses tiap 5 menit.
+5. Tab **Kolaborasi**: pilih influencer dari katalog, **Ajukan kolaborasi**. Tab **Iklan**: **Lihat rekomendasi**, lalu **Ajukan iklan** ke tim Satu Alur.
+6. Sidebar **Kantor Satu Alur** (hanya admin; di mode demo pengguna demo adalah admin): tab **Permintaan** ubah status dan beri catatan, tab **Influencer** tambah/ubah katalog.
+
+> "Satu Alur tidak menerbitkan apa pun tanpa Anda minta. Token Meta terenkripsi dan tidak pernah sampai ke browser."
+
 ### Bagian 8. Pengaturan (10:30–11:00)
 
 Sidebar bawah → **Pengaturan** (drawer kanan).
@@ -201,6 +214,7 @@ Klik ikon **Keluar** di sidebar untuk kembali ke landing.
 - [ ] Radar peluang (bila sudah dirilis)
 - [ ] Pencari prospek (bila sudah dirilis)
 - [ ] Media sosial: Konten, hashtag, Jadwal, Ide, Iklan Meta, Kolaborasi, Pustaka
+- [ ] Publikasi Meta (bila sudah dirilis): Akun, bagikan, `#gagal`, jadwal, Kolaborasi, Iklan, Kantor Satu Alur
 
 ### Lainnya
 
@@ -213,7 +227,7 @@ Klik ikon **Keluar** di sidebar untuk kembali ke landing.
 |------------|--------------------|
 | "AI Superpowers" dengan 4 asisten, tool calling kalkulator/query DB/format rupiah | Penasihat AI dengan 5 agen. Angka dihitung di aplikasi dan diberikan ke AI sebagai konteks. Tidak ada tool calling |
 | Partnership Hub berisi 3 layanan berbayar (Organic Growth, Influencer Network, AI Agent Marketing) | Tab Kolaborasi berisi ide kerja sama dengan mitra lokal yang dibuat AI, tanpa layanan berbayar |
-| Konten dijadwalkan lalu diposting otomatis | Jadwal hanya pengingat dengan status manual "Tandai terposting" |
+| Konten dijadwalkan lalu diposting otomatis | Hanya untuk Facebook/Instagram yang terhubung (cron 5 menit). Jadwal lama di tahap "Media sosial" tetap pengingat manual |
 | Notifikasi WhatsApp/Email otomatis ke pelanggan | Konektor baru berupa konfigurasi lokal, belum mengirim apa pun |
 | Laporan AI tersimpan sebagai riwayat | Penjelasan AI belum disimpan ke tabel `reports` |
 | Data demo sama di semua lingkungan | Mode mock lokal memakai 8 permintaan contoh, bukan data 12 bulan akun demo |
