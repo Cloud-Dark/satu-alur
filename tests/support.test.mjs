@@ -56,11 +56,11 @@ test('nextStatusOnReply: staff', () => {
   assert.equal(nextStatusOnReply('closed', 'staff'), 'closed')
 })
 
-test('author names: company, else name, else email; staff never by email', () => {
+test('author names: company, else name, else email; staff only as the team', () => {
   assert.equal(customerAuthorName({ company: 'CV Maju', name: 'Budi', email: 'b@x.id' }), 'CV Maju')
   assert.equal(customerAuthorName({ company: ' ', name: 'Budi', email: 'b@x.id' }), 'Budi')
   assert.equal(customerAuthorName({ company: null, name: '', email: 'b@x.id' }), 'b@x.id')
-  assert.equal(staffAuthorName('budi'), 'Tim Satu Alur (budi)')
+  assert.equal(staffAuthorName('budi'), 'Tim Satu Alur')
   assert.equal(staffAuthorName(''), 'Tim Satu Alur')
 })
 

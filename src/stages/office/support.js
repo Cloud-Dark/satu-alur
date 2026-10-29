@@ -3,6 +3,7 @@ import { showToast } from '../../ui/animations.js'
 import { adminListTickets, adminGetTicket, adminReplyTicket, adminUpdateTicket, PAGE_SIZE } from '../../customers/api.js'
 import { TICKET_STATUS_LABEL } from '../../support/rules.js'
 import { statusTag, replyForm, threadView, staleReply } from '../../support/page.js'
+import { LEAVE_MSG } from './site-doc.js'
 
 const { el } = C
 const STATUS_OPTIONS = Object.entries(TICKET_STATUS_LABEL).map(([value, label]) => ({ value, label }))
@@ -14,6 +15,8 @@ const waiting = (t) => (t.status === 'open' || t.status === 'in_progress') && t.
 /** Pengaduan CS: inbox by status → thread with a reply box and a status select. onChanged() refreshes the badge. */
 export function draw(host, ctx, setDirty, onChanged = () => {}) {
   let run = 0
+  let hasDraft = false
+  const setDraft = (has) => { hasDraft = has; setDirty(has) }
   const live = (mine) => !ctx.signal.aborted && mine === run
   const view = el('div')
   const pg = C.pager({ label: 'daftar tiket', pageSize: PAGE_SIZE, sizes: [PAGE_SIZE], hideSize: true, onChange: () => load(pg.page) })
@@ -35,7 +38,7 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
 
   async function load(page) {
     const mine = ++run
-    setDirty(false)
+    setDraft(false)
     view.replaceChildren(seg, body, pg.root)
     body.replaceChildren(C.skeletonRows(3))
     let data
@@ -58,7 +61,7 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
 
   async function showThread(id, draft = '') {
     const mine = ++run
-    setDirty(false)
+    setDraft(!!draft.trim()) // a draft carried over a reload still counts until it is sent
     view.replaceChildren(C.skeletonRows(3))
     let th
     try { th = await adminGetTicket(id) } catch (e) {
@@ -69,7 +72,8 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
       return
     }
     if (!live(mine)) return
-    const drawThread = ({ ticket: t, messages }) => {
+    // keep: reply text to carry into the redrawn form (a status save must not wipe an unsent reply)
+    const drawThread = ({ ticket: t, messages }, keep = '') => {
       const status = C.select({ label: 'Status', id: `of-tk-${t.id}-status`, value: t.status, options: STATUS_OPTIONS })
       const save = C.button({ label: 'Simpan status', icon: 'save', variant: 'soft', size: 'sm' })
       const err = el('p', { className: 'field-error', role: 'alert' })
@@ -79,7 +83,7 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
         try {
           const next = await adminUpdateTicket(t.id, { status: status.input.value })
           showToast('Status tiket diperbarui.', 'success')
-          if (live(mine)) { drawThread(next); onChanged() }
+          if (live(mine)) { drawThread(next, reply.querySelector('textarea').value); onChanged() }
         } catch (ex) { err.textContent = ex.message } finally { restore() }
       })
       // Unsent text marks the section dirty, so switching sections asks first (office/index.js).
@@ -95,15 +99,14 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
         drawThread(next)
         onChanged()
         showToast('Balasan terkirim.', 'success')
-      }, { draft, onDraft: setDirty })
-      draft = ''
+      }, { draft: keep, onDraft: setDraft })
       const who = el('span', { className: 'muted small' }, [t.company, t.email].filter(Boolean).join(' · '))
       view.replaceChildren(threadView(t, {
-        onBack: () => load(pg.page), messages, meta: who,
+        onBack: () => { if (!hasDraft || confirm(LEAVE_MSG)) load(pg.page) }, messages, meta: who,
         foot: el('div', { className: 'sp-staff-foot' }, reply, el('div', { className: 'sp-status' }, status.wrap, save), err),
       }))
     }
-    drawThread(th)
+    drawThread(th, draft)
   }
 
   load(1)

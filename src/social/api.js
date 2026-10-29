@@ -5,6 +5,7 @@
  * Every failure carries a readable Indonesian message.
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
+import { signOutIfSuspended } from '../http-cloud.js'
 import { PLATFORMS, validateScheduleAt, igEligibility } from './rules.js'
 import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer } from '../office/rules.js'
 
@@ -32,7 +33,11 @@ async function call(path, { method = 'GET', body, raw, signal } = {}) {
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
-  if (!res.ok || json?.error) throw Object.assign(new Error(json?.error?.message || `HTTP ${res.status}`), { status: res.status })
+  if (!res.ok || json?.error) {
+    const message = json?.error?.message || `HTTP ${res.status}`
+    signOutIfSuspended(res.status, message)
+    throw Object.assign(new Error(message), { status: res.status })
+  }
   return json?.data
 }
 

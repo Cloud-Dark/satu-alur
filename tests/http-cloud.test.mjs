@@ -174,6 +174,25 @@ test('auth: a 403 "ditangguhkan" on any call signs out locally and leaves the no
   assert.equal(seen.length, 1)
 })
 
+test('signOutIfSuspended: the shared helper the customers and social clients call on their errors', async () => {
+  const { signOutIfSuspended } = await import('../src/http-cloud.js')
+  const cloud = createHttpCloud()
+  const seen = []
+  cloud.auth.onAuthStateChange((ev) => seen.push(ev))
+  sessionStorage.clear()
+  localStorage.setItem('satualur_token', 'tok')
+  signOutIfSuspended(403, 'Khusus tim Satu Alur.')
+  signOutIfSuspended(401, 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.')
+  assert.equal(localStorage.getItem('satualur_token'), 'tok')
+  assert.deepEqual(seen, [])
+  signOutIfSuspended(403, 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.')
+  assert.equal(localStorage.getItem('satualur_token'), null)
+  assert.deepEqual(seen, ['SIGNED_OUT'])
+  assert.equal(sessionStorage.getItem('satualur_auth_notice'), 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.')
+  signOutIfSuspended(403, 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.') // no token left: nothing more
+  assert.deepEqual(seen, ['SIGNED_OUT'])
+})
+
 test('auth: getSession without token makes no request; 401 drops a stale token', async () => {
   const cloud = createHttpCloud()
   const none = await cloud.auth.getSession()

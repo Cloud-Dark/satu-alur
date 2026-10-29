@@ -163,6 +163,8 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_contact_status ON contact_messages(status, created_at);
 CREATE INDEX IF NOT EXISTS idx_contact_ip ON contact_messages(ip_hash, created_at);
+-- The global cap (200 per hour, all senders) counts by created_at alone.
+CREATE INDEX IF NOT EXISTS idx_contact_created ON contact_messages(created_at);
 
 -- Staff flags per user (Pengguna). suspended = 1 blocks every session and login (authenticate, OTP, demo).
 -- Staff-only; never in TABLES. Staff users (@staff.satualur.internal) are never flagged.

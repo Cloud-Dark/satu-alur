@@ -3,7 +3,7 @@
  * memory + localStorage. Used for local development and e2e tests
  * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
-import { isBlocked, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
+import { isBlocked, isStaffEmail, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
 
 const STORAGE_KEY = 'satualur_mock_v1'
 const OTP_STORE = 'satualur_mock_otp'
@@ -77,7 +77,8 @@ function startSession(user, extra) {
 
 const mockAuth = {
   async sendOtp({ email }) {
-    if (!email || !email.includes('@')) throw new Error('Email tidak valid.')
+    // Same rule as the Worker: staff addresses come only from staff login.
+    if (!email || !email.includes('@') || isStaffEmail(email)) throw new Error('Email tidak valid.')
     const code = String(Math.floor(100000 + Math.random() * 900000))
     const id = crypto.randomUUID()
     const otpData = JSON.parse(localStorage.getItem(OTP_STORE) || '{}')
@@ -91,6 +92,7 @@ const mockAuth = {
   },
 
   async verifyOtp({ email, verificationId, isExistingUser, token }) {
+    if (isStaffEmail(email)) throw new Error('Email tidak valid.')
     const otpData = JSON.parse(localStorage.getItem(OTP_STORE) || '{}')
     const rec = otpData[verificationId]
     if (!rec || rec.email !== email || rec.code !== token) {

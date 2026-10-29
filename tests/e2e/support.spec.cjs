@@ -69,7 +69,7 @@ module.exports = async function support(t) {
   await sthread.getByLabel('Balasan').fill('Kami cek dulu.')
   await sthread.getByRole('button', { name: 'Kirim balasan' }).click()
   await sthread.locator('.sp-msg.is-staff').waitFor({ timeout: 8000 })
-  t.check(await sthread.locator('.sp-msg.is-staff .sp-msg-author').textContent() === 'Tim Satu Alur (staff)', 'staff: reply signed "Tim Satu Alur (staff)", never the email')
+  t.check(await sthread.locator('.sp-msg.is-staff .sp-msg-author').textContent() === 'Tim Satu Alur', 'staff: reply signed "Tim Satu Alur" (no staff username or email)')
   t.check(await sthread.locator('select[id$="-status"]').inputValue() === 'in_progress', 'staff: a reply on Terbuka moves it to Diproses')
   await s.waitForFunction(() => !/tiket menunggu/.test(document.querySelector('.of-nav')?.textContent || ''), null, { timeout: 8000 }).catch(() => {})
   t.check(!/tiket menunggu/.test(await s.locator('.of-nav').textContent()), 'staff: the badge clears once staff replied')
@@ -80,13 +80,12 @@ module.exports = async function support(t) {
   await s.getByRole('button', { name: 'Contact Us', exact: true }).click()
   await s.waitForTimeout(300)
   t.check(/belum disimpan/.test(asked) && await sthread.getByLabel('Balasan').inputValue() === 'draf', 'staff: an unsent reply asks before switching sections')
-  await sthread.getByLabel('Balasan').fill('')
 
   // business sees the reply and Diproses
   await row.click()
   await thread.waitFor({ timeout: 8000 })
   await thread.locator('.sp-msg.is-staff').waitFor({ timeout: 8000 })
-  t.check(await thread.locator('.sp-msg-author').allTextContents().then((x) => x.join('|')) === 'pemilik|Tim Satu Alur (staff)', 'business: messages in time order with author names')
+  t.check(await thread.locator('.sp-msg-author').allTextContents().then((x) => x.join('|')) === 'pemilik|Tim Satu Alur', 'business: messages in time order with author names')
   t.check(await thread.locator('.tag', { hasText: 'Diproses' }).count() === 1, 'business: status Diproses')
 
   // staff marks it Selesai; a customer reply reopens it
@@ -96,10 +95,22 @@ module.exports = async function support(t) {
     await s.getByText('Status tiket diperbarui.').first().waitFor({ timeout: 8000 })
   }
   await setStatus('resolved')
+  t.check(await sthread.getByLabel('Balasan').inputValue() === 'draf', 'staff: Simpan status keeps the unsent reply')
+  asked = ''
+  s.once('dialog', (d) => { asked = d.message(); d.dismiss() })
+  await sthread.getByRole('button', { name: 'Kembali ke daftar tiket' }).click()
+  await s.waitForTimeout(300)
+  t.check(/belum disimpan/.test(asked) && await sthread.count() === 1, 'staff: back to the list asks first while a reply is unsent')
+  await sthread.getByLabel('Balasan').fill('')
   await a.getByRole('button', { name: 'Kembali ke daftar tiket' }).click()
   await row.locator('.tag', { hasText: 'Selesai' }).waitFor({ timeout: 8000 })
   await row.click()
   await thread.getByLabel('Balasan').fill('Masih dobel.')
+  let askedA = ''
+  a.once('dialog', (d) => { askedA = d.message(); d.dismiss() })
+  await a.getByRole('button', { name: 'Kembali ke daftar tiket' }).click()
+  await a.waitForTimeout(300)
+  t.check(/Balasan belum dikirim/.test(askedA) && await thread.getByLabel('Balasan').inputValue() === 'Masih dobel.', 'business: back to the list asks first while a reply is unsent')
   await thread.getByRole('button', { name: 'Kirim balasan' }).click()
   await thread.locator('.tag', { hasText: 'Terbuka' }).waitFor({ timeout: 8000 }).catch(() => {})
   t.check(await thread.locator('.sp-msg').count() === 3 && await thread.locator('.tag', { hasText: 'Terbuka' }).count() === 1, 'business: a reply on Selesai reopens the ticket (Terbuka)')

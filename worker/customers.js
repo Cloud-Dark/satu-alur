@@ -6,7 +6,8 @@
 
 import {
   validateCustomer, validateSuspendReason, escapeLike, STAFF_EMAIL_SUFFIX,
-  validateContact, validateContactUpdate, isHoneypot, contactRateLimited, CONTACT_STATUS_LABEL, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
+  validateContact, validateContactUpdate, isHoneypot, CONTACT_STATUS_LABEL, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
+  CONTACT_LIMIT, CONTACT_GLOBAL_LIMIT, ipBucket, DEMO_SUSPEND_MESSAGE,
 } from '../src/customers/rules.js';
 import {
   validateTicket, validateReply, validateTicketStatus, nextStatusOnReply, customerAuthorName, staffAuthorName,
@@ -104,14 +105,19 @@ export async function handleContactPost(request, env, deps) {
     if (err?.validation) throw new deps.HttpError(400, err.message);
     throw err;
   }
-  const ipHash = await deps.sha256Hex(`${request.headers.get('CF-Connecting-IP') || 'unknown'}:${env.TOKEN_KEY || 'satu-alur-contact'}`);
+  const ip = ipBucket(request.headers.get('CF-Connecting-IP')) || 'unknown';
+  const ipHash = await deps.sha256Hex(`${ip}:${env.TOKEN_KEY || 'satu-alur-contact'}`);
   const now = Date.now();
-  const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM contact_messages WHERE ip_hash = ? AND created_at > ?')
-    .bind(ipHash, new Date(now - HOUR_MS).toISOString()).first();
-  if (contactRateLimited(recent.n)) throw new deps.HttpError(429, CONTACT_LIMIT_MESSAGE);
-  await env.DB.prepare(
-    'INSERT INTO contact_messages (name, email, phone, subject, message, status, staff_note, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-  ).bind(v.name, v.email, v.phone, v.subject, v.message, 'new', '', ipHash, new Date(now).toISOString()).run();
+  const since = new Date(now - HOUR_MS).toISOString();
+  // Both limits are checked inside the INSERT so parallel posts can't slip past them together.
+  const res = await env.DB.prepare(
+    `INSERT INTO contact_messages (name, email, phone, subject, message, status, staff_note, ip_hash, created_at)
+     SELECT ?, ?, ?, ?, ?, 'new', '', ?, ?
+     WHERE (SELECT COUNT(*) FROM contact_messages WHERE ip_hash = ? AND created_at > ?) < ?
+       AND (SELECT COUNT(*) FROM contact_messages WHERE created_at > ?) < ?`,
+  ).bind(v.name, v.email, v.phone, v.subject, v.message, ipHash, new Date(now).toISOString(),
+    ipHash, since, CONTACT_LIMIT, since, CONTACT_GLOBAL_LIMIT).run();
+  if (!res.meta?.changes) throw new deps.HttpError(429, CONTACT_LIMIT_MESSAGE);
   return deps.ok({ message: CONTACT_OK_MESSAGE });
 }
 
@@ -185,6 +191,8 @@ async function adminAndTarget(request, env, deps, params) {
 
 export async function handleAdminUserSuspend(request, env, deps, params) {
   const { admin, target } = await adminAndTarget(request, env, deps, params);
+  // Shared demo accounts are used by every visitor; suspending one would lock them all out.
+  if (deps.DEMO_EMAILS.has(String(target.email).toLowerCase())) throw new deps.HttpError(400, DEMO_SUSPEND_MESSAGE);
   let reason;
   try {
     reason = validateSuspendReason(await deps.readJson(request));

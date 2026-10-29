@@ -9,13 +9,16 @@ const TONE = { new: 'brand', read: 'neutral', replied: 'ok', archived: 'neutral'
 let filter = 'new'
 
 // One message: a header button opens it (a new message becomes Dibaca), the body is plain text.
-function item(r, { onChanged, onSaved, signal }) {
+function item(r, { onChanged, onSaved, signal, setDirty }) {
   const id = `of-ct-${r.id}`
   const statusTag = el('span', {}, C.tag(CONTACT_STATUS_LABEL[r.status], TONE[r.status]))
   const status = C.select({ label: 'Status', id: `${id}-status`, value: r.status, options: Object.entries(CONTACT_STATUS_LABEL).map(([value, label]) => ({ value, label })) })
   const note = C.textarea({ label: 'Catatan internal', id: `${id}-note`, rows: 3, value: r.staff_note || '', attrs: { maxlength: '2000' } })
   const err = el('p', { className: 'field-error', role: 'alert' })
   const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary', size: 'sm' })
+  // Unsaved note or status marks the section dirty, so switching sections asks first (office/index.js).
+  note.input.addEventListener('input', () => setDirty(true))
+  status.input.addEventListener('change', () => setDirty(true))
   const href = mailtoHref(r.email, r.subject)
   const reply = href ? el('a', { className: 'btn btn-soft btn-sm', href }, 'Balas lewat email') : null
   const detail = el('div', { className: 'of-contact-detail', id: `${id}-detail`, hidden: true },
@@ -45,6 +48,7 @@ function item(r, { onChanged, onSaved, signal }) {
     try {
       await adminUpdateContact(r.id, { status: status.input.value, staff_note: note.input.value })
       showToast('Pesan diperbarui.', 'success')
+      setDirty(false)
       if (!signal.aborted) onSaved()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
@@ -62,6 +66,7 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
 
   async function load(page) {
     const mine = ++run
+    setDirty(false)
     body.replaceChildren(C.skeletonRows(3))
     let data
     try { data = await adminListContact({ status: filter, page }) } catch (e) {
@@ -80,7 +85,7 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
       body.replaceChildren(C.emptyState({ title: 'Tidak ada pesan', body: 'Belum ada pesan dengan status ini.', iconName: 'inbox' }))
       return
     }
-    const opts = { onChanged, onSaved: () => { onChanged(); load(pg.page) }, signal: ctx.signal }
+    const opts = { onChanged, onSaved: () => { onChanged(); load(pg.page) }, signal: ctx.signal, setDirty }
     body.replaceChildren(el('div', { className: 'of-cust-list' }, ...data.items.map((r) => item(r, opts))))
   }
   load(1)

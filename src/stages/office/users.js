@@ -71,7 +71,7 @@ export function draw(host, ctx, setDirty) {
       const b = C.button({ label: 'Pulihkan', variant: 'soft', size: 'sm' })
       b.addEventListener('click', () => act(b, 'Memulihkan…', () => adminRestoreUser(u.id), 'Pengguna dipulihkan.'))
       actions.append(b)
-    } else {
+    } else if (!u.demo) { // shared demo accounts can't be suspended (Worker answers 400)
       const b = C.button({ label: 'Tangguhkan', variant: 'soft', size: 'sm' })
       b.addEventListener('click', () => suspendDialog(ctx, u, b, () => load(pg.page), setDirty))
       actions.append(b)

@@ -45,4 +45,5 @@ export function nextStatusOnReply(status, author) {
 }
 
 export const customerAuthorName = ({ company, name, email }) => str(company) || str(name) || String(email || '')
-export const staffAuthorName = (name) => (str(name) ? `Tim Satu Alur (${str(name)})` : 'Tim Satu Alur')
+// Staff sign as the team: their login usernames never reach customers.
+export const staffAuthorName = () => 'Tim Satu Alur'

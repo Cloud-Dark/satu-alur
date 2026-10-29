@@ -2,6 +2,9 @@
 
 export const CUSTOMER_STATUS_LABEL = { trial: 'Uji coba', active: 'Aktif', past_due: 'Tertunggak', cancelled: 'Berhenti' }
 export const STAFF_EMAIL_SUFFIX = '@staff.satualur.internal'
+/** Staff addresses exist only through staff login; the email (OTP) sign-up refuses them. */
+export const isStaffEmail = (email) => String(email ?? '').trim().toLowerCase().endsWith(STAFF_EMAIL_SUFFIX)
+export const DEMO_SUSPEND_MESSAGE = 'Akun demo bersama tidak bisa ditangguhkan.'
 
 function fail(message) {
   throw Object.assign(new Error(message), { validation: true })
@@ -84,6 +87,25 @@ export const isHoneypot = (body) => str(body?.website) !== ''
 
 /** Messages from one ip_hash in the last hour → refuse? */
 export const contactRateLimited = (count) => count >= CONTACT_LIMIT
+/** Messages from everyone in the last hour → refuse? (stops rotating-address floods) */
+export const CONTACT_GLOBAL_LIMIT = 200
+export const contactGloballyLimited = (count) => count >= CONTACT_GLOBAL_LIMIT
+
+/**
+ * Rate-limit bucket for an address: IPv4 as is, IPv6 by its /64 (one customer usually owns a whole /64).
+ * `::` is expanded and leading zeros dropped so every spelling of one /64 lands in the same bucket;
+ * IPv4-mapped IPv6 (::ffff:1.2.3.4) counts as the IPv4 address.
+ */
+export function ipBucket(ip) {
+  const s = String(ip ?? '').trim().toLowerCase()
+  if (!s.includes(':')) return s
+  if (s.includes('.')) return s.slice(s.lastIndexOf(':') + 1)
+  const [head, tail] = s.split('::')
+  const h = head ? head.split(':') : []
+  const t = tail ? tail.split(':') : []
+  const groups = tail === undefined ? h : [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t]
+  return groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':')
+}
 
 export function validateContactUpdate(body) {
   const b = body && typeof body === 'object' ? body : {}

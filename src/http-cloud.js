@@ -22,6 +22,17 @@ function authHeaders(extra = {}) {
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra
 }
 
+/**
+ * Suspended mid-session: drop the token and let the app fall back to the login page, which shows the message.
+ * Shared by every API client (customers, social) so a 403 from any endpoint signs out the same way.
+ */
+export function signOutIfSuspended(status, message) {
+  if (status !== 403 || message !== SUSPENDED_MESSAGE || !getToken()) return
+  setToken(null)
+  try { sessionStorage.setItem(AUTH_NOTICE_KEY, message) } catch { /* storage tidak tersedia */ }
+  notifyAuth('SIGNED_OUT', null)
+}
+
 // Panggil endpoint JSON; tidak pernah throw — selalu {data, count, error}
 async function request(path, { method = 'GET', body, signal } = {}) {
   try {
@@ -35,12 +46,7 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     try { json = await res.json() } catch { /* body kosong / bukan JSON */ }
     if (!res.ok) {
       const message = json?.error?.message || (typeof json?.error === 'string' ? json.error : null) || json?.message || `HTTP ${res.status}`
-      // Suspended mid-session: drop the token and let the app fall back to the login page, which shows the message.
-      if (res.status === 403 && message === SUSPENDED_MESSAGE && getToken()) {
-        setToken(null)
-        try { sessionStorage.setItem(AUTH_NOTICE_KEY, message) } catch { /* storage tidak tersedia */ }
-        notifyAuth('SIGNED_OUT', null)
-      }
+      signOutIfSuspended(res.status, message)
       return { data: null, error: { message, status: res.status } }
     }
     return { data: json?.data ?? null, count: json?.count, error: json?.error ?? null }

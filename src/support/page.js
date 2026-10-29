@@ -11,6 +11,7 @@ import { TICKET_STATUS_LABEL, TICKET_CATEGORY_LABEL, TICKET_CLOSED_MESSAGE, vali
 const { el } = C
 const TONE = { open: 'brand', in_progress: 'warn', resolved: 'ok', closed: 'neutral' }
 const LEAVE = 'Tiket belum dikirim. Tutup tanpa mengirim?'
+const REPLY_LEAVE = 'Balasan belum dikirim. Tinggalkan tiket ini?'
 let seq = 0
 
 export const statusTag = (s) => C.tag(TICKET_STATUS_LABEL[s] || s, TONE[s])
@@ -162,7 +163,8 @@ export async function render(container, ctx) {
         }, { draft, onDraft: (has) => { hasDraft = has } })
       if (t.status === 'closed') hasDraft = false
       draft = ''
-      body.replaceChildren(threadView(t, { onBack: showList, foot, messages }))
+      const onBack = () => { if (!hasDraft || confirm(REPLY_LEAVE)) showList() }
+      body.replaceChildren(threadView(t, { onBack, foot, messages }))
     }
     draw(th)
   }

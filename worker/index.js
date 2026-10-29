@@ -27,7 +27,7 @@ import {
   handleSupportList, handleSupportGet, handleSupportCreate, handleSupportReply,
   handleAdminSupport, handleAdminSupportCounts, handleAdminSupportGet, handleAdminSupportReply, handleAdminSupportUpdate,
 } from './customers.js';
-import { SUSPENDED_MESSAGE } from '../src/customers/rules.js';
+import { SUSPENDED_MESSAGE, isStaffEmail } from '../src/customers/rules.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -247,7 +247,8 @@ async function authenticate(request, env) {
 async function handleSendOtp(request, env) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
-  if (!email) throw new HttpError(400, 'Email tidak valid.');
+  // Staff addresses are created only by staff login; an OTP sign-up must never claim one.
+  if (!email || isStaffEmail(email)) throw new HttpError(400, 'Email tidak valid.');
 
   const now = Date.now();
   // Opportunistic cleanup of expired rows.
@@ -291,6 +292,7 @@ async function handleSendOtp(request, env) {
 async function handleVerifyOtp(request, env) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
+  if (email && isStaffEmail(email)) throw new HttpError(400, 'Email tidak valid.');
   const verificationId = typeof body.verificationId === 'string' ? body.verificationId : '';
   const token = typeof body.token === 'string' ? body.token.trim() : String(body.token ?? '').trim();
   const bad = new HttpError(400, 'Kode OTP salah atau sudah kadaluarsa.');

@@ -24,10 +24,14 @@ module.exports = async function office(t) {
   t.check(await u.getByRole('heading', { name: 'Kantor Satu Alur' }).count() === 0, 'regular user: office page never renders')
   await u.close()
 
-  // the staff user's own email through the normal OTP login stays a regular user
+  // a staff address can't sign up through the normal OTP login at all
   const n = await t.page()
-  await loginLive(n, t.base, 'staff@staff.satualur.internal')
-  t.check(await n.locator('.flow-item[data-stage="office"]').count() === 0, 'staff email via #/masuk: no "Kantor Satu Alur"')
+  await n.goto(`${t.base}/#/masuk`, { waitUntil: 'load' })
+  await n.waitForSelector('#auth-email')
+  await n.fill('#auth-email', 'staff@STAFF.satualur.internal')
+  await n.click('.auth-form-email button[type=submit]')
+  await n.getByText('Email tidak valid.').first().waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await n.getByText('Email tidak valid.').count() >= 1 && await n.locator('.auth-demo:not([hidden])').count() === 0 && await n.locator('.app-shell').count() === 0, 'staff email via #/masuk: refused with "Email tidak valid.", no code sent')
   await n.close()
 
   // staff page: username + password only; empty form, wrong password, unknown user
@@ -357,6 +361,8 @@ module.exports = async function office(t) {
   await p.locator('.of-user').first().waitFor({ timeout: 8000 })
   t.check(await p.locator('.of-user').count() === 3 && await p.locator('.of-user', { hasText: 'staff.satualur.internal' }).count() === 0, 'users: three business users listed, no staff account', await p.locator('.of-user').allTextContents())
   t.check(await p.locator('.of-user', { hasText: 'demo-ac@satualur.id' }).locator('.tag', { hasText: 'Demo' }).count() === 1, 'users: shared demo account is tagged Demo')
+  t.check(await p.locator('.of-user', { hasText: 'demo-ac@satualur.id' }).getByRole('button', { name: 'Tangguhkan' }).count() === 0
+    && await p.locator('.of-user', { hasText: 'pemilik@usaha.id' }).getByRole('button', { name: 'Tangguhkan' }).count() === 1, 'users: no Tangguhkan on the shared demo account')
   await p.getByLabel('Cari pengguna').fill('pemilik@usaha')
   await p.waitForFunction(() => document.querySelectorAll('.of-user').length === 1, null, { timeout: 8000 }).catch(() => {})
   const urow = p.locator('.of-user', { hasText: 'pemilik@usaha.id' })
