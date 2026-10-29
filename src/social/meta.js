@@ -109,8 +109,24 @@ export async function postFacebook({ pageId, pageToken, message, imageUrl }, fet
   return { id: r.id, permalink: await permalinkOf(fetchFn, r.id, 'permalink_url', pageToken) }
 }
 
-export async function postInstagram({ igUserId, pageToken, caption, imageUrl }, fetchFn) {
+const IG_POLLS = 5
+const IG_POLL_MS = 1500
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// Instagram fetches the image asynchronously: publishing before the container is FINISHED fails.
+async function waitForContainer(fetchFn, id, pageToken, wait) {
+  for (let i = 0; i < IG_POLLS; i++) {
+    if (i > 0) await wait(IG_POLL_MS)
+    const { status_code: s } = await get(fetchFn, `/${id}`, { fields: 'status_code', access_token: pageToken })
+    if (s === 'FINISHED') return
+    if (s === 'ERROR' || s === 'EXPIRED') throw new MetaError('Instagram menolak gambar ini.')
+  }
+  throw new MetaError('Instagram masih memproses gambar, coba lagi nanti.', { kind: 'transient' })
+}
+
+export async function postInstagram({ igUserId, pageToken, caption, imageUrl, wait = sleep }, fetchFn) {
   const c = await post(fetchFn, `/${igUserId}/media`, { image_url: imageUrl, caption, access_token: pageToken })
+  await waitForContainer(fetchFn, c.id, pageToken, wait)
   const m = await postFinal(fetchFn, `/${igUserId}/media_publish`, { creation_id: c.id, access_token: pageToken })
   return { id: m.id, permalink: await permalinkOf(fetchFn, m.id, 'permalink', pageToken) }
 }

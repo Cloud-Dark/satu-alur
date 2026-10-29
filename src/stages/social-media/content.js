@@ -110,6 +110,7 @@ function composer(ctx, item, initialBody, onCreated) {
       const rows = await Social.publishNow(await persist(), chosen)
       for (const r of rows) {
         if (r.status === 'posted') showToast(`Tayang di ${PLATFORM_LABEL[r.platform]}`, 'success')
+        else if (r.status !== 'failed') showToast(`${PLATFORM_LABEL[r.platform]}: Status belum pasti — periksa Laporan tayang sebelum mencoba lagi.`, 'warning', 6000)
         else showToast(r.error || `Gagal tayang di ${PLATFORM_LABEL[r.platform]}`, 'danger')
       }
     })

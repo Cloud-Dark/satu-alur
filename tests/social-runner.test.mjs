@@ -80,7 +80,7 @@ test('happy Facebook post is marked posted with permalink', async () => {
 
 test('Instagram post uses the media URL of the image key', async () => {
   const store = memStore([row({ platform: 'instagram', image_key: 'abc' })])
-  const f = stubFetch([{ json: { id: 'C' } }, { json: { id: 'M' } }, { json: { permalink: 'https://instagram.com/p/M' } }])
+  const f = stubFetch([{ json: { id: 'C' } }, { json: { status_code: 'FINISHED' } }, { json: { id: 'M' } }, { json: { permalink: 'https://instagram.com/p/M' } }])
   assert.equal(await publishRow(store.rows[0], deps(store, f)), 'posted')
   assert.match(f.calls[0].url, /\/IG\/media$/)
   assert.equal(store.rows[0].permalink, 'https://instagram.com/p/M')
@@ -188,4 +188,22 @@ test('sweepStuck fails rows publishing for over 15 minutes only', async () => {
   assert.equal(store.rows[0].status, 'failed')
   assert.equal(store.rows[0].error, 'Status tidak pasti, periksa halaman Anda')
   assert.equal(store.rows[1].status, 'publishing')
+})
+
+test('publish-now (requeue: false) fails a transient error instead of requeueing', async () => {
+  const store = memStore([row({ attempts: 0 })])
+  const f = stubFetch([{ status: 400, json: { error: { message: 'busy', code: 4 } } }])
+  assert.equal(await publishRow(store.rows[0], { ...deps(store, f), requeue: false }), 'failed')
+  assert.equal(store.rows[0].status, 'failed')
+  assert.equal(store.rows[0].error, 'busy')
+  assert.equal(store.rows[0].attempts, 0)
+})
+
+test('a 2xx without an id is still marked posted', async () => {
+  const store = memStore([row()])
+  const f = stubFetch([{ json: {} }, { json: {} }])
+  assert.equal(await publishRow(store.rows[0], deps(store, f)), 'posted')
+  assert.equal(store.rows[0].status, 'posted')
+  assert.equal(store.rows[0].platform_post_id, null)
+  assert.equal(store.rows[0].permalink, null)
 })

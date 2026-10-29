@@ -11,8 +11,11 @@ const MISMATCH = 'Akun Facebook berubah atau terputus, jadwalkan ulang'
 const STUCK = 'Status tidak pasti, periksa halaman Anda'
 const GENERIC = 'Gagal memposting ke Meta.'
 
-/** Returns 'posted' | 'requeued' | 'failed', or 'skipped' when another run already claimed the row. */
-export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, now }) {
+/**
+ * Returns 'posted' | 'requeued' | 'failed', or 'skipped' when another run already claimed the row.
+ * `requeue: false` (publish-now) fails transient errors instead: the user is waiting and may retry by hand.
+ */
+export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, now, wait, requeue = true }) {
   const nowIso = new Date(now()).toISOString()
   if (!(await store.claim(row.id, nowIso))) return 'skipped'
 
@@ -27,7 +30,7 @@ export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, no
     const imageUrl = row.image_key ? mediaUrl(row.image_key) : undefined
     const text = row.content || ''
     result = ig
-      ? await postInstagram({ igUserId: account.ig_user_id, pageToken: account.pageToken, caption: text, imageUrl }, fetchFn)
+      ? await postInstagram({ igUserId: account.ig_user_id, pageToken: account.pageToken, caption: text, imageUrl, wait }, fetchFn)
       : await postFacebook({ pageId: account.page_id, pageToken: account.pageToken, message: text, imageUrl }, fetchFn)
   } catch (err) {
     if (!(err instanceof MetaError)) {
@@ -39,7 +42,7 @@ export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, no
       await store.markFailed(row.id, STUCK)
       return 'failed'
     }
-    if (err.kind === 'transient' && (row.attempts || 0) + 1 < MAX_ATTEMPTS) {
+    if (requeue && err.kind === 'transient' && (row.attempts || 0) + 1 < MAX_ATTEMPTS) {
       await store.requeue(row.id, err.message)
       return 'requeued'
     }
@@ -48,11 +51,11 @@ export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, no
     return 'failed'
   }
   // Outside the try: the post exists now, so a store error must not turn into a retry (the stuck sweep handles it).
-  await store.markPosted(row.id, { platform_post_id: result.id, permalink: result.permalink ?? null, published_at: nowIso })
+  await store.markPosted(row.id, { platform_post_id: result.id ?? null, permalink: result.permalink ?? null, published_at: nowIso })
   return 'posted'
 }
 
-export async function runDue(deps, limit = 25) {
+export async function runDue(deps, limit = 15) {
   const tally = { posted: 0, failed: 0, requeued: 0 }
   const rows = await deps.store.listDue(new Date(deps.now()).toISOString(), limit)
   for (const row of rows) {

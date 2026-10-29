@@ -10,6 +10,7 @@ import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer } from '..
 
 const TOKEN_KEY = 'satualur_token'
 const DEMO_KEY = 'satualur_social_demo_v1'
+export const UNCERTAIN = 'Status tidak pasti — periksa Laporan tayang sebelum mencoba lagi.'
 const token = () => { try { return localStorage.getItem(TOKEN_KEY) } catch { return null } }
 
 async function call(path, { method = 'GET', body, raw, signal } = {}) {
@@ -122,7 +123,7 @@ export async function getAccount() {
 
 export async function startConnect() {
   if (isUsingMockCloud()) {
-    demo((s) => { s.account = { page_name: 'Demo Page', ig_username: 'demo', needs_reconnect: false } })
+    demo((s) => { s.account = { page_name: 'Demo Page', ig_username: 'demo', ig_connected: true, needs_reconnect: false } })
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('satualur:db-write'))
     return
   }
@@ -148,7 +149,7 @@ export async function disconnect() {
 /* ------------------------------------------------------------------ media */
 export async function uploadImage(blob) {
   if (isUsingMockCloud()) {
-    const key = `demo${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`
+    const key = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('') // same shape as an R2 key, so validators accept it
     objectUrls.set(key, typeof URL !== 'undefined' && URL.createObjectURL ? URL.createObjectURL(blob) : '')
     return key
   }
@@ -193,7 +194,16 @@ export async function publishNow(contentId, platforms) {
       return s.posts.filter((r) => ids.includes(r.id)).map((r) => ({ ...r }))
     })
   }
-  return call('/api/social/publish', { method: 'POST', body: { content_id: contentId, platforms } })
+  // A lost response, network error or 5xx may still have posted: never invite a blind retry.
+  let rows
+  try {
+    rows = await call('/api/social/publish', { method: 'POST', body: { content_id: contentId, platforms } })
+  } catch (e) {
+    if (e.status === undefined || e.status >= 500) throw new Error(UNCERTAIN)
+    throw e
+  }
+  if (!Array.isArray(rows)) throw new Error(UNCERTAIN)
+  return rows
 }
 
 export async function schedulePost(contentId, platforms, scheduledAtIso) {

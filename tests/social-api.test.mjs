@@ -94,3 +94,29 @@ test('social client demo mode', async () => {
     assert.equal((await api.adminListRequests())[0].admin_note, 'ok')
   } finally { await server.close() }
 })
+
+test('live publishNow: lost response, network error or 5xx is reported as uncertain, 4xx keeps its message', async () => {
+  data.set('satualur_use_mock', '0')
+  const server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom',
+    define: { 'import.meta.env.VITE_USE_MOCK': JSON.stringify('false') } })
+  const realFetch = globalThis.fetch
+  try {
+    const api = await server.ssrLoadModule('/src/social/api.js')
+    const UNCERTAIN = 'Status tidak pasti — periksa Laporan tayang sebelum mencoba lagi.'
+    const reply = (status, body) => async () => new Response(body, { status, headers: { 'content-type': 'application/json' } })
+    globalThis.fetch = async () => { throw new TypeError('network') }
+    await assert.rejects(api.publishNow(1, ['facebook']), { message: UNCERTAIN })
+    globalThis.fetch = reply(502, '<html>')
+    await assert.rejects(api.publishNow(1, ['facebook']), { message: UNCERTAIN })
+    globalThis.fetch = reply(200, '')
+    await assert.rejects(api.publishNow(1, ['facebook']), { message: UNCERTAIN })
+    globalThis.fetch = reply(400, JSON.stringify({ error: { message: 'Pilih platform Facebook dan/atau Instagram.' } }))
+    await assert.rejects(api.publishNow(1, ['facebook']), { message: 'Pilih platform Facebook dan/atau Instagram.' })
+    globalThis.fetch = reply(200, JSON.stringify({ data: [{ id: 1, status: 'posted' }] }))
+    assert.deepEqual(await api.publishNow(1, ['facebook']), [{ id: 1, status: 'posted' }])
+  } finally {
+    globalThis.fetch = realFetch
+    data.delete('satualur_use_mock')
+    await server.close()
+  }
+})

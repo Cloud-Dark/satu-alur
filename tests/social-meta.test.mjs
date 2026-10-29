@@ -38,15 +38,16 @@ test('postFacebook with image uses photos', async () => {
 })
 
 test('postInstagram creates container, publishes, fetches permalink', async () => {
-  const f = stub([{ json: { id: 'C1' } }, { json: { id: 'M1' } }, { json: { permalink: 'https://instagram.com/p/1' } }])
+  const f = stub([{ json: { id: 'C1' } }, { json: { status_code: 'FINISHED' } }, { json: { id: 'M1' } }, { json: { permalink: 'https://instagram.com/p/1' } }])
   const r = await postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'cap', imageUrl: 'https://x/i.jpg' }, f)
   assert.deepEqual(r, { id: 'M1', permalink: 'https://instagram.com/p/1' })
   assert.match(f.calls[0].url, /\/IG\/media$/)
   assert.equal(f.calls[0].body.get('image_url'), 'https://x/i.jpg')
   assert.equal(f.calls[0].body.get('caption'), 'cap')
-  assert.match(f.calls[1].url, /\/IG\/media_publish$/)
-  assert.equal(f.calls[1].body.get('creation_id'), 'C1')
-  assert.match(f.calls[2].url, /\/M1\?.*fields=permalink/)
+  assert.match(f.calls[1].url, /\/C1\?.*fields=status_code/)
+  assert.match(f.calls[2].url, /\/IG\/media_publish$/)
+  assert.equal(f.calls[2].body.get('creation_id'), 'C1')
+  assert.match(f.calls[3].url, /\/M1\?.*fields=permalink/)
 })
 
 test('Graph error 190 rejects with token MetaError', async () => {
@@ -101,7 +102,7 @@ test('postFacebook: permalink lookup failure still resolves with null permalink'
 })
 
 test('postInstagram: permalink fetch rejection still resolves with null permalink', async () => {
-  const f = stub([{ json: { id: 'C1' } }, { json: { id: 'M1' } }, new Error('boom')])
+  const f = stub([{ json: { id: 'C1' } }, { json: { status_code: 'FINISHED' } }, { json: { id: 'M1' } }, new Error('boom')])
   assert.deepEqual(await postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u' }, f), { id: 'M1', permalink: null })
 })
 
@@ -120,7 +121,7 @@ test('5xx on the final publish call is ambiguous (the post may be live)', async 
 })
 
 test('a network failure on media_publish is ambiguous', async () => {
-  const f = stub([{ json: { id: 'C' } }, new Error('reset')])
+  const f = stub([{ json: { id: 'C' } }, { json: { status_code: 'FINISHED' } }, new Error('reset')])
   await assert.rejects(postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u' }, f),
     (e) => e.kind === 'transient' && e.ambiguous === true)
 })
@@ -135,4 +136,28 @@ test('rate limit (code 4) on the final publish call is not ambiguous', async () 
   const f = stub([{ status: 400, json: { error: { message: 'limit', code: 4 } } }])
   await assert.rejects(postFacebook({ pageId: 'PAGE', pageToken: 'T', message: 'hi' }, f),
     (e) => e.kind === 'transient' && !e.ambiguous)
+})
+
+test('postInstagram polls the container until FINISHED before publishing', async () => {
+  const waits = []
+  const wait = async (ms) => { waits.push(ms) }
+  const f = stub([{ json: { id: 'C1' } }, { json: { status_code: 'IN_PROGRESS' } }, { json: { status_code: 'FINISHED' } },
+    { json: { id: 'M1' } }, { json: { permalink: 'p' } }])
+  assert.deepEqual(await postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u', wait }, f), { id: 'M1', permalink: 'p' })
+  assert.deepEqual(waits, [1500])
+  assert.match(f.calls[3].url, /\/IG\/media_publish$/)
+})
+
+test('postInstagram: container ERROR is fatal and never publishes', async () => {
+  const f = stub([{ json: { id: 'C1' } }, { json: { status_code: 'ERROR' } }])
+  await assert.rejects(postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u', wait: async () => {} }, f),
+    (e) => e instanceof MetaError && e.kind === 'fatal' && e.message === 'Instagram menolak gambar ini.')
+  assert.equal(f.calls.length, 2)
+})
+
+test('postInstagram: still IN_PROGRESS after 5 polls is transient, not ambiguous', async () => {
+  const f = stub([{ json: { id: 'C1' } }, ...Array.from({ length: 5 }, () => ({ json: { status_code: 'IN_PROGRESS' } }))])
+  await assert.rejects(postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u', wait: async () => {} }, f),
+    (e) => e.kind === 'transient' && !e.ambiguous)
+  assert.equal(f.calls.filter((c) => c.method === 'POST').length, 1)
 })
