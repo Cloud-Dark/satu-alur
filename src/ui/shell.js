@@ -25,7 +25,7 @@ import * as StageLeads from '../stages/leads.js'
 import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
-import * as StageOffice from '../stages/office.js'
+import * as StageOffice from '../stages/office/index.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
