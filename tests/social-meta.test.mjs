@@ -112,3 +112,27 @@ test('listPages parses /me/accounts', async () => {
   assert.match(f.calls[0].url, /\/me\/accounts\?/)
   assert.equal(new URL(f.calls[0].url).searchParams.get('access_token'), 'UT')
 })
+
+test('5xx on the final publish call is ambiguous (the post may be live)', async () => {
+  const f = stub([{ status: 500, json: { error: { message: 'boom', code: 2 } } }])
+  await assert.rejects(postFacebook({ pageId: 'PAGE', pageToken: 'T', message: 'hi' }, f),
+    (e) => e instanceof MetaError && e.kind === 'transient' && e.ambiguous === true)
+})
+
+test('a network failure on media_publish is ambiguous', async () => {
+  const f = stub([{ json: { id: 'C' } }, new Error('reset')])
+  await assert.rejects(postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u' }, f),
+    (e) => e.kind === 'transient' && e.ambiguous === true)
+})
+
+test('5xx on the IG container step is not ambiguous', async () => {
+  const f = stub([{ status: 500, json: { error: { message: 'boom', code: 2 } } }])
+  await assert.rejects(postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u' }, f),
+    (e) => e.kind === 'transient' && !e.ambiguous)
+})
+
+test('rate limit (code 4) on the final publish call is not ambiguous', async () => {
+  const f = stub([{ status: 400, json: { error: { message: 'limit', code: 4 } } }])
+  await assert.rejects(postFacebook({ pageId: 'PAGE', pageToken: 'T', message: 'hi' }, f),
+    (e) => e.kind === 'transient' && !e.ambiguous)
+})

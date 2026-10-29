@@ -313,7 +313,13 @@ export async function handleSocialPublish(request, env, { authenticate, readJson
   const body = await readJson(request);
   const rows = await createPosts(env, user.id, body, new Date().toISOString(), HttpError);
   const deps = runnerDeps(env);
-  for (const row of rows) await publishRow(row, deps);
+  for (const row of rows) {
+    try {
+      await publishRow(row, deps);
+    } catch (err) {
+      console.error('Social publish row failed', err?.name); // the re-select below shows its real status
+    }
+  }
   const ids = rows.map((r) => r.id);
   const { results } = await env.DB.prepare(`SELECT * FROM social_posts WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY id`)
     .bind(...ids).all();

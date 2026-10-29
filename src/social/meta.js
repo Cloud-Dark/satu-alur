@@ -5,6 +5,7 @@
  */
 
 export const GRAPH = 'https://graph.facebook.com/v21.0'
+const RATE_LIMIT_CODES = [4, 17, 32, 613]
 const SCOPE = 'pages_show_list,pages_read_engagement,pages_manage_posts,instagram_basic,instagram_content_publish,business_management'
 
 export class MetaError extends Error {
@@ -21,7 +22,7 @@ export function classifyMetaError(status, body) {
   const e = body && body.error
   const code = e && e.code
   if (code === 190 || code === 102) return 'token'
-  if (status >= 500 || [4, 17, 32, 613].includes(code) || (e && e.is_transient)) return 'transient'
+  if (status >= 500 || RATE_LIMIT_CODES.includes(code) || (e && e.is_transient)) return 'transient'
   return 'fatal'
 }
 
@@ -90,15 +91,26 @@ async function permalinkOf(fetchFn, id, field, pageToken) {
   }
 }
 
+// The call that creates the live post: a transient failure (timeout, 5xx) may mean it went out anyway,
+// so it is flagged ambiguous and must never be retried. Rate limits are rejected before posting.
+async function postFinal(fetchFn, path, params) {
+  try {
+    return await post(fetchFn, path, params)
+  } catch (e) {
+    if (e instanceof MetaError && e.kind === 'transient' && !RATE_LIMIT_CODES.includes(e.code)) e.ambiguous = true
+    throw e
+  }
+}
+
 export async function postFacebook({ pageId, pageToken, message, imageUrl }, fetchFn) {
   const r = imageUrl
-    ? await post(fetchFn, `/${pageId}/photos`, { url: imageUrl, caption: message, access_token: pageToken })
-    : await post(fetchFn, `/${pageId}/feed`, { message, access_token: pageToken })
+    ? await postFinal(fetchFn, `/${pageId}/photos`, { url: imageUrl, caption: message, access_token: pageToken })
+    : await postFinal(fetchFn, `/${pageId}/feed`, { message, access_token: pageToken })
   return { id: r.id, permalink: await permalinkOf(fetchFn, r.id, 'permalink_url', pageToken) }
 }
 
 export async function postInstagram({ igUserId, pageToken, caption, imageUrl }, fetchFn) {
   const c = await post(fetchFn, `/${igUserId}/media`, { image_url: imageUrl, caption, access_token: pageToken })
-  const m = await post(fetchFn, `/${igUserId}/media_publish`, { creation_id: c.id, access_token: pageToken })
+  const m = await postFinal(fetchFn, `/${igUserId}/media_publish`, { creation_id: c.id, access_token: pageToken })
   return { id: m.id, permalink: await permalinkOf(fetchFn, m.id, 'permalink', pageToken) }
 }

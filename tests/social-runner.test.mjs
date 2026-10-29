@@ -103,9 +103,36 @@ test('no account fails without calling Meta', async () => {
   assert.equal(f.calls.length, 0)
 })
 
-test('transient error requeues until the third attempt', async () => {
+test('ambiguous error on the final publish call fails and is never requeued', async () => {
+  const store = memStore([row({ attempts: 0 })])
+  let requeued = 0
+  const requeue = store.requeue
+  store.requeue = async (...a) => { requeued++; return requeue(...a) }
+  const f = stubFetch([{ status: 503, json: { error: { message: 'timeout', code: 2 } } }])
+  assert.equal(await publishRow(store.rows[0], deps(store, f)), 'failed')
+  assert.equal(store.rows[0].status, 'failed')
+  assert.equal(store.rows[0].error, 'Status tidak pasti, periksa halaman Anda')
+  assert.equal(requeued, 0)
+})
+
+test('a store error on one row does not stop runDue', async () => {
+  const store = memStore([row({ id: 1 }), row({ id: 2 })])
+  const claim = store.claim
+  store.claim = async (id, iso) => { if (id === 1) throw new Error('D1 down'); return claim(id, iso) }
+  const f = stubFetch([{ json: { id: 'P' } }, { json: { permalink_url: 'u' } }])
+  const orig = console.error
+  console.error = () => {}
+  try {
+    assert.equal((await runDue(deps(store, f))).posted, 1)
+  } finally {
+    console.error = orig
+  }
+  assert.equal(store.rows[1].status, 'posted')
+})
+
+test('transient (rate limit) error requeues until the third attempt', async () => {
   const store = memStore([row({ attempts: 0 }), row({ id: 2, attempts: 2 })])
-  const busy = () => ({ status: 500, json: { error: { message: 'busy', code: 2 } } })
+  const busy = () => ({ status: 400, json: { error: { message: 'busy', code: 4 } } })
   assert.equal(await publishRow(store.rows[0], deps(store, stubFetch([busy()]))), 'requeued')
   assert.equal(store.rows[0].status, 'scheduled')
   assert.equal(store.rows[0].attempts, 1)

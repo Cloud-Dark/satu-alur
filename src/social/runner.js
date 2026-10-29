@@ -35,6 +35,10 @@ export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, no
       await store.markFailed(row.id, GENERIC)
       return 'failed'
     }
+    if (err.ambiguous) {
+      await store.markFailed(row.id, STUCK)
+      return 'failed'
+    }
     if (err.kind === 'transient' && (row.attempts || 0) + 1 < MAX_ATTEMPTS) {
       await store.requeue(row.id, err.message)
       return 'requeued'
@@ -52,8 +56,12 @@ export async function runDue(deps, limit = 25) {
   const tally = { posted: 0, failed: 0, requeued: 0 }
   const rows = await deps.store.listDue(new Date(deps.now()).toISOString(), limit)
   for (const row of rows) {
-    const r = await publishRow(row, deps)
-    if (r in tally) tally[r]++
+    try {
+      const r = await publishRow(row, deps)
+      if (r in tally) tally[r]++
+    } catch (err) {
+      console.error('Social runDue row failed', err?.name) // one bad row must not stop the rest
+    }
   }
   return tally
 }
