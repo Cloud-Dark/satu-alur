@@ -117,7 +117,9 @@ export async function render(container, ctx = {}) {
       })
       if (error) throw new Error(error.message)
       const upd = await db.from('assignments').update({ status: 'done' }).eq('id', a.id)
-      if (upd.error) console.warn('Status penugasan tidak diperbarui:', upd.error.message)
+      // The completion is the source of truth (activeAssignments skips assignments
+      // that have one), so a failed status update can't cause a second completion.
+      if (upd.error) showToast(`Selesai tercatat, tetapi status penugasan belum diperbarui: ${upd.error.message}`, 'warning', 6000)
       const row = Array.isArray(data) ? data[0] : data
       restore()
       const next = C.button({ label: 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })

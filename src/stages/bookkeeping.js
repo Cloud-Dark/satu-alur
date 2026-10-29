@@ -27,6 +27,11 @@ export async function render(container, ctx = {}) {
   let flow = null
   const selected = () => flow?.completion(complSel.input.value) || null
   const amountValue = () => Number(amount.input.value)
+  // One revenue entry per completion; costs can be posted as many times as needed.
+  const revenueTaken = () => {
+    const c = selected()
+    return Boolean(c && category.input.value === 'pendapatan' && flow?.ledgerOf(c.id).some(isRevenue))
+  }
 
   const wiz = C.wizard({
     label: 'Posting jurnal',
@@ -49,6 +54,7 @@ export async function render(container, ctx = {}) {
           if (!category.input.value) errs.push({ text: 'Pilih kategori.', input: category.input })
           const amt = amountValue()
           if (!amount.input.value || !Number.isFinite(amt) || amt <= 0) errs.push({ text: 'Jumlah harus angka lebih dari nol.', input: amount.input })
+          if (revenueTaken()) errs.push({ text: 'Pendapatan pekerjaan ini sudah diposting. Pilih kategori biaya, atau pekerjaan lain.', input: category.input })
           return errs
         },
         onEnter: () => drawContext(),
@@ -64,6 +70,7 @@ export async function render(container, ctx = {}) {
           if (!selected()) errs.push('Pilih pekerjaan selesai.')
           if (!category.input.value) errs.push('Pilih kategori.')
           if (!(amountValue() > 0)) errs.push('Jumlah harus angka lebih dari nol.')
+          if (revenueTaken()) errs.push('Pendapatan pekerjaan ini sudah diposting.')
           return errs
         },
         onPrimary: () => save(),

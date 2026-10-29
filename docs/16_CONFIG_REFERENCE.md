@@ -64,7 +64,6 @@ Halaman Pengaturan menyimpan di peramban: `satualur_settings_mcp`, `satualur_set
 | `deploy` | `vite build && wrangler deploy` | Build lalu deploy ke Cloudflare |
 | `db:migrate:local` | `wrangler d1 migrations apply satu-alur-db --local` | Terapkan migrasi ke D1 lokal |
 | `db:migrate:remote` | `wrangler d1 migrations apply satu-alur-db --remote` | Terapkan migrasi ke D1 Cloudflare |
-| `setup` | `node scripts/setup.js` | Skrip lama untuk `cloud.config.js` (WorkBuddy); status relevansi _TBD_ |
 | `lint`, `test` | placeholder | Belum dikonfigurasi |
 
 ## Konstanta di Kode Worker

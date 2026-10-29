@@ -446,6 +446,44 @@ async function assertFkOwnership(env, spec, rows, userId) {
   }
 }
 
+// Money and flow rules the generic endpoint enforces on top of the schema:
+// ledger amounts are positive, an assignment is completed once, and a
+// completion carries at most one revenue entry. Seeds write via SQL, not here.
+const LEDGER_CATEGORY_SET = new Set(['pendapatan', 'biaya_tenaga', 'biaya_bahan', 'biaya_transport', 'biaya_lain']);
+
+async function assertFlowRules(env, table, rows, userId) {
+  if (table === 'ledger_entries') {
+    const revenueFor = new Set();
+    for (const r of rows) {
+      if ('amount' in r) {
+        const amt = Number(r.amount);
+        if (!Number.isFinite(amt) || amt <= 0) throw bad('Jumlah jurnal harus lebih dari nol.');
+      }
+      if ('category' in r && !LEDGER_CATEGORY_SET.has(r.category)) throw bad('Kategori jurnal tidak dikenal.');
+      if (r.category === 'pendapatan' && r.completion_id != null) {
+        const key = String(r.completion_id);
+        const dup = revenueFor.has(key) || await env.DB.prepare(
+          "SELECT 1 AS x FROM ledger_entries WHERE owner_id = ? AND completion_id = ? AND category = 'pendapatan' LIMIT 1",
+        ).bind(userId, r.completion_id).first();
+        if (dup) throw new HttpError(409, 'Pendapatan untuk pekerjaan ini sudah diposting.');
+        revenueFor.add(key);
+      }
+    }
+  }
+  if (table === 'completions') {
+    const seen = new Set();
+    for (const r of rows) {
+      if (r.assignment_id == null) continue;
+      const key = String(r.assignment_id);
+      const dup = seen.has(key) || await env.DB.prepare(
+        'SELECT 1 AS x FROM completions WHERE owner_id = ? AND assignment_id = ? LIMIT 1',
+      ).bind(userId, r.assignment_id).first();
+      if (dup) throw new HttpError(409, 'Penugasan ini sudah ditandai selesai.');
+      seen.add(key);
+    }
+  }
+}
+
 function mapDbError(err) {
   const m = String(err && err.message);
   if (/constraint/i.test(m)) return new HttpError(400, 'Data tidak valid atau melanggar batasan.');
@@ -467,6 +505,7 @@ async function handleDb(request, env) {
     if (values.length === 0 || values.length > MAX_INSERT_ROWS) throw bad('Values tidak valid.');
     const rows = values.map((v) => serializeRow(spec, v, { forWrite: 'insert' }));
     await assertFkOwnership(env, spec, rows, uid);
+    await assertFlowRules(env, table, rows, uid);
     const stmts = rows.map((r) => {
       const cols = ['owner_id', ...Object.keys(r)];
       return env.DB.prepare(
@@ -493,6 +532,10 @@ async function handleDb(request, env) {
       const keys = Object.keys(ch);
       if (keys.length === 0) throw bad('Changes kosong.');
       await assertFkOwnership(env, spec, [ch], uid);
+      if (table === 'ledger_entries' && ('amount' in ch || 'category' in ch)) {
+        if ('amount' in ch && !(Number(ch.amount) > 0)) throw bad('Jumlah jurnal harus lebih dari nol.');
+        if ('category' in ch && !LEDGER_CATEGORY_SET.has(ch.category)) throw bad('Kategori jurnal tidak dikenal.');
+      }
       stmt = env.DB.prepare(
         `UPDATE ${table} SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE owner_id = ?${whereSql} RETURNING *`,
       ).bind(...Object.values(ch), uid, ...params);

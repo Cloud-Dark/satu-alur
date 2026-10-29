@@ -1,7 +1,7 @@
 /**
- * Mock WorkBuddy Cloud SDK — runs entirely in browser memory + localStorage.
- * Mengisi gap saat cloud service WorkBuddy belum diaktifkan.
- * Dapat diganti dengan SDK nyata secara transparan saat publicConfig tersedia.
+ * Mock cloud — the same interface as src/http-cloud.js, kept in browser
+ * memory + localStorage. Used for local development and e2e tests
+ * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
 
 const STORAGE_KEY = 'satualur_mock_v1'
@@ -21,6 +21,34 @@ function ensureTable(name) {
   if (!_state[name]) _state[name] = []
   return _state[name]
 }
+// Mirrors assertFlowRules in worker/index.js so tests catch the same mistakes.
+const LEDGER_CATEGORIES = ['pendapatan', 'biaya_tenaga', 'biaya_bahan', 'biaya_transport', 'biaya_lain']
+function flowRuleError(table, rows) {
+  if (table === 'ledger_entries') {
+    const revenueFor = new Set()
+    for (const r of rows) {
+      if ('amount' in r && !(Number(r.amount) > 0)) return 'Jumlah jurnal harus lebih dari nol.'
+      if ('category' in r && !LEDGER_CATEGORIES.includes(r.category)) return 'Kategori jurnal tidak dikenal.'
+      if (r.category === 'pendapatan' && r.completion_id != null) {
+        const key = String(r.completion_id)
+        const dup = revenueFor.has(key) || ensureTable('ledger_entries').some((l) => String(l.completion_id) === key && l.category === 'pendapatan')
+        if (dup) return 'Pendapatan untuk pekerjaan ini sudah diposting.'
+        revenueFor.add(key)
+      }
+    }
+  }
+  if (table === 'completions') {
+    const seen = new Set()
+    for (const r of rows) {
+      if (r.assignment_id == null) continue
+      const key = String(r.assignment_id)
+      if (seen.has(key) || ensureTable('completions').some((c) => String(c.assignment_id) === key)) return 'Penugasan ini sudah ditandai selesai.'
+      seen.add(key)
+    }
+  }
+  return null
+}
+
 function persist() {
   saveState(_state)
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('satualur:db-write'))
@@ -200,6 +228,8 @@ const mockDatabase = {
     const originalThen = builder.then
     builder.then = async function (resolve) {
       if (builder._insert) {
+        const ruleError = flowRuleError(table, builder._insert)
+        if (ruleError) return resolve({ data: null, error: { message: ruleError } })
         const created = builder._insert.map(item => ({
           id: Date.now() + Math.floor(Math.random() * 100000),
           owner_id: _session?.user?.id ?? 'anon',
@@ -209,6 +239,9 @@ const mockDatabase = {
         ensureTable(table).push(...created)
         persist()
         return resolve({ data: created, error: null })
+      }
+      if ((builder._update || builder._delete) && filters.length === 0) {
+        return resolve({ data: null, error: { message: 'Filter diperlukan untuk update/delete.' } })
       }
       if (builder._update) {
         let affected = 0

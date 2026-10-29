@@ -1,12 +1,26 @@
 # Changelog
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-28
+> Terakhir diperbarui: 2026-10-29
 > Pemilik: _TBD_
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Versi mengikuti `package.json` (saat ini `0.1.0`); penetapan nomor versi rilis: _TBD_.
 
 ## [Unreleased]
+
+### 2026-10-29 - Tindak lanjut audit kode
+
+#### Diperbaiki
+- Worker menolak jurnal dengan jumlah nol/negatif atau kategori tak dikenal, pendapatan ganda untuk satu pekerjaan selesai (409), dan penyelesaian ganda untuk satu penugasan (409). Mock memakai aturan yang sama.
+- Pembukuan memberi pesan validasi bila pendapatan pekerjaan itu sudah diposting; biaya tetap boleh berkali-kali.
+- Penyelesaian menampilkan peringatan bila status penugasan gagal diperbarui (sebelumnya hanya `console.warn`).
+- Mock menolak `update`/`delete` tanpa filter, sama seperti Worker.
+
+#### Dihapus
+- `scripts/setup.js` dan skrip `npm run setup` (sisa WorkBuddy), serta helper mati `typewriterEffect` dan `createParticleBackground`.
+
+#### Pengujian
+- `tests/flow-rules.test.mjs`: 7 tes untuk aturan uang dan alur (total 152 unit test).
 
 ### 2026-10-28 - Port ke Cloudflare
 
