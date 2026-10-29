@@ -4,6 +4,7 @@ import * as Requests from './requests.js'
 import * as Landing from './site-landing.js'
 import * as Doc from './site-doc.js'
 import * as Plans from './plans.js'
+import * as Payment from './payment.js'
 
 const { el } = C
 const STORE = 'satualur_office_section'
@@ -14,7 +15,7 @@ const GROUPS = [
     { key: 'legal', label: 'Legal', draw: Doc.drawLegal }] },
   { title: 'Bisnis', items: [
     { key: 'plans', label: 'Paket langganan', draw: Plans.draw },
-    { key: 'gateway', label: 'Payment gateway', soon: true }] },
+    { key: 'gateway', label: 'Payment gateway', draw: Payment.draw }] },
   { title: 'Pelanggan', items: [{ key: 'customers', label: 'Pelanggan & layanan', soon: true }] },
   { title: 'Agensi influencer', items: [
     { key: 'influencers', label: 'Influencer', draw: Influencers.draw },

@@ -117,3 +117,16 @@ CREATE TABLE IF NOT EXISTS subscription_plans (
   updated_at TEXT NOT NULL,
   updated_by TEXT
 );
+
+-- Single row (id = 1). Secrets are AES-GCM ciphertext (TOKEN_KEY); never in TABLES, never returned.
+CREATE TABLE IF NOT EXISTS payment_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  provider TEXT NOT NULL DEFAULT 'none',
+  mode TEXT NOT NULL DEFAULT 'sandbox',
+  client_key TEXT NOT NULL DEFAULT '',
+  server_key_enc TEXT,
+  server_key_last4 TEXT NOT NULL DEFAULT '',
+  webhook_token_enc TEXT,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);

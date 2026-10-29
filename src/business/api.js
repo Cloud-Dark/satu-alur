@@ -5,6 +5,7 @@
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { validatePlan, validateReorder } from './plan-rules.js'
+import { validatePaymentSettings, testGateway } from './payment.js'
 
 const DEMO_KEY = 'satualur_business_demo_v1'
 const FAIL_KEY = 'satualur_business_fail'
@@ -108,6 +109,52 @@ export async function adminReorderPlans(ids) {
   const rows = await call('/api/office/admin/plans/reorder', { method: 'POST', body: { ids } })
   refreshPublic()
   return rows
+}
+
+/* Payment gateway. The demo store never keeps a secret: only "set", last4, and whether the key contained "salah". */
+const NO_PAYMENT = { provider: 'none', mode: 'sandbox', client_key: '', server_key_set: false, server_key_last4: '', webhook_token_set: false, updated_at: null, updated_by: null }
+const publicPayment = ({ key_wrong, ...rest } = {}) => ({ ...NO_PAYMENT, ...rest })
+
+/** Stored settings (flags + last4, never a key). Throws a readable error on failure. */
+export async function adminGetPayment() {
+  if (isUsingMockCloud()) {
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pengaturan pembayaran. Coba lagi.')
+    return publicPayment(loadDemo().payment)
+  }
+  try {
+    return await call('/api/office/admin/payment', { cache: 'no-store' })
+  } catch (e) {
+    throw new Error(`Gagal memuat pengaturan pembayaran. ${e.message}`)
+  }
+}
+
+/** Save; blank secrets keep the stored ones, `clear_server_key: true` removes the server key. */
+export async function adminSavePayment(body) {
+  if (!isUsingMockCloud()) return call('/api/office/admin/payment', { method: 'PUT', body })
+  const v = validatePaymentSettings(body)
+  const db = loadDemo()
+  const cur = db.payment || {}
+  const keep = !v.clear_server_key && cur.server_key_set
+  db.payment = {
+    provider: v.provider, mode: v.mode, client_key: v.client_key,
+    server_key_set: Boolean(v.server_key) || Boolean(keep),
+    server_key_last4: v.server_key ? v.server_key.slice(-4) : keep ? cur.server_key_last4 : '',
+    key_wrong: v.server_key ? v.server_key.includes('salah') : Boolean(keep && cur.key_wrong),
+    webhook_token_set: Boolean(v.webhook_token) || Boolean(cur.webhook_token_set),
+    updated_at: new Date().toISOString(),
+    updated_by: (await getCloud().auth.getSession())?.data?.user?.name || 'demo',
+  }
+  localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+  return publicPayment(db.payment)
+}
+
+/** Test the stored settings against the provider; returns { ok, message }. */
+export async function adminTestPayment() {
+  if (!isUsingMockCloud()) return call('/api/office/admin/payment/test', { method: 'POST' })
+  const p = loadDemo().payment || {}
+  // Fake provider answer after ~600 ms: 401 when the saved key contained "salah".
+  const fake = async () => { await new Promise((r) => setTimeout(r, 600)); return { status: p.key_wrong ? 401 : p.provider === 'xendit' ? 200 : 404 } }
+  return testGateway({ provider: p.provider, mode: p.mode, serverKey: p.server_key_set ? 'demo' : '' }, fake)
 }
 
 /** Patch any fields of a plan (also used to reorder via `sort` and to deactivate via `active: 0`). */
