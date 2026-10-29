@@ -14,7 +14,7 @@ const path = require('path')
 const STAGE_LABELS = {
   dashboard: 'Ringkasan', request: 'Permintaan', offer: 'Penawaran', assign: 'Penugasan',
   complete: 'Penyelesaian', bookkeeping: 'Pembukuan', report: 'Laporan',
-  social: 'Media sosial', advisor: 'Penasihat AI', radar: 'Radar peluang', leads: 'Pencari prospek',
+  'social-media': 'Media Sosial', advisor: 'Penasihat AI', radar: 'Radar peluang', leads: 'Pencari prospek',
 }
 
 function makeContext({ browser, base, spec, results, shotDir }) {

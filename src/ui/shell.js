@@ -18,7 +18,6 @@ import * as StageComplete from '../stages/complete.js'
 import * as StageBookkeeping from '../stages/bookkeeping.js'
 import * as StageReport from '../stages/report.js'
 import * as StageSettings from '../stages/settings.js'
-import * as StageSocial from '../stages/social.js'
 import * as StageAdvisor from '../stages/advisor.js'
 import * as StageRadar from '../stages/radar.js'
 import * as StageLeads from '../stages/leads.js'
@@ -47,15 +46,13 @@ export const STAGES = [
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
   { key: 'leads', group: 'growth', label: 'Pencari prospek', sub: 'Peta & radius', icon: 'mapPin', module: StageLeads,
     action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'social', group: 'growth', label: 'Media sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocial,
+  { key: 'social-media', group: 'growth', label: 'Media Sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocialMedia,
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
   { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 
-  { key: 'social-media', group: 'growth', label: 'Social Media', icon: 'message', module: StageSocialMedia,
-    action: { label: 'Asisten AI', icon: 'bot', to: 'ai-assistant' } },
   { key: 'ai-assistant', group: 'growth', label: 'AI Superpowers', icon: 'bot', module: StageAIAssistant,
-    action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
+    action: { label: 'Media Sosial', icon: 'megaphone', to: 'social-media' } },
   { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
   { key: 'office', group: 'growth', label: 'Kantor Satu Alur', sub: 'Influencer & permintaan', icon: 'users', module: StageOffice, adminOnly: true,

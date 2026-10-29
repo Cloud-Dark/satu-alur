@@ -1,10 +1,10 @@
-// E2E: Social Media menu (#/social-media) — Akun + Konten tabs on the mock cloud (demo mode).
+// E2E: Media Sosial menu (#/social-media) — Akun + Konten tabs on the mock cloud (demo mode).
 const { loginLive, goStage } = require('./lib.cjs')
 
 module.exports = async function socialMedia(t) {
   const p = await t.page()
   await loginLive(p, t.base)
-  t.check(await goStage(p, 'social-media'), 'sidebar has "Social Media"')
+  t.check(await goStage(p, 'social-media'), 'sidebar has "Media Sosial"')
   const tab = (name) => p.getByRole('radio', { name, exact: true })
   await p.waitForSelector('.workspace-tabs .seg-btn')
   const labels = await p.$$eval('.workspace-tabs .seg-btn', (b) => b.map((x) => x.textContent.trim()))
