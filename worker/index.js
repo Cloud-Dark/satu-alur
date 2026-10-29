@@ -13,6 +13,10 @@ import {
   handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
   handleSocialPublish, handleSocialSchedule, handleSocialScheduleCancel, runCron,
 } from './social.js';
+import {
+  handleInfluencers, handleRequestCreate, handleRequestList, handleAdminInfluencers, handleAdminInfluencerCreate,
+  handleAdminInfluencerUpdate, handleAdminRequests, handleAdminRequestUpdate,
+} from './office.js';
 import { isAdmin } from '../src/social/rules.js';
 
 // ---------------------------------------------------------------- constants
@@ -864,6 +868,14 @@ const ROUTES = {
   'POST /api/social/publish': (req, env) => handleSocialPublish(req, env, ROUTE_DEPS),
   'POST /api/social/schedule': (req, env) => handleSocialSchedule(req, env, ROUTE_DEPS),
   'DELETE /api/social/schedule/:id': (req, env, params) => handleSocialScheduleCancel(req, env, ROUTE_DEPS, params),
+  'GET /api/office/influencers': (req, env) => handleInfluencers(req, env, ROUTE_DEPS),
+  'POST /api/office/requests': (req, env) => handleRequestCreate(req, env, ROUTE_DEPS),
+  'GET /api/office/requests': (req, env) => handleRequestList(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/influencers': (req, env) => handleAdminInfluencers(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/influencers': (req, env) => handleAdminInfluencerCreate(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/influencers/:id': (req, env, params) => handleAdminInfluencerUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/requests': (req, env) => handleAdminRequests(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/requests/:id': (req, env, params) => handleAdminRequestUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 
