@@ -4,7 +4,7 @@
  * in localStorage `satualur_site_demo_v1` as { [key]: { value, updated_at, updated_by } }.
  * Test seam: localStorage `satualur_site_fail` = '1' makes getSite fail (demo mode).
  */
-import { isUsingMockCloud } from '../cloud.js'
+import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { validateSiteContent } from './content-rules.js'
 
 const DEMO_KEY = 'satualur_site_demo_v1'
@@ -52,8 +52,9 @@ export async function getSite(key) {
 export async function saveSite(key, value) {
   if (isUsingMockCloud()) {
     const clean = validateSiteContent(key, value)
+    const who = (await getCloud().auth.getSession())?.data?.user?.name || 'demo'
     const all = loadDemo()
-    all[key] = { value: clean, updated_at: new Date().toISOString(), updated_by: 'demo' }
+    all[key] = { value: clean, updated_at: new Date().toISOString(), updated_by: who }
     localStorage.setItem(DEMO_KEY, JSON.stringify(all))
     return { key, ...all[key] }
   }

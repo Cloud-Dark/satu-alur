@@ -24,7 +24,7 @@ const el = (tag, cls, text) => {
   return n
 }
 
-function blockNode(b) {
+export function blockNode(b) {
   if (b.type === 'h') return el('h2', '', b.text)
   if (b.type === 'ul') {
     const ul = el('ul')
@@ -36,6 +36,8 @@ function blockNode(b) {
 
 export function renderDocPage(root, ctx, key) {
   let disposed = false
+  const prevTitle = document.title
+  document.title = `${DOC_TITLES[key]} — Satu Alur`
   const page = el('div', 'lp doc-page')
 
   const header = el('header', 'lp-header is-scrolled')
@@ -73,7 +75,10 @@ export function renderDocPage(root, ctx, key) {
       body.append(el('p', 'doc-empty', 'Dokumen ini sedang disiapkan.'))
       return
     }
-    if (v.title.trim()) title.textContent = v.title.trim()
+    if (v.title.trim()) {
+      title.textContent = v.title.trim()
+      document.title = `${v.title.trim()} — Satu Alur`
+    }
     body.append(...parseDoc(v.body).map(blockNode))
     if (row.updated_at) {
       const d = new Date(row.updated_at)
@@ -83,5 +88,5 @@ export function renderDocPage(root, ctx, key) {
     }
   })
 
-  return () => { disposed = true }
+  return () => { disposed = true; document.title = prevTitle }
 }

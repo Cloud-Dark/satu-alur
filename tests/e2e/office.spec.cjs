@@ -55,6 +55,7 @@ module.exports = async function office(t) {
   await p.waitForTimeout(800)
   t.check(await p.locator('.flow-item[aria-current="page"]').getAttribute('data-stage') === 'office', 'staff login lands on Kantor Satu Alur')
   const radio = (name) => p.getByRole('radio', { name, exact: true })
+  const sec = (name) => p.getByRole('button', { name, exact: true }).click()
   const kolaborasi = async () => {
     await goStage(p, 'social-media')
     await radio('Kolaborasi').click()
@@ -77,6 +78,12 @@ module.exports = async function office(t) {
 
   // add an influencer
   await goStage(p, 'office')
+  for (const h of ['Konten situs', 'Bisnis', 'Pelanggan', 'Agensi influencer']) {
+    t.check(await p.getByRole('heading', { name: h, exact: true }).count() === 1, `nav heading "${h}"`)
+  }
+  t.check(await p.getByRole('button', { name: 'Landing page' }).getAttribute('aria-current') === 'page', 'landing is the default section')
+  t.check(await p.getByRole('button', { name: /Paket & pembayaran/ }).isDisabled(), 'Bisnis item is disabled (Segera)')
+  await sec('Influencer')
   await p.getByRole('button', { name: 'Tambah influencer' }).click()
   const dlg = p.getByRole('dialog', { name: 'Tambah influencer' })
   await dlg.getByRole('button', { name: 'Simpan' }).click()
@@ -112,7 +119,7 @@ module.exports = async function office(t) {
 
   // process the request
   await goStage(p, 'office')
-  await radio('Permintaan').click()
+  await sec('Permintaan')
   const req = p.locator('.of-request').first()
   await req.waitFor({ timeout: 8000 })
   t.check((await req.textContent()).includes('Promosi kedai baru'), 'request shows its payload fields')
@@ -129,5 +136,43 @@ module.exports = async function office(t) {
   await kolaborasi()
   await p.locator('.sm-request', { hasText: 'Diproses' }).first().waitFor({ timeout: 8000 })
   t.check((await p.locator('.sm-request').first().textContent()).includes('Kami hubungi lusa'), 'business sees Diproses and the admin note')
+
+  // landing editor
+  await goStage(p, 'office')
+  await sec('Landing page')
+  await p.getByLabel('Judul', { exact: true }).fill('Uji *judul* baru')
+  t.check((await p.locator('.of-preview .lp-hero-title em').textContent()) === 'judul', 'live preview renders <em>')
+  const addPoint = p.getByRole('button', { name: 'Tambah poin' })
+  while (!(await addPoint.isDisabled())) await addPoint.click()
+  t.check(await p.getByLabel(/^Poin \d/).count() === 4 && await addPoint.isDisabled(), 'a 5th point is impossible')
+  await p.getByRole('button', { name: 'Simpan' }).click()
+  await p.getByText(/Terakhir diubah .* oleh staff/).waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await p.getByText(/Terakhir diubah .* oleh staff/).count() === 1, 'landing shows "Terakhir diubah ... oleh staff"')
+  await p.evaluate(() => { location.hash = '#/' })
+  await p.waitForFunction(() => /Uji judul baru/.test(document.querySelector('.lp-hero-title')?.textContent || ''), null, { timeout: 8000 }).catch(() => {})
+  t.check((await p.locator('.lp-hero-title').textContent()).trim() === 'Uji judul baru' && await p.locator('.lp-hero-title em').textContent() === 'judul', 'landing hero shows the saved title')
+
+  // legal editor + unsaved guard
+  await p.evaluate(() => { location.hash = '#/app' })
+  await p.waitForSelector('.app-shell')
+  await sec('Legal')
+  await p.getByLabel('Judul', { exact: true }).fill('Privasi uji')
+  await p.getByLabel('Isi', { exact: true }).fill('## Data\n- email')
+  p.once('dialog', (d) => d.dismiss())
+  await sec('Landing page')
+  t.check(await p.getByLabel('Isi', { exact: true }).count() === 1, 'dirty form: declining the confirm stays')
+  await p.getByRole('button', { name: 'Simpan' }).click()
+  await p.getByText(/Terakhir diubah .* oleh staff/).waitFor({ timeout: 8000 }).catch(() => {})
+  await p.evaluate(() => { location.hash = '#/privasi' })
+  await p.waitForSelector('.doc-page h2', { timeout: 8000 }).catch(() => {})
+  t.check((await p.locator('.doc-page h2').textContent()) === 'Data' && await p.locator('.doc-page li').count() === 1, '#/privasi shows the saved heading and list')
+
+  // 360px: the section picker is a labelled select and nothing scrolls sideways
+  await p.setViewportSize({ width: 360, height: 800 })
+  await p.evaluate(() => { location.hash = '#/app' })
+  await p.waitForSelector('.app-shell')
+  t.check(await p.getByLabel('Bagian', { exact: true }).isVisible(), '360px: section select is shown')
+  await p.waitForTimeout(500)
+  t.check(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), '360px: no horizontal scroll')
   await t.noErrors(p)
 }

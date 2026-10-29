@@ -26,7 +26,8 @@ function fillTitle(el, title) {
   el.replaceChildren(title.slice(0, m.index), em, title.slice(m.index + m[0].length))
 }
 
-export function renderHero(container, hero = {}) {
+export function renderHero(container, hero) {
+  if (!hero || typeof hero !== 'object') hero = {}
   if (!blank(hero.badge)) {
     const el = slot(container, 'p', 'lp-hero-badge')
     const dot = document.createElement('span')

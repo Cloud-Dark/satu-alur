@@ -691,7 +691,7 @@ export function renderLanding(root, ctx = {}) {
       item.querySelector('p').textContent = f.a.trim()
       return item
     }))
-  })
+  }).catch(() => {})
 
   /* --- Counters (real counts only: stages, AI agents, data flows) --- */
   if (!reduced && 'IntersectionObserver' in window) {
