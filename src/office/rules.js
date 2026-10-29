@@ -3,13 +3,25 @@
 export const REQUEST_STATUSES = ['new', 'in_progress', 'done']
 const GOALS = ['awareness', 'traffic', 'leads', 'messages']
 
+const SHORT_MAX = 200
+
+// Tagged so the worker turns only these into 400s (anything else is a real bug).
+function fail(message) {
+  throw Object.assign(new Error(message), { validation: true })
+}
 const str = (v) => (typeof v === 'string' ? v.trim() : '')
+// Trimmed single-line field capped at 200 characters.
+function short(v, label) {
+  const s = str(v)
+  if (s.length > SHORT_MAX) fail(`${label} maksimal ${SHORT_MAX} karakter.`)
+  return s
+}
 const isInt = (v) => Number.isInteger(v)
 
 function optInt(v, min, max, msg) {
   if (v === undefined || v === null || v === '') return null
   const n = typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v
-  if (!isInt(n) || n < min || n > max) throw new Error(msg)
+  if (!isInt(n) || n < min || n > max) fail(msg)
   return n
 }
 
@@ -18,29 +30,29 @@ export function validateServiceRequest(body) {
   const p = b.payload && typeof b.payload === 'object' ? b.payload : {}
   if (b.kind === 'collab') {
     const campaign = str(p.campaign)
-    if (!campaign) throw new Error('Ceritakan kampanye Anda.')
-    if (campaign.length > 2000) throw new Error('Cerita kampanye maksimal 2000 karakter.')
-    const budget_range = str(p.budget_range)
-    if (!budget_range) throw new Error('Pilih kisaran budget.')
-    const timing = str(p.timing)
-    if (!timing) throw new Error('Isi waktu pelaksanaan.')
+    if (!campaign) fail('Ceritakan kampanye Anda.')
+    if (campaign.length > 2000) fail('Cerita kampanye maksimal 2000 karakter.')
+    const budget_range = short(p.budget_range, 'Kisaran budget')
+    if (!budget_range) fail('Pilih kisaran budget.')
+    const timing = short(p.timing, 'Waktu pelaksanaan')
+    if (!timing) fail('Isi waktu pelaksanaan.')
     const id = Number(b.influencer_id)
-    if (!isInt(id) || id < 1) throw new Error('Pilih influencer.')
+    if (!isInt(id) || id < 1) fail('Pilih influencer.')
     return { kind: 'collab', influencer_id: id, payload: { campaign, budget_range, timing } }
   }
   if (b.kind === 'ads') {
-    const service = str(p.service)
-    if (!service) throw new Error('Layanan yang diiklankan wajib diisi.')
+    const service = short(p.service, 'Layanan')
+    if (!service) fail('Layanan yang diiklankan wajib diisi.')
     const goal = str(p.goal)
-    if (goal && !GOALS.includes(goal)) throw new Error('Tujuan iklan tidak dikenal.')
+    if (goal && !GOALS.includes(goal)) fail('Tujuan iklan tidak dikenal.')
     const notes = str(p.notes)
-    if (notes.length > 2000) throw new Error('Catatan maksimal 2000 karakter.')
+    if (notes.length > 2000) fail('Catatan maksimal 2000 karakter.')
     return {
       kind: 'ads',
       influencer_id: null,
       payload: {
         service,
-        location: str(p.location),
+        location: short(p.location, 'Lokasi'),
         daily_budget: optInt(p.daily_budget, 10000, 1000000000, 'Budget harian harus 10.000 sampai 1.000.000.000.'),
         duration_days: optInt(p.duration_days, 1, 90, 'Durasi harus 1 sampai 90 hari.'),
         goal,
@@ -48,24 +60,24 @@ export function validateServiceRequest(body) {
       },
     }
   }
-  throw new Error('Jenis permintaan tidak dikenal.')
+  fail('Jenis permintaan tidak dikenal.')
 }
 
 export function validateInfluencer(body) {
   const b = body || {}
-  const name = str(b.name)
-  if (!name) throw new Error('Nama wajib diisi.')
-  const niche = str(b.niche)
-  if (!niche) throw new Error('Niche wajib diisi.')
-  const city = str(b.city)
-  if (!city) throw new Error('Kota wajib diisi.')
+  const name = short(b.name, 'Nama')
+  if (!name) fail('Nama wajib diisi.')
+  const niche = short(b.niche, 'Niche')
+  if (!niche) fail('Niche wajib diisi.')
+  const city = short(b.city, 'Kota')
+  if (!city) fail('Kota wajib diisi.')
   const bio = str(b.bio)
-  if (bio.length > 2000) throw new Error('Bio maksimal 2000 karakter.')
+  if (bio.length > 2000) fail('Bio maksimal 2000 karakter.')
   const photo_key = b.photo_key ? String(b.photo_key) : null
-  if (photo_key && !/^[0-9a-f]{32}$/.test(photo_key)) throw new Error('Foto tidak valid.')
+  if (photo_key && !/^[0-9a-f]{32}$/.test(photo_key)) fail('Foto tidak valid.')
   const msg = 'Jumlah pengikut harus bilangan bulat 0 atau lebih.'
   const visible = b.visible === undefined ? 1 : Number(b.visible)
-  if (visible !== 0 && visible !== 1) throw new Error('Status tampil harus 0 atau 1.')
+  if (visible !== 0 && visible !== 1) fail('Status tampil harus 0 atau 1.')
   return {
     name, niche, city, bio, photo_key,
     ig_followers: optInt(b.ig_followers, 0, Number.MAX_SAFE_INTEGER, msg) ?? 0,

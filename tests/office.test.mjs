@@ -34,3 +34,22 @@ test('validateInfluencer requires niche and city, checks counts, photo_key, visi
   assert.equal(r.ig_followers, 10)
   assert.equal(r.tiktok_followers, 0)
 })
+
+test('short text fields are capped at 200 characters', () => {
+  const long = 'x'.repeat(201)
+  const collab = (p) => validateServiceRequest({ kind: 'collab', influencer_id: 1, payload: { campaign: 'c', budget_range: 'b', timing: 't', ...p } })
+  const ads = (p) => validateServiceRequest({ kind: 'ads', payload: { service: 's', ...p } })
+  assert.throws(() => collab({ budget_range: long }), { message: 'Kisaran budget maksimal 200 karakter.' })
+  assert.throws(() => collab({ timing: long }), { message: 'Waktu pelaksanaan maksimal 200 karakter.' })
+  assert.throws(() => ads({ service: long }), { message: 'Layanan maksimal 200 karakter.' })
+  assert.throws(() => ads({ location: long }), { message: 'Lokasi maksimal 200 karakter.' })
+  assert.throws(() => validateInfluencer({ name: long, niche: 'n', city: 'c' }), { message: 'Nama maksimal 200 karakter.' })
+  assert.throws(() => validateInfluencer({ name: 'n', niche: long, city: 'c' }), { message: 'Niche maksimal 200 karakter.' })
+  assert.throws(() => validateInfluencer({ name: 'n', niche: 'n', city: long }), { message: 'Kota maksimal 200 karakter.' })
+  assert.equal(collab({ timing: 'x'.repeat(200) }).payload.timing.length, 200)
+})
+
+test('validation errors are tagged so the worker maps only them to 400', () => {
+  assert.throws(() => validateServiceRequest({ kind: 'nope' }), (e) => e.validation === true)
+  assert.throws(() => validateInfluencer({}), (e) => e.validation === true)
+})
