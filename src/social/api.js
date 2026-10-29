@@ -38,6 +38,8 @@ async function call(path, { method = 'GET', body, raw, signal } = {}) {
 /* ------------------------------------------------------------------ demo store */
 let now = () => Date.now()
 export function __setNow(fn) { now = fn || (() => Date.now()) }
+let delayMs = 2000
+export function __setDelay(ms) { delayMs = ms }
 
 const objectUrls = new Map() // key -> object URL (demo uploads; memory only)
 const SEED_INFLUENCERS = [
@@ -177,7 +179,16 @@ export async function deleteContent(id) {
 
 /* ------------------------------------------------------------------ publish / schedule */
 export async function publishNow(contentId, platforms) {
-  if (isUsingMockCloud()) return demoCreatePosts(contentId, platforms, new Date(now()).toISOString(), true)
+  if (isUsingMockCloud()) {
+    const rows = await demoCreatePosts(contentId, platforms, new Date(now()).toISOString(), true)
+    if (delayMs > 0) await new Promise((r) => setTimeout(r, delayMs))
+    const ids = rows.map((r) => r.id)
+    return demo((s) => {
+      s.posts.forEach((r) => { if (ids.includes(r.id)) r.resolve_at = 0 })
+      settle(s)
+      return s.posts.filter((r) => ids.includes(r.id)).map((r) => ({ ...r }))
+    })
+  }
   return call('/api/social/publish', { method: 'POST', body: { content_id: contentId, platforms } })
 }
 

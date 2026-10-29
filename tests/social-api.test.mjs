@@ -20,6 +20,7 @@ test('social client demo mode', async () => {
   try {
     let t = Date.parse('2026-11-01T10:00:00Z')
     api.__setNow(() => t)
+    api.__setDelay(0)
     await cloud.auth.demoLogin({ email: 'demo@satualur.id' })
     const session = await cloud.auth.getSession()
     assert.equal(session.data.is_admin, true)
@@ -53,9 +54,9 @@ test('social client demo mode', async () => {
     assert.equal(byContent(bad.id).error, 'Meta menolak posting (simulasi).')
 
     const [row] = await api.publishNow(ok.id, ['facebook'])
-    assert.equal(row.status, 'publishing')
-    t += 2500
-    assert.equal((await api.listSchedules()).find((r) => r.id === row.id).status, 'posted')
+    assert.equal(row.status, 'posted')
+    assert.match(row.permalink, /^https:\/\/facebook\.com\/demo\//)
+    assert.equal((await api.publishNow(bad.id, ['facebook']))[0].status, 'failed')
 
     const [s] = await api.schedulePost(ok.id, ['facebook'], new Date(t + 120000).toISOString())
     await api.cancelSchedule(s.id)
@@ -67,7 +68,6 @@ test('social client demo mode', async () => {
     await api.saveContent({ kind: 'content', body: 'Foto', image_key: key })
     const withImg = (await api.listContents()).find((c) => c.image_key === key)
     const [ig] = await api.publishNow(withImg.id, ['instagram'])
-    t += 2500
     assert.match((await api.listSchedules()).find((r) => r.id === ig.id).permalink, /^https:\/\/instagram\.com\/p\/demo/)
 
     await api.deleteContent(withImg.id)
