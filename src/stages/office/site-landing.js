@@ -1,7 +1,7 @@
 import '../../styles/landing.css'
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
-import { getSite, saveSite } from '../../site/api.js'
+import { loadSite, saveSite } from '../../site/api.js'
 import { validateSiteContent } from '../../site/content-rules.js'
 import { renderHero } from '../../site/hero.js'
 import { HERO, HERO_POINTS, FAQS } from '../../landing/content.js'
@@ -34,10 +34,24 @@ function fromRow(row) {
 
 const toValue = (s) => ({ hero: { badge: s.badge, title: s.title, subtitle: s.subtitle, points: s.points }, faqs: s.faqs })
 
-export async function draw(host, ctx, setDirty) {
+/** Loads a row for an editor; on failure shows the error + "Coba lagi" (no form, so nothing can be saved). Returns the row or null. */
+export async function loadOrRetry(host, ctx, key, retry) {
   host.replaceChildren(C.skeletonRows(4))
-  const row0 = await getSite('landing')
-  if (ctx.signal.aborted) return
+  try {
+    const row = await loadSite(key)
+    return ctx.signal.aborted ? null : row
+  } catch (ex) {
+    if (ctx.signal.aborted) return null
+    const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
+    again.addEventListener('click', retry)
+    host.replaceChildren(C.errorState(ex.message), again)
+    return null
+  }
+}
+
+export async function draw(host, ctx, setDirty) {
+  const row0 = await loadOrRetry(host, ctx, 'landing', () => draw(host, ctx, setDirty))
+  if (!row0) return
   let row = row0
   let state = fromRow(row)
   const snap = () => JSON.stringify(state)
@@ -66,11 +80,11 @@ export async function draw(host, ctx, setDirty) {
       const f = C.field({ label: `Poin ${i + 1}`, id: `of-ld-pt${i}-${id}`, value: p, attrs: { maxlength: '60' } })
       f.input.addEventListener('input', () => { state.points[i] = f.input.value; redraw(); touch() })
       const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus poin ${i + 1}` })
-      rm.addEventListener('click', () => { state.points.splice(i, 1); rebuild() })
+      rm.addEventListener('click', () => { state.points.splice(i, 1); rebuild(`[id^=of-ld-pt${Math.max(0, Math.min(i, state.points.length - 1))}-]`) })
       return el('div', { className: 'of-row' }, f.wrap, rm)
     })
     const addPoint = C.button({ label: 'Tambah poin', icon: 'plus', variant: 'soft', size: 'sm', disabled: state.points.length >= MAX_POINTS })
-    addPoint.addEventListener('click', () => { state.points.push(''); rebuild() })
+    addPoint.addEventListener('click', () => { state.points.push(''); rebuild(`[id^=of-ld-pt${state.points.length - 1}-]`) })
 
     const faqs = state.faqs.map((fq, i) => {
       const q = C.field({ label: 'Pertanyaan', id: `of-ld-q${i}-${id}`, value: fq.q, attrs: { maxlength: '160' } })
@@ -82,13 +96,13 @@ export async function draw(host, ctx, setDirty) {
         b.addEventListener('click', fn)
         return b
       }
-      const swap = (j) => () => { [state.faqs[i], state.faqs[j]] = [state.faqs[j], state.faqs[i]]; rebuild() }
+      const swap = (j) => () => { [state.faqs[i], state.faqs[j]] = [state.faqs[j], state.faqs[i]]; rebuild(`[id^=of-ld-q${j}-]`) }
       return el('article', { className: 'of-faq' }, q.wrap, a.wrap, el('div', { className: 'of-row-actions' },
         act('Naik', i === 0, swap(i - 1)), act('Turun', i === state.faqs.length - 1, swap(i + 1)),
-        act('Hapus', false, () => { state.faqs.splice(i, 1); rebuild() })))
+        act('Hapus', false, () => { state.faqs.splice(i, 1); rebuild('[id^=of-ld-q' + Math.max(0, Math.min(i, state.faqs.length - 1)) + '-]') })))
     })
     const addFaq = C.button({ label: 'Tambah FAQ', icon: 'plus', variant: 'soft', size: 'sm', disabled: state.faqs.length >= MAX_FAQS })
-    addFaq.addEventListener('click', () => { state.faqs.push({ q: '', a: '' }); rebuild() })
+    addFaq.addEventListener('click', () => { state.faqs.push({ q: '', a: '' }); rebuild(`[id^=of-ld-q${state.faqs.length - 1}-]`) })
 
     const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary' })
     save.addEventListener('click', async () => {
@@ -120,6 +134,11 @@ export async function draw(host, ctx, setDirty) {
       err, el('div', { className: 'of-actions' }, save, reset), stamp)
     redraw()
   }
-  const rebuild = () => { build(); touch() }
+  // Rebuilding drops focus; put it back on the control that triggered the change.
+  const rebuild = (focus) => {
+    build()
+    touch()
+    if (focus) host.querySelector(focus)?.focus()
+  }
   build()
 }

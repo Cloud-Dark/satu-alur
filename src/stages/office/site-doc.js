@@ -1,10 +1,10 @@
 import '../../styles/landing.css'
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
-import { getSite, saveSite } from '../../site/api.js'
+import { saveSite } from '../../site/api.js'
 import { validateSiteContent, parseDoc } from '../../site/content-rules.js'
 import { DOC_TITLES, blockNode } from '../../site/doc-page.js'
-import { stampLine } from './site-landing.js'
+import { stampLine, loadOrRetry } from './site-landing.js'
 
 const { el } = C
 const ROUTE = { about: '#/tentang', privacy: '#/privasi', terms: '#/syarat', cookies: '#/cookie' }
@@ -14,9 +14,8 @@ let seq = 0
 
 async function drawDoc(host, ctx, setDirty, key) {
   const mine = host.dataset.doc = key
-  host.replaceChildren(C.skeletonRows(4))
-  let row = await getSite(key)
-  if (ctx.signal.aborted || host.dataset.doc !== mine) return
+  let row = await loadOrRetry(host, ctx, key, () => drawDoc(host, ctx, setDirty, key))
+  if (!row || host.dataset.doc !== mine) return
   const state = { title: row?.value?.title ?? DOC_TITLES[key], body: row?.value?.body ?? '' }
   const snap = () => JSON.stringify(state)
   let saved = snap()

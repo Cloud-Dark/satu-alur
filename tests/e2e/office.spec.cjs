@@ -137,6 +137,18 @@ module.exports = async function office(t) {
   await p.locator('.sm-request', { hasText: 'Diproses' }).first().waitFor({ timeout: 8000 })
   t.check((await p.locator('.sm-request').first().textContent()).includes('Kami hubungi lusa'), 'business sees Diproses and the admin note')
 
+  // failed load: error + Coba lagi, never a Simpan button
+  await p.evaluate(() => localStorage.setItem('satualur_site_fail', '1'))
+  await goStage(p, 'office')
+  await sec('Tentang kami')
+  await sec('Landing page')
+  await p.getByRole('button', { name: 'Coba lagi' }).waitFor({ timeout: 8000 })
+  t.check(await p.getByRole('button', { name: 'Simpan' }).count() === 0, 'failed load: no Simpan button')
+  await p.evaluate(() => localStorage.removeItem('satualur_site_fail'))
+  await p.getByRole('button', { name: 'Coba lagi' }).click()
+  await p.getByRole('button', { name: 'Simpan' }).waitFor({ timeout: 8000 })
+  t.check(await p.getByLabel('Judul', { exact: true }).count() === 1, 'Coba lagi loads the form')
+
   // landing editor
   await goStage(p, 'office')
   await sec('Landing page')

@@ -34,6 +34,21 @@ async function call(path, { method = 'GET', body } = {}) {
 
 const loadDemo = () => { try { return JSON.parse(localStorage.getItem(DEMO_KEY)) || {} } catch { return {} } }
 
+/** Admin read: { value | null, updated_at, updated_by }. { value: null } means no row yet; a failed load throws. */
+export async function loadSite(key) {
+  if (isUsingMockCloud()) {
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat konten. Coba lagi.')
+    const row = loadDemo()[key]
+    return { value: row?.value ?? null, updated_at: row?.updated_at ?? null, updated_by: row?.updated_by ?? null }
+  }
+  try {
+    const row = await call(`/api/site/${encodeURIComponent(key)}`)
+    return row && typeof row === 'object' ? row : { value: null }
+  } catch (e) {
+    throw new Error(`Gagal memuat konten. ${e.message}`)
+  }
+}
+
 /** { key, value | null, updated_at, updated_by }, or null on any error (callers keep their defaults). */
 export async function getSite(key) {
   try {
