@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  PLATFORMS, validateScheduleAt, toUtcIso, igEligibility, isAdmin, SCHEDULE_STATUS_LABEL, REQUEST_STATUS_LABEL,
+  PLATFORMS, validateScheduleAt, toUtcIso, igEligibility, SCHEDULE_STATUS_LABEL, REQUEST_STATUS_LABEL,
 } from '../src/social/rules.js'
 
 test('platforms are Facebook and Instagram only', () => {
@@ -25,11 +25,6 @@ test('instagram eligibility', () => {
   assert.equal(igEligibility({ hasImage: true, width: 1080, height: 1350, caption: 'x' }).ok, true)  // 0.8
   assert.equal(igEligibility({ hasImage: true, width: 1080, height: 1080, caption: 'a'.repeat(2201) }).ok, false)
   assert.equal(igEligibility({ hasImage: true, width: 1080, height: 1080, caption: Array(31).fill('#a').join(' ') }).ok, false)
-})
-test('isAdmin', () => {
-  assert.equal(isAdmin('Ops@Satu-Alur.id', 'ops@satu-alur.id, x@y.z'), true)
-  assert.equal(isAdmin('a@b.c', undefined), false)
-  assert.equal(isAdmin('', ''), false)
 })
 test('status labels', () => {
   assert.deepEqual(Object.values(SCHEDULE_STATUS_LABEL), ['Terjadwal', 'Memproses', 'Tayang', 'Gagal', 'Dibatalkan'])

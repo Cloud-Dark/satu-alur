@@ -110,8 +110,33 @@ const mockAuth = {
     return { data: { user }, error: null }
   },
 
+  /**
+   * Staff login for dev/e2e. Accounts come from VITE_STAFF_USERS ("user:password,user2:password2");
+   * the real Worker uses hashed passwords in staff_accounts (worker/staff.js). None by default.
+   */
+  async staffLogin({ username, password }) {
+    const name = String(username || '').trim().toLowerCase()
+    const accounts = String(import.meta.env?.VITE_STAFF_USERS || '').split(',').map((s) => s.trim()).filter(Boolean)
+    if (!name || !accounts.some((a) => a === `${name}:${password}`)) throw new Error('Username atau password salah.')
+    const email = `${name}@staff.satualur.internal`
+    const users = ensureTable('users')
+    let user = users.find(u => u.email === email)
+    if (!user) {
+      user = { id: crypto.randomUUID(), email, name, created_at: new Date().toISOString() }
+      users.push(user)
+      persist()
+    }
+    _session = { user, access_token: 'mock_' + crypto.randomUUID(), is_staff: true }
+    notifyAuth('SIGNED_IN')
+    return { data: { user }, error: null }
+  },
+
   async getSession() {
-    if (_session) return { data: { ..._session, is_admin: true }, error: null } // demo user is an admin
+    // Same rule as the Worker: only a staff-login session is an admin.
+    if (_session) {
+      const { is_staff, ...pub } = _session
+      return { data: { ...pub, is_admin: is_staff === true }, error: null }
+    }
     return { data: null, error: { message: 'Belum masuk.' } }
   },
 

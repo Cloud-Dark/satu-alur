@@ -1,9 +1,59 @@
-// E2E: Kantor Satu Alur (admin stage) on the mock cloud, where the demo user is an admin.
+// E2E: Kantor Satu Alur (staff-only stage) on the mock cloud. run.cjs defines one staff
+// account in VITE_STAFF_USERS (staff / rahasia-staf-123). Office access needs a
+// username + password sign-in at /super-admin-login; the normal #/masuk login never grants it.
 const { loginLive, goStage } = require('./lib.cjs')
 
+async function staffLogin(page, base, username, password) {
+  await page.goto(`${base}/super-admin-login`, { waitUntil: 'load' })
+  await page.waitForSelector('#staff-username')
+  await page.fill('#staff-username', username)
+  await page.fill('#staff-password', password)
+  await page.getByRole('button', { name: 'Masuk' }).click()
+}
+
 module.exports = async function office(t) {
+  // regular business user: no menu entry, and the URL falls back to the dashboard
+  const u = await t.page()
+  await loginLive(u, t.base, 'pemilik@usaha.id')
+  t.check(await u.locator('.flow-item[data-stage="office"]').count() === 0, 'regular user: no "Kantor Satu Alur" in the menu')
+  await u.evaluate(() => sessionStorage.setItem('satualur_stage', 'office'))
+  await u.goto(`${t.base}/#/app`)
+  await u.waitForSelector('.app-shell')
+  await u.waitForTimeout(800)
+  t.check(await u.locator('.flow-item[aria-current="page"]').getAttribute('data-stage') === 'dashboard', 'regular user: stored office stage falls back to the dashboard')
+  t.check(await u.getByRole('heading', { name: 'Kantor Satu Alur' }).count() === 0, 'regular user: office page never renders')
+  await u.close()
+
+  // the staff user's own email through the normal OTP login stays a regular user
+  const n = await t.page()
+  await loginLive(n, t.base, 'staff@staff.satualur.internal')
+  t.check(await n.locator('.flow-item[data-stage="office"]').count() === 0, 'staff email via #/masuk: no "Kantor Satu Alur"')
+  await n.close()
+
+  // staff page: username + password only; empty form, wrong password, unknown user
+  const x = await t.page()
+  await x.goto(`${t.base}/super-admin-login`, { waitUntil: 'load' })
+  await x.waitForSelector('#staff-username')
+  t.check(await x.locator('#staff-password').getAttribute('type') === 'password', 'staff page asks for username + password')
+  t.check(await x.locator('#auth-email, .auth-mode, .auth-demo').count() === 0, 'staff page has no email code or demo accounts')
+  await x.getByRole('button', { name: 'Masuk' }).click()
+  t.check(await x.getByText('Isi username dan password.').count() === 1, 'empty form asks for username and password')
+  await staffLogin(x, t.base, 'staff', 'password-salah-123')
+  await x.getByText('Username atau password salah.').first().waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await x.getByText('Username atau password salah.').count() === 1, 'wrong password is refused')
+  t.check(await x.locator('#staff-password').inputValue() === '', 'password field cleared after a failure')
+  await staffLogin(x, t.base, 'bukanstaf', 'rahasia-staf-123')
+  await x.getByText('Username atau password salah.').first().waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await x.locator('.app-shell').count() === 0, 'unknown username is refused with the same message')
+  await x.close()
+
+  // staff sign-in lands on Kantor Satu Alur
   const p = await t.page()
-  await loginLive(p, t.base)
+  await staffLogin(p, t.base, 'staff', 'rahasia-staf-123')
+  await p.waitForFunction(() => location.pathname === '/' && location.hash.startsWith('#/app'), null, { timeout: 10000 })
+  await p.waitForSelector('.app-shell')
+  await p.waitForTimeout(800)
+  t.check(await p.locator('.flow-item[aria-current="page"]').getAttribute('data-stage') === 'office', 'staff login lands on Kantor Satu Alur')
   const radio = (name) => p.getByRole('radio', { name, exact: true })
   const kolaborasi = async () => {
     await goStage(p, 'social-media')

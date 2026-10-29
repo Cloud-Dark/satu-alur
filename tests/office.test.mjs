@@ -53,3 +53,11 @@ test('validation errors are tagged so the worker maps only them to 400', () => {
   assert.throws(() => validateServiceRequest({ kind: 'nope' }), (e) => e.validation === true)
   assert.throws(() => validateInfluencer({}), (e) => e.validation === true)
 })
+
+test('worker admin = a session from the staff username/password login only', async () => {
+  const { isAdminUser } = await import('../worker/social.js')
+  assert.equal(isAdminUser({ email: 'budi@staff.satualur.internal', is_staff: 1 }), true)
+  assert.equal(isAdminUser({ email: 'budi@staff.satualur.internal', is_staff: 0 }), false) // OTP login with the same email
+  assert.equal(isAdminUser({ email: 'x@y.z' }), false)
+  assert.equal(isAdminUser(null), false)
+})

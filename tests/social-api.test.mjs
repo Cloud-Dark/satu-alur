@@ -23,7 +23,7 @@ test('social client demo mode', async () => {
     api.__setDelay(0)
     await cloud.auth.demoLogin({ email: 'demo@satualur.id' })
     const session = await cloud.auth.getSession()
-    assert.equal(session.data.is_admin, true)
+    assert.equal(session.data.is_admin, false, 'a demo login is never Satu Alur staff (only /super-admin-login is)')
 
     assert.deepEqual(await api.getAccount(), { configured: true, account: null })
     await api.startConnect()

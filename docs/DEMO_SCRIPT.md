@@ -160,7 +160,7 @@ Mode demo: tidak memanggil Meta; akun dan hasil terbit disimulasikan. Konten yan
 3. Buat konten berisi `#gagal`, bagikan: baris gagal dengan pesan galat, tunjukkan bahwa yang lain tetap jalan.
 4. Tab **Jadwal → Daftar konten**: jadwalkan (**Jadwalkan tayang**, waktu WIB, minimal 1 menit ke depan), lalu **Batalkan** satu jadwal. **Laporan tayang** menampilkan hasilnya. Di produksi cron memproses tiap 5 menit.
 5. Tab **Kolaborasi**: pilih influencer dari katalog, **Ajukan kolaborasi**. Tab **Iklan**: **Lihat rekomendasi**, lalu **Ajukan iklan** ke tim Satu Alur.
-6. Sidebar **Kantor Satu Alur** (hanya admin; di mode demo pengguna demo adalah admin): tab **Permintaan** ubah status dan beri catatan, tab **Influencer** tambah/ubah katalog.
+6. **Kantor Satu Alur** (khusus staf; tidak tampil di dasbor pengguna): buka `/super-admin-login` dan masuk dengan username dan password staf. Di mode demo akun staf diatur lewat `VITE_STAFF_USERS`, mis. `VITE_STAFF_USERS=staff:rahasia-demo-123 npm run dev`, lalu buka `http://localhost:5173/super-admin-login`. tab **Permintaan** ubah status dan beri catatan, tab **Influencer** tambah/ubah katalog.
 
 > "Satu Alur tidak menerbitkan apa pun tanpa Anda minta. Token Meta terenkripsi dan tidak pernah sampai ke browser."
 

@@ -39,8 +39,24 @@ Tidak dapat diakses lewat `POST /api/db`.
 | `user_id` | TEXT NOT NULL | FK `users(id)` ON DELETE CASCADE |
 | `expires_at` | TEXT NOT NULL | 30 hari sejak dibuat |
 | `created_at` | TEXT NOT NULL | |
+| `is_staff` | INTEGER NOT NULL DEFAULT 0 | 1 = dibuat `POST /api/auth/staff-login` (migrasi 0007); satu-satunya sumber hak admin |
 
 Indeks: `idx_sessions_user_id`, `idx_sessions_expires_at`.
+
+### staff_accounts
+
+Akun staf Kantor Satu Alur (migrasi 0007). Dikelola hanya lewat `npm run staff`; tidak pernah ada di whitelist `/api/db`.
+
+| Kolom | Tipe | Catatan |
+|-------|------|---------|
+| `id` | INTEGER PK | |
+| `username` | TEXT NOT NULL UNIQUE | `[a-z0-9._-]{3,32}` |
+| `password_hash` | TEXT NOT NULL | `pbkdf2-sha256$<iterasi>$<salt>$<hash>` |
+| `active` | INTEGER NOT NULL DEFAULT 1 | 0 = dinonaktifkan |
+| `failed_attempts` | INTEGER NOT NULL DEFAULT 0 | direset saat login berhasil atau saat terkunci |
+| `locked_until` | TEXT | terkunci 15 menit setelah 5 kali salah |
+| `last_login_at` | TEXT | |
+| `created_at` | TEXT NOT NULL | |
 
 ### otp_codes
 

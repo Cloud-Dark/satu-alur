@@ -21,7 +21,7 @@
  */
 import { oauthUrl, exchangeCode, listPages, MetaError } from '../src/social/meta.js';
 import { encryptToken, decryptToken, signState, verifyState } from '../src/social/crypto.js';
-import { PLATFORMS, validateScheduleAt, igEligibility, isAdmin } from '../src/social/rules.js';
+import { PLATFORMS, validateScheduleAt, igEligibility } from '../src/social/rules.js';
 import { publishRow, runDue, sweepStuck } from '../src/social/runner.js';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -32,7 +32,8 @@ const DEMO_DENIED = 'Tidak tersedia di akun demo.';
 
 export const isConfigured = (env) => env.DEMO_OTP !== 'true'
   && Boolean(env.META_APP_ID && env.META_APP_SECRET && env.TOKEN_KEY && env.PUBLIC_BASE_URL);
-export const isAdminUser = (email, env) => env.DEMO_OTP !== 'true' && isAdmin(email, env.ADMIN_EMAILS);
+// Staff = a session created by POST /api/auth/staff-login (username + password); see worker/staff.js.
+export const isAdminUser = (user) => user?.is_staff === 1;
 const isDemoUser = (user, deps) => deps.DEMO_EMAILS.has(String(user.email || '').toLowerCase());
 // Authenticates and rejects the shared demo accounts (one user per business, shared by every visitor).
 async function realUser(request, env, deps) {
@@ -192,7 +193,7 @@ export async function handleSocialOauthPick(request, env, deps) {
 export async function handleSocialMediaUpload(request, env, deps) {
   const { ok, HttpError } = deps;
   const user = await realUser(request, env, deps);
-  const connected = isConfigured(env) && (isAdminUser(user.email, env)
+  const connected = isConfigured(env) && (isAdminUser(user)
     || await env.DB.prepare('SELECT 1 FROM social_accounts WHERE owner_id = ?').bind(user.id).first());
   if (!connected) throw new HttpError(403, 'Hubungkan akun Facebook terlebih dahulu.');
   if (!env.MEDIA) throw new HttpError(503, 'Penyimpanan media belum dikonfigurasi.');

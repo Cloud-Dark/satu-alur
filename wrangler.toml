@@ -28,8 +28,7 @@ DEMO_LOGIN = "true"
 # Meta publishing (Social Media). Secrets (wrangler secret put): META_APP_SECRET, TOKEN_KEY (32-byte base64).
 # The integration stays "not configured" until DEMO_OTP is "false" and META_APP_ID, META_APP_SECRET, TOKEN_KEY and PUBLIC_BASE_URL are all set.
 META_APP_ID = ""
-# Comma-separated emails of Satu Alur office staff (admin screen).
-ADMIN_EMAILS = ""
+# Staff (Kantor Satu Alur) sign in at /super-admin-login with accounts made by `npm run staff`.
 # Public origin without a trailing slash (OAuth redirect + media URLs Meta fetches).
 PUBLIC_BASE_URL = ""
 

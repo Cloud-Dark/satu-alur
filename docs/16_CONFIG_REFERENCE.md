@@ -28,7 +28,7 @@ Sumber: `wrangler.toml`, `package.json`, `vite.config.js`, `src/cloud.js`. Pemas
 
 | Nama | Jenis | Nilai | Dampak |
 |------|-------|-------|--------|
-| `DEMO_OTP` | var | `"true"` atau lainnya | Hanya string persis `"true"` yang membuat `send-otp` mengembalikan `demoCode`. Ubah ke `"false"` atau hapus untuk produksi. Tidak aman untuk publik ([10_RISK_REGISTER.md](10_RISK_REGISTER.md) R-001). Selama `"true"`, integrasi Meta dianggap belum dikonfigurasi (tidak ada OAuth, unggah, terbit, atau cron) dan `ADMIN_EMAILS` diabaikan: siapa pun bisa masuk sebagai email apa pun. |
+| `DEMO_OTP` | var | `"true"` atau lainnya | Hanya string persis `"true"` yang membuat `send-otp` mengembalikan `demoCode`. Ubah ke `"false"` atau hapus untuk produksi. Tidak aman untuk publik ([10_RISK_REGISTER.md](10_RISK_REGISTER.md) R-001). Selama `"true"`, integrasi Meta dianggap belum dikonfigurasi (tidak ada OAuth, unggah, terbit, atau cron), karena siapa pun bisa masuk sebagai email apa pun. Login staf (`/super-admin-login`) tidak terpengaruh karena memakai password. |
 | `EMAIL_API_KEY` | secret (rencana) | - | Belum dipakai; disebut dalam TODO provider email di Worker. Provider: _TBD_. |
 
 ## Binding yang Dibaca Worker
@@ -112,12 +112,12 @@ Key tidak pernah dikirim ke klien; Worker memanggil `places:searchText` dengan h
 
 Rute Worker ada di `worker/social.js`; enkripsi token dan `state` OAuth di `src/social/crypto.js`. Integrasi dianggap **terkonfigurasi** hanya bila `DEMO_OTP` bukan `"true"` dan `META_APP_ID`, `META_APP_SECRET`, `TOKEN_KEY`, dan `PUBLIC_BASE_URL` semuanya terisi; selain itu `GET /api/social/account` mengembalikan `configured: false` dan tab Akun menampilkan "Belum dikonfigurasi".
 
-**Penting:** ubah `DEMO_OTP` menjadi `"false"` sebelum mengisi `META_*` dan `ADMIN_EMAILS`. Selama `DEMO_OTP` = `"true"`, kode OTP dikembalikan untuk email apa pun, jadi Worker sengaja menganggap Meta belum dikonfigurasi, menolak semua rute admin (403), dan tidak menjalankan cron. Akun demo bersama (`DEMO_EMAILS`) tidak pernah bisa menghubungkan, mengunggah, atau menerbitkan ("Tidak tersedia di akun demo.").
+**Penting:** ubah `DEMO_OTP` menjadi `"false"` sebelum mengisi `META_*`. Selama `DEMO_OTP` = `"true"`, kode OTP dikembalikan untuk email apa pun, jadi Worker sengaja menganggap Meta belum dikonfigurasi dan tidak menjalankan cron. Akun demo bersama (`DEMO_EMAILS`) tidak pernah bisa menghubungkan, mengunggah, atau menerbitkan ("Tidak tersedia di akun demo.").
 
 | Nama | Jenis | Contoh | Fungsi |
 |------|-------|--------|--------|
 | `META_APP_ID` | var | `1234567890` | App ID aplikasi Meta. |
-| `ADMIN_EMAILS` | var | `ops@satualur.id,cs@satualur.id` | Email staf kantor Satu Alur (dipisah koma, tidak peka huruf besar). Hanya mereka yang mendapat `is_admin: true` dari `GET /api/auth/session`. Tidak berlaku selama `DEMO_OTP` = `"true"`. |
+| `VITE_STAFF_USERS` | env build (mode mock/dev) | `staff:rahasia-demo-123` | Akun staf untuk mode mock/e2e (`username:password`, dipisah koma). Kosong secara bawaan. Tidak berpengaruh pada Worker asli. |
 | `PUBLIC_BASE_URL` | var | `https://app.satualur.id` | Origin publik tanpa garis miring di akhir. Dipakai untuk redirect OAuth dan URL gambar yang diambil Meta. |
 | `META_APP_SECRET` | secret | - | App Secret Meta. Juga menandatangani `state` OAuth (berlaku 10 menit). |
 | `TOKEN_KEY` | secret | keluaran `openssl rand -base64 32` | Kunci AES-GCM 32 byte (base64) untuk mengenkripsi token Page di tabel `social_accounts`. Mengganti kunci memutus semua koneksi (pengguna harus menghubungkan ulang). |
@@ -143,3 +143,19 @@ Token Meta tidak pernah dikirim ke klien atau ditulis ke log. Tabel `social_acco
 5. Instagram harus akun Business/Creator yang ditautkan ke Halaman Facebook. Bila Halaman tidak punya IG tertaut, koneksi tetap berhasil (hanya Facebook).
 
 Selama aplikasi dalam mode pengembangan, hanya pengguna yang terdaftar sebagai admin/developer/tester aplikasi yang bisa menghubungkan Halaman. **App Review Meta (izin di atas, akses lanjutan) wajib** sebelum bisnis lain (bukan tester) bisa terhubung.
+
+## Akun staf Kantor Satu Alur
+
+Staf masuk di `https://<domain>/super-admin-login` dengan username dan password. Halaman ini tidak ditautkan di aplikasi, dan Kantor Satu Alur hanya terbuka untuk sesi dari halaman ini (berlaku 12 jam). Login OTP biasa tidak pernah mendapat akses.
+
+Akun disimpan di tabel D1 `staff_accounts` (hanya hash PBKDF2-SHA256 + salt, bukan password) dan dikelola hanya lewat terminal:
+
+| Perintah | Fungsi |
+|----------|--------|
+| `npm run staff -- add <username> --remote` | Buat akun. Password diminta dua kali dan tidak tampil (minimal 12 karakter). |
+| `npm run staff -- reset <username> --remote` | Ganti password, buka kunci, dan cabut sesi staf yang aktif. |
+| `npm run staff -- disable <username> --remote` | Nonaktifkan akun dan cabut sesinya. |
+| `npm run staff -- enable <username> --remote` | Aktifkan kembali dan buka kunci. |
+| `npm run staff -- list --remote` | Daftar akun, status, kunci, dan login terakhir. |
+
+Tanpa `--remote` perintah memakai D1 lokal. Username: 3–32 karakter huruf kecil, angka, `.`, `_`, `-`. Setelah 5 kali salah password, akun terkunci 15 menit. Jalankan migrasi 0007 sebelum membuat akun pertama.

@@ -1,6 +1,7 @@
 import { getSession, onAuthStateChange, restoreAuth, signOut } from '../auth/auth.js'
 import { renderLanding } from '../landing/landing.js'
 import { renderLoginPage } from '../auth/login-page.js'
+import { renderStaffLogin } from '../auth/staff-login.js'
 import { renderShell } from './shell.js'
 
 /**
@@ -8,15 +9,21 @@ import { renderShell } from './shell.js'
  *   #/        landing page (public)
  *   #/masuk   login page (redirects to #/app when already signed in)
  *   #/app     application shell (requires a session)
+ *   /super-admin-login   staff login, username + password (real path; lands on Kantor Satu Alur)
  *
  * Every page renderer receives (root, ctx) and may return a cleanup function
  * that is called before the next page renders (stop WebGL loops, observers…).
  */
 
+// Satu Alur staff sign in here with username + password (a real path, not linked anywhere);
+// only these sessions can open Kantor Satu Alur.
+const STAFF_PATH = '/super-admin-login'
+
 const ROUTES = {
   '/': renderLanding,
   '/masuk': renderLoginPage,
   '/app': renderShell,
+  [STAFF_PATH]: renderStaffLogin,
 }
 
 let currentUser = null
@@ -24,14 +31,24 @@ let currentIsAdmin = false
 let cleanup = null
 let rootEl = null
 
+const onStaffPath = () => location.pathname.replace(/\/+$/, '') === STAFF_PATH
+
 export function navigate(path) {
-  if (location.hash === `#${path}`) render()
+  // Leaving /super-admin-login: drop the path so the hash router takes over again.
+  if (onStaffPath()) { history.replaceState(null, '', `/#${path}`); render() }
+  else if (location.hash === `#${path}`) render()
   else location.hash = path
 }
 
 function currentPath() {
+  if (onStaffPath()) return STAFF_PATH
   const path = location.hash.replace(/^#/, '').split('?')[0] || '/'
   return ROUTES[path] ? path : '/'
+}
+
+function openOffice() {
+  try { sessionStorage.setItem('satualur_stage', 'office') } catch { /* storage unavailable */ }
+  navigate('/app')
 }
 
 function render() {
@@ -42,12 +59,16 @@ function render() {
     history.replaceState(null, '', `#/app${back[1] || ''}`)
   }
   let path = currentPath()
-  if (path === '/app' && !currentUser) path = '/masuk'
-  if (path === '/masuk' && currentUser) path = '/app'
-  // Compare paths only, so a query such as #/masuk?demo survives.
-  const hashPath = location.hash.replace(/^#/, '').split('?')[0]
-  if ((hashPath || '/') !== path && !(path === '/' && !location.hash)) {
-    history.replaceState(null, '', `#${path}`)
+  if (path === STAFF_PATH) {
+    if (currentIsAdmin) { openOffice(); return }
+  } else {
+    if (path === '/app' && !currentUser) path = '/masuk'
+    if (path === '/masuk' && currentUser) path = '/app'
+    // Compare paths only, so a query such as #/masuk?demo survives.
+    const hashPath = location.hash.replace(/^#/, '').split('?')[0]
+    if ((hashPath || '/') !== path && !(path === '/' && !location.hash)) {
+      history.replaceState(null, '', `#${path}`)
+    }
   }
 
   if (typeof cleanup === 'function') {
@@ -65,7 +86,8 @@ function render() {
     async onSignedIn(user) {
       currentUser = user
       await loadAdmin()
-      navigate('/app')
+      if (path === STAFF_PATH && currentIsAdmin) openOffice()
+      else navigate('/app')
     },
     async signOut() {
       await signOut()
@@ -114,7 +136,7 @@ export async function mountApp(root) {
       if (next) await loadAdmin()
       else currentIsAdmin = false
       // The login page shows its own success state and navigates via ctx.onSignedIn.
-      if (changed && !(next && currentPath() === '/masuk')) render()
+      if (changed && !(next && (currentPath() === '/masuk' || currentPath() === STAFF_PATH))) render()
     })
   } catch (e) {
     console.warn('Auth state observer error:', e.message)

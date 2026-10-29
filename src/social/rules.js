@@ -39,13 +39,6 @@ export function igEligibility({ hasImage, width, height, caption }) {
   return { ok: true }
 }
 
-/** `adminEmails` berisi daftar email dipisah koma (env ADMIN_EMAILS). Perbandingan tanpa memperhatikan huruf besar/kecil. */
-export function isAdmin(email, adminEmails) {
-  const e = String(email || '').trim().toLowerCase()
-  if (!e) return false
-  return String(adminEmails || '').split(',').map((s) => s.trim().toLowerCase()).includes(e)
-}
-
 export const SCHEDULE_STATUS_LABEL = {
   scheduled: 'Terjadwal',
   publishing: 'Memproses',

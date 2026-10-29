@@ -8,6 +8,7 @@
  */
 
 import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.js';
+import { handleStaffLogin } from './staff.js';
 import {
   handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
   handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
@@ -214,7 +215,7 @@ async function authenticate(request, env) {
   if (!m) throw new HttpError(401, 'Belum masuk.');
   const tokenHash = await sha256Hex(m[1]);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at
+    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff
        FROM sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
   )
@@ -333,7 +334,8 @@ async function handleDemoLogin(request, env) {
 
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
-  return ok({ user, is_admin: isAdminUser(user.email, env) });
+  const { is_staff, ...pub } = user;
+  return ok({ user: pub, is_admin: isAdminUser(user) });
 }
 
 async function handleSignout(request, env) {
@@ -843,12 +845,13 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
   'POST /api/auth/verify-otp': handleVerifyOtp,
   'POST /api/auth/demo-login': handleDemoLogin,
+  'POST /api/auth/staff-login': (req, env) => handleStaffLogin(req, env, ROUTE_DEPS),
   'GET /api/auth/session': handleSession,
   'POST /api/auth/signout': handleSignout,
   'POST /api/db': handleDb,

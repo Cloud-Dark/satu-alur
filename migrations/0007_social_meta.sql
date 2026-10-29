@@ -24,6 +24,22 @@ CREATE TABLE IF NOT EXISTS social_oauth_picks (
 
 ALTER TABLE social_contents ADD COLUMN image_key TEXT;
 
+-- 1 = created by POST /api/auth/staff-login; only these sessions can open Kantor Satu Alur.
+ALTER TABLE sessions ADD COLUMN is_staff INTEGER NOT NULL DEFAULT 0;
+
+-- Satu Alur staff (username + password). Managed only with `npm run staff` (scripts/staff.mjs). Never in TABLES.
+-- password_hash: pbkdf2-sha256$<iterations>$<salt>$<hash> (src/staff/password.js).
+CREATE TABLE IF NOT EXISTS staff_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until TEXT,
+  last_login_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
 -- One row per platform per publish/schedule. Kept apart from social_schedules,
 -- which the "Media sosial" stage uses as free-form notes (the cron must never see those).
 -- Status: scheduled | publishing | posted | failed | cancelled

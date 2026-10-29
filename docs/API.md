@@ -76,6 +76,18 @@ Respons 200:
 
 Kesalahan: 400 "Kode OTP salah atau sudah kadaluarsa." (kode salah, kedaluwarsa, email tidak cocok, atau melebihi 5 percobaan). `access_token` berlaku 30 hari.
 
+### POST /api/auth/staff-login
+
+Login staf Satu Alur dari halaman `/super-admin-login` (kode: `worker/staff.js`). Akun dibuat dengan `npm run staff` (lihat [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md)).
+
+```json
+{ "username": "budi", "password": "minimal-12-karakter" }
+```
+
+Respons 200 sama seperti `verify-otp` (`user` dengan email `<username>@staff.satualur.internal`, `access_token`). Sesi ditandai `sessions.is_staff = 1` dan berlaku 12 jam. Hanya sesi ini yang mendapat `is_admin: true`.
+
+Kesalahan: 401 "Username atau password salah." (username tidak ada, password salah, atau akun nonaktif; pesan sama agar username tidak bisa ditebak), 429 "Terlalu banyak percobaan. Coba lagi dalam 15 menit." (5 kali salah berturut-turut).
+
 ### GET /api/auth/session
 
 Respons 200: `{ "data": { "user": { ... } }, "error": null }`. 401 bila tidak valid.
@@ -232,7 +244,7 @@ Satu baris `social_posts` per platform. Instagram wajib bergambar dan butuh akun
 
 ## Kantor Satu Alur
 
-Kode: `worker/office.js`. Rute `admin/*` hanya untuk email di `ADMIN_EMAILS` (selain itu 403 "Khusus tim Satu Alur."). `GET /api/auth/session` mengembalikan `is_admin`. Login akun demo bukan admin di Worker asli; di mode mock/demo pengguna demo adalah admin.
+Kode: `worker/office.js`. Rute `admin/*` hanya untuk sesi dari `POST /api/auth/staff-login` (username + password di `/super-admin-login`); selain itu 403 "Khusus tim Satu Alur.". Login OTP biasa (`#/masuk`) tidak pernah menjadi admin. `GET /api/auth/session` mengembalikan `is_admin`. Login akun demo bukan admin di Worker asli; di mode mock/demo akun staf diatur lewat `VITE_STAFF_USERS` (kosong secara bawaan).
 
 | Rute | Fungsi |
 |------|--------|

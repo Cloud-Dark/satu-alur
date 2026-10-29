@@ -23,7 +23,7 @@ function validated(HttpError, fn) {
 
 async function requireAdmin(request, env, { authenticate, HttpError }) {
   const { user } = await authenticate(request, env);
-  if (!isAdminUser(user.email, env)) throw new HttpError(403, 'Khusus tim Satu Alur.');
+  if (!isAdminUser(user)) throw new HttpError(403, 'Khusus tim Satu Alur.');
   return user;
 }
 
