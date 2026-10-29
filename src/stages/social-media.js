@@ -150,10 +150,11 @@ export async function render(container, ctx = {}) {
         el('a', { className: 'btn btn-primary', href: 'mailto:hello@satu-alur.id' }, C.icon('message'), 'Hubungi tim marketing'))))
   }
   function tabCtx() {
-    return { status, signal: controller.signal, getModelId: () => modelId, account: acct.account, configured: acct.configured, pick,
+    return { status, signal: controller.signal, getModelId: () => modelId, account: acct.account, configured: acct.configured, loadError: acct.error, pick,
       refresh, clearPick: () => { pick = null }, goto: (value) => tabs.querySelector(`[data-value="${value}"]`).click() }
   }
   function draw() {
+    controller?.abort() // stop AI streams and fetches of the tab being replaced
     controller = new AbortController()
     if (currentTab === 'account') Account.render(host, tabCtx())
     else if (currentTab === 'content' || currentTab === 'brainstorm') Content.render(host, tabCtx(), currentTab === 'brainstorm')
@@ -162,7 +163,7 @@ export async function render(container, ctx = {}) {
     else partnershipTab()
   }
   async function loadAccount() {
-    try { acct = await getAccount() } catch (err) { status.show('danger', err.message) }
+    try { acct = await getAccount() } catch (err) { acct = { configured: true, account: null, error: err.message } }
   }
   async function refresh() {
     await loadAccount()

@@ -30,11 +30,32 @@ module.exports = async function socialMedia(t) {
   t.check(await p.evaluate(() => localStorage.getItem('satualur_social_migrated')) === '1', 'import sets migrated flag')
   t.check(await p.evaluate(() => Boolean(localStorage.getItem('satualur_saved_content'))), 'import keeps old keys')
 
-  // connect (demo connects immediately)
+  // not connected: Konten points to Akun
+  await tab('Konten').click()
+  await p.waitForSelector('.workspace-library .sm-composer')
+  t.check(await p.getByRole('button', { name: 'Hubungkan akun di tab Akun untuk membagikan.' }).count() >= 1, 'not connected: link to the Akun tab instead of checkboxes')
+  t.check(await p.locator('.workspace-library input[value=facebook]').count() === 0, 'not connected: no platform checkboxes')
+  await tab('Akun').click()
+
+  // Page picker (demo lists a Page for any pick id); choosing it connects
+  await p.evaluate(() => { location.hash = '#/social-media?social_pick=abc' })
+  await p.getByRole('button', { name: 'Pilih Demo Page' }).click()
+  await p.waitForSelector('text=Demo Page', { timeout: 8000 })
+  t.check(await p.getByRole('button', { name: 'Putuskan' }).count() === 1, 'picking a Page connects the account')
+
+  // connected message from the OAuth return
+  await p.evaluate(() => { location.hash = '#/social-media?social=connected' })
+  await p.locator('.note-ok', { hasText: 'Akun berhasil terhubung.' }).waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await p.locator('.note-ok', { hasText: 'Akun berhasil terhubung.' }).count() === 1, 'social=connected shows success message')
+
+  // disconnect (confirm) then connect again
+  p.once('dialog', (d) => d.accept())
+  await p.getByRole('button', { name: 'Putuskan' }).click()
+  await p.getByRole('button', { name: 'Hubungkan Facebook & Instagram' }).waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await p.getByRole('button', { name: 'Hubungkan Facebook & Instagram' }).count() === 1, 'Putuskan (confirmed) returns to the not-connected state')
   await p.getByRole('button', { name: 'Hubungkan Facebook & Instagram' }).click()
   await p.waitForSelector('text=Demo Page', { timeout: 8000 })
-  t.check(true, 'Akun shows "Demo Page" after connecting')
-  t.check(await p.getByRole('button', { name: 'Putuskan' }).count() === 1, 'Putuskan button shown')
+  t.check(await p.getByText('Demo Page').count() >= 1, 'Akun shows "Demo Page" after connecting')
 
   // Konten: generate, save, share
   await tab('Konten').click()
@@ -47,7 +68,7 @@ module.exports = async function socialMedia(t) {
   const out = p.locator('.workspace-output .sm-composer')
   await out.getByRole('button', { name: 'Simpan', exact: true }).click()
   await p.waitForSelector('.workspace-library .sm-composer', { timeout: 8000 })
-  t.check(true, 'saved content appears in the library')
+  t.check(await p.locator('.workspace-library .sm-composer').count() >= 1, 'saved content appears in the library')
   const item = p.locator('.workspace-library .sm-composer').first()
   await item.getByLabel('Isi konten').fill('Tips E2E: bersihkan filter AC.')
   await item.getByRole('button', { name: 'Simpan', exact: true }).click()
@@ -70,11 +91,16 @@ module.exports = async function socialMedia(t) {
   await p.waitForFunction(() => !document.querySelector('.workspace-library .sm-composer input[value=instagram]')?.disabled, null, { timeout: 8000 }).catch(() => {})
   t.check(await ig.isEnabled(), 'Instagram checkbox enabled after adding a 1:1 image')
 
+  // caption with more than 30 hashtags disables Instagram again
+  await item.getByLabel('Isi konten').fill(Array.from({ length: 31 }, (_, i) => `#tag${i}`).join(' '))
+  t.check(await ig.isDisabled(), 'Instagram disabled when the caption has more than 30 hashtags')
+  t.check(await item.getByText('Instagram maksimal 30 hashtag.').count() >= 1, 'hashtag reason shown as hint')
+
   // Brainstorm reuses the generator and saves automatically
   await tab('Brainstorm').click()
   await p.fill('#sm-topic', 'Musim hujan')
   await p.getByRole('button', { name: 'Mulai brainstorm' }).click()
   await p.waitForSelector('.workspace-library .workspace-entry', { timeout: 25000 })
-  t.check(true, 'brainstorm result saved to the library')
+  t.check(await p.locator('.workspace-library .workspace-entry').count() >= 1, 'brainstorm result saved to the library')
   await t.noErrors(p)
 }

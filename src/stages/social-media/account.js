@@ -112,6 +112,12 @@ function importPanel(ctx, rows) {
 }
 
 export function render(host, ctx) {
+  if (ctx.loadError) {
+    const retry = C.button({ label: 'Coba lagi', icon: 'refresh', variant: 'soft' })
+    retry.addEventListener('click', () => ctx.refresh())
+    host.replaceChildren(C.errorState(`Status akun tidak dapat dimuat: ${ctx.loadError}`), retry)
+    return
+  }
   const legacy = legacyRows()
   host.replaceChildren(el('div', { className: 'workspace-stack' },
     ctx.pick ? pickPanel(ctx) : null,

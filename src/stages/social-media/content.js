@@ -8,6 +8,7 @@ import { toJpeg } from '../../social/image.js'
 const { el } = C
 const PLATFORMS = [{ value: 'instagram', label: 'Instagram' }, { value: 'facebook', label: 'Facebook' }]
 const PLATFORM_LABEL = { facebook: 'Facebook', instagram: 'Instagram' }
+const RECONNECT = 'Hubungkan ulang akun di tab Akun.'
 let seq = 0
 
 // Editable content with image, platform checkboxes, Simpan and Bagikan sekarang.
@@ -30,7 +31,7 @@ function composer(ctx, item, initialBody, onCreated) {
   }
   function syncIg() {
     if (!checks.instagram) return
-    const r = igCheck()
+    const r = ctx.account.needs_reconnect ? { ok: false, reason: RECONNECT } : igCheck()
     checks.instagram.input.disabled = !r.ok
     if (!r.ok) checks.instagram.input.checked = false
     checks.instagram.hint.textContent = r.ok ? '' : r.reason
@@ -57,10 +58,12 @@ function composer(ctx, item, initialBody, onCreated) {
         const input = el('input', { type: 'checkbox', id: `sm-${p}-${id}`, value: p })
         const hint = el('span', { className: 'field-hint', id: `sm-${p}-${id}-hint` })
         input.setAttribute('aria-describedby', hint.id)
+        if (ctx.account.needs_reconnect) { input.disabled = true; if (p === 'facebook') hint.textContent = RECONNECT }
         checks[p] = { input, hint }
         return el('div', {}, el('label', { className: 'check-row', htmlFor: input.id }, input, PLATFORM_LABEL[p]), ' ', hint)
       })))
     syncIg()
+    if (ctx.account.needs_reconnect) now.disabled = true
   }
 
   // Returns the content id, saving first when needed.
@@ -76,7 +79,7 @@ function composer(ctx, item, initialBody, onCreated) {
   async function guarded(button, busy, fn) {
     const restore = C.setBusy(button, busy)
     ctx.status.hide()
-    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore(); if (!ctx.account) now.disabled = true }
+    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore(); if (!ctx.account || ctx.account.needs_reconnect) now.disabled = true }
   }
 
   body.input.addEventListener('input', syncIg)
