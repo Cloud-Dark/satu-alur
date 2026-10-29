@@ -4,11 +4,10 @@ import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
 import { igEligibility } from '../../social/rules.js'
 import { toJpeg } from '../../social/image.js'
+import { PLATFORM_LABEL, connectedPlatforms, platformReason } from './platforms.js'
 
 const { el } = C
 const PLATFORMS = [{ value: 'instagram', label: 'Instagram' }, { value: 'facebook', label: 'Facebook' }]
-const PLATFORM_LABEL = { facebook: 'Facebook', instagram: 'Instagram' }
-const RECONNECT = 'Hubungkan ulang akun di tab Akun.'
 let seq = 0
 
 // Editable content with image, platform checkboxes, Simpan and Bagikan sekarang.
@@ -31,10 +30,10 @@ function composer(ctx, item, initialBody, onCreated) {
   }
   function syncIg() {
     if (!checks.instagram) return
-    const r = ctx.account.needs_reconnect ? { ok: false, reason: RECONNECT } : igCheck()
-    checks.instagram.input.disabled = !r.ok
-    if (!r.ok) checks.instagram.input.checked = false
-    checks.instagram.hint.textContent = r.ok ? '' : r.reason
+    const reason = platformReason(ctx.account, 'instagram', igCheck())
+    checks.instagram.input.disabled = Boolean(reason)
+    if (reason) checks.instagram.input.checked = false
+    checks.instagram.hint.textContent = reason
   }
   function drawImage() {
     const url = state.imageKey ? Social.mediaUrl(state.imageKey) : ''
@@ -52,13 +51,13 @@ function composer(ctx, item, initialBody, onCreated) {
       now.disabled = true
       return
     }
-    const platforms = ['facebook', ...(ctx.account.ig_username ? ['instagram'] : [])]
+    const platforms = connectedPlatforms(ctx.account)
     share.replaceChildren(el('fieldset', { className: 'sm-platforms' }, el('legend', { className: 'field-label' }, 'Bagikan ke'),
       ...platforms.map((p) => {
         const input = el('input', { type: 'checkbox', id: `sm-${p}-${id}`, value: p })
         const hint = el('span', { className: 'field-hint', id: `sm-${p}-${id}-hint` })
         input.setAttribute('aria-describedby', hint.id)
-        if (ctx.account.needs_reconnect) { input.disabled = true; if (p === 'facebook') hint.textContent = RECONNECT }
+        if (ctx.account.needs_reconnect) { input.disabled = true; if (p === 'facebook') hint.textContent = platformReason(ctx.account, p) }
         checks[p] = { input, hint }
         return el('div', {}, el('label', { className: 'check-row', htmlFor: input.id }, input, PLATFORM_LABEL[p]), ' ', hint)
       })))

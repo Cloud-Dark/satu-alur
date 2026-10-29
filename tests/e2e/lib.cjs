@@ -43,8 +43,8 @@ function makeContext({ browser, base, spec, results, shotDir }) {
       results.push({ spec, label, ok: true, todo: reason })
       console.log(`  TODO  ${label}  (${reason})`)
     },
-    async page({ width = 1440, height = 900, theme = 'light', reducedMotion, permissions } = {}) {
-      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion, permissions })
+    async page({ width = 1440, height = 900, theme = 'light', reducedMotion, permissions, timezoneId } = {}) {
+      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion, permissions, timezoneId })
       const page = await ctx.newPage()
       page.errors = []
       page.on('pageerror', (e) => page.errors.push(String(e)))
