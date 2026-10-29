@@ -97,3 +97,23 @@ CREATE TABLE IF NOT EXISTS site_content (
   updated_at TEXT NOT NULL,
   updated_by TEXT
 );
+
+CREATE TABLE IF NOT EXISTS subscription_plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  tagline TEXT NOT NULL DEFAULT '',
+  price_idr INTEGER,
+  period TEXT NOT NULL DEFAULT 'month',
+  period_label TEXT NOT NULL DEFAULT '',
+  recommended INTEGER NOT NULL DEFAULT 0,
+  badge TEXT NOT NULL DEFAULT '',
+  limits_json TEXT NOT NULL DEFAULT '[]',
+  features_json TEXT NOT NULL DEFAULT '[]',
+  cta_label TEXT NOT NULL DEFAULT '',
+  cta_kind TEXT NOT NULL DEFAULT 'signup',
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);

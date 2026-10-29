@@ -1,0 +1,105 @@
+/**
+ * Subscription plans — client for /api/plans (public read) and /api/office/admin/plans (staff).
+ * In demo mode (mock cloud) plans live in localStorage `satualur_business_demo_v1` as { next, plans: [] }.
+ * Test seams (demo mode): `satualur_business_fail` = '1' makes reads fail; `satualur_business_delay` = ms delays admin reads.
+ */
+import { getCloud, isUsingMockCloud } from '../cloud.js'
+import { validatePlan } from './plan-rules.js'
+
+const DEMO_KEY = 'satualur_business_demo_v1'
+const FAIL_KEY = 'satualur_business_fail'
+const token = () => { try { return localStorage.getItem('satualur_token') } catch { return null } }
+
+async function call(path, { method = 'GET', body, cache } = {}) {
+  let res
+  try {
+    res = await fetch(path, {
+      method,
+      credentials: 'same-origin',
+      ...(cache ? { cache } : {}),
+      headers: {
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    })
+  } catch {
+    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+  }
+  let json = null
+  try { json = await res.json() } catch { /* not JSON */ }
+  if (!res.ok || json?.error) throw Object.assign(new Error(json?.error?.message || `HTTP ${res.status}`), { status: res.status })
+  return json?.data
+}
+
+const loadDemo = () => {
+  try {
+    const d = JSON.parse(localStorage.getItem(DEMO_KEY))
+    if (d && Array.isArray(d.plans)) return d
+  } catch { /* corrupt: start empty */ }
+  return { next: 1, plans: [] }
+}
+const bySort = (a, b) => a.sort - b.sort || a.id - b.id
+
+/** Active plans in order, or null on any error (the landing keeps its built-in cards). */
+export async function getPlans() {
+  try {
+    if (isUsingMockCloud()) {
+      if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('demo: gagal dimuat')
+      return loadDemo().plans.filter((p) => p.active).sort(bySort)
+    }
+    const rows = await call('/api/plans')
+    return Array.isArray(rows) ? rows : null
+  } catch {
+    return null
+  }
+}
+
+/** All plans, inactive included. Throws a readable error on failure. */
+export async function adminListPlans() {
+  if (isUsingMockCloud()) {
+    const wait = Number(localStorage.getItem('satualur_business_delay')) || 0
+    if (wait) await new Promise((r) => setTimeout(r, wait))
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat paket. Coba lagi.')
+    return loadDemo().plans.sort(bySort)
+  }
+  try {
+    return (await call('/api/office/admin/plans', { cache: 'no-store' })) || []
+  } catch (e) {
+    throw new Error(`Gagal memuat paket. ${e.message}`)
+  }
+}
+
+// The public list is cached for 60 s; refresh this browser's copy so the landing shows the change.
+const refreshPublic = () => { fetch('/api/plans', { cache: 'reload' }).catch(() => {}) }
+
+async function mockWrite(patch, id) {
+  const db = loadDemo()
+  const cur = id === undefined ? null : db.plans.find((p) => p.id === id)
+  if (id !== undefined && !cur) throw new Error('Paket tidak ditemukan.')
+  const v = validatePlan({ ...(cur || {}), ...patch })
+  if (db.plans.some((p) => p.slug === v.slug && p.id !== id)) throw new Error('Slug sudah dipakai.')
+  const who = (await getCloud().auth.getSession())?.data?.user?.name || 'demo'
+  const row = { ...v, id: cur ? cur.id : db.next, updated_at: new Date().toISOString(), updated_by: who }
+  if (v.recommended) db.plans.forEach((p) => { if (p.id !== row.id) p.recommended = 0 })
+  if (cur) db.plans[db.plans.indexOf(cur)] = row
+  else { db.plans.push(row); db.next += 1 }
+  localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+  return row
+}
+
+/** Create a plan; returns the saved plan. */
+export async function adminCreatePlan(plan) {
+  if (isUsingMockCloud()) return mockWrite(plan)
+  const row = await call('/api/office/admin/plans', { method: 'POST', body: plan })
+  refreshPublic()
+  return row
+}
+
+/** Patch any fields of a plan (also used to reorder via `sort` and to deactivate via `active: 0`). */
+export async function adminUpdatePlan(id, patch) {
+  if (isUsingMockCloud()) return mockWrite(patch, id)
+  const row = await call(`/api/office/admin/plans/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch })
+  refreshPublic()
+  return row
+}

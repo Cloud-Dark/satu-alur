@@ -16,6 +16,8 @@ import { mountFlowScene } from '../three/flow-scene.js'
 import { mountAgentDemo } from './terminal.js'
 import { PRICING_TIERS, PRICING_NOTE } from './pricing.js'
 import { getSite } from '../site/api.js'
+import { getPlans } from '../business/api.js'
+import { renderPlanCard } from '../business/plan-card.js'
 import { renderHero } from '../site/hero.js'
 import { NAV, HERO_POINTS, STAGES, TICKER, FEATURES, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
 
@@ -691,6 +693,12 @@ export function renderLanding(root, ctx = {}) {
       item.querySelector('p').textContent = f.a.trim()
       return item
     }))
+  }).catch(() => {})
+
+  // Pricing: the built-in cards stay unless the API returns at least one active plan.
+  getPlans().then((plans) => {
+    if (disposed || !plans?.length) return
+    page.querySelector('.lp-tiers').replaceChildren(...plans.map(renderPlanCard))
   }).catch(() => {})
 
   /* --- Counters (real counts only: stages, AI agents, data flows) --- */

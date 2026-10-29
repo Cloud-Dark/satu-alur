@@ -19,6 +19,7 @@ import {
   handleAdminInfluencerUpdate, handleAdminRequests, handleAdminRequestUpdate,
 } from './office.js';
 import { handleSiteGet, handleSitePut } from './site.js';
+import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate } from './business.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -881,6 +882,10 @@ const ROUTES = {
   'PATCH /api/office/admin/requests/:id': (req, env, params) => handleAdminRequestUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/site/:key': (req, env, params) => handleSiteGet(req, env, ROUTE_DEPS, params),
   'PUT /api/office/admin/site/:key': (req, env, params) => handleSitePut(req, env, ROUTE_DEPS, params),
+  'GET /api/plans': (req, env) => handlePlansPublic(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/plans': (req, env) => handleAdminPlans(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/plans': (req, env) => handleAdminPlanCreate(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/plans/:id': (req, env, params) => handleAdminPlanUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 

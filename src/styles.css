@@ -1548,6 +1548,9 @@ body.scroll-lock { overflow: hidden; }
 .of-row-actions, .of-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
 .of-preview { padding: var(--s-4); border: 1px dashed var(--line); border-radius: var(--r-md); overflow-wrap: anywhere; }
 .of-preview .lp-hero-copy { max-width: none; }
+.of-preview .lp-tier { max-width: 380px; margin: 0 auto; }
+.of-row-wrap { flex-wrap: wrap; }
+.of-row-wrap > .field { flex: 1 1 140px; }
 @media (max-width: 768px) {
   .of-layout { grid-template-columns: minmax(0, 1fr); }
   .of-nav { display: none; }
