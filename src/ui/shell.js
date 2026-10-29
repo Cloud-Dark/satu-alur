@@ -26,6 +26,7 @@ import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
 import * as StageOffice from '../stages/office/index.js'
+import * as StageSupport from '../support/page.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
@@ -56,6 +57,9 @@ export const STAGES = [
   { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
   { key: 'office', group: 'growth', label: 'Kantor Satu Alur', sub: 'Influencer & permintaan', icon: 'users', module: StageOffice, adminOnly: true,
+    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
+  // Every signed-in user (staff too, harmless); drawn last in the nav, just above Pengaturan.
+  { key: 'support', group: 'help', label: 'Bantuan', sub: 'Tiket ke tim Satu Alur', icon: 'message', module: StageSupport,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 ]
 
@@ -146,6 +150,7 @@ export function renderShell(root, ctx) {
   const [dash, ...rest] = stages
   const flow = rest.filter((s) => !s.group)
   const growth = rest.filter((s) => s.group === 'growth')
+  const help = rest.filter((s) => s.group === 'help')
   const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': 'Navigasi alur' },
     el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
     el('nav', { className: 'side-nav', 'aria-label': 'Tahap alur' },
@@ -154,6 +159,7 @@ export function renderShell(root, ctx) {
       el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
       el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
       el('ol', { className: 'flow-list flow-list-growth' }, growth.map(navItem)),
+      el('ol', { className: 'flow-list flow-list-help' }, help.map(navItem)),
     ),
     el('div', { className: 'side-foot' },
       settingsBtn,
@@ -341,7 +347,7 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    crumbNum.textContent = stage.key === 'dashboard' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
+    crumbNum.textContent = stage.key === 'dashboard' || stage.group === 'help' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
     const a = stage.action
     const b = button({

@@ -8,7 +8,12 @@ import {
   validateCustomer, validateSuspendReason, escapeLike, STAFF_EMAIL_SUFFIX,
   validateContact, validateContactUpdate, isHoneypot, contactRateLimited, CONTACT_STATUS_LABEL, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
 } from '../src/customers/rules.js';
+import {
+  validateTicket, validateReply, validateTicketStatus, nextStatusOnReply, customerAuthorName, staffAuthorName, ticketLimitReached,
+  TICKET_STATUS_LABEL, TICKET_LIMIT_MESSAGE, TICKET_NOT_FOUND,
+} from '../src/support/rules.js';
 import { requireAdmin } from './office.js';
+import { realUser } from './social.js';
 
 const PAGE_SIZE = 50;
 const SELECT = `SELECT u.id, u.email, u.name, u.created_at, c.plan_id, p.name AS plan_name, c.status, c.period_end,
@@ -214,4 +219,146 @@ export async function handleAdminUserRevokeSessions(request, env, deps, params) 
   const { target } = await adminAndTarget(request, env, deps, params);
   const res = await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id).run();
   return deps.ok({ id: target.id, ended: res.meta?.changes ?? 0 });
+}
+
+// ------------------------------------------------------------------ Support tickets (Bantuan / Pengaduan CS)
+
+const TICKET_COLS = 't.id, t.owner_id, t.category, t.subject, t.status, t.created_at, t.updated_at, t.last_reply_by';
+const STAFF_TICKETS = `SELECT ${TICKET_COLS}, u.email, u.name AS user_name, c.company
+  FROM support_tickets t JOIN users u ON u.id = t.owner_id LEFT JOIN customer_accounts c ON c.owner_id = t.owner_id`;
+
+// Validator errors → 400; anything else bubbles up.
+function checked(fn, HttpError) {
+  try {
+    return fn();
+  } catch (err) {
+    if (err?.validation) throw new HttpError(400, err.message);
+    throw err;
+  }
+}
+function ticketParam(params, HttpError) {
+  if (!/^\d+$/.test(params.id || '')) throw new HttpError(404, TICKET_NOT_FOUND);
+  return Number(params.id);
+}
+const messagesOf = async (env, id) => (await env.DB.prepare(
+  'SELECT id, ticket_id, author, author_name, body, created_at FROM support_messages WHERE ticket_id = ? ORDER BY created_at, id',
+).bind(id).all()).results;
+
+// The caller's own ticket only: another owner's id gets the same 404 as a missing one, so ids can't be probed.
+async function ownThread(env, deps, id, ownerId) {
+  const ticket = await env.DB.prepare(`SELECT ${TICKET_COLS} FROM support_tickets t WHERE t.id = ? AND t.owner_id = ?`).bind(id, ownerId).first();
+  if (!ticket) throw new deps.HttpError(404, TICKET_NOT_FOUND);
+  return { ticket, messages: await messagesOf(env, id) };
+}
+async function staffThread(env, deps, id) {
+  const ticket = await env.DB.prepare(`${STAFF_TICKETS} WHERE t.id = ?`).bind(id).first();
+  if (!ticket) throw new deps.HttpError(404, TICKET_NOT_FOUND);
+  return { ticket, messages: await messagesOf(env, id) };
+}
+
+// Inserts the message and moves the ticket (status, updated_at, last_reply_by). ownerId scopes customer writes.
+function saveReply(env, { id, author, name, body, status, ownerId }) {
+  const now = new Date().toISOString();
+  const update = ownerId === undefined
+    ? env.DB.prepare('UPDATE support_tickets SET status = ?, updated_at = ?, last_reply_by = ? WHERE id = ?').bind(status, now, author, id)
+    : env.DB.prepare('UPDATE support_tickets SET status = ?, updated_at = ?, last_reply_by = ? WHERE id = ? AND owner_id = ?').bind(status, now, author, id, ownerId);
+  return env.DB.batch([
+    env.DB.prepare('INSERT INTO support_messages (ticket_id, author, author_name, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, author, name, body, now),
+    update,
+  ]);
+}
+
+async function customerName(env, user) {
+  const acct = await env.DB.prepare('SELECT company FROM customer_accounts WHERE owner_id = ?').bind(user.id).first();
+  return customerAuthorName({ company: acct?.company, name: user.name, email: user.email });
+}
+
+export async function handleSupportList(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  // ponytail: no paging; the newest 200 is plenty while open tickets are capped at 20 per business.
+  const { results } = await env.DB.prepare(
+    `SELECT ${TICKET_COLS} FROM support_tickets t WHERE t.owner_id = ? ORDER BY t.updated_at DESC, t.id DESC LIMIT 200`,
+  ).bind(user.id).all();
+  return deps.ok({ items: results });
+}
+
+export async function handleSupportGet(request, env, deps, params) {
+  const { user } = await deps.authenticate(request, env);
+  return deps.ok(await ownThread(env, deps, ticketParam(params, deps.HttpError), user.id));
+}
+
+export async function handleSupportCreate(request, env, deps) {
+  const user = await realUser(request, env, deps);
+  const body = await deps.readJson(request);
+  const v = checked(() => validateTicket(body), deps.HttpError);
+  const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM support_tickets WHERE owner_id = ? AND status != 'closed'").bind(user.id).first();
+  if (ticketLimitReached(open.n)) throw new deps.HttpError(400, TICKET_LIMIT_MESSAGE);
+  const name = await customerName(env, user);
+  const now = new Date().toISOString();
+  const [ins] = await env.DB.batch([
+    env.DB.prepare("INSERT INTO support_tickets (owner_id, category, subject, status, created_at, updated_at, last_reply_by) VALUES (?, ?, ?, 'open', ?, ?, 'customer')")
+      .bind(user.id, v.category, v.subject, now, now),
+    env.DB.prepare("INSERT INTO support_messages (ticket_id, author, author_name, body, created_at) VALUES (last_insert_rowid(), 'customer', ?, ?, ?)")
+      .bind(name, v.body, now),
+  ]);
+  return deps.ok(await ownThread(env, deps, ins.meta.last_row_id, user.id));
+}
+
+export async function handleSupportReply(request, env, deps, params) {
+  const user = await realUser(request, env, deps);
+  const id = ticketParam(params, deps.HttpError);
+  const { ticket } = await ownThread(env, deps, id, user.id);
+  const reqBody = await deps.readJson(request);
+  const body = checked(() => validateReply(reqBody), deps.HttpError);
+  const status = checked(() => nextStatusOnReply(ticket.status, 'customer'), deps.HttpError);
+  await saveReply(env, { id, author: 'customer', name: await customerName(env, user), body, status, ownerId: user.id });
+  return deps.ok(await ownThread(env, deps, id, user.id));
+}
+
+export async function handleAdminSupport(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status') || 'all';
+  if (status !== 'all' && !Object.hasOwn(TICKET_STATUS_LABEL, status)) throw new deps.HttpError(400, 'Status tidak dikenal.');
+  const page = Math.max(1, parseInt(url.searchParams.get('page'), 10) || 1);
+  const where = status === 'all' ? '' : 'WHERE t.status = ?';
+  const args = status === 'all' ? [] : [status];
+  const [count, { results }] = await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM support_tickets t ${where}`).bind(...args).first(),
+    env.DB.prepare(`${STAFF_TICKETS} ${where} ORDER BY t.updated_at DESC, t.id DESC LIMIT ? OFFSET ?`).bind(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE).all(),
+  ]);
+  return deps.ok({ items: results, total: count.n, page });
+}
+
+export async function handleAdminSupportCounts(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM support_tickets WHERE status IN ('open', 'in_progress') AND last_reply_by = 'customer'",
+  ).first();
+  return deps.ok({ open: row.n });
+}
+
+export async function handleAdminSupportGet(request, env, deps, params) {
+  await requireAdmin(request, env, deps);
+  return deps.ok(await staffThread(env, deps, ticketParam(params, deps.HttpError)));
+}
+
+export async function handleAdminSupportReply(request, env, deps, params) {
+  const admin = await requireAdmin(request, env, deps);
+  const id = ticketParam(params, deps.HttpError);
+  const { ticket } = await staffThread(env, deps, id);
+  const reqBody = await deps.readJson(request);
+  const body = checked(() => validateReply(reqBody), deps.HttpError);
+  await saveReply(env, { id, author: 'staff', name: staffAuthorName(admin.name), body, status: nextStatusOnReply(ticket.status, 'staff') });
+  return deps.ok(await staffThread(env, deps, id));
+}
+
+export async function handleAdminSupportUpdate(request, env, deps, params) {
+  await requireAdmin(request, env, deps);
+  const id = ticketParam(params, deps.HttpError);
+  const reqBody = await deps.readJson(request);
+  const status = checked(() => validateTicketStatus(reqBody), deps.HttpError);
+  const res = await env.DB.prepare('UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?').bind(status, new Date().toISOString(), id).run();
+  if (!res.meta?.changes) throw new deps.HttpError(404, TICKET_NOT_FOUND);
+  return deps.ok(await staffThread(env, deps, id));
 }

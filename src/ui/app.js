@@ -59,11 +59,12 @@ function openOffice() {
 }
 
 function render() {
-  // The Meta OAuth callback returns to #/social-media?...: open that stage inside the app, keeping the query.
-  const back = /^#\/social-media(\?.*)?$/.exec(location.hash)
+  // The Meta OAuth callback returns to #/social-media?...; #/support?tiket=<id> links a ticket.
+  // Open that stage inside the app, keeping the query for the stage to read.
+  const back = /^#\/(social-media|support)(\?.*)?$/.exec(location.hash)
   if (back) {
-    try { sessionStorage.setItem('satualur_stage', 'social-media') } catch { /* storage unavailable */ }
-    history.replaceState(null, '', `#/app${back[1] || ''}`)
+    try { sessionStorage.setItem('satualur_stage', back[1]) } catch { /* storage unavailable */ }
+    history.replaceState(null, '', `#/app${back[2] || ''}`)
   }
   let path = currentPath()
   if (path === STAFF_PATH) {

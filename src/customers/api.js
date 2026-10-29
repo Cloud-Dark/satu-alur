@@ -12,6 +12,10 @@ import {
   validateCustomer, validateSuspendReason, STAFF_EMAIL_SUFFIX,
   validateContact, validateContactUpdate, isHoneypot, contactRateLimited, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
 } from './rules.js'
+import {
+  validateTicket, validateReply, validateTicketStatus, nextStatusOnReply, customerAuthorName, staffAuthorName, ticketLimitReached,
+  TICKET_LIMIT_MESSAGE, TICKET_NOT_FOUND,
+} from '../support/rules.js'
 import { adminListPlans } from '../business/api.js'
 
 export const PAGE_SIZE = 50
@@ -218,4 +222,123 @@ export async function adminUpdateContact(id, body) {
   Object.assign(row, v, { updated_at: new Date().toISOString(), updated_by: (await getCloud().auth.getSession())?.data?.user?.name || 'demo' })
   localStorage.setItem(DEMO_KEY, JSON.stringify(db))
   return row
+}
+
+/* ------------------------------------------------------------------ Support tickets (Bantuan / Pengaduan CS) */
+// Demo mode keeps { tickets: [row incl. owner_id], ticket_messages: [row] } in DEMO_KEY. Every customer read and
+// write filters by the mock session user's id, like the Worker's `AND owner_id = ?`. Threads are { ticket, messages }.
+
+const nextId = (rows) => rows.reduce((m, r) => Math.max(m, r.id), 0) + 1
+const byUpdated = (a, b) => String(b.updated_at).localeCompare(String(a.updated_at)) || b.id - a.id
+const saveDb = (db) => localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+async function sessionUser() {
+  const u = (await getCloud().auth.getSession())?.data?.user
+  if (!u) throw new Error('Belum masuk.')
+  return u
+}
+function realOnly(u) {
+  if (isDemoEmail(u.email)) throw new Error('Tidak tersedia di akun demo.')
+}
+const mockCustomerName = (u) => customerAuthorName({ company: loadAccounts()[u.id]?.company, name: u.name, email: u.email })
+// ownerId undefined = staff (any ticket); another owner's ticket reads as missing.
+function mockThread(db, id, ownerId) {
+  const ticket = (db.tickets || []).find((t) => String(t.id) === String(id) && (ownerId === undefined || t.owner_id === ownerId))
+  if (!ticket) throw new Error(TICKET_NOT_FOUND)
+  return { ticket, messages: (db.ticket_messages || []).filter((m) => m.ticket_id === ticket.id) }
+}
+function mockReply(db, ticket, author, name, body) {
+  const now = new Date().toISOString()
+  const msgs = db.ticket_messages || []
+  db.ticket_messages = [...msgs, { id: nextId(msgs), ticket_id: ticket.id, author, author_name: name, body, created_at: now }]
+  Object.assign(ticket, { status: nextStatusOnReply(ticket.status, author), updated_at: now, last_reply_by: author })
+}
+function withOwner(t) {
+  const u = (read('satualur_mock_v1', {}).users || []).find((x) => x.id === t.owner_id)
+  return { ...t, email: u?.email ?? '', user_name: u?.name ?? '', company: loadAccounts()[t.owner_id]?.company ?? null }
+}
+
+/** The signed-in business's own tickets, newest activity first. */
+export async function listTickets() {
+  if (!isUsingMockCloud()) return (await call('/api/support/tickets', { cache: 'no-store' })).items
+  const u = await sessionUser()
+  return (read(DEMO_KEY, {}).tickets || []).filter((t) => t.owner_id === u.id).sort(byUpdated)
+}
+
+export async function getTicket(id) {
+  if (!isUsingMockCloud()) return call(`/api/support/tickets/${encodeURIComponent(id)}`, { cache: 'no-store' })
+  return mockThread(read(DEMO_KEY, {}), id, (await sessionUser()).id)
+}
+
+/** { category, subject, body } → the new thread. */
+export async function createTicket(body) {
+  if (!isUsingMockCloud()) return call('/api/support/tickets', { method: 'POST', body })
+  const u = await sessionUser()
+  realOnly(u)
+  const v = validateTicket(body)
+  const db = read(DEMO_KEY, {})
+  const tickets = db.tickets || []
+  if (ticketLimitReached(tickets.filter((t) => t.owner_id === u.id && t.status !== 'closed').length)) throw new Error(TICKET_LIMIT_MESSAGE)
+  const now = new Date().toISOString()
+  const ticket = { id: nextId(tickets), owner_id: u.id, category: v.category, subject: v.subject, status: 'open', created_at: now, updated_at: now, last_reply_by: 'customer' }
+  db.tickets = [...tickets, ticket]
+  mockReply(db, ticket, 'customer', mockCustomerName(u), v.body)
+  saveDb(db)
+  return mockThread(db, ticket.id, u.id)
+}
+
+export async function replyTicket(id, body) {
+  if (!isUsingMockCloud()) return call(`/api/support/tickets/${encodeURIComponent(id)}/messages`, { method: 'POST', body })
+  const u = await sessionUser()
+  realOnly(u)
+  const db = read(DEMO_KEY, {})
+  const { ticket } = mockThread(db, id, u.id)
+  mockReply(db, ticket, 'customer', mockCustomerName(u), validateReply(body))
+  saveDb(db)
+  return mockThread(db, id, u.id)
+}
+
+/** Staff: { items (with email, user_name, company), total, page }; status = a ticket status or 'all'. */
+export async function adminListTickets({ status = 'all', page = 1 } = {}) {
+  if (isUsingMockCloud()) {
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat tiket. Coba lagi.')
+    const all = (read(DEMO_KEY, {}).tickets || []).filter((t) => status === 'all' || t.status === status).sort(byUpdated)
+    return { items: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(withOwner), total: all.length, page }
+  }
+  try {
+    return await call(`/api/office/admin/support?status=${encodeURIComponent(status)}&page=${page}`, { cache: 'no-store' })
+  } catch (e) {
+    throw new Error(`Gagal memuat tiket. ${e.message}`)
+  }
+}
+
+/** { open } — open/in_progress tickets whose last reply came from the customer (the badge). */
+export async function adminTicketCounts() {
+  if (!isUsingMockCloud()) return call('/api/office/admin/support/counts', { cache: 'no-store' })
+  const open = (read(DEMO_KEY, {}).tickets || []).filter((t) => ['open', 'in_progress'].includes(t.status) && t.last_reply_by === 'customer').length
+  return { open }
+}
+
+export async function adminGetTicket(id) {
+  if (!isUsingMockCloud()) return call(`/api/office/admin/support/${encodeURIComponent(id)}`, { cache: 'no-store' })
+  const th = mockThread(read(DEMO_KEY, {}), id)
+  return { ...th, ticket: withOwner(th.ticket) }
+}
+
+export async function adminReplyTicket(id, body) {
+  if (!isUsingMockCloud()) return call(`/api/office/admin/support/${encodeURIComponent(id)}/messages`, { method: 'POST', body })
+  const db = read(DEMO_KEY, {})
+  const { ticket } = mockThread(db, id)
+  mockReply(db, ticket, 'staff', staffAuthorName((await sessionUser()).name), validateReply(body))
+  saveDb(db)
+  return adminGetTicket(id)
+}
+
+/** PATCH { status } — staff may set any status. */
+export async function adminUpdateTicket(id, body) {
+  if (!isUsingMockCloud()) return call(`/api/office/admin/support/${encodeURIComponent(id)}`, { method: 'PATCH', body })
+  const status = validateTicketStatus(body)
+  const db = read(DEMO_KEY, {})
+  Object.assign(mockThread(db, id).ticket, { status, updated_at: new Date().toISOString() })
+  saveDb(db)
+  return adminGetTicket(id)
 }

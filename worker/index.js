@@ -24,6 +24,8 @@ import {
   handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
   handleAdminUsers, handleAdminUserSuspend, handleAdminUserRestore, handleAdminUserRevokeSessions,
   handleContactPost, handleAdminContact, handleAdminContactCounts, handleAdminContactUpdate,
+  handleSupportList, handleSupportGet, handleSupportCreate, handleSupportReply,
+  handleAdminSupport, handleAdminSupportCounts, handleAdminSupportGet, handleAdminSupportReply, handleAdminSupportUpdate,
 } from './customers.js';
 import { SUSPENDED_MESSAGE } from '../src/customers/rules.js';
 
@@ -918,6 +920,16 @@ const ROUTES = {
   'GET /api/office/admin/contact': (req, env) => handleAdminContact(req, env, ROUTE_DEPS),
   'GET /api/office/admin/contact/counts': (req, env) => handleAdminContactCounts(req, env, ROUTE_DEPS),
   'PATCH /api/office/admin/contact/:id': (req, env, params) => handleAdminContactUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/support/tickets': (req, env) => handleSupportList(req, env, ROUTE_DEPS),
+  'POST /api/support/tickets': (req, env) => handleSupportCreate(req, env, ROUTE_DEPS),
+  'GET /api/support/tickets/:id': (req, env, params) => handleSupportGet(req, env, ROUTE_DEPS, params),
+  'POST /api/support/tickets/:id/messages': (req, env, params) => handleSupportReply(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/support': (req, env) => handleAdminSupport(req, env, ROUTE_DEPS),
+  // Exact keys win before the :id patterns are tried (handleApi), so /counts never reaches :id.
+  'GET /api/office/admin/support/counts': (req, env) => handleAdminSupportCounts(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/support/:id': (req, env, params) => handleAdminSupportGet(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/support/:id/messages': (req, env, params) => handleAdminSupportReply(req, env, ROUTE_DEPS, params),
+  'PATCH /api/office/admin/support/:id': (req, env, params) => handleAdminSupportUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 

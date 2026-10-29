@@ -8,7 +8,8 @@ import * as Payment from './payment.js'
 import * as Customers from './customers.js'
 import * as Users from './users.js'
 import * as Contact from './contact.js'
-import { adminContactCounts } from '../../customers/api.js'
+import * as Support from './support.js'
+import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
 const { el } = C
 const STORE = 'satualur_office_section'
@@ -24,7 +25,7 @@ const GROUPS = [
     { key: 'customers', label: 'Pelanggan & mitra', draw: Customers.draw },
     { key: 'users', label: 'Pengguna', draw: Users.draw },
     { key: 'contact', label: 'Contact Us', draw: Contact.draw },
-    { key: 'tickets', label: 'Pengaduan CS', soon: true }] },
+    { key: 'tickets', label: 'Pengaduan CS', draw: Support.draw }] },
   { title: 'Agensi influencer', items: [
     { key: 'influencers', label: 'Influencer', draw: Influencers.draw },
     { key: 'requests', label: 'Permintaan', draw: Requests.draw }] },
@@ -43,22 +44,25 @@ export async function render(container, ctx) {
   const host = el('div', { className: 'of-content' })
 
   const buttons = {}
-  // Count of new Contact Us messages; refreshed on render, when the inbox loads and after status changes.
-  const badge = el('span')
-  async function refreshCount() {
-    try {
-      const { new: n } = await adminContactCounts()
-      if (ctx.signal.aborted) return
-      badge.replaceChildren(...(n ? [C.tag(String(n), 'brand'), el('span', { className: 'sr-only' }, ' pesan baru')] : []))
-      select.querySelector('option[value="contact"]').textContent = n ? `Contact Us (${n} baru)` : 'Contact Us'
-    } catch { /* the badge is optional */ }
+  // Badges: new Contact Us messages and tickets waiting on staff; refreshed on render, when an inbox loads and after changes.
+  const BADGES = {
+    contact: { el: el('span'), count: async () => (await adminContactCounts()).new, sr: ' pesan baru', option: (n) => `Contact Us (${n} baru)` },
+    tickets: { el: el('span'), count: async () => (await adminTicketCounts()).open, sr: ' tiket menunggu', option: (n) => `Pengaduan CS (${n} menunggu)` },
   }
+  const refreshCount = () => Promise.all(Object.entries(BADGES).map(async ([key, b]) => {
+    try {
+      const n = await b.count()
+      if (ctx.signal.aborted) return
+      b.el.replaceChildren(...(n ? [C.tag(String(n), 'brand'), el('span', { className: 'sr-only' }, b.sr)] : []))
+      select.querySelector(`option[value="${key}"]`).textContent = n ? b.option(n) : ITEMS.find((i) => i.key === key).label
+    } catch { /* the badge is optional */ }
+  }))
   const nav = el('nav', { className: 'of-nav', 'aria-label': 'Bagian Kantor Satu Alur' }, ...GROUPS.map((g) =>
     el('div', { className: 'of-nav-group' }, el('h2', { className: 'of-nav-title' }, g.title),
       el('ul', {}, ...g.items.map((i) => {
         const b = el('button', { type: 'button', className: 'of-nav-item', disabled: Boolean(i.soon) }, el('span', {}, i.label), i.soon ? el('span', { className: 'of-soon' }, 'Segera') : null)
         buttons[i.key] = b
-        if (i.key === 'contact') b.append(badge)
+        if (BADGES[i.key]) b.append(BADGES[i.key].el)
         b.addEventListener('click', () => go(i.key))
         return el('li', {}, b)
       })))))

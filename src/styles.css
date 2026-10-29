@@ -1562,6 +1562,24 @@ body.scroll-lock { overflow: hidden; }
 .of-contact-detail[hidden] { display: none; }
 .of-contact-detail > .field { justify-self: stretch; }
 .of-contact-msg { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; justify-self: stretch; }
+
+/* Support tickets (Bantuan + Pengaduan CS): stored text is pre-wrap text nodes */
+.sp-thread, .sp-thread-error { display: grid; gap: var(--s-3); justify-items: start; min-width: 0; }
+.sp-thread > *, .sp-staff-foot { justify-self: stretch; min-width: 0; }
+.sp-thread > .btn { justify-self: start; }
+.sp-subject { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+h2.sp-subject { font-size: 1.15rem; }
+.sp-meta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); align-items: center; margin: 0; }
+.sp-msgs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.sp-msg { padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); min-width: 0; }
+.sp-msg.is-staff { background: var(--surface-2); border-left: 3px solid var(--brand); }
+.sp-msg-head { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); align-items: baseline; margin: 0 0 var(--s-2); overflow-wrap: anywhere; }
+.sp-msg-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-reply, .sp-staff-foot { display: grid; gap: var(--s-3); justify-items: start; }
+.sp-reply > .field { justify-self: stretch; }
+.sp-status { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: end; }
+.sp-status > .field { flex: 1 1 200px; margin: 0; }
+.sp-closed { margin: 0; }
 .of-row-wrap { flex-wrap: wrap; }
 .of-row-wrap > .field { flex: 1 1 140px; }
 @media (max-width: 768px) {

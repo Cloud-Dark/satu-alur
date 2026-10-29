@@ -92,7 +92,7 @@ module.exports = async function office(t) {
     t.check(await p.getByRole('heading', { name: h, exact: true }).count() === 1, `nav heading "${h}"`)
   }
   t.check(await p.getByRole('button', { name: 'Landing page' }).getAttribute('aria-current') === 'page', 'landing is the default section')
-  t.check(!(await p.getByRole('button', { name: 'Payment gateway', exact: true }).isDisabled()) && await p.getByRole('button', { name: /^Pelanggan & mitra$/ }).isEnabled() && await p.getByRole('button', { name: 'Pengguna', exact: true }).isEnabled() && await p.getByRole('button', { name: /^Pengaduan CS/ }).isDisabled(), 'Payment gateway, Pelanggan & mitra and Pengguna are enabled; Pengaduan CS stays Segera')
+  t.check(!(await p.getByRole('button', { name: 'Payment gateway', exact: true }).isDisabled()) && await p.getByRole('button', { name: /^Pelanggan & mitra$/ }).isEnabled() && await p.getByRole('button', { name: 'Pengguna', exact: true }).isEnabled() && await p.getByRole('button', { name: /^Pengaduan CS/ }).isEnabled(), 'Payment gateway, Pelanggan & mitra, Pengguna and Pengaduan CS are enabled')
   await sec('Influencer')
   await p.getByRole('button', { name: 'Tambah influencer' }).click()
   const dlg = p.getByRole('dialog', { name: 'Tambah influencer' })

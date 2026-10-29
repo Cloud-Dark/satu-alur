@@ -36,7 +36,7 @@ export const isConfigured = (env) => env.DEMO_OTP !== 'true'
 export const isAdminUser = (user) => user?.is_staff === 1;
 const isDemoUser = (user, deps) => deps.DEMO_EMAILS.has(String(user.email || '').toLowerCase());
 // Authenticates and rejects the shared demo accounts (one user per business, shared by every visitor).
-async function realUser(request, env, deps) {
+export async function realUser(request, env, deps) {
   const { user } = await deps.authenticate(request, env);
   if (isDemoUser(user, deps)) throw new deps.HttpError(403, DEMO_DENIED);
   return user;

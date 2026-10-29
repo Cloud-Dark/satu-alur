@@ -173,3 +173,28 @@ CREATE TABLE IF NOT EXISTS user_flags (
   updated_at TEXT NOT NULL,
   updated_by TEXT
 );
+
+-- Support tickets (Bantuan / Pengaduan CS). Customer routes always filter by owner_id; staff read all.
+-- Never in TABLES. last_reply_by drives the staff badge (open/in_progress tickets waiting on staff).
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category TEXT NOT NULL CHECK (category IN ('teknis', 'tagihan', 'akun', 'lainnya')),
+  subject TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  last_reply_by TEXT NOT NULL CHECK (last_reply_by IN ('customer', 'staff'))
+);
+CREATE INDEX IF NOT EXISTS idx_support_owner ON support_tickets(owner_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_support_status ON support_tickets(status, updated_at);
+
+CREATE TABLE IF NOT EXISTS support_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id INTEGER NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  author TEXT NOT NULL CHECK (author IN ('customer', 'staff')),
+  author_name TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id, created_at);
