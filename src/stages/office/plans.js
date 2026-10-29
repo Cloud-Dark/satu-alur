@@ -1,7 +1,7 @@
 import '../../styles/landing.css'
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
-import { adminListPlans, adminCreatePlan, adminUpdatePlan } from '../../business/api.js'
+import { adminListPlans, adminCreatePlan, adminUpdatePlan, adminReorderPlans } from '../../business/api.js'
 import { validatePlan, formatPrice } from '../../business/plan-rules.js'
 import { renderPlanCard } from '../../business/plan-card.js'
 import { PRICING_TIERS } from '../../landing/pricing.js'
@@ -147,8 +147,9 @@ export function draw(host, ctx) {
     // Reorder = swap `sort` between neighbours (two PATCHes).
     const move = async (i, j) => {
       try {
-        await adminUpdatePlan(rows[i].id, { sort: rows[j].sort })
-        await adminUpdatePlan(rows[j].id, { sort: rows[i].sort })
+        const ids = rows.map((r) => r.id);
+        [ids[i], ids[j]] = [ids[j], ids[i]]
+        await adminReorderPlans(ids)
       } catch (ex) { showToast(ex.message, 'error') }
       if (!ctx.signal.aborted) load()
     }
@@ -172,15 +173,24 @@ export function draw(host, ctx) {
     if (items.length) body = items
     else {
       const imp = C.button({ label: 'Impor paket dari landing saat ini', variant: 'soft' })
+      const impErr = el('p', { className: 'field-error', role: 'alert' })
       imp.addEventListener('click', async () => {
+        impErr.textContent = ''
         const restore = C.setBusy(imp, 'Mengimpor…')
+        let failed = false
         try {
-          for (const [i, t] of PRICING_TIERS.entries()) await adminCreatePlan(validatePlan(fromTier(t, i)))
-          showToast('Tiga paket diimpor.', 'success')
-        } catch (ex) { showToast(ex.message, 'error') } finally { restore() }
-        if (!ctx.signal.aborted) load()
+          // Only slugs that are not there yet, so a retry after a partial failure never duplicates.
+          const have = new Set((await adminListPlans()).map((p) => p.slug))
+          for (const [i, t] of PRICING_TIERS.entries()) if (!have.has(t.id)) await adminCreatePlan(validatePlan(fromTier(t, i)))
+          showToast('Paket diimpor.', 'success')
+        } catch (ex) {
+          failed = true
+          impErr.textContent = `Impor belum selesai: ${ex.message}`
+        } finally { restore() }
+        if (failed) imp.querySelector('.btn-label').textContent = 'Impor ulang'
+        else if (!ctx.signal.aborted) load()
       })
-      body = [C.emptyState({ title: 'Belum ada paket', body: 'Landing page memakai paket bawaan sampai ada paket aktif di sini.', iconName: 'sprout', action: imp })]
+      body = [C.emptyState({ title: 'Belum ada paket', body: 'Landing page memakai paket bawaan sampai ada paket aktif di sini.', iconName: 'sprout', action: el('div', { className: 'of-list' }, imp, impErr) })]
     }
     host.replaceChildren(C.panel({ title: 'Paket langganan', meta: `${rows.length} paket`, actions: add }, ...body))
   }

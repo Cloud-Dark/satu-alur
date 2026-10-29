@@ -30,6 +30,13 @@ export function formatPrice(plan) {
   return { price, period: label || SUFFIX[plan.period] || '' }
 }
 
+/** The new order must list every existing plan id exactly once. Returns the ids. */
+export function validateReorder(ids, existing) {
+  if (!Array.isArray(ids) || !ids.every(Number.isInteger) || new Set(ids).size !== ids.length) fail('Urutan paket tidak valid.')
+  if (ids.length !== existing.length || !existing.every((id) => ids.includes(id))) fail('Urutan harus memuat semua paket.')
+  return ids
+}
+
 export function validatePlan(body) {
   const b = body && typeof body === 'object' ? body : {}
   const slug = str(b.slug)
@@ -46,9 +53,11 @@ export function validatePlan(body) {
   const cta_label = text(b.cta_label, 'Teks tombol', 30)
   if (!cta_label) fail('Teks tombol wajib diisi.')
 
-  const limits = Array.isArray(b.limits) ? b.limits : []
+  if (b.limits !== undefined && !Array.isArray(b.limits)) fail('Format batasan tidak valid.')
+  if (b.features !== undefined && !Array.isArray(b.features)) fail('Format fitur tidak valid.')
+  const limits = b.limits || []
   if (limits.length > 6) fail('Maksimal 6 batas.')
-  const features = Array.isArray(b.features) ? b.features : []
+  const features = b.features || []
   if (features.length > 12) fail('Maksimal 12 fitur.')
   if (b.sort !== undefined && !Number.isInteger(b.sort)) fail('Urutan harus bilangan bulat.')
 
@@ -61,8 +70,8 @@ export function validatePlan(body) {
     period_label: text(b.period_label, 'Label periode', 40),
     recommended: flag(b.recommended, 'Rekomendasi') ?? 0,
     badge: text(b.badge, 'Badge', 30),
-    limits: limits.map((l) => ({ label: text(l?.label, 'Label batas', 30), value: text(l?.value, 'Nilai batas', 60) })),
-    features: features.map((f) => text(f, 'Fitur', 100)),
+    limits: limits.map((l) => ({ label: text(l?.label, 'Label batas', 30), value: text(l?.value, 'Nilai batas', 60) })).filter((l) => l.label && l.value),
+    features: features.map((f) => text(f, 'Fitur', 100)).filter(Boolean),
     cta_label,
     cta_kind: b.cta_kind,
     sort: b.sort ?? 0,

@@ -3,7 +3,7 @@
  * Helpers (authenticate, readJson, ok, HttpError) are injected by worker/index.js.
  */
 
-import { validatePlan } from '../src/business/plan-rules.js';
+import { validatePlan, validateReorder } from '../src/business/plan-rules.js';
 import { requireAdmin } from './office.js';
 
 const FIELDS = ['slug', 'name', 'tagline', 'price_idr', 'period', 'period_label', 'recommended', 'badge', 'limits', 'features', 'cta_label', 'cta_kind', 'sort', 'active'];
@@ -69,6 +69,17 @@ export async function handleAdminPlanCreate(request, env, deps) {
     ).bind(...cols(v), now, user.name));
   const row = await env.DB.prepare(`SELECT ${COLS} FROM subscription_plans WHERE slug = ?`).bind(v.slug).first();
   return ok(toPlan(row));
+}
+
+export async function handleAdminPlanReorder(request, env, deps) {
+  const { readJson, ok, HttpError } = deps;
+  const user = await requireAdmin(request, env, deps);
+  const body = await readJson(request);
+  const { results } = await env.DB.prepare('SELECT id FROM subscription_plans').all();
+  const ids = validated(HttpError, () => validateReorder(body.ids, results.map((r) => r.id)));
+  const now = new Date().toISOString();
+  await env.DB.batch(ids.map((id, i) => env.DB.prepare('UPDATE subscription_plans SET sort = ?, updated_at = ?, updated_by = ? WHERE id = ?').bind(i + 1, now, user.name, id)));
+  return ok(await list(env, ''));
 }
 
 export async function handleAdminPlanUpdate(request, env, deps, params) {

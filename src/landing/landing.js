@@ -313,10 +313,10 @@ function pricingHTML() {
       <header class="lp-head lp-head-center">
         <p class="eyebrow reveal">Harga</p>
         <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-price-title">Mulai gratis. <em>Naik kelas</em> saat tumbuh.</h2>
-        <p class="lp-lede reveal" style="--d: 120ms">Tiga paket untuk tiga tahap usaha. Pilih yang sesuai sekarang, pindah paket kapan saja.</p>
+        <p class="lp-lede reveal" id="lp-price-lede" style="--d: 120ms">Tiga paket untuk tiga tahap usaha. Pilih yang sesuai sekarang, pindah paket kapan saja.</p>
       </header>
       <div class="lp-tiers">${tiers}</div>
-      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}${esc(PRICING_NOTE)} <span id="lp-contact-note">Kontak penjualan Enterprise segera tersedia.</span></p>
+      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}<span id="lp-draft-note">${esc(PRICING_NOTE)} </span><span id="lp-contact-note">Kontak penjualan Enterprise segera tersedia.</span></p>
     </div>
   </section>`
 }
@@ -699,6 +699,9 @@ export function renderLanding(root, ctx = {}) {
   getPlans().then((plans) => {
     if (disposed || !plans?.length) return
     page.querySelector('.lp-tiers').replaceChildren(...plans.map(renderPlanCard))
+    // The built-in copy says "three plans" and "draft prices"; neither is true of live plans.
+    page.querySelector('#lp-price-lede').textContent = 'Pilih paket sesuai tahap usaha Anda. Pindah paket kapan saja.'
+    page.querySelector('#lp-draft-note').remove()
   }).catch(() => {})
 
   /* --- Counters (real counts only: stages, AI agents, data flows) --- */

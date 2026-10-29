@@ -4,7 +4,7 @@
  * Test seams (demo mode): `satualur_business_fail` = '1' makes reads fail; `satualur_business_delay` = ms delays admin reads.
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
-import { validatePlan } from './plan-rules.js'
+import { validatePlan, validateReorder } from './plan-rules.js'
 
 const DEMO_KEY = 'satualur_business_demo_v1'
 const FAIL_KEY = 'satualur_business_fail'
@@ -94,6 +94,20 @@ export async function adminCreatePlan(plan) {
   const row = await call('/api/office/admin/plans', { method: 'POST', body: plan })
   refreshPublic()
   return row
+}
+
+/** Rewrite `sort` as 1..n following `ids` (every plan id once) in one write. */
+export async function adminReorderPlans(ids) {
+  if (isUsingMockCloud()) {
+    const db = loadDemo()
+    validateReorder(ids, db.plans.map((p) => p.id))
+    db.plans.forEach((p) => { p.sort = ids.indexOf(p.id) + 1 })
+    localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+    return db.plans.sort(bySort)
+  }
+  const rows = await call('/api/office/admin/plans/reorder', { method: 'POST', body: { ids } })
+  refreshPublic()
+  return rows
 }
 
 /** Patch any fields of a plan (also used to reorder via `sort` and to deactivate via `active: 0`). */

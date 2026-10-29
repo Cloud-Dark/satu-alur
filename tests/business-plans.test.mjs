@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { validatePlan, formatPrice, PERIODS } from '../src/business/plan-rules.js'
+import { validatePlan, validateReorder, formatPrice, PERIODS } from '../src/business/plan-rules.js'
 
 const base = { slug: 'ukm', name: 'UKM', tagline: 'Untuk tim', price_idr: 349000, period: 'month', cta_label: 'Pilih', cta_kind: 'signup' }
 
@@ -49,6 +49,23 @@ test('validatePlan: at most 6 limits and 12 features, with length caps', () => {
   assert.equal(validatePlan({ ...base, features: f(12) }).features.length, 12)
   assert.throws(() => validatePlan({ ...base, features: f(13) }), /Maksimal 12 fitur/)
   assert.throws(() => validatePlan({ ...base, features: ['x'.repeat(101)] }), /maksimal 100/)
+})
+
+test('validatePlan: blank features and half-empty limit rows are dropped; non-arrays are refused', () => {
+  const p = validatePlan({ ...base, features: ['A', '  ', ''], limits: [{ label: 'L', value: 'v' }, { label: '', value: 'x' }, { label: 'y', value: '' }] })
+  assert.deepEqual(p.features, ['A'])
+  assert.deepEqual(p.limits, [{ label: 'L', value: 'v' }])
+  assert.throws(() => validatePlan({ ...base, limits: 'x' }), /Format batasan tidak valid\./)
+  assert.throws(() => validatePlan({ ...base, features: {} }), /Format fitur tidak valid\./)
+  assert.equal(validatePlan({ ...base, limits: undefined }).limits.length, 0)
+})
+
+test('validateReorder: needs every existing id exactly once', () => {
+  assert.deepEqual(validateReorder([3, 1, 2], [1, 2, 3]), [3, 1, 2])
+  assert.throws(() => validateReorder([1, 1, 2], [1, 2, 3]), /Urutan paket tidak valid/)
+  assert.throws(() => validateReorder([1, 2], [1, 2, 3]), /semua paket/)
+  assert.throws(() => validateReorder('x', [1]), /tidak valid/)
+  assert.throws(() => validateReorder([1, 4], [1, 2]), /semua paket/)
 })
 
 test('validatePlan: tags every failure as a validation error', () => {
