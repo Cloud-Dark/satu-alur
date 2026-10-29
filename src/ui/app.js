@@ -20,6 +20,7 @@ const ROUTES = {
 }
 
 let currentUser = null
+let currentIsAdmin = false
 let cleanup = null
 let rootEl = null
 
@@ -59,14 +60,17 @@ function render() {
 
   const ctx = {
     user: currentUser,
+    isAdmin: currentIsAdmin,
     navigate,
-    onSignedIn(user) {
+    async onSignedIn(user) {
       currentUser = user
+      await loadAdmin()
       navigate('/app')
     },
     async signOut() {
       await signOut()
       currentUser = null
+      currentIsAdmin = false
       navigate('/')
     },
   }
@@ -74,6 +78,11 @@ function render() {
   if (cleanup && typeof cleanup.then === 'function') {
     cleanup.then((fn) => { cleanup = fn || null })
   }
+}
+
+// UX only: the worker enforces admin rights on every /api/office/admin call.
+async function loadAdmin() {
+  try { currentIsAdmin = (await getSession()).data?.is_admin === true } catch { currentIsAdmin = false }
 }
 
 export async function mountApp(root) {
@@ -89,6 +98,7 @@ export async function mountApp(root) {
   try {
     const { data: session } = await getSession()
     currentUser = session?.user ?? null
+    currentIsAdmin = session?.is_admin === true
   } catch {
     currentUser = null
   }
@@ -97,10 +107,12 @@ export async function mountApp(root) {
   render()
 
   try {
-    onAuthStateChange((_event, session) => {
+    onAuthStateChange(async (_event, session) => {
       const next = session?.user ?? null
       const changed = (next?.id ?? null) !== (currentUser?.id ?? null)
       currentUser = next
+      if (next) await loadAdmin()
+      else currentIsAdmin = false
       // The login page shows its own success state and navigates via ctx.onSignedIn.
       if (changed && !(next && currentPath() === '/masuk')) render()
     })

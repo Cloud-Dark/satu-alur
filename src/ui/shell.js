@@ -26,6 +26,7 @@ import * as StageLeads from '../stages/leads.js'
 import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
+import * as StageOffice from '../stages/office.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
@@ -57,6 +58,8 @@ export const STAGES = [
     action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
   { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
+  { key: 'office', group: 'growth', label: 'Kantor Satu Alur', sub: 'Influencer & permintaan', icon: 'users', module: StageOffice, adminOnly: true,
+    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 ]
 
 const STAGE_KEY = 'satualur_stage'
@@ -77,6 +80,7 @@ function initials(user) {
 
 export function renderShell(root, ctx) {
   const user = ctx.user || {}
+  const stages = STAGES.filter((s) => !s.adminOnly || ctx.isAdmin)
   const prevTitle = document.title
   const isMock = isUsingMockCloud()
   const mq = window.matchMedia(DESKTOP)
@@ -87,7 +91,7 @@ export function renderShell(root, ctx) {
   }
 
   let current = store.get(sessionStorage, STAGE_KEY)
-  if (!STAGES.some((s) => s.key === current)) current = 'dashboard'
+  if (!stages.some((s) => s.key === current)) current = 'dashboard'
   let viewCtl = null
   let lastFocus = null
 
@@ -142,7 +146,7 @@ export function renderShell(root, ctx) {
     try { await ctx.signOut() } finally { signOutBtn.disabled = false }
   })
 
-  const [dash, ...rest] = STAGES
+  const [dash, ...rest] = stages
   const flow = rest.filter((s) => !s.group)
   const growth = rest.filter((s) => s.group === 'growth')
   const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': 'Navigasi alur' },
@@ -353,7 +357,7 @@ export function renderShell(root, ctx) {
   }
 
   async function show(key, params = {}, { focus = false } = {}) {
-    const stage = STAGES.find((s) => s.key === key) || STAGES[0]
+    const stage = stages.find((s) => s.key === key) || stages[0]
     viewCtl?.abort()
     viewCtl = new AbortController()
     const signal = viewCtl.signal
