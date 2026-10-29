@@ -11,12 +11,13 @@ const DEMO_KEY = 'satualur_site_demo_v1'
 const FAIL_KEY = 'satualur_site_fail'
 const token = () => { try { return localStorage.getItem('satualur_token') } catch { return null } }
 
-async function call(path, { method = 'GET', body } = {}) {
+async function call(path, { method = 'GET', body, cache } = {}) {
   let res
   try {
     res = await fetch(path, {
       method,
       credentials: 'same-origin',
+      ...(cache ? { cache } : {}),
       headers: {
         ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
         ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
@@ -45,7 +46,7 @@ export async function loadSite(key) {
     return { value: row?.value ?? null, updated_at: row?.updated_at ?? null, updated_by: row?.updated_by ?? null }
   }
   try {
-    const row = await call(`/api/site/${encodeURIComponent(key)}`)
+    const row = await call(`/api/site/${encodeURIComponent(key)}`, { cache: 'no-store' })
     return row && typeof row === 'object' ? row : { value: null }
   } catch (e) {
     throw new Error(`Gagal memuat konten. ${e.message}`)
@@ -76,5 +77,8 @@ export async function saveSite(key, value) {
     localStorage.setItem(DEMO_KEY, JSON.stringify(all))
     return { key, ...all[key] }
   }
-  return call(`/api/office/admin/site/${encodeURIComponent(key)}`, { method: 'PUT', body: { value } })
+  const saved = await call(`/api/office/admin/site/${encodeURIComponent(key)}`, { method: 'PUT', body: { value } })
+  // The public GET is cached for 60 s; refresh this browser's copy so the landing and doc pages show the save.
+  fetch(`/api/site/${encodeURIComponent(key)}`, { cache: 'reload' }).catch(() => {})
+  return saved
 }

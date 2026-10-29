@@ -14,7 +14,9 @@ function parseKey(params, HttpError) {
 async function readRow(env, key) {
   const row = await env.DB.prepare('SELECT value_json, updated_at, updated_by FROM site_content WHERE key = ?').bind(key).first();
   if (!row) return { key, value: null };
-  return { key, value: JSON.parse(row.value_json), updated_at: row.updated_at, updated_by: row.updated_by };
+  let value = null
+  try { value = JSON.parse(row.value_json) } catch { /* corrupt row: let the admin overwrite it */ }
+  return { key, value, updated_at: row.updated_at, updated_by: row.updated_by };
 }
 
 export async function handleSiteGet(request, env, { ok, HttpError }, params) {

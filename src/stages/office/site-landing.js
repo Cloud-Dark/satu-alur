@@ -79,7 +79,7 @@ export async function draw(host, ctx, setDirty) {
     const points = state.points.map((p, i) => {
       const f = C.field({ label: `Poin ${i + 1}`, id: `of-ld-pt${i}-${id}`, value: p, attrs: { maxlength: '60' } })
       f.input.addEventListener('input', () => { state.points[i] = f.input.value; redraw(); touch() })
-      const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus poin ${i + 1}` })
+      const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus poin ${i + 1}`, disabled: state.points.length <= 1, title: state.points.length <= 1 ? 'Minimal satu poin; kosong berarti memakai bawaan.' : undefined })
       rm.addEventListener('click', () => { state.points.splice(i, 1); rebuild(state.points.length ? `[id^=of-ld-pt${Math.min(i, state.points.length - 1)}-]` : '.of-add-point') })
       return el('div', { className: 'of-row' }, f.wrap, rm)
     })
@@ -92,14 +92,14 @@ export async function draw(host, ctx, setDirty) {
       q.input.addEventListener('input', () => { fq.q = q.input.value; touch() })
       a.input.addEventListener('input', () => { fq.a = a.input.value; touch() })
       const act = (label, disabled, fn) => {
-        const b = C.button({ label, variant: 'ghost', size: 'sm', disabled, 'aria-label': `${label} FAQ ${i + 1}` })
+        const b = C.button({ label, variant: 'ghost', size: 'sm', disabled, 'aria-label': `${label} FAQ ${i + 1}`, title: disabled && label === 'Hapus' ? 'Minimal satu FAQ; kosong berarti memakai bawaan.' : undefined })
         b.addEventListener('click', fn)
         return b
       }
       const swap = (j) => () => { [state.faqs[i], state.faqs[j]] = [state.faqs[j], state.faqs[i]]; rebuild(`[id^=of-ld-q${j}-]`) }
       return el('article', { className: 'of-faq' }, q.wrap, a.wrap, el('div', { className: 'of-row-actions' },
         act('Naik', i === 0, swap(i - 1)), act('Turun', i === state.faqs.length - 1, swap(i + 1)),
-        act('Hapus', false, () => { state.faqs.splice(i, 1); rebuild('[id^=of-ld-q' + Math.max(0, Math.min(i, state.faqs.length - 1)) + '-]') })))
+        act('Hapus', state.faqs.length <= 1, () => { state.faqs.splice(i, 1); rebuild('[id^=of-ld-q' + Math.max(0, Math.min(i, state.faqs.length - 1)) + '-]') })))
     })
     const addFaq = C.button({ label: 'Tambah FAQ', icon: 'plus', variant: 'soft', size: 'sm', disabled: state.faqs.length >= MAX_FAQS })
     addFaq.addEventListener('click', () => { state.faqs.push({ q: '', a: '' }); rebuild(`[id^=of-ld-q${state.faqs.length - 1}-]`) })

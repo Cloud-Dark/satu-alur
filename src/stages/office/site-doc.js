@@ -43,7 +43,7 @@ async function drawDoc(host, ctx, setDirty, key) {
     try {
       row = await saveSite(key, clean)
       saved = snap()
-      touch()
+      if (host.dataset.doc === mine) touch()
       stamp.textContent = stampLine(row)
       showToast('Halaman tersimpan.', 'success')
     } catch (ex) { err.textContent = ex.message } finally { restore() }

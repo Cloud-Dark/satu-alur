@@ -64,6 +64,10 @@ export async function render(container, ctx) {
     show()
   }
 
+  const onUnload = (e) => { if (dirty) { e.preventDefault(); e.returnValue = '' } }
+  window.addEventListener('beforeunload', onUnload)
+  ctx.signal.addEventListener('abort', () => window.removeEventListener('beforeunload', onUnload))
+
   container.replaceChildren(
     C.pageHeader({ title: 'Kantor Satu Alur', description: 'Kelola konten situs, influencer, dan permintaan dari bisnis.' }),
     mobile, el('div', { className: 'of-layout' }, nav, host))
