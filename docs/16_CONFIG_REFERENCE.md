@@ -130,7 +130,7 @@ npx wrangler r2 bucket create satu-alur-media
 
 Untuk `wrangler dev` lokal, taruh secret di `.dev.vars` (jangan di-commit).
 
-Token Meta tidak pernah dikirim ke klien atau ditulis ke log. Tabel `social_accounts` tidak ada di whitelist `/api/db`; `social_schedules` hanya bisa dibaca lewat `/api/db` (semua penulisan lewat `/api/social/*`).
+Token Meta tidak pernah dikirim ke klien atau ditulis ke log. Tabel `social_accounts` tidak ada di whitelist `/api/db`; baris publikasi Meta ada di tabel `social_posts` (migrasi `0007_social_meta.sql`), yang hanya bisa dibaca lewat `/api/db` (semua penulisan lewat `/api/social/*`). Tabel `social_schedules` tetap catatan bebas halaman Media sosial dan tidak pernah diproses cron.
 
 ### Menyiapkan aplikasi Meta
 

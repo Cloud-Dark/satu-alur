@@ -81,8 +81,11 @@ const TABLES = {
     json: ['meta_json'],
   },
   social_schedules: {
+    columns: ['id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'created_at'],
+  },
+  social_posts: {
     columns: [
-      'id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'content_id', 'image_key', 'page_id',
+      'id', 'owner_id', 'content_id', 'platform', 'content', 'image_key', 'page_id', 'scheduled_at', 'status',
       'platform_post_id', 'permalink', 'error', 'attempts', 'published_at', 'claimed_at', 'created_at',
     ],
   },
@@ -99,7 +102,7 @@ const TABLES = {
 };
 // social_accounts is deliberately absent from TABLES (it holds Page tokens).
 // Tables /api/db may only select from; writes go through /api/social/*.
-const READ_ONLY_TABLES = new Set(['social_schedules']);
+const READ_ONLY_TABLES = new Set(['social_posts']);
 // Columns the client may never set directly.
 const PROTECTED_COLUMNS = new Set(['id', 'owner_id']);
 

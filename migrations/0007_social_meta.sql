@@ -15,17 +15,29 @@ CREATE TABLE IF NOT EXISTS social_accounts (
 
 ALTER TABLE social_contents ADD COLUMN image_key TEXT;
 
+-- One row per platform per publish/schedule. Kept apart from social_schedules,
+-- which the "Media sosial" stage uses as free-form notes (the cron must never see those).
 -- Status: scheduled | publishing | posted | failed | cancelled
-ALTER TABLE social_schedules ADD COLUMN content_id INTEGER;
-ALTER TABLE social_schedules ADD COLUMN image_key TEXT;
-ALTER TABLE social_schedules ADD COLUMN page_id TEXT;
-ALTER TABLE social_schedules ADD COLUMN platform_post_id TEXT;
-ALTER TABLE social_schedules ADD COLUMN permalink TEXT;
-ALTER TABLE social_schedules ADD COLUMN error TEXT;
-ALTER TABLE social_schedules ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE social_schedules ADD COLUMN published_at TEXT;
-ALTER TABLE social_schedules ADD COLUMN claimed_at TEXT;
-CREATE INDEX IF NOT EXISTS idx_social_schedules_due ON social_schedules(status, scheduled_at);
+CREATE TABLE IF NOT EXISTS social_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_id TEXT NOT NULL,
+  content_id INTEGER,
+  platform TEXT NOT NULL,
+  content TEXT NOT NULL,
+  image_key TEXT,
+  page_id TEXT,
+  scheduled_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'scheduled',
+  platform_post_id TEXT,
+  permalink TEXT,
+  error TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  published_at TEXT,
+  claimed_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_social_posts_owner_id ON social_posts(owner_id);
+CREATE INDEX IF NOT EXISTS idx_social_posts_due ON social_posts(status, scheduled_at);
 
 -- Global influencer catalogue, written by the office (admins) only.
 CREATE TABLE IF NOT EXISTS influencers (
