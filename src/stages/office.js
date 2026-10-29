@@ -29,7 +29,6 @@ function payloadPairs(r) {
 
 function influencerDialog(ctx, inf, opener, onSaved) {
   const id = ++seq
-  const dialog = el('dialog', { className: 'sm-dialog', 'aria-labelledby': `of-inf-title-${id}` })
   const v = inf || {}
   const f = (label, key, extra = {}) => C.field({ label, id: `of-inf-${key}-${id}`, value: v[key] ?? '', ...extra })
   const name = f('Nama', 'name', { required: true })
@@ -43,16 +42,18 @@ function influencerDialog(ctx, inf, opener, onSaved) {
   const showPhoto = () => { const u = photoKey ? Social.mediaUrl(photoKey) : ''; preview.hidden = !u; if (u) preview.src = u }
   showPhoto()
   const file = C.field({ label: 'Foto', id: `of-inf-photo-${id}`, type: 'file', attrs: { accept: 'image/*' } })
-  const visible = el('input', { type: 'checkbox', id: `of-inf-visible-${id}`, checked: v.visible !== 0 })
+  const vis = C.choiceGroup({ legend: 'Visibilitas', name: `of-inf-visible-${id}`,
+    options: [{ value: 'on', label: 'Tampilkan di katalog', checked: v.visible !== 0, hint: 'Bisnis hanya melihat influencer yang ditampilkan.' }] })
+  const visible = vis.inputs.on
   const err = el('p', { className: 'field-error', role: 'alert' })
   const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary', type: 'submit' })
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
-  const form = el('form', { className: 'form', method: 'dialog', noValidate: true },
-    el('h2', { id: `of-inf-title-${id}` }, inf ? `Ubah ${inf.name}` : 'Tambah influencer'),
-    name.wrap, niche.wrap, city.wrap, ig.wrap, tt.wrap, bio.wrap, file.wrap, preview,
-    el('label', { htmlFor: `of-inf-visible-${id}` }, visible, ' Tampilkan di katalog'),
-    err, el('div', { className: 'form-actions' }, cancel, save))
-  dialog.append(form)
+  const { form, close } = C.modal({
+    title: inf ? `Ubah ${inf.name}` : 'Tambah influencer',
+    children: [name.wrap, el('div', { className: 'form-row' }, niche.wrap, city.wrap), el('div', { className: 'form-row' }, ig.wrap, tt.wrap),
+      bio.wrap, file.wrap, preview, vis.wrap, err],
+    actions: [cancel, save], opener,
+  })
   file.input.addEventListener('change', async () => {
     const f0 = file.input.files[0]
     if (!f0) return
@@ -60,8 +61,7 @@ function influencerDialog(ctx, inf, opener, onSaved) {
     save.disabled = true
     try { photoKey = await Social.uploadImage((await toJpeg(f0)).blob); showPhoto() } catch (ex) { err.textContent = ex.message } finally { save.disabled = false }
   })
-  cancel.addEventListener('click', () => dialog.close())
-  dialog.addEventListener('close', () => { dialog.remove(); opener.focus() })
+  cancel.addEventListener('click', close)
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     err.textContent = ''
@@ -74,13 +74,11 @@ function influencerDialog(ctx, inf, opener, onSaved) {
     const restore = C.setBusy(save, 'Menyimpan…')
     try {
       await Social.adminSaveInfluencer(row)
-      dialog.close()
+      close()
       showToast('Influencer tersimpan.', 'success')
       if (!ctx.signal.aborted) onSaved()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
-  document.body.append(dialog)
-  dialog.showModal()
 }
 
 function drawInfluencers(ctx, host) {

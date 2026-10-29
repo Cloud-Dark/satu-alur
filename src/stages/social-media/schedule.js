@@ -16,38 +16,35 @@ function localMin() {
 
 function openDialog(ctx, item, opener) {
   const id = ++seq
-  const dialog = el('dialog', { className: 'sm-dialog', 'aria-labelledby': `sm-dlg-title-${id}` })
-  const date = C.field({ label: 'Tanggal dan waktu', id: `sm-when-${id}`, type: 'datetime-local', attrs: { min: localMin() } })
+  const date = C.field({ label: 'Tanggal dan waktu', id: `sm-when-${id}`, type: 'datetime-local', required: true,
+    hint: 'Tayang dalam ± 5 menit dari waktu yang dipilih.', attrs: { min: localMin() } })
   const dateErr = el('p', { className: 'field-error', role: 'alert', id: `sm-when-${id}-err` })
-  date.input.setAttribute('aria-describedby', dateErr.id)
+  date.input.setAttribute('aria-describedby', `${date.input.getAttribute('aria-describedby')} ${dateErr.id}`)
   const platErr = el('p', { className: 'field-error', role: 'alert' })
   const save = C.button({ label: 'Simpan jadwal', icon: 'calendar', variant: 'primary', type: 'submit' })
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
-  const checks = {}
   const reconnect = Boolean(ctx.account?.needs_reconnect)
   const platforms = reconnect ? [] : connectedPlatforms(ctx.account)
   if (reconnect) platErr.textContent = RECONNECT
   const ig = igEligibility({ hasImage: Boolean(item.image_key), width: item.meta_json?.width ?? 1, height: item.meta_json?.height ?? 1, caption: item.body })
-  const boxes = platforms.map((p) => {
-    const input = el('input', { type: 'checkbox', id: `sm-dlg-${p}-${id}`, value: p })
-    const hint = el('span', { className: 'field-hint', id: `${input.id}-hint` })
-    input.setAttribute('aria-describedby', hint.id)
-    hint.textContent = platformReason(ctx.account, p, ig)
-    input.disabled = Boolean(hint.textContent)
-    checks[p] = input
-    return el('div', {}, el('label', { className: 'check-row', htmlFor: input.id }, input, PLATFORM_LABEL[p]), ' ', hint)
-  })
+  const group = C.choiceGroup({ legend: 'Platform', name: `sm-dlg-plat-${id}`, required: true, options: platforms.map((p) => {
+    const reason = platformReason(ctx.account, p, ig)
+    return { value: p, label: PLATFORM_LABEL[p], disabled: Boolean(reason), hint: reason || undefined }
+  }) })
+  const checks = group.inputs
   const goAkun = C.button({ label: 'Hubungkan akun di tab Akun untuk menjadwalkan.', variant: 'ghost', size: 'sm', type: 'button' })
-  goAkun.addEventListener('click', () => { dialog.close(); ctx.goto('account') })
-  const form = el('form', { className: 'form', method: 'dialog' },
-    el('h2', { id: `sm-dlg-title-${id}` }, 'Jadwalkan tayang'),
-    el('p', { className: 'workspace-preview' }, item.body.slice(0, 120)),
-    date.wrap, dateErr, el('p', { className: 'field-hint' }, 'Tayang dalam ± 5 menit dari waktu yang dipilih.'),
-    platforms.length ? el('fieldset', { className: 'sm-platforms' }, el('legend', { className: 'field-label' }, 'Platform'), ...boxes) : (ctx.account ? null : goAkun),
-    platErr, el('div', { className: 'form-actions' }, cancel, platforms.length ? save : null))
-  dialog.append(form)
-  cancel.addEventListener('click', () => dialog.close())
-  dialog.addEventListener('close', () => { dialog.remove(); opener.focus() })
+  const { form, close } = C.modal({
+    title: 'Jadwalkan tayang',
+    children: [
+      el('p', { className: 'workspace-preview' }, item.body.slice(0, 120)),
+      date.wrap, dateErr,
+      platforms.length ? group.wrap : (ctx.account ? null : goAkun),
+      platErr,
+    ],
+    actions: [cancel, platforms.length ? save : null], opener,
+  })
+  goAkun.addEventListener('click', () => { close(); ctx.goto('account') })
+  cancel.addEventListener('click', close)
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     dateErr.textContent = ''
@@ -61,12 +58,10 @@ function openDialog(ctx, item, opener) {
     const restore = C.setBusy(save, 'Menyimpan…')
     try {
       await Social.schedulePost(item.id, chosen, iso)
-      dialog.close()
+      close()
       showToast('Jadwal tersimpan.', 'success')
     } catch (err) { dateErr.textContent = err.message } finally { restore() }
   })
-  document.body.append(dialog)
-  dialog.showModal()
 }
 
 export async function render(host, ctx) {

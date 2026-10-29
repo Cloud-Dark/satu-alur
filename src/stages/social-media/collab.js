@@ -9,19 +9,20 @@ let seq = 0
 
 function openDialog(ctx, inf, opener, onSent) {
   const id = ++seq
-  const dialog = el('dialog', { className: 'sm-dialog', 'aria-labelledby': `sm-collab-title-${id}` })
-  const campaign = C.textarea({ label: 'Ceritakan kampanye Anda', id: `sm-collab-campaign-${id}`, required: true })
+  const campaign = C.textarea({ label: 'Ceritakan kampanye Anda', id: `sm-collab-campaign-${id}`, required: true,
+    placeholder: 'Tujuan, produk yang dipromosikan, dan jenis konten yang diinginkan' })
   const budget = C.field({ label: 'Kisaran anggaran', id: `sm-collab-budget-${id}`, required: true, placeholder: 'Rp2–5 juta' })
   const timing = C.field({ label: 'Waktu kampanye', id: `sm-collab-timing-${id}`, required: true, placeholder: 'Desember 2026' })
   const err = el('p', { className: 'field-error', role: 'alert' })
   const send = C.button({ label: 'Kirim permintaan', icon: 'message', variant: 'primary', type: 'submit' })
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
-  const form = el('form', { className: 'form', method: 'dialog', noValidate: true },
-    el('h2', { id: `sm-collab-title-${id}` }, `Ajukan kolaborasi dengan ${inf.name}`),
-    campaign.wrap, budget.wrap, timing.wrap, err, el('div', { className: 'form-actions' }, cancel, send))
-  dialog.append(form)
-  cancel.addEventListener('click', () => dialog.close())
-  dialog.addEventListener('close', () => { dialog.remove(); opener.focus() })
+  const { form, close } = C.modal({
+    title: `Ajukan kolaborasi dengan ${inf.name}`,
+    description: 'Tim Satu Alur akan menghubungi Anda untuk mengatur kerja sama.',
+    children: [campaign.wrap, el('div', { className: 'form-row' }, budget.wrap, timing.wrap), err],
+    actions: [cancel, send], opener,
+  })
+  cancel.addEventListener('click', close)
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     err.textContent = ''
@@ -32,13 +33,11 @@ function openDialog(ctx, inf, opener, onSent) {
     const restore = C.setBusy(send, 'Mengirim…')
     try {
       await Social.sendRequest(body)
-      dialog.close()
+      close()
       showToast(SENT, 'success')
       if (!ctx.signal.aborted) onSent()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
-  document.body.append(dialog)
-  dialog.showModal()
 }
 
 function card(ctx, inf, onSent) {
