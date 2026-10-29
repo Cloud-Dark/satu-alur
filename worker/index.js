@@ -839,7 +839,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const LEAD_DEPS = { authenticate, readJson, ok, HttpError };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
@@ -850,16 +850,16 @@ const ROUTES = {
   'POST /api/db': handleDb,
   'GET /api/llm/models': handleModels,
   'POST /api/llm/chat': handleChat,
-  'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, LEAD_DEPS),
-  'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, LEAD_DEPS),
-  'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, LEAD_DEPS),
-  'GET /api/social/account': (req, env) => handleSocialAccount(req, env, LEAD_DEPS),
-  'DELETE /api/social/account': (req, env) => handleSocialDisconnect(req, env, LEAD_DEPS),
-  'POST /api/social/oauth/start': (req, env) => handleSocialOauthStart(req, env, LEAD_DEPS),
+  'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, ROUTE_DEPS),
+  'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, ROUTE_DEPS),
+  'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, ROUTE_DEPS),
+  'GET /api/social/account': (req, env) => handleSocialAccount(req, env, ROUTE_DEPS),
+  'DELETE /api/social/account': (req, env) => handleSocialDisconnect(req, env, ROUTE_DEPS),
+  'POST /api/social/oauth/start': (req, env) => handleSocialOauthStart(req, env, ROUTE_DEPS),
   'GET /api/social/oauth/callback': handleSocialOauthCallback,
-  'GET /api/social/oauth/pages': (req, env) => handleSocialOauthPages(req, env, LEAD_DEPS),
-  'POST /api/social/oauth/pick': (req, env) => handleSocialOauthPick(req, env, LEAD_DEPS),
-  'POST /api/social/media': (req, env) => handleSocialMediaUpload(req, env, LEAD_DEPS),
+  'GET /api/social/oauth/pages': (req, env) => handleSocialOauthPages(req, env, ROUTE_DEPS),
+  'POST /api/social/oauth/pick': (req, env) => handleSocialOauthPick(req, env, ROUTE_DEPS),
+  'POST /api/social/media': (req, env) => handleSocialMediaUpload(req, env, ROUTE_DEPS),
   'GET /api/media/:key': handleMediaGet,
 };
 

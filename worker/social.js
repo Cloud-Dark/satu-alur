@@ -25,7 +25,18 @@ const CACHE_HOST = 'https://social-cache.satu-alur.internal';
 const isConfigured = (env) => Boolean(env.META_APP_ID && env.META_APP_SECRET && env.TOKEN_KEY && env.PUBLIC_BASE_URL);
 const redirectUri = (env) => `${env.PUBLIC_BASE_URL}/api/social/oauth/callback`;
 const appUrl = (env, query) => `${env.PUBLIC_BASE_URL || ''}/#/social-media?${query}`;
-const redirect = (location) => new Response(null, { status: 302, headers: { location, 'cache-control': 'no-store' } });
+// Binds the OAuth state to the browser that started it (login CSRF). One-shot: every callback clears it.
+const NONCE_COOKIE = '__Host-social_nonce';
+const nonceCookie = (value, maxAge) => `${NONCE_COOKIE}=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+function cookieNonce(request) {
+  const m = new RegExp(`(?:^|;\\s*)${NONCE_COOKIE}=([0-9a-f]{32})(?:;|$)`).exec(request.headers.get('cookie') || '');
+  return m ? m[1] : null;
+}
+// Only the callback redirects, so every redirect also clears the nonce cookie.
+const redirect = (location) => new Response(null, {
+  status: 302,
+  headers: { location, 'cache-control': 'no-store', 'set-cookie': nonceCookie('', 0) },
+});
 const redirectError = (env, message) => redirect(appUrl(env, `social_error=${encodeURIComponent(message)}`));
 
 function randomHex(nBytes) {
@@ -116,8 +127,11 @@ export async function handleSocialDisconnect(request, env, { authenticate, ok })
 export async function handleSocialOauthStart(request, env, { authenticate, ok, HttpError }) {
   const { user } = await authenticate(request, env);
   requireConfigured(env, HttpError);
-  const state = await signState({ ownerId: user.id, exp: Date.now() + STATE_TTL_MS }, env.META_APP_SECRET);
-  return ok({ url: oauthUrl({ appId: env.META_APP_ID, redirectUri: redirectUri(env), state }) });
+  const nonce = randomHex(16);
+  const state = await signState({ ownerId: user.id, exp: Date.now() + STATE_TTL_MS, nonce }, env.META_APP_SECRET);
+  const res = ok({ url: oauthUrl({ appId: env.META_APP_ID, redirectUri: redirectUri(env), state }) });
+  res.headers.append('set-cookie', nonceCookie(nonce, STATE_TTL_MS / 1000));
+  return res;
 }
 
 export async function handleSocialOauthCallback(request, env) {
@@ -126,7 +140,7 @@ export async function handleSocialOauthCallback(request, env) {
   if (q.get('error') || !code) return redirectError(env, 'Koneksi dibatalkan.');
   if (!isConfigured(env)) return redirectError(env, 'Integrasi Meta belum dikonfigurasi.');
   const st = await verifyState(q.get('state'), env.META_APP_SECRET);
-  if (!st) return redirectError(env, 'Sesi koneksi kedaluwarsa, coba lagi.');
+  if (!st || !st.nonce || cookieNonce(request) !== st.nonce) return redirectError(env, 'Sesi koneksi kedaluwarsa, coba lagi.');
 
   let pages;
   try {

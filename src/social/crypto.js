@@ -25,8 +25,8 @@ export async function decryptToken(blob, keyB64) {
   return dec.decode(pt)
 }
 
-export async function signState({ ownerId, exp }, secret) {
-  const payload = b64url(enc.encode(JSON.stringify({ ownerId, exp })))
+export async function signState({ ownerId, exp, nonce }, secret) {
+  const payload = b64url(enc.encode(JSON.stringify({ ownerId, exp, nonce })))
   const sig = await crypto.subtle.sign('HMAC', await hmacKey(secret), enc.encode(payload))
   return `${payload}.${b64url(sig)}`
 }
@@ -37,9 +37,9 @@ export async function verifyState(state, secret, now = Date.now()) {
     if (!payload || !sig || extra !== undefined) return null
     // crypto.subtle.verify compares in constant time.
     if (!(await crypto.subtle.verify('HMAC', await hmacKey(secret), unb64url(sig), enc.encode(payload)))) return null
-    const { ownerId, exp } = JSON.parse(dec.decode(unb64url(payload)))
+    const { ownerId, exp, nonce } = JSON.parse(dec.decode(unb64url(payload)))
     if (typeof ownerId !== 'string' || !ownerId || !(Number(exp) >= now)) return null
-    return { ownerId }
+    return { ownerId, nonce: typeof nonce === 'string' ? nonce : null }
   } catch {
     return null
   }
