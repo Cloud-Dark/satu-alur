@@ -3,6 +3,7 @@ import { renderLanding } from '../landing/landing.js'
 import { renderLoginPage } from '../auth/login-page.js'
 import { renderStaffLogin } from '../auth/staff-login.js'
 import { renderShell } from './shell.js'
+import { renderDocPage } from '../site/doc-page.js'
 
 /**
  * Hash router:
@@ -23,6 +24,10 @@ const ROUTES = {
   '/': renderLanding,
   '/masuk': renderLoginPage,
   '/app': renderShell,
+  '/tentang': (root, ctx) => renderDocPage(root, ctx, 'about'),
+  '/privasi': (root, ctx) => renderDocPage(root, ctx, 'privacy'),
+  '/syarat': (root, ctx) => renderDocPage(root, ctx, 'terms'),
+  '/cookie': (root, ctx) => renderDocPage(root, ctx, 'cookies'),
   [STAFF_PATH]: renderStaffLogin,
 }
 

@@ -15,6 +15,8 @@ import { observeReveal, prefersReducedMotion } from '../ui/reveal.js'
 import { mountFlowScene } from '../three/flow-scene.js'
 import { mountAgentDemo } from './terminal.js'
 import { PRICING_TIERS, PRICING_NOTE } from './pricing.js'
+import { getSite } from '../site/api.js'
+import { renderHero } from '../site/hero.js'
 import { NAV, HERO_POINTS, STAGES, TICKER, FEATURES, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -392,13 +394,14 @@ function footerHTML() {
             ['FAQ', 'href="#faq" data-scroll="faq"'],
           ])}
           ${col('Perusahaan', [
-            ['Tentang kami', 'href="#" data-placeholder aria-disabled="true"'],
+            ['Tentang kami', 'href="#/tentang"'],
             ['Roadmap', 'href="#ide-besar" data-scroll="ide-besar"'],
             ['Kontak', 'href="#" data-placeholder aria-disabled="true"'],
           ])}
           ${col('Legal', [
-            ['Kebijakan privasi', 'href="#" data-placeholder aria-disabled="true"'],
-            ['Syarat & ketentuan', 'href="#" data-placeholder aria-disabled="true"'],
+            ['Kebijakan privasi', 'href="#/privasi"'],
+            ['Syarat & ketentuan', 'href="#/syarat"'],
+            ['Kebijakan cookie', 'href="#/cookie"'],
           ])}
         </div>
       </div>
@@ -653,14 +656,41 @@ export function renderLanding(root, ctx = {}) {
   menu.querySelectorAll('a[href^="#/"]').forEach((a) => on(a, 'click', () => closeMenu(false)))
 
   /* --- FAQ accordion (height animates via grid rows in CSS) --- */
-  page.querySelectorAll('[data-faq]').forEach((btn) => {
-    on(btn, 'click', () => {
-      const open = btn.getAttribute('aria-expanded') === 'true'
-      const panel = document.getElementById(btn.getAttribute('aria-controls'))
-      btn.setAttribute('aria-expanded', String(!open))
-      btn.closest('.lp-faq-item').classList.toggle('is-open', !open)
-      panel.inert = open
-    })
+  // Delegated, so FAQ rows swapped in from the API keep working.
+  const faqList = page.querySelector('.lp-faq')
+  on(faqList, 'click', (e) => {
+    const btn = e.target.closest('[data-faq]')
+    if (!btn) return
+    const open = btn.getAttribute('aria-expanded') === 'true'
+    const panel = document.getElementById(btn.getAttribute('aria-controls'))
+    btn.setAttribute('aria-expanded', String(!open))
+    btn.closest('.lp-faq-item').classList.toggle('is-open', !open)
+    panel.inert = open
+  })
+
+  /* --- Editable content: defaults are already rendered; swap in stored fields (text nodes only) --- */
+  let disposed = false
+  getSite('landing').then((row) => {
+    const v = row?.value
+    if (disposed || !v) return
+    renderHero(page.querySelector('.lp-hero-copy'), v.hero)
+    const faqs = (Array.isArray(v.faqs) ? v.faqs : []).filter((f) => f && typeof f.q === 'string' && typeof f.a === 'string' && f.q.trim() && f.a.trim())
+    if (!faqs.length) return
+    faqList.replaceChildren(...faqs.map((f, i) => {
+      const item = document.createElement('div')
+      item.className = 'lp-faq-item'
+      item.innerHTML = `
+        <h3 class="lp-faq-q">
+          <button type="button" id="faq-q-${i}" aria-expanded="false" aria-controls="faq-a-${i}" data-faq>
+            <span class="lp-faq-text"></span>
+            <span class="lp-faq-icon" aria-hidden="true">${iconHTML('plus', { size: 16, stroke: 2 })}</span>
+          </button>
+        </h3>
+        <div class="lp-faq-a" id="faq-a-${i}" role="region" aria-labelledby="faq-q-${i}" inert><div><p></p></div></div>`
+      item.querySelector('.lp-faq-text').textContent = f.q.trim()
+      item.querySelector('p').textContent = f.a.trim()
+      return item
+    }))
   })
 
   /* --- Counters (real counts only: stages, AI agents, data flows) --- */
@@ -690,7 +720,6 @@ export function renderLanding(root, ctx = {}) {
   disposers.push(observeReveal(page))
   disposers.push(mountAgentDemo(page.querySelector('[data-agent]'), AGENT_DEMO))
 
-  let disposed = false
   let sceneCleanup = null
   mountFlowScene(page.querySelector('[data-scene]'), { highlight: 1 })
     .then((fn) => { if (disposed) fn?.(); else sceneCleanup = fn })
