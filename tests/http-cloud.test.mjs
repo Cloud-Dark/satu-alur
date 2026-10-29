@@ -154,6 +154,26 @@ test('auth: wrong OTP throws the server message', async () => {
   assert.equal(localStorage.getItem('satualur_token'), null)
 })
 
+test('auth: a 403 "ditangguhkan" on any call signs out locally and leaves the notice for the login page', async () => {
+  const cloud = createHttpCloud()
+  const seen = []
+  cloud.auth.onAuthStateChange((ev, s) => seen.push([ev, s]))
+  sessionStorage.clear()
+  localStorage.setItem('satualur_token', 'tok')
+  replies.push({ status: 403, json: { error: { message: 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.' } } })
+  const r = await cloud.database.from('requests').select('*')
+  assert.equal(r.error.status, 403)
+  assert.equal(localStorage.getItem('satualur_token'), null)
+  assert.deepEqual(seen, [['SIGNED_OUT', null]])
+  assert.equal(sessionStorage.getItem('satualur_auth_notice'), 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.')
+  // any other 403 (e.g. not staff) keeps the session
+  localStorage.setItem('satualur_token', 'tok')
+  replies.push({ status: 403, json: { error: { message: 'Khusus tim Satu Alur.' } } })
+  await cloud.database.from('requests').select('*')
+  assert.equal(localStorage.getItem('satualur_token'), 'tok')
+  assert.equal(seen.length, 1)
+})
+
 test('auth: getSession without token makes no request; 401 drops a stale token', async () => {
   const cloud = createHttpCloud()
   const none = await cloud.auth.getSession()

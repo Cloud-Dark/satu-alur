@@ -23,6 +23,20 @@ function realDate(s) {
   return d.toISOString().slice(0, 10) === s
 }
 
+export const SUSPENDED_MESSAGE = 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.'
+/** sessionStorage key: a message the login page shows once (set when a suspended session is dropped). */
+export const AUTH_NOTICE_KEY = 'satualur_auth_notice'
+
+/** A user_flags row (or nothing) → is this user locked out? */
+export const isBlocked = (flag) => Boolean(flag && (flag.suspended === 1 || flag.suspended === true))
+
+export function validateSuspendReason(body) {
+  const s = str(body?.reason)
+  if (!s) fail('Alasan wajib diisi.')
+  if (s.length > 300) fail('Alasan maksimal 300 karakter.')
+  return s
+}
+
 export function validateCustomer(body) {
   const b = body && typeof body === 'object' ? body : {}
   if (typeof b.status !== 'string' || !Object.hasOwn(CUSTOMER_STATUS_LABEL, b.status)) fail('Status tidak dikenal.')

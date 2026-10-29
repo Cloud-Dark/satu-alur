@@ -1,6 +1,23 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { validateCustomer, CUSTOMER_STATUS_LABEL, escapeLike } from '../src/customers/rules.js'
+import { validateCustomer, CUSTOMER_STATUS_LABEL, escapeLike, isBlocked, SUSPENDED_MESSAGE, validateSuspendReason } from '../src/customers/rules.js'
+
+test('isBlocked: only a flag with suspended = 1 blocks', () => {
+  assert.equal(isBlocked(null), false)
+  assert.equal(isBlocked(undefined), false)
+  assert.equal(isBlocked({ suspended: 0, reason: 'lama' }), false)
+  assert.equal(isBlocked({ suspended: 1 }), true)
+  assert.equal(isBlocked({ suspended: true }), true)
+})
+
+test('suspension message and reason validation', () => {
+  assert.equal(SUSPENDED_MESSAGE, 'Akun Anda ditangguhkan. Hubungi tim Satu Alur.')
+  assert.equal(validateSuspendReason({ reason: '  spam  ' }), 'spam')
+  assert.throws(() => validateSuspendReason({ reason: '   ' }), (e) => e.validation && e.message === 'Alasan wajib diisi.')
+  assert.throws(() => validateSuspendReason(null), (e) => e.validation && e.message === 'Alasan wajib diisi.')
+  assert.throws(() => validateSuspendReason({ reason: 'x'.repeat(301) }), (e) => e.validation && e.message === 'Alasan maksimal 300 karakter.')
+  assert.equal(validateSuspendReason({ reason: 'x'.repeat(300) }).length, 300)
+})
 
 const base = { plan_id: 2, status: 'active', period_end: '2026-12-31', company: 'CV Maju', phone: '0812', notes: 'ok' }
 const fails = (body, re) => assert.throws(() => validateCustomer(body), (e) => e.validation === true && re.test(e.message))

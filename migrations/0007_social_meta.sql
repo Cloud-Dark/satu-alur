@@ -144,3 +144,13 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
   updated_at TEXT NOT NULL,
   updated_by TEXT
 );
+
+-- Staff flags per user (Pengguna). suspended = 1 blocks every session and login (authenticate, OTP, demo).
+-- Staff-only; never in TABLES. Staff users (@staff.satualur.internal) are never flagged.
+CREATE TABLE IF NOT EXISTS user_flags (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  suspended INTEGER NOT NULL DEFAULT 0 CHECK (suspended IN (0, 1)),
+  reason TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);

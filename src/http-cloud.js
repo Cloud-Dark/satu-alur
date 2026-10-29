@@ -3,6 +3,8 @@
  * Antarmuka sama dengan mock cloud: auth, database (builder ala supabase), llm.
  */
 
+import { SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from './customers/rules.js'
+
 const TOKEN_KEY = 'satualur_token'
 
 function getToken() {
@@ -33,6 +35,12 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     try { json = await res.json() } catch { /* body kosong / bukan JSON */ }
     if (!res.ok) {
       const message = json?.error?.message || (typeof json?.error === 'string' ? json.error : null) || json?.message || `HTTP ${res.status}`
+      // Suspended mid-session: drop the token and let the app fall back to the login page, which shows the message.
+      if (res.status === 403 && message === SUSPENDED_MESSAGE && getToken()) {
+        setToken(null)
+        try { sessionStorage.setItem(AUTH_NOTICE_KEY, message) } catch { /* storage tidak tersedia */ }
+        notifyAuth('SIGNED_OUT', null)
+      }
       return { data: null, error: { message, status: res.status } }
     }
     return { data: json?.data ?? null, count: json?.count, error: json?.error ?? null }

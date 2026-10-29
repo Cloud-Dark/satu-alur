@@ -1,12 +1,14 @@
 /**
  * Customers admin (staff) — client for /api/office/admin/customers.
  * Demo mode (mock cloud): business users come from the mock cloud's users table (localStorage `satualur_mock_v1`);
- * plan/status rows live in `satualur_customers_demo_v1` as { accounts: { [userId]: row } }.
+ * plan/status rows live in `satualur_customers_demo_v1` as { accounts: { [userId]: row } }; user flags
+ * (Pengguna) live there too as { flags: { [userId]: { suspended, reason, revoked_at, updated_at, updated_by } } },
+ * and src/mock/mock-cloud.js reads them to refuse suspended logins.
  * Test seams (demo mode): `satualur_customers_fail` = '1' makes reads fail; `satualur_customers_delay` = ms delays the list.
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { isDemoEmail } from '../auth/demo-accounts.js'
-import { validateCustomer, STAFF_EMAIL_SUFFIX } from './rules.js'
+import { validateCustomer, validateSuspendReason, STAFF_EMAIL_SUFFIX } from './rules.js'
 import { adminListPlans } from '../business/api.js'
 
 export const PAGE_SIZE = 50
@@ -55,17 +57,23 @@ async function withPlans(rows) {
   })
 }
 
+// Mock list: same search (fields), order and paging as the Worker.
+async function mockPage({ q, page }, fields) {
+  const wait = Number(localStorage.getItem('satualur_customers_delay')) || 0
+  if (wait) await new Promise((r) => setTimeout(r, wait))
+  if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pelanggan. Coba lagi.')
+  const needle = q.trim().toLowerCase()
+  const hit = (u) => !needle || fields(u).some((s) => String(s || '').toLowerCase().includes(needle))
+  const all = mockUsers().filter(hit).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+  return { rows: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: all.length, page }
+}
+
 /** { items, total, page } — 50 per page, newest first. Throws a readable error. */
 export async function adminListCustomers({ q = '', page = 1 } = {}) {
   if (isUsingMockCloud()) {
-    const wait = Number(localStorage.getItem('satualur_customers_delay')) || 0
-    if (wait) await new Promise((r) => setTimeout(r, wait))
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pelanggan. Coba lagi.')
-    const needle = q.trim().toLowerCase()
     const accounts = loadAccounts()
-    const hit = (u) => !needle || [u.email, u.name, accounts[u.id]?.company].some((s) => String(s || '').toLowerCase().includes(needle))
-    const all = mockUsers().filter(hit).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
-    return { items: await withPlans(all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)), total: all.length, page }
+    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name, accounts[u.id]?.company])
+    return { items: await withPlans(rows), total, page }
   }
   try {
     return await call(`/api/office/admin/customers?q=${encodeURIComponent(q)}&page=${page}`, { cache: 'no-store' })
@@ -101,4 +109,55 @@ export async function adminSaveCustomer(id, body) {
   db.accounts = { ...(db.accounts || {}), [id]: { ...v, updated_at: new Date().toISOString(), updated_by: who } }
   localStorage.setItem(DEMO_KEY, JSON.stringify(db))
   return (await withPlans([u]))[0]
+}
+
+/* ------------------------------------------------------------------ Pengguna */
+
+const loadFlags = () => read(DEMO_KEY, {}).flags || {}
+async function saveFlag(id, change) {
+  const u = mockUsers().find((x) => x.id === id) // mockUsers() drops staff, like the Worker's 400
+  if (!u) throw new Error('Pengguna tidak ditemukan.')
+  const db = read(DEMO_KEY, {})
+  const who = (await getCloud().auth.getSession())?.data?.user?.name || 'demo'
+  db.flags = { ...(db.flags || {}), [id]: { ...(db.flags?.[id] || {}), ...change, updated_at: new Date().toISOString(), updated_by: who } }
+  localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+}
+
+/** { items: [{ id, email, name, created_at, active_sessions, suspended, reason, last_session_at, demo }], total, page } */
+export async function adminListUsers({ q = '', page = 1 } = {}) {
+  if (isUsingMockCloud()) {
+    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name])
+    const flags = loadFlags()
+    // ponytail: mock sessions live in each page's memory, so the mock can't count them; always 0 here.
+    const items = rows.map((u) => ({
+      id: u.id, email: u.email, name: u.name, created_at: u.created_at, active_sessions: 0, last_session_at: null,
+      suspended: flags[u.id]?.suspended === 1, reason: flags[u.id]?.reason || '', demo: isDemoEmail(u.email),
+    }))
+    return { items, total, page }
+  }
+  try {
+    return await call(`/api/office/admin/users?q=${encodeURIComponent(q)}&page=${page}`, { cache: 'no-store' })
+  } catch (e) {
+    throw new Error(`Gagal memuat pengguna. ${e.message}`)
+  }
+}
+
+const userPath = (id, action) => `/api/office/admin/users/${encodeURIComponent(id)}/${action}`
+
+/** Suspends the user (reason required, ≤ 300) and ends all their sessions. */
+export async function adminSuspendUser(id, reason) {
+  const clean = validateSuspendReason({ reason })
+  if (!isUsingMockCloud()) return call(userPath(id, 'suspend'), { method: 'POST', body: { reason: clean } })
+  const now = new Date().toISOString()
+  await saveFlag(id, { suspended: 1, reason: clean, revoked_at: now })
+}
+
+export async function adminRestoreUser(id) {
+  if (!isUsingMockCloud()) return call(userPath(id, 'restore'), { method: 'POST' })
+  await saveFlag(id, { suspended: 0 })
+}
+
+export async function adminRevokeUserSessions(id) {
+  if (!isUsingMockCloud()) return call(userPath(id, 'revoke-sessions'), { method: 'POST' })
+  await saveFlag(id, { revoked_at: new Date().toISOString() })
 }

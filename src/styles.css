@@ -1554,6 +1554,8 @@ body.scroll-lock { overflow: hidden; }
 .of-cust:hover { background: var(--surface-2); }
 .of-cust-main { display: grid; gap: 2px; min-width: 0; flex: 1 1 220px; overflow-wrap: anywhere; }
 .of-cust-meta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); align-items: center; }
+.of-user { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); justify-content: space-between; align-items: center; min-width: 0; padding: var(--s-3); border-bottom: 1px solid var(--line); }
+.of-user-reason { white-space: pre-wrap; overflow-wrap: anywhere; }
 .of-row-wrap { flex-wrap: wrap; }
 .of-row-wrap > .field { flex: 1 1 140px; }
 @media (max-width: 768px) {

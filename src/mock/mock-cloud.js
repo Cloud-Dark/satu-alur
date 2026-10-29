@@ -3,6 +3,7 @@
  * memory + localStorage. Used for local development and e2e tests
  * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
+import { isBlocked, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
 
 const STORAGE_KEY = 'satualur_mock_v1'
 const OTP_STORE = 'satualur_mock_otp'
@@ -61,6 +62,19 @@ function notifyAuth(event) {
   if (_sessionCb) _sessionCb(event, _session)
 }
 
+// Same rules as the Worker: flags are written by src/customers/api.js (staff › Pengguna) under
+// `satualur_customers_demo_v1`.flags[userId] = { suspended, reason, revoked_at, … }.
+function userFlag(userId) {
+  try { return (JSON.parse(localStorage.getItem('satualur_customers_demo_v1')) || {}).flags?.[userId] || null } catch { return null }
+}
+function refuseSuspended(user) {
+  if (isBlocked(userFlag(user.id))) throw new Error(SUSPENDED_MESSAGE)
+}
+function startSession(user, extra) {
+  _session = { user, access_token: 'mock_' + crypto.randomUUID(), created_at: new Date().toISOString(), ...extra }
+  notifyAuth('SIGNED_IN')
+}
+
 const mockAuth = {
   async sendOtp({ email }) {
     if (!email || !email.includes('@')) throw new Error('Email tidak valid.')
@@ -92,8 +106,8 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
-    notifyAuth('SIGNED_IN')
+    refuseSuspended(user)
+    startSession(user)
     return { data: { user }, error: null }
   },
 
@@ -105,8 +119,8 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
-    notifyAuth('SIGNED_IN')
+    refuseSuspended(user)
+    startSession(user)
     return { data: { user }, error: null }
   },
 
@@ -126,12 +140,22 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID(), is_staff: true }
-    notifyAuth('SIGNED_IN')
+    startSession(user, { is_staff: true })
     return { data: { user }, error: null }
   },
 
   async getSession() {
+    if (_session) {
+      const flag = userFlag(_session.user.id)
+      if (isBlocked(flag) || (flag?.revoked_at && flag.revoked_at >= _session.created_at)) {
+        _session = null
+        if (isBlocked(flag)) {
+          try { sessionStorage.setItem(AUTH_NOTICE_KEY, SUSPENDED_MESSAGE) } catch { /* storage unavailable */ }
+          return { data: null, error: { message: SUSPENDED_MESSAGE, status: 403 } }
+        }
+        return { data: null, error: { message: 'Sesi tidak valid atau sudah berakhir.', status: 401 } }
+      }
+    }
     // Same rule as the Worker: only a staff-login session is an admin.
     if (_session) {
       const { is_staff, ...pub } = _session

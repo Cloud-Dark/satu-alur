@@ -6,6 +6,7 @@ import * as Doc from './site-doc.js'
 import * as Plans from './plans.js'
 import * as Payment from './payment.js'
 import * as Customers from './customers.js'
+import * as Users from './users.js'
 
 const { el } = C
 const STORE = 'satualur_office_section'
@@ -19,7 +20,7 @@ const GROUPS = [
     { key: 'gateway', label: 'Payment gateway', draw: Payment.draw }] },
   { title: 'Pelanggan', items: [
     { key: 'customers', label: 'Pelanggan & mitra', draw: Customers.draw },
-    { key: 'users', label: 'Pengguna', soon: true },
+    { key: 'users', label: 'Pengguna', draw: Users.draw },
     { key: 'contact', label: 'Contact Us', soon: true },
     { key: 'tickets', label: 'Pengaduan CS', soon: true }] },
   { title: 'Agensi influencer', items: [

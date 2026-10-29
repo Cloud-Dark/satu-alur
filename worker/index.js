@@ -20,7 +20,11 @@ import {
 } from './office.js';
 import { handleSiteGet, handleSitePut } from './site.js';
 import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
-import { handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut } from './customers.js';
+import {
+  handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
+  handleAdminUsers, handleAdminUserSuspend, handleAdminUserRestore, handleAdminUserRevokeSessions,
+} from './customers.js';
+import { SUSPENDED_MESSAGE } from '../src/customers/rules.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -210,6 +214,12 @@ function normalizeEmail(v) {
 
 const nowIso = () => new Date().toISOString();
 
+// Login routes call this before creating a session (after the OTP check, so the 403 never leaks account state).
+async function refuseSuspended(env, userId) {
+  const f = await env.DB.prepare('SELECT suspended FROM user_flags WHERE user_id = ?').bind(userId).first();
+  if (f?.suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+}
+
 // --------------------------------------------------------------------- auth
 
 async function authenticate(request, env) {
@@ -218,14 +228,17 @@ async function authenticate(request, env) {
   if (!m) throw new HttpError(401, 'Belum masuk.');
   const tokenHash = await sha256Hex(m[1]);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff
+    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended
        FROM sessions s JOIN users u ON u.id = s.user_id
+       LEFT JOIN user_flags f ON f.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
   )
     .bind(tokenHash, nowIso())
     .first();
   if (!row) throw new HttpError(401, 'Sesi tidak valid atau sudah berakhir.');
-  return { user: row, tokenHash };
+  const { suspended, ...user } = row;
+  if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+  return { user, tokenHash };
 }
 
 async function handleSendOtp(request, env) {
@@ -303,6 +316,7 @@ async function handleVerifyOtp(request, env) {
     .run();
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new Error('user missing after upsert');
+  await refuseSuspended(env, user.id);
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -327,6 +341,7 @@ async function handleDemoLogin(request, env) {
   if (!email || !DEMO_EMAILS.has(email)) throw new HttpError(400, 'Akun demo tidak dikenal.');
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
+  await refuseSuspended(env, user.id);
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -894,6 +909,10 @@ const ROUTES = {
   'GET /api/office/admin/customers': (req, env) => handleAdminCustomers(req, env, ROUTE_DEPS),
   'GET /api/office/admin/customers/:userId': (req, env, params) => handleAdminCustomerGet(req, env, ROUTE_DEPS, params),
   'PUT /api/office/admin/customers/:userId': (req, env, params) => handleAdminCustomerPut(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/users': (req, env) => handleAdminUsers(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/users/:userId/suspend': (req, env, params) => handleAdminUserSuspend(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/users/:userId/restore': (req, env, params) => handleAdminUserRestore(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/users/:userId/revoke-sessions': (req, env, params) => handleAdminUserRevokeSessions(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 

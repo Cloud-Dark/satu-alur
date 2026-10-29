@@ -11,6 +11,7 @@
 import '../styles/auth.css'
 import { sendEmailCode, submitEmailOtp, loginWithDemo } from './auth.js'
 import { DEMO_ACCOUNTS, DEMO_SCALES } from './demo-accounts.js'
+import { AUTH_NOTICE_KEY } from '../customers/rules.js'
 import { enhanceSelect } from '../ui/combobox.js'
 import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
@@ -283,6 +284,11 @@ export function renderLoginPage(root, ctx = {}) {
     message.hidden = !text
   }
   say('')
+  // Left by the cloud client when a suspended session was dropped; shown once.
+  try {
+    const notice = sessionStorage.getItem(AUTH_NOTICE_KEY)
+    if (notice) { sessionStorage.removeItem(AUTH_NOTICE_KEY); say(notice, 'error') }
+  } catch { /* storage unavailable */ }
 
   function setSceneState(s) { scene?.setState?.(s) }
 
