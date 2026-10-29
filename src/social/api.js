@@ -173,6 +173,10 @@ export async function saveContent({ kind, body, title = null, image_key = null, 
   return unwrap(await db().from('social_contents').insert(row), 'Gagal menyimpan')
 }
 
+export async function updateContent(id, patch) {
+  unwrap(await db().from('social_contents').update(patch).eq('id', id), 'Gagal menyimpan')
+}
+
 export async function deleteContent(id) {
   unwrap(await db().from('social_contents').delete().eq('id', id), 'Gagal menghapus')
 }

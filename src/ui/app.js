@@ -34,6 +34,12 @@ function currentPath() {
 }
 
 function render() {
+  // The Meta OAuth callback returns to #/social-media?...: open that stage inside the app, keeping the query.
+  const back = /^#\/social-media(\?.*)?$/.exec(location.hash)
+  if (back) {
+    try { sessionStorage.setItem('satualur_stage', 'social-media') } catch { /* storage unavailable */ }
+    history.replaceState(null, '', `#/app${back[1] || ''}`)
+  }
   let path = currentPath()
   if (path === '/app' && !currentUser) path = '/masuk'
   if (path === '/masuk' && currentUser) path = '/app'

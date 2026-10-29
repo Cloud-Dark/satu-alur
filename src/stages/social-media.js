@@ -2,18 +2,31 @@ import * as AI from '../ai/superpowers.js'
 import { loadModels, pickDefaultModel } from '../ai/models.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
+import { getAccount } from '../social/api.js'
+import * as Account from './social-media/account.js'
+import * as Content from './social-media/content.js'
 
 const { el } = C
-const PLATFORMS = ['Instagram', 'TikTok', 'Facebook', 'LinkedIn', 'X'].map((label) => ({ value: label.toLowerCase(), label }))
+const PLATFORMS = ['Instagram', 'Facebook'].map((label) => ({ value: label.toLowerCase(), label }))
 const TABS = [
-  { value: 'content', label: 'Konten AI' }, { value: 'schedule', label: 'Jadwal' },
-  { value: 'brainstorm', label: 'Brainstorm' }, { value: 'ads', label: 'Meta Ads' }, { value: 'partnership', label: 'Partnership' },
+  { value: 'account', label: 'Akun' }, { value: 'content', label: 'Konten' }, { value: 'schedule', label: 'Jadwal' },
+  { value: 'brainstorm', label: 'Brainstorm' }, { value: 'ads', label: 'Iklan' }, { value: 'collab', label: 'Kolaborasi' },
 ]
-let currentTab = 'content'
+let currentTab = 'account'
 
 export async function render(container, ctx = {}) {
   let controller = null
   let modelId = null
+  let acct = { configured: true, account: null }
+  let pick = null
+  // Return from the Meta OAuth callback (see ui/app.js): open Akun, show the outcome, drop the query.
+  const query = new URLSearchParams(location.hash.split('?')[1] || '')
+  const back = { connected: query.get('social') === 'connected', error: query.get('social_error'), pick: query.get('social_pick') }
+  if (back.connected || back.error || back.pick) {
+    currentTab = 'account'
+    pick = back.pick
+    history.replaceState(null, '', '#/app')
+  }
   const status = C.message()
   const host = el('div')
   const tabs = C.segmented({ options: TABS, value: currentTab, label: 'Social media', onChange: (value) => {
@@ -41,104 +54,6 @@ export async function render(container, ctx = {}) {
   function write(key, items) {
     try { localStorage.setItem(key, JSON.stringify(items)); return true }
     catch { status.show('danger', 'Tidak dapat menyimpan. Periksa izin atau kapasitas penyimpanan browser.'); return false }
-  }
-  function saveContent(content, type) {
-    const items = read('satualur_saved_content')
-    if (!items) return false
-    const saved = write('satualur_saved_content', [...items, { id: Date.now(), content, type, created_at: new Date().toISOString() }])
-    if (saved) showToast('Konten tersimpan di browser ini.', 'success')
-    return saved
-  }
-  function savedList(target, type) {
-    const items = read('satualur_saved_content')
-    if (!items) { target.replaceChildren(C.errorState('Konten tersimpan belum dapat dibaca.')); return }
-    const filtered = items.filter((s) => type === 'brainstorm' ? s.type === 'brainstorm' : s.type !== 'brainstorm').slice().reverse()
-    target.replaceChildren()
-    if (!filtered.length) target.appendChild(C.emptyState({ title: 'Belum ada konten tersimpan', iconName: 'file',
-      body: type === 'brainstorm' ? 'Hasil brainstorming akan disimpan otomatis di sini.' : 'Buat konten, lalu pilih Simpan konten.' }))
-    filtered.slice(0, 10).forEach((s) => target.appendChild(el('article', { className: 'workspace-entry' },
-      el('div', { className: 'workspace-entry-head' }, C.tag(s.type), el('span', { className: 'muted small' }, C.formatDateTime(s.created_at))),
-      el('p', { className: 'workspace-preview' }, s.content),
-      el('div', { className: 'form-actions' },
-        C.button({ label: 'Salin', icon: 'file', variant: 'soft', size: 'sm', onClick: async () => {
-          try { await navigator.clipboard.writeText(s.content); showToast('Konten disalin.', 'success') }
-          catch { status.show('danger', 'Tidak dapat menyalin. Periksa izin clipboard browser.') }
-        } }),
-        C.button({ label: 'Hapus', icon: 'x', variant: 'ghost', size: 'sm', onClick: () => {
-          const all = read('satualur_saved_content')
-          if (all && write('satualur_saved_content', all.filter((x) => x.id !== s.id))) savedList(target, type)
-        } })),
-    )))
-  }
-  async function generate(prompt, button, output, type, library) {
-    if (!modelId) { status.show('danger', 'Model AI belum tersedia. Muat ulang halaman atau periksa pengaturan.'); return }
-    const run = new AbortController()
-    controller?.abort()
-    controller = run
-    const restore = C.setBusy(button, 'Menyiapkan konten…')
-    const console = C.aiConsole({ model: modelId })
-    output.replaceChildren(console.root)
-    console.onStop(() => run.abort())
-    console.setStatus('Menulis', true)
-    status.hide()
-    let full = ''
-    try {
-      for await (const event of AI.chatWithAgent({ agentKey: 'social', message: prompt, modelId, signal: run.signal, useMemory: false })) {
-        if (run.signal.aborted || ctx.signal?.aborted) return
-        if (event.type === 'error') throw new Error(event.message)
-        if (event.type === 'text') {
-          full = event.full
-          console.writeHTML(C.sanitizeHTML(full.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>')))
-        }
-      }
-      if (!full.trim()) throw new Error('AI tidak mengembalikan konten. Silakan coba lagi.')
-      console.setStatus('Selesai')
-      if (type === 'brainstorm') {
-        if (saveContent(full, type)) savedList(library, type)
-      } else output.appendChild(C.button({ label: 'Simpan konten', icon: 'save', variant: 'soft', onClick: () => {
-        if (saveContent(full, type)) savedList(library, type)
-      } }))
-    } catch (err) {
-      console.setStatus(err.name === 'AbortError' ? 'Dihentikan' : 'Gagal')
-      if (err.name !== 'AbortError') status.show('danger', err.message)
-    } finally {
-      console.done()
-      if (run.signal.aborted) console.setStatus('Dihentikan')
-      restore()
-      if (controller === run) controller = null
-    }
-  }
-  function contentTab(brainstorm = false) {
-    const topic = C.field({ label: brainstorm ? 'Tema brainstorming' : 'Topik atau layanan', id: 'sm-topic', required: true,
-      placeholder: 'Perawatan AC rumah di musim hujan', attrs: { maxlength: '500' } })
-    const platform = C.select({ label: 'Platform', id: 'sm-platform', options: PLATFORMS })
-    const type = C.select({ label: brainstorm ? 'Jumlah ide' : 'Jenis konten', id: 'sm-type', options: brainstorm
-      ? ['5', '10', '20'].map((n) => ({ value: n, label: `${n} ide` }))
-      : [{ value: 'caption', label: 'Caption posting' }, { value: 'naskah video', label: 'Naskah video' }, { value: 'seri story', label: 'Story series' },
-        { value: 'copy iklan', label: 'Copy iklan' }, { value: 'prompt gambar AI', label: 'Prompt gambar AI' }] })
-    const tone = C.select({ label: 'Gaya bahasa', id: 'sm-tone', options: ['Santai', 'Profesional', 'Inspiratif', 'Edukatif', 'Promosi'].map((label) => ({ value: label, label })) })
-    const cta = C.field({ label: 'Ajakan bertindak', id: 'sm-cta', placeholder: 'Hubungi kami untuk konsultasi', attrs: { maxlength: '300' } })
-    const submit = C.button({ label: brainstorm ? 'Mulai brainstorm' : 'Buat konten', icon: 'sparkles', variant: 'primary', type: 'submit' })
-    const output = el('div', { className: 'workspace-output' })
-    const library = el('div')
-    const kind = brainstorm ? 'brainstorm' : 'content'
-    const form = el('form', { className: 'form' }, topic.wrap, el('div', { className: 'form-row' }, platform.wrap, type.wrap),
-      brainstorm ? null : tone.wrap, brainstorm ? null : cta.wrap, el('div', { className: 'form-actions' }, submit))
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      if (!topic.input.value.trim()) { topic.input.focus(); return }
-      const prompt = brainstorm
-        ? `Lakukan brainstorm ${type.input.value} ide konten tentang ${topic.input.value.trim()} untuk ${platform.input.value}. Sertakan judul, hook, format, konsep dan estimasi engagement. Gunakan bahasa Indonesia.`
-        : `Buat ${type.input.value} untuk ${platform.input.value} tentang ${topic.input.value.trim()}. Gaya: ${tone.input.value}. Ajakan bertindak: ${cta.input.value.trim()}. Gunakan bahasa Indonesia dan sertakan hashtag relevan.`
-      await generate(prompt, submit, output, kind, library)
-    })
-    host.replaceChildren(el('div', { className: 'workspace-stack' },
-      el('div', { className: 'stage-grid workspace-grid' },
-        C.panel({ title: brainstorm ? 'Brainstorm lab' : 'Studio konten', meta: 'Dari ide menjadi draf', raised: true }, form),
-        C.panel({ title: 'Hasil AI', meta: 'Periksa kembali sebelum digunakan' }, output)),
-      C.panel({ title: brainstorm ? 'Ide tersimpan' : 'Pustaka konten', meta: 'Disimpan di browser ini' }, library)))
-    output.appendChild(C.emptyState({ title: 'Mulai dari sebuah topik', iconName: 'sparkles', body: 'Isi kebutuhan Anda di formulir untuk membuat draf pertama.' }))
-    savedList(library, kind)
   }
   function scheduleTab() {
     const platform = C.select({ label: 'Platform', id: 'sched-platform', options: PLATFORMS })
@@ -234,13 +149,34 @@ export async function render(container, ctx = {}) {
           el('h3', { className: 'workspace-entry-title' }, C.icon(name), title), el('p', {}, description), el('p', { className: 'muted small' }, price))),
         el('a', { className: 'btn btn-primary', href: 'mailto:hello@satu-alur.id' }, C.icon('message'), 'Hubungi tim marketing'))))
   }
-  function draw() {
-    if (currentTab === 'schedule') scheduleTab()
-    else if (currentTab === 'ads') adsTab()
-    else if (currentTab === 'partnership') partnershipTab()
-    else contentTab(currentTab === 'brainstorm')
+  function tabCtx() {
+    return { status, signal: controller.signal, getModelId: () => modelId, account: acct.account, configured: acct.configured, pick,
+      refresh, clearPick: () => { pick = null }, goto: (value) => tabs.querySelector(`[data-value="${value}"]`).click() }
   }
+  function draw() {
+    controller = new AbortController()
+    if (currentTab === 'account') Account.render(host, tabCtx())
+    else if (currentTab === 'content' || currentTab === 'brainstorm') Content.render(host, tabCtx(), currentTab === 'brainstorm')
+    else if (currentTab === 'schedule') scheduleTab()
+    else if (currentTab === 'ads') adsTab()
+    else partnershipTab()
+  }
+  async function loadAccount() {
+    try { acct = await getAccount() } catch (err) { status.show('danger', err.message) }
+  }
+  async function refresh() {
+    await loadAccount()
+    if (ctx.signal?.aborted) return
+    draw()
+    host.setAttribute('tabindex', '-1')
+    host.focus({ preventScroll: true })
+  }
+  host.replaceChildren(C.skeletonRows(3))
+  await loadAccount()
+  if (ctx.signal?.aborted) return
   draw()
+  if (back.connected) status.show('ok', 'Akun berhasil terhubung.')
+  else if (back.error) status.show('danger', back.error)
   try {
     await loadModels()
     if (!ctx.signal?.aborted) modelId = pickDefaultModel()?.id
