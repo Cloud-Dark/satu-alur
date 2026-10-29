@@ -13,6 +13,15 @@ CREATE TABLE IF NOT EXISTS social_accounts (
   connected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
+-- Pending multi-Page choice after the OAuth callback (10 min, one-shot). Never in TABLES.
+-- blob = AES-GCM output of encryptToken over the Page list (Page tokens included).
+CREATE TABLE IF NOT EXISTS social_oauth_picks (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  blob TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+
 ALTER TABLE social_contents ADD COLUMN image_key TEXT;
 
 -- One row per platform per publish/schedule. Kept apart from social_schedules,

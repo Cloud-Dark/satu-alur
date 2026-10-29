@@ -11,13 +11,12 @@ import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.
 import {
   handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
   handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
-  handleSocialPublish, handleSocialSchedule, handleSocialScheduleCancel, runCron,
+  handleSocialPublish, handleSocialSchedule, handleSocialScheduleCancel, runCron, isAdminUser,
 } from './social.js';
 import {
   handleInfluencers, handleRequestCreate, handleRequestList, handleAdminInfluencers, handleAdminInfluencerCreate,
   handleAdminInfluencerUpdate, handleAdminRequests, handleAdminRequestUpdate,
 } from './office.js';
-import { isAdmin } from '../src/social/rules.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -334,7 +333,7 @@ async function handleDemoLogin(request, env) {
 
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
-  return ok({ user, is_admin: isAdmin(user.email, env.ADMIN_EMAILS) });
+  return ok({ user, is_admin: isAdminUser(user.email, env) });
 }
 
 async function handleSignout(request, env) {
@@ -844,7 +843,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,

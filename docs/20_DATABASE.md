@@ -201,6 +201,7 @@ Catatan: `owner_id` pada tabel domain tidak dideklarasikan sebagai foreign key k
 | Tabel | Isi | Akses |
 |-------|-----|-------|
 | `social_accounts` | Satu Halaman Facebook per bisnis (`owner_id` PK): `page_id`, `page_name`, `page_token_enc` (AES-GCM), `ig_user_id`, `ig_username`, `needs_reconnect`, `connected_at` | Tidak ada di whitelist `/api/db`; hanya lewat `/api/social/*` |
+| `social_oauth_picks` | Pilihan Halaman yang tertunda setelah OAuth (lebih dari satu Halaman): `id` (32 hex), `owner_id`, `blob` (daftar Halaman + token, AES-GCM), `expires_at` (10 menit). Dihapus saat dipakai; baris kedaluwarsa dibersihkan saat callback berikutnya | Tidak ada di whitelist `/api/db`; hanya lewat `/api/social/oauth/*` |
 | `social_posts` | Satu baris per platform per terbit/jadwal: `content_id`, `platform`, `content`, `image_key`, `page_id`, `scheduled_at`, `status` (`scheduled`, `publishing`, `posted`, `failed`, `cancelled`), `platform_post_id`, `permalink`, `error`, `attempts`, `published_at`, `claimed_at`. Indeks `owner_id` dan `(status, scheduled_at)` | Baca-saja lewat `/api/db`; tulis lewat `/api/social/*` dan cron |
 | `influencers` | Katalog global: `name`, `photo_key`, `niche`, `city`, `ig_followers`, `tiktok_followers`, `bio`, `visible` | Hanya lewat `/api/office/*`; tulis oleh admin |
 | `service_requests` | Permintaan bisnis ke kantor: `kind` (`collab`/`ads`), `influencer_id`, `payload_json`, `status` (`new`/`in_progress`/`done`), `admin_note`, `updated_at`. Indeks `owner_id` | Hanya lewat `/api/office/*` |

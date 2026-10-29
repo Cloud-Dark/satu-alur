@@ -3,7 +3,7 @@
  * Helpers (authenticate, readJson, ok, HttpError) are injected by worker/index.js.
  */
 
-import { isAdmin } from '../src/social/rules.js';
+import { isAdminUser } from './social.js';
 import { validateServiceRequest, validateInfluencer, REQUEST_STATUSES } from '../src/office/rules.js';
 
 const INFLUENCER_PUBLIC = 'id, name, photo_key, niche, city, ig_followers, tiktok_followers, bio';
@@ -11,18 +11,19 @@ const INFLUENCER_FIELDS = ['name', 'photo_key', 'niche', 'city', 'ig_followers',
 const REQUEST_SELECT = `SELECT r.id, r.kind, r.influencer_id, i.name AS influencer_name, r.payload_json,
   r.status, r.admin_note, r.created_at, r.updated_at`;
 
-// Validators throw plain Errors with the Indonesian text; turn them into 400s.
+// Validators tag their errors (err.validation) with the Indonesian text; only those become 400s.
 function validated(HttpError, fn) {
   try {
     return fn();
   } catch (err) {
-    throw new HttpError(400, err.message);
+    if (err?.validation) throw new HttpError(400, err.message);
+    throw err;
   }
 }
 
 async function requireAdmin(request, env, { authenticate, HttpError }) {
   const { user } = await authenticate(request, env);
-  if (!isAdmin(user.email, env.ADMIN_EMAILS)) throw new HttpError(403, 'Khusus tim Satu Alur.');
+  if (!isAdminUser(user.email, env)) throw new HttpError(403, 'Khusus tim Satu Alur.');
   return user;
 }
 
