@@ -220,7 +220,7 @@ function featuresHTML() {
             <span class="lp-chat-head-ic">${iconHTML('sparkles', { size: 18, stroke: 1.9 })}</span>
             <div class="lp-chat-head-text">
               <p>Penawaran AI</p>
-              <span><span class="pulse-dot" aria-hidden="true"></span>Streaming<span class="lp-hide-xs">&nbsp;· Workers AI</span></span>
+              <span><span class="pulse-dot" aria-hidden="true"></span>AI<span class="lp-hide-xs">&nbsp;· langsung</span></span>
             </div>
             <span class="tag tag-accent">Contoh</span>
           </div>
@@ -405,7 +405,7 @@ function footerHTML() {
       <p class="display lp-foot-line" aria-hidden="true">Bisnis yang <em>tumbuh</em> dimulai dari alur yang rapi.</p>
       <div class="lp-foot-base">
         <span>© 2026 Satu Alur. Hak cipta dilindungi.</span>
-        <span>Berjalan di Cloudflare Workers · D1 · Workers AI</span>
+        <span>Cepat, aman, dan siap dipakai dari mana saja</span>
       </div>
     </div>
   </footer>
