@@ -34,10 +34,10 @@ export function blockNode(b) {
   return el('p', '', b.text)
 }
 
-export function renderDocPage(root, ctx, key) {
-  let disposed = false
+/** The public page frame (logo header, reading column, footer) → { title, body, close }; close() restores document.title. */
+export function docShell(root, headingText, docTitle) {
   const prevTitle = document.title
-  document.title = `${DOC_TITLES[key]} — Satu Alur`
+  document.title = `${docTitle} — Satu Alur`
   const page = el('div', 'lp doc-page')
 
   const header = el('header', 'lp-header is-scrolled')
@@ -49,7 +49,7 @@ export function renderDocPage(root, ctx, key) {
   bar.append(logoLink({ size: 30 }), actions)
   header.append(bar)
 
-  const title = el('h1', 'display doc-title', DOC_TITLES[key])
+  const title = el('h1', 'display doc-title', headingText)
   const body = el('div', 'doc-body')
   const article = el('article', 'doc-col')
   article.append(title, body)
@@ -67,6 +67,12 @@ export function renderDocPage(root, ctx, key) {
 
   page.append(header, main, footer)
   root.append(page)
+  return { title, body, close: () => { document.title = prevTitle } }
+}
+
+export function renderDocPage(root, ctx, key) {
+  let disposed = false
+  const { title, body, close } = docShell(root, DOC_TITLES[key], DOC_TITLES[key])
 
   getSite(key).then((row) => {
     if (disposed) return
@@ -88,5 +94,5 @@ export function renderDocPage(root, ctx, key) {
     }
   })
 
-  return () => { disposed = true; document.title = prevTitle }
+  return () => { disposed = true; close() }
 }

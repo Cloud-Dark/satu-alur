@@ -8,7 +8,10 @@
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { isDemoEmail } from '../auth/demo-accounts.js'
-import { validateCustomer, validateSuspendReason, STAFF_EMAIL_SUFFIX } from './rules.js'
+import {
+  validateCustomer, validateSuspendReason, STAFF_EMAIL_SUFFIX,
+  validateContact, validateContactUpdate, isHoneypot, contactRateLimited, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
+} from './rules.js'
 import { adminListPlans } from '../business/api.js'
 
 export const PAGE_SIZE = 50
@@ -160,4 +163,59 @@ export async function adminRestoreUser(id) {
 export async function adminRevokeUserSessions(id) {
   if (!isUsingMockCloud()) return call(userPath(id, 'revoke-sessions'), { method: 'POST' })
   await saveFlag(id, { revoked_at: new Date().toISOString() })
+}
+
+/* ------------------------------------------------------------------ Contact Us */
+// Demo mode keeps messages in DEMO_KEY as { contact: [row], contact_hits: [ms] }; the rate limit is per browser (one fixed "ip").
+
+/** Public form → CONTACT_OK_MESSAGE. Honeypot hits succeed without storing. */
+export async function sendContact(body) {
+  if (!isUsingMockCloud()) return (await call('/api/contact', { method: 'POST', body })).message
+  if (isHoneypot(body)) return CONTACT_OK_MESSAGE
+  const v = validateContact(body)
+  const db = read(DEMO_KEY, {})
+  const now = Date.now()
+  const hits = (db.contact_hits || []).filter((t) => t > now - 3600 * 1000)
+  if (contactRateLimited(hits.length)) throw new Error(CONTACT_LIMIT_MESSAGE)
+  const rows = db.contact || []
+  const id = rows.reduce((m, r) => Math.max(m, r.id), 0) + 1
+  db.contact = [...rows, { id, ...v, status: 'new', staff_note: '', created_at: new Date(now).toISOString(), updated_at: null, updated_by: null }]
+  db.contact_hits = [...hits, now]
+  localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+  return CONTACT_OK_MESSAGE
+}
+
+/** { items, total, page } — status: new | read | replied | archived | all; 50 per page, newest first. */
+export async function adminListContact({ status = 'new', page = 1 } = {}) {
+  if (isUsingMockCloud()) {
+    const wait = Number(localStorage.getItem('satualur_customers_delay')) || 0
+    if (wait) await new Promise((r) => setTimeout(r, wait))
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pesan. Coba lagi.')
+    const all = (read(DEMO_KEY, {}).contact || []).filter((r) => status === 'all' || r.status === status)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id)
+    return { items: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: all.length, page }
+  }
+  try {
+    return await call(`/api/office/admin/contact?status=${encodeURIComponent(status)}&page=${page}`, { cache: 'no-store' })
+  } catch (e) {
+    throw new Error(`Gagal memuat pesan. ${e.message}`)
+  }
+}
+
+/** Number of unread (new) messages, for the badge. */
+export async function adminContactCounts() {
+  if (isUsingMockCloud()) return { new: (read(DEMO_KEY, {}).contact || []).filter((r) => r.status === 'new').length }
+  return call('/api/office/admin/contact/counts', { cache: 'no-store' })
+}
+
+/** PATCH { status?, staff_note? }; returns the saved message. */
+export async function adminUpdateContact(id, body) {
+  if (!isUsingMockCloud()) return call(`/api/office/admin/contact/${encodeURIComponent(id)}`, { method: 'PATCH', body })
+  const v = validateContactUpdate(body)
+  const db = read(DEMO_KEY, {})
+  const row = (db.contact || []).find((r) => r.id === id)
+  if (!row) throw new Error('Pesan tidak ditemukan.')
+  Object.assign(row, v, { updated_at: new Date().toISOString(), updated_by: (await getCloud().auth.getSession())?.data?.user?.name || 'demo' })
+  localStorage.setItem(DEMO_KEY, JSON.stringify(db))
+  return row
 }

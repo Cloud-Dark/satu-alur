@@ -55,3 +55,48 @@ export function validateCustomer(body) {
     notes: text(b.notes, 'Catatan internal', 2000),
   }
 }
+
+/* ------------------------------------------------------------------ Contact Us */
+
+export const CONTACT_STATUS_LABEL = { new: 'Baru', read: 'Dibaca', replied: 'Dibalas', archived: 'Arsip' }
+export const CONTACT_OK_MESSAGE = 'Pesan terkirim. Tim Satu Alur akan membalas lewat email.'
+export const CONTACT_LIMIT_MESSAGE = 'Terlalu banyak pesan. Coba lagi nanti.'
+export const CONTACT_LIMIT = 5
+// Strict on purpose: nothing that could smuggle extra mailto parameters or a scheme.
+const EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/
+
+function required(v, label, max) {
+  const s = text(v, label, max)
+  if (!s) fail(`${label} wajib diisi.`)
+  return s
+}
+
+export function validateContact(body) {
+  const b = body && typeof body === 'object' ? body : {}
+  const name = required(b.name, 'Nama', 80)
+  const email = str(b.email)
+  if (email.length > 120 || !EMAIL_RE.test(email)) fail('Email tidak valid.')
+  return { name, email, phone: text(b.phone, 'Telepon', 30), subject: required(b.subject, 'Subjek', 120), message: required(b.message, 'Pesan', 3000) }
+}
+
+/** The hidden `website` field: humans never see it, bots fill it. */
+export const isHoneypot = (body) => str(body?.website) !== ''
+
+/** Messages from one ip_hash in the last hour → refuse? */
+export const contactRateLimited = (count) => count >= CONTACT_LIMIT
+
+export function validateContactUpdate(body) {
+  const b = body && typeof body === 'object' ? body : {}
+  const out = {}
+  if (b.status !== undefined) {
+    if (typeof b.status !== 'string' || !Object.hasOwn(CONTACT_STATUS_LABEL, b.status)) fail('Status tidak dikenal.')
+    out.status = b.status
+  }
+  if (b.staff_note !== undefined) out.staff_note = text(b.staff_note, 'Catatan', 2000)
+  if (!Object.keys(out).length) fail('Tidak ada perubahan.')
+  return out
+}
+
+/** "Balas lewat email" link, or null when the stored address is not a strict email. */
+export const mailtoHref = (email, subject) =>
+  EMAIL_RE.test(String(email)) ? `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(`Re: ${subject}`)}` : null

@@ -1556,6 +1556,12 @@ body.scroll-lock { overflow: hidden; }
 .of-cust-meta { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-3); align-items: center; }
 .of-user { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); justify-content: space-between; align-items: center; min-width: 0; padding: var(--s-3); border-bottom: 1px solid var(--line); }
 .of-user-reason { white-space: pre-wrap; overflow-wrap: anywhere; }
+.of-seg-wrap { display: flex; flex-wrap: wrap; max-width: 100%; margin-bottom: var(--s-3); border-radius: var(--r-md); }
+.of-seg-wrap .seg-btn { padding: 0 10px; }
+.of-contact-detail {display: grid; gap: var(--s-3); justify-items: start; padding: var(--s-3); border-bottom: 1px solid var(--line); min-width: 0; }
+.of-contact-detail[hidden] { display: none; }
+.of-contact-detail > .field { justify-self: stretch; }
+.of-contact-msg { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; justify-self: stretch; }
 .of-row-wrap { flex-wrap: wrap; }
 .of-row-wrap > .field { flex: 1 1 140px; }
 @media (max-width: 768px) {

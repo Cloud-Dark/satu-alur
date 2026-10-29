@@ -23,6 +23,7 @@ import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdmin
 import {
   handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
   handleAdminUsers, handleAdminUserSuspend, handleAdminUserRestore, handleAdminUserRevokeSessions,
+  handleContactPost, handleAdminContact, handleAdminContactCounts, handleAdminContactUpdate,
 } from './customers.js';
 import { SUSPENDED_MESSAGE } from '../src/customers/rules.js';
 
@@ -913,6 +914,10 @@ const ROUTES = {
   'POST /api/office/admin/users/:userId/suspend': (req, env, params) => handleAdminUserSuspend(req, env, ROUTE_DEPS, params),
   'POST /api/office/admin/users/:userId/restore': (req, env, params) => handleAdminUserRestore(req, env, ROUTE_DEPS, params),
   'POST /api/office/admin/users/:userId/revoke-sessions': (req, env, params) => handleAdminUserRevokeSessions(req, env, ROUTE_DEPS, params),
+  'POST /api/contact': (req, env) => handleContactPost(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/contact': (req, env) => handleAdminContact(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/contact/counts': (req, env) => handleAdminContactCounts(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/contact/:id': (req, env, params) => handleAdminContactUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
 };
 

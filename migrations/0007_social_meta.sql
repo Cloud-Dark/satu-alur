@@ -145,6 +145,25 @@ CREATE TABLE IF NOT EXISTS customer_accounts (
   updated_by TEXT
 );
 
+-- Public Contact Us messages (POST /api/contact, no auth). Staff-only reads; never in TABLES.
+-- ip_hash = SHA-256(IP + salt): used only to rate-limit, never returned to any client.
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'read', 'replied', 'archived')),
+  staff_note TEXT NOT NULL DEFAULT '',
+  ip_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT,
+  updated_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_contact_status ON contact_messages(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_contact_ip ON contact_messages(ip_hash, created_at);
+
 -- Staff flags per user (Pengguna). suspended = 1 blocks every session and login (authenticate, OTP, demo).
 -- Staff-only; never in TABLES. Staff users (@staff.satualur.internal) are never flagged.
 CREATE TABLE IF NOT EXISTS user_flags (

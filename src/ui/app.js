@@ -4,6 +4,7 @@ import { renderLoginPage } from '../auth/login-page.js'
 import { renderStaffLogin } from '../auth/staff-login.js'
 import { renderShell } from './shell.js'
 import { renderDocPage } from '../site/doc-page.js'
+import { renderContactPage } from '../contact/page.js'
 
 /**
  * Hash router:
@@ -28,6 +29,7 @@ const ROUTES = {
   '/privasi': (root, ctx) => renderDocPage(root, ctx, 'privacy'),
   '/syarat': (root, ctx) => renderDocPage(root, ctx, 'terms'),
   '/cookie': (root, ctx) => renderDocPage(root, ctx, 'cookies'),
+  '/kontak': renderContactPage,
   [STAFF_PATH]: renderStaffLogin,
 }
 

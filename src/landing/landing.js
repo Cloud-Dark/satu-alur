@@ -287,7 +287,7 @@ function pricingHTML() {
     const variant = { primary: 'btn-primary', accent: 'btn-accent', soft: 'btn-soft' }[t.cta.variant] || ''
     const cta = t.cta.href
       ? `<a class="btn btn-lg ${variant} lp-tier-cta" href="${t.cta.href}">${esc(t.cta.label)} ${iconHTML('arrowRight', { className: 'icon-trailing' })}</a>`
-      : `<a class="btn btn-lg ${variant} lp-tier-cta" href="#" data-placeholder aria-describedby="lp-contact-note">${esc(t.cta.label)} ${iconHTML('arrowUpRight', { className: 'icon-trailing' })}</a>`
+      : `<a class="btn btn-lg ${variant} lp-tier-cta" href="#/kontak" aria-describedby="lp-contact-note">${esc(t.cta.label)} ${iconHTML('arrowUpRight', { className: 'icon-trailing' })}</a>`
     return `
     <article class="lp-tier reveal${t.recommended ? ' is-recommended' : ''}" style="--d: ${i * 90}ms" aria-labelledby="tier-${t.id}">
       <header class="lp-tier-head">
@@ -316,7 +316,7 @@ function pricingHTML() {
         <p class="lp-lede reveal" id="lp-price-lede" style="--d: 120ms">Tiga paket untuk tiga tahap usaha. Pilih yang sesuai sekarang, pindah paket kapan saja.</p>
       </header>
       <div class="lp-tiers">${tiers}</div>
-      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}<span id="lp-draft-note">${esc(PRICING_NOTE)} </span><span id="lp-contact-note">Kontak penjualan Enterprise segera tersedia.</span></p>
+      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}<span id="lp-draft-note">${esc(PRICING_NOTE)} </span><span id="lp-contact-note">Untuk paket Enterprise, hubungi kami lewat halaman Kontak.</span></p>
     </div>
   </section>`
 }
@@ -398,7 +398,7 @@ function footerHTML() {
           ${col('Perusahaan', [
             ['Tentang kami', 'href="#/tentang"'],
             ['Roadmap', 'href="#ide-besar" data-scroll="ide-besar"'],
-            ['Kontak', 'href="#" data-placeholder aria-disabled="true"'],
+            ['Kontak', 'href="#/kontak"'],
           ])}
           ${col('Legal', [
             ['Kebijakan privasi', 'href="#/privasi"'],

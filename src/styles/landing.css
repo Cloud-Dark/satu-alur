@@ -1103,6 +1103,11 @@ html.lp-lock { overflow: hidden; }
 .doc-body ul { margin: 0 0 1em; padding-left: 1.4em; }
 .doc-empty, .doc-updated { color: var(--text-muted); }
 .doc-updated { margin-top: 2.5em; font-size: var(--fs-sm); }
+/* Contact form (#/kontak): labels above controls; .contact-hp is off-screen, not display:none, so bots still fill it */
+.contact-form { display: grid; gap: 16px; margin-top: 24px; }
+.contact-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.contact-done { display: grid; justify-items: start; gap: 16px; margin-top: 24px; padding: 20px; border: 1px solid var(--line); border-radius: var(--r-md); }
+.contact-done p { margin: 0; }
 .doc-foot-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }
 .doc-foot-links a { font-size: var(--fs-sm); color: var(--text-muted); text-decoration: none; }
 .doc-foot-links a:hover { color: var(--text); }

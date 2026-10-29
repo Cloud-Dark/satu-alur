@@ -4,7 +4,10 @@
  * Helpers (authenticate, readJson, ok, HttpError, DEMO_EMAILS) are injected by worker/index.js.
  */
 
-import { validateCustomer, validateSuspendReason, escapeLike, STAFF_EMAIL_SUFFIX } from '../src/customers/rules.js';
+import {
+  validateCustomer, validateSuspendReason, escapeLike, STAFF_EMAIL_SUFFIX,
+  validateContact, validateContactUpdate, isHoneypot, contactRateLimited, CONTACT_STATUS_LABEL, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
+} from '../src/customers/rules.js';
 import { requireAdmin } from './office.js';
 
 const PAGE_SIZE = 50;
@@ -78,6 +81,72 @@ export async function handleAdminCustomerPut(request, env, deps, params) {
        company = excluded.company, phone = excluded.phone, notes = excluded.notes, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
   ).bind(cur.id, v.plan_id, v.status, v.period_end, v.company, v.phone, v.notes, new Date().toISOString(), user.name).run();
   return ok(toCustomer(await findUser(env, cur.id), deps.DEMO_EMAILS));
+}
+
+// ------------------------------------------------------------------ Contact Us
+
+const CONTACT_COLS = 'id, name, email, phone, subject, message, status, staff_note, created_at, updated_at, updated_by'; // never ip_hash
+const HOUR_MS = 3600 * 1000;
+
+// Public, no auth. Honeypot hits look like successes; the per-IP limit counts the last hour.
+export async function handleContactPost(request, env, deps) {
+  const body = await deps.readJson(request);
+  if (isHoneypot(body)) return deps.ok({ message: CONTACT_OK_MESSAGE });
+  let v;
+  try {
+    v = validateContact(body);
+  } catch (err) {
+    if (err?.validation) throw new deps.HttpError(400, err.message);
+    throw err;
+  }
+  const ipHash = await deps.sha256Hex(`${request.headers.get('CF-Connecting-IP') || 'unknown'}:${env.TOKEN_KEY || 'satu-alur-contact'}`);
+  const now = Date.now();
+  const recent = await env.DB.prepare('SELECT COUNT(*) AS n FROM contact_messages WHERE ip_hash = ? AND created_at > ?')
+    .bind(ipHash, new Date(now - HOUR_MS).toISOString()).first();
+  if (contactRateLimited(recent.n)) throw new deps.HttpError(429, CONTACT_LIMIT_MESSAGE);
+  await env.DB.prepare(
+    'INSERT INTO contact_messages (name, email, phone, subject, message, status, staff_note, ip_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  ).bind(v.name, v.email, v.phone, v.subject, v.message, 'new', '', ipHash, new Date(now).toISOString()).run();
+  return deps.ok({ message: CONTACT_OK_MESSAGE });
+}
+
+export async function handleAdminContact(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const url = new URL(request.url);
+  const status = url.searchParams.get('status') || 'new';
+  if (status !== 'all' && !Object.hasOwn(CONTACT_STATUS_LABEL, status)) throw new deps.HttpError(400, 'Status tidak dikenal.');
+  const page = Math.max(1, parseInt(url.searchParams.get('page'), 10) || 1);
+  const where = status === 'all' ? '' : 'WHERE status = ?';
+  const args = status === 'all' ? [] : [status];
+  const [count, { results }] = await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM contact_messages ${where}`).bind(...args).first(),
+    env.DB.prepare(`SELECT ${CONTACT_COLS} FROM contact_messages ${where} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`)
+      .bind(...args, PAGE_SIZE, (page - 1) * PAGE_SIZE).all(),
+  ]);
+  return deps.ok({ items: results, total: count.n, page });
+}
+
+export async function handleAdminContactCounts(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM contact_messages WHERE status = 'new'").first();
+  return deps.ok({ new: row.n });
+}
+
+export async function handleAdminContactUpdate(request, env, deps, params) {
+  const admin = await requireAdmin(request, env, deps);
+  if (!/^\d+$/.test(params.id || '')) throw new deps.HttpError(404, 'Pesan tidak ditemukan.');
+  let v;
+  try {
+    v = validateContactUpdate(await deps.readJson(request));
+  } catch (err) {
+    if (err?.validation) throw new deps.HttpError(400, err.message);
+    throw err;
+  }
+  const sets = Object.keys(v).map((k) => `${k} = ?`);
+  const res = await env.DB.prepare(`UPDATE contact_messages SET ${sets.join(', ')}, updated_at = ?, updated_by = ? WHERE id = ?`)
+    .bind(...Object.values(v), new Date().toISOString(), admin.name, Number(params.id)).run();
+  if (!res.meta?.changes) throw new deps.HttpError(404, 'Pesan tidak ditemukan.');
+  return deps.ok(await env.DB.prepare(`SELECT ${CONTACT_COLS} FROM contact_messages WHERE id = ?`).bind(Number(params.id)).first());
 }
 
 // ------------------------------------------------------------------ Pengguna

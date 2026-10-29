@@ -7,6 +7,8 @@ import * as Plans from './plans.js'
 import * as Payment from './payment.js'
 import * as Customers from './customers.js'
 import * as Users from './users.js'
+import * as Contact from './contact.js'
+import { adminContactCounts } from '../../customers/api.js'
 
 const { el } = C
 const STORE = 'satualur_office_section'
@@ -21,7 +23,7 @@ const GROUPS = [
   { title: 'Pelanggan', items: [
     { key: 'customers', label: 'Pelanggan & mitra', draw: Customers.draw },
     { key: 'users', label: 'Pengguna', draw: Users.draw },
-    { key: 'contact', label: 'Contact Us', soon: true },
+    { key: 'contact', label: 'Contact Us', draw: Contact.draw },
     { key: 'tickets', label: 'Pengaduan CS', soon: true }] },
   { title: 'Agensi influencer', items: [
     { key: 'influencers', label: 'Influencer', draw: Influencers.draw },
@@ -41,11 +43,22 @@ export async function render(container, ctx) {
   const host = el('div', { className: 'of-content' })
 
   const buttons = {}
+  // Count of new Contact Us messages; refreshed on render, when the inbox loads and after status changes.
+  const badge = el('span')
+  async function refreshCount() {
+    try {
+      const { new: n } = await adminContactCounts()
+      if (ctx.signal.aborted) return
+      badge.replaceChildren(...(n ? [C.tag(String(n), 'brand'), el('span', { className: 'sr-only' }, ' pesan baru')] : []))
+      select.querySelector('option[value="contact"]').textContent = n ? `Contact Us (${n} baru)` : 'Contact Us'
+    } catch { /* the badge is optional */ }
+  }
   const nav = el('nav', { className: 'of-nav', 'aria-label': 'Bagian Kantor Satu Alur' }, ...GROUPS.map((g) =>
     el('div', { className: 'of-nav-group' }, el('h2', { className: 'of-nav-title' }, g.title),
       el('ul', {}, ...g.items.map((i) => {
         const b = el('button', { type: 'button', className: 'of-nav-item', disabled: Boolean(i.soon) }, el('span', {}, i.label), i.soon ? el('span', { className: 'of-soon' }, 'Segera') : null)
         buttons[i.key] = b
+        if (i.key === 'contact') b.append(badge)
         b.addEventListener('click', () => go(i.key))
         return el('li', {}, b)
       })))))
@@ -64,7 +77,7 @@ export async function render(container, ctx) {
     // Each section draws into its own box; a slow load from a section we left lands in a detached box.
     const box = el('div')
     host.replaceChildren(box)
-    ITEMS.find((i) => i.key === current).draw(box, ctx, (d) => { if (box.parentNode === host) dirty = d })
+    ITEMS.find((i) => i.key === current).draw(box, ctx, (d) => { if (box.parentNode === host) dirty = d }, refreshCount)
   }
   function go(key) {
     if (key === current) return
@@ -82,4 +95,5 @@ export async function render(container, ctx) {
     C.pageHeader({ title: 'Kantor Satu Alur', description: 'Kelola konten situs, influencer, dan permintaan dari bisnis.' }),
     mobile, el('div', { className: 'of-layout' }, nav, host))
   show()
+  refreshCount()
 }

@@ -21,10 +21,8 @@ export function renderPlanCard(plan) {
 
   const cta = h('a', `btn btn-lg ${variant} lp-tier-cta`, plan.cta_label || 'Pilih paket', ' ', icon(contact ? 'arrowUpRight' : 'arrowRight', { className: 'icon-trailing' }))
   if (contact) {
-    cta.setAttribute('href', '#')
-    cta.setAttribute('data-placeholder', '')
+    cta.setAttribute('href', '#/kontak')
     cta.setAttribute('aria-describedby', 'lp-contact-note')
-    cta.addEventListener('click', (e) => e.preventDefault())
   } else {
     cta.setAttribute('href', '#/masuk')
   }
