@@ -19,12 +19,13 @@ import { parseModelJson } from './agent.js'
 export const SOCIAL_MARKER = '[agent:social]'
 
 export const PLATFORMS = [
-  { value: 'instagram', label: 'Instagram', limit: 2200, style: 'visual, caption dengan baris pembuka kuat, hashtag di akhir' },
-  { value: 'tiktok', label: 'TikTok', limit: 4000, style: 'santai, cepat, hook di 2 detik pertama, bahasa lisan' },
-  { value: 'facebook', label: 'Facebook', limit: 63206, style: 'hangat, bercerita, cocok untuk komunitas lokal' },
-  { value: 'linkedin', label: 'LinkedIn', limit: 3000, style: 'profesional, berbasis pengalaman dan hasil kerja, minim hashtag' },
-  { value: 'whatsapp', label: 'WhatsApp (Status/Channel)', limit: 700, style: 'singkat, personal, ajakan chat langsung, tanpa hashtag' },
-  { value: 'x', label: 'X', limit: 280, style: 'padat, satu gagasan, maksimal 280 karakter termasuk hashtag' },
+  { value: 'instagram', label: 'Instagram', limit: 2200, maxTags: 12, style: 'visual, caption dengan baris pembuka kuat, hashtag di akhir' },
+  { value: 'tiktok', label: 'TikTok', limit: 4000, maxTags: 6, style: 'santai, cepat, hook di 2 detik pertama, bahasa lisan' },
+  { value: 'facebook', label: 'Facebook', limit: 63206, maxTags: 5, style: 'hangat, bercerita, cocok untuk komunitas lokal' },
+  { value: 'threads', label: 'Threads', limit: 500, maxTags: 1, style: 'teks lebih dulu, singkat dan seperti mengobrol, satu gagasan per posting, ajak pembaca membalas; paling banyak 1 tag topik' },
+  { value: 'linkedin', label: 'LinkedIn', limit: 3000, maxTags: 5, style: 'profesional, berbasis pengalaman dan hasil kerja, minim hashtag' },
+  { value: 'whatsapp', label: 'WhatsApp (Status/Channel)', limit: 700, maxTags: 0, style: 'singkat, personal, ajakan chat langsung, tanpa hashtag' },
+  { value: 'x', label: 'X', limit: 280, maxTags: 2, style: 'padat, satu gagasan, maksimal 280 karakter termasuk hashtag' },
 ]
 /** Meta Ads covers Facebook + Instagram; only used for saved ad plans. */
 export const META_PLATFORM = { value: 'meta', label: 'Meta (FB & IG)' }
@@ -65,6 +66,17 @@ export const PARTNER_GOALS = [
   { value: 'bundle', label: 'Paket layanan gabungan' },
 ]
 
+/** Hashtag budget per platform (Threads uses one topic tag, WhatsApp none). */
+export function capHashtags(platform, tags) {
+  const p = PLATFORMS.find((x) => x.value === platform)
+  const list = Array.isArray(tags) ? tags : []
+  return p ? list.slice(0, p.maxTags) : list
+}
+
+const tagRule = (p) => (p.maxTags === 0
+  ? 'Tanpa hashtag.'
+  : p.maxTags === 1 ? 'Hashtag: paling banyak 1 tag topik.' : `Hashtag: paling banyak ${p.maxTags}.`)
+
 export const platformLabel = (v) => [...PLATFORMS, META_PLATFORM].find((p) => p.value === v)?.label || (v ? String(v) : 'Semua platform')
 export const labelOf = (list, v) => list.find((o) => o.value === v)?.label || v || '—'
 
@@ -87,7 +99,7 @@ const SCHEMAS = {
     properties: {
       title: S('Judul singkat untuk pustaka, maksimal 8 kata.'),
       body: S('Isi konten siap pakai. Gunakan baris baru untuk paragraf/slide/adegan. Tanpa hashtag.'),
-      hashtags: LIST('5–12 hashtag relevan, diawali #, tanpa spasi. Kosong untuk WhatsApp.'),
+      hashtags: LIST('Hashtag relevan, diawali #, tanpa spasi, sesuai batas platform. Kosong bila platform tanpa hashtag.'),
       notes: S('Satu kalimat saran pemakaian (visual, waktu unggah umum, atau format).'),
     },
     required: ['title', 'body', 'hashtags', 'notes'],
@@ -325,12 +337,12 @@ function contextBlock(business) {
 
 /* -------------------------------------------------------------- Tasks */
 
-export function generateContent({ platform, type, topic, tone, cta, business, ...run }) {
+export async function generateContent({ platform, type, topic, tone, cta, business, ...run }) {
   const p = PLATFORMS.find((x) => x.value === platform) || PLATFORMS[0]
   const t = CONTENT_TYPES.find((x) => x.value === type) || CONTENT_TYPES[0]
-  return runTask('content', {
+  const res = await runTask('content', {
     ...run,
-    instruction: `Tugas: tulis ${t.ask} untuk ${p.label}. Gaya platform: ${p.style}. Batas teks ${p.limit.toLocaleString('id-ID')} karakter. Sertakan ajakan bertindak yang jelas.`,
+    instruction: `Tugas: tulis ${t.ask} untuk ${p.label}. Gaya platform: ${p.style}. Batas teks ${p.limit.toLocaleString('id-ID')} karakter. ${tagRule(p)} Sertakan ajakan bertindak yang jelas.`,
     user: [
       `Topik / layanan: ${topic}`,
       `Platform: ${p.label}`,
@@ -339,13 +351,19 @@ export function generateContent({ platform, type, topic, tone, cta, business, ..
       cta ? `Ajakan bertindak yang diminta: ${cta}` : 'Ajakan bertindak: tentukan yang paling cocok (misalnya chat WhatsApp).',
     ].join('\n') + contextBlock(business),
   })
+  return res.data ? { ...res, data: { ...res.data, hashtags: capHashtags(p.value, res.data.hashtags) } } : res
+}
+
+const fewTags = (platform) => {
+  const p = PLATFORMS.find((x) => x.value === platform)
+  return p && p.maxTags > 0 && p.maxTags <= 2 ? ` ${p.label} memakai paling banyak ${p.maxTags} tag per posting, jadi urutkan dari yang paling relevan.` : ''
 }
 
 export function generateHashtags({ topic, platform, count = 15, business, ...run }) {
   return runTask('hashtags', {
     ...run,
     temperature: 0.6,
-    instruction: `Tugas: susun ${count} hashtag untuk ${platformLabel(platform)}. Campurkan hashtag umum, niche layanan, dan lokal (kota/area). Hindari hashtag yang menyesatkan atau tidak terkait.`,
+    instruction: `Tugas: susun ${count} hashtag untuk ${platformLabel(platform)}. Campurkan hashtag umum, niche layanan, dan lokal (kota/area). Hindari hashtag yang menyesatkan atau tidak terkait.${fewTags(platform)}`,
     user: `Topik: ${topic}` + contextBlock(business),
   })
 }

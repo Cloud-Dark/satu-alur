@@ -1,6 +1,6 @@
 // E2E: Media sosial workspace (mock AI) — tabs (keyboard), generate content,
 // hashtag tool, save to library, schedule + mark posted + delete, ideas, library
-// filter/search. Adapted from the ad-hoc social-test.cjs. TC-SOC-*.
+// filter/search, Threads, linked accounts. Adapted from the ad-hoc social-test.cjs. TC-SOC-*.
 const { loginLive, goStage, norm } = require('./lib.cjs')
 
 module.exports = async function social(t) {
@@ -105,5 +105,50 @@ module.exports = async function social(t) {
   await p.locator('#sm-panel-content .console-stop').first().click().catch(() => {})
   await p.waitForTimeout(500)
   t.check(/Dihentikan|Selesai/.test(await p.textContent('#sm-panel-content .console-status').catch(() => '')), 'stop button ends the stream')
+  // linked accounts (Akun terhubung): validate, connect, persist, default platform, disconnect
+  await tab('Akun terhubung').click()
+  await p.waitForSelector('#sm-panel-accounts .sm-acc-card')
+  const cards = await p.$$eval('#sm-panel-accounts .sm-acc-card', (els) => els.map((e) => e.dataset.platform))
+  t.check(cards.includes('threads') && cards.length >= 7, 'accounts tab lists every platform incl. Threads', cards.join(','))
+  const thr = p.locator('#sm-panel-accounts [data-platform=threads]')
+  await thr.locator('input[name=acc_threads]').fill('nama tidak valid!')
+  await thr.getByRole('button', { name: 'Hubungkan' }).click()
+  t.check(/tidak valid/.test(norm(await thr.textContent())), 'invalid handle shows a message')
+  await thr.locator('input[name=acc_threads]').fill('https://www.threads.net/@jasa.ac.e2e')
+  await thr.getByRole('button', { name: 'Hubungkan' }).click()
+  await p.waitForSelector('#sm-panel-accounts [data-platform=threads].is-on')
+  t.check(/@jasa\.ac\.e2e/.test(norm(await thr.textContent())), 'Threads connected from a profile link', norm(await thr.textContent()).slice(0, 80))
+  t.check(await thr.locator('a', { hasText: 'Buka profil' }).getAttribute('href') === 'https://www.threads.net/@jasa.ac.e2e', '"Buka profil" points at the profile')
+  t.check(/1 dari/.test(await p.textContent('#sm-panel-accounts .panel-meta')), 'panel meta counts connected accounts')
+  const techy = /oauth|api|localstorage|cloudflare|json/i.test(await p.textContent('#sm-panel-accounts'))
+  t.check(!techy, 'accounts tab has no technical wording')
+
+  // leave and come back: the page is rebuilt from scratch and reads the saved accounts
+  await goStage(p, 'dashboard')
+  await goStage(p, 'social')
+  await p.waitForSelector('#sm-panel-accounts .sm-acc-card')
+  t.check(await p.locator('#sm-panel-accounts [data-platform=threads].is-on').count() === 1, 'connected account survives leaving the page')
+
+  // a fresh page defaults the writer to the connected platform (Threads)
+  await tab('Konten').click()
+  t.check(await p.inputValue('#sm-panel-content select[name=platform]') === 'threads', 'content platform defaults to the connected account')
+  await p.fill('#sm-panel-content input[name=topic]', 'Servis AC Bekasi')
+  await p.getByRole('button', { name: 'Buat konten' }).click()
+  await waitResult('content')
+  t.check(/\/ 500 karakter/.test(await p.textContent('#sm-panel-content .sm-count')), 'Threads counter uses the 500-character limit')
+  t.check(await p.locator('#sm-panel-content .sm-result .sm-hashtag').count() <= 1, 'Threads keeps at most one topic tag')
+  // capture window.open instead of leaving the test for a real site
+  await p.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null } })
+  await p.locator('#sm-panel-content .sm-result').getByRole('button', { name: 'Salin & buka Threads' }).click()
+  const opened = await p.evaluate(() => window.__opened[0] || '')
+  t.check(opened.startsWith('https://www.threads.net/intent/post?text=') && opened.length > 50, '"Salin & buka Threads" opens the Threads composer with the text', opened.slice(0, 70))
+
+  await tab('Akun terhubung').click()
+  const off = thr.getByRole('button', { name: 'Putuskan' })
+  await off.click()
+  await off.click()
+  await p.waitForTimeout(300)
+  t.check(await p.locator('#sm-panel-accounts [data-platform=threads].is-on').count() === 0, '"Putuskan" (two clicks) disconnects the account')
+
   await t.noErrors(p)
 }

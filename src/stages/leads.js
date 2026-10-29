@@ -475,7 +475,14 @@ export async function render(container, ctx = {}) {
       if (!inIndonesia(p.lat, p.lon)) { formMsg.show('warn', 'Titik di luar Indonesia. Pilih titik di wilayah Indonesia.'); return }
       setPoint(p, 'Titik di peta')
     })
-    onAbort(() => { map?.remove(); map = null })
+    // Stop pan/zoom animations first: removing a map mid-animation makes
+    // Leaflet's pending transition callbacks read positions of removed panes.
+    onAbort(() => {
+      const m = map
+      map = null
+      if (!m) return
+      try { m.stop(); m.off(); m.remove() } catch { /* already torn down */ }
+    })
     const onTheme = () => drawCircle()
     window.addEventListener('themechange', onTheme)
     onAbort(() => window.removeEventListener('themechange', onTheme))

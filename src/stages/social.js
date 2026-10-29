@@ -5,8 +5,8 @@
  * onto the v2 stage architecture: AI content per platform, posting schedule,
  * idea brainstorm, Meta ads helper, collaboration ideas, hashtags and a saved
  * content library. Persistence lives in D1 (social_contents,
- * social_schedules) instead of localStorage. Nothing on this page shows
- * invented performance numbers.
+ * social_schedules); linked accounts stay on the device (social-accounts.js).
+ * Nothing on this page shows invented performance numbers or posts for the user.
  */
 import '../styles/social.css'
 import { getCloud } from '../cloud.js'
@@ -14,6 +14,7 @@ import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { resolveModel, abortable } from './offer.js'
 import * as AI from '../ai/social-agent.js'
+import * as Acc from './social-accounts.js'
 
 const { el, icon } = C
 
@@ -24,6 +25,7 @@ const TABS = [
   { key: 'ads', label: 'Iklan Meta', icon: 'target' },
   { key: 'partner', label: 'Kolaborasi', icon: 'handshake' },
   { key: 'library', label: 'Pustaka', icon: 'bookmark' },
+  { key: 'accounts', label: 'Akun terhubung', icon: 'plug' },
 ]
 
 const KINDS = [
@@ -219,28 +221,50 @@ export async function render(container, ctx = {}) {
   let model = null
   const modelNotes = new Set()
   const modelNote = () => {
-    const n = el('span', { className: 'model-note' }, model ? `Model: ${model.id}` : 'Model: memuat…')
+    const n = el('span', { className: 'model-note', hidden: true })
     modelNotes.add(n)
     return n
   }
   const modelReady = resolveModel()
-    .then((m) => { model = m; modelNotes.forEach((n) => { n.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' }) })
-    .catch((err) => modelNotes.forEach((n) => { n.textContent = `Model: ${err.message}` }))
+    .then((m) => { model = m; if (!m) modelNotes.forEach((n) => { n.textContent = 'AI sedang tidak tersedia'; n.hidden = false }) })
+    .catch((err) => modelNotes.forEach((n) => { n.textContent = 'AI sedang tidak tersedia'; n.hidden = false }))
 
   let business = { services: [], areas: [], requests: 0 }
   const businessReady = loadBusiness().then((b) => { business = b; return b })
 
+  const userId = ctx.user?.id
+  let accounts = Acc.loadAccounts(userId)
+  const accountSubs = new Set()
+  const stopAccounts = Acc.onAccountsChange(() => {
+    accounts = Acc.loadAccounts(userId)
+    accountSubs.forEach((fn) => fn())
+  })
+  ctx.signal?.addEventListener('abort', stopAccounts)
+  /** First connected platform the writer supports, else Instagram. */
+  const defaultPlatform = () => Acc.connectedPlatforms(accounts, AI.PLATFORMS.map((p) => p.value))[0] || 'instagram'
+  /** Follows the default until the user picks a platform (setting .value fires no change). */
+  function followDefault(select) {
+    let touched = false
+    select.input.addEventListener('change', () => { touched = true })
+    accountSubs.add(() => { if (!touched) select.input.value = defaultPlatform() })
+    return select
+  }
+
+  /** Opens the platform's own composer (or profile) and copies the text. */
+  function openPlatform(platform, text) {
+    const url = Acc.composeUrl(platform, text, accounts[platform])
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    copyText(text, 'Konten')
+  }
+  const shortLabel = (platform) => AI.platformLabel(platform).replace(/\s*\(.*\)$/, '')
+  function openButton(platform, getText, opts = {}) {
+    const b = C.button({ label: `Salin & buka ${shortLabel(platform)}`, icon: 'arrowUpRight', variant: 'ghost', ...opts })
+    b.addEventListener('click', () => openPlatform(platform, getText()))
+    return b
+  }
+
   /* ------------------------------------------------------------ Header */
-  const header = el('header', { className: 'page-head' },
-    el('div', { className: 'page-head-text' },
-      el('span', { className: 'step-pill sm-pill' },
-        el('span', { className: 'sm-pill-ico', 'aria-hidden': 'true' }, icon('megaphone', { size: 14 })),
-        el('span', { className: 'step-text' }, 'Pertumbuhan', el('span', { 'aria-hidden': 'true' }, '·'), el('b', {}, 'Media sosial')),
-      ),
-      el('h1', { className: 'page-title display', tabindex: '-1' }, 'Media ', el('em', {}, 'sosial')),
-      el('p', { className: 'page-desc' }, 'Tulis konten per platform, atur jadwal unggah, kumpulkan ide, dan susun rencana iklan Meta serta kolaborasi. Semua hasil AI bisa diedit sebelum disimpan ke pustaka.'),
-    ),
-  )
+  const header = C.pageHeader({ title: 'Media sosial' })
 
   /* -------------------------------------------------------------- Tabs */
   const tablist = el('div', { className: 'sm-tabs', role: 'tablist', 'aria-label': 'Alat media sosial' })
@@ -283,6 +307,7 @@ export async function render(container, ctx = {}) {
     ads: buildAds,
     partner: buildPartner,
     library: buildLibrary,
+    accounts: buildAccounts,
   }
   function ensure(key) {
     if (!built.has(key)) {
@@ -319,17 +344,17 @@ export async function render(container, ctx = {}) {
   async function runAI({ out, msg, btn, busyLabel, run, onDone }) {
     msg.hide()
     if (!model) {
-      const restoreWait = C.setBusy(btn, 'Memuat model…')
+      const restoreWait = C.setBusy(btn, 'Menyiapkan AI…')
       try { await modelReady } catch { /* reported below */ } finally { restoreWait() }
     }
     if (!model) {
-      msg.show('danger', 'Model AI belum tersedia. Periksa koneksi lalu muat ulang halaman.')
+      msg.show('danger', 'AI belum tersedia. Periksa koneksi lalu muat ulang halaman.')
       return
     }
     const ac = new AbortController()
     active.add(ac)
     const restore = C.setBusy(btn, busyLabel)
-    const ui = C.aiConsole({ model: model.id })
+    const ui = C.aiConsole()
     ui.onStop(() => ac.abort())
     ui.setStatus('Menulis…', true)
     ui.write('')
@@ -425,7 +450,7 @@ export async function render(container, ctx = {}) {
     const ta = C.textarea({ label: 'Teks dari AI', rows: 10, value: raw })
     return el('div', { className: 'sm-result' },
       el('div', { className: 'note note-warn' }, icon('alert'), el('div', { className: 'note-body' },
-        el('p', {}, 'AI tidak mengembalikan format terstruktur. Teks aslinya ditampilkan di bawah dan tetap bisa diedit, disalin, atau disimpan.'))),
+        el('p', {}, 'Jawaban AI tidak bisa dirapikan otomatis. Teksnya tetap ditampilkan di bawah dan bisa diedit, disalin, atau disimpan.'))),
       ta.wrap,
       el('div', { className: 'form-actions' },
         saveButton(() => onSaveRow(ta.input.value.trim())),
@@ -468,7 +493,7 @@ export async function render(container, ctx = {}) {
 
   /* =========================================================== Konten */
   function buildContent() {
-    const platform = C.select({ label: 'Platform', name: 'platform', options: AI.PLATFORMS, value: 'instagram' })
+    const platform = followDefault(C.select({ label: 'Platform', name: 'platform', options: AI.PLATFORMS, value: defaultPlatform() }))
     const type = C.select({ label: 'Jenis konten', name: 'type', options: AI.CONTENT_TYPES, value: 'caption' })
     const topic = C.field({ label: 'Topik, produk, atau layanan', name: 'topic', required: true, placeholder: 'Contoh: Pembersihan AC rumah di Jakarta Selatan' })
     const tone = C.select({ label: 'Nada', name: 'tone', options: AI.TONES, value: 'casual' })
@@ -589,6 +614,7 @@ export async function render(container, ctx = {}) {
           })),
           copyBtn(fullText, 'Konten'),
           schedBtn,
+          openButton(input.platform, fullText),
         ),
       )
     }
@@ -607,7 +633,7 @@ export async function render(container, ctx = {}) {
 
   /* ============================================================ Jadwal */
   function buildSchedule() {
-    const platform = C.select({ label: 'Platform', name: 'platform', options: AI.PLATFORMS, value: 'instagram' })
+    const platform = followDefault(C.select({ label: 'Platform', name: 'platform', options: AI.PLATFORMS, value: defaultPlatform() }))
     const postType = C.select({ label: 'Tipe', name: 'post_type', options: AI.POST_TYPES, value: 'organic' })
     const content = C.textarea({ label: 'Konten atau caption', name: 'content', required: true, rows: 6, placeholder: 'Tulis atau tempel konten yang akan diunggah…' })
     const when = C.field({ label: 'Tanggal dan jam', name: 'scheduled_at', type: 'datetime-local', required: true, value: toLocalInput(nextSlot()) })
@@ -687,7 +713,9 @@ export async function render(container, ctx = {}) {
       confirmAction(del, 'Yakin hapus?', async () => {
         try { await data.deleteSchedule(s.id); showToast('Jadwal dihapus.', 'info') } catch (err) { showToast(err.message, 'error') }
       })
-      box.append(copyIcon(() => s.content), del)
+      const open = C.iconButton({ iconName: 'arrowUpRight', label: `Salin & buka ${shortLabel(s.platform)}`, className: 'sm-icon-btn' })
+      open.addEventListener('click', () => openPlatform(s.platform, s.content))
+      box.append(copyIcon(() => s.content), open, del)
       return box
     }
 
@@ -1083,6 +1111,77 @@ export async function render(container, ctx = {}) {
     data.on('library', draw)
     if (!data.library) data.loadLibrary()
 
+    return { root: panel, onShow: draw }
+  }
+
+  /* ==================================================== Akun terhubung */
+  function buildAccounts() {
+    const grid = el('ul', { className: 'sm-acc-grid' })
+    const panel = C.panel({ title: 'Akun terhubung', meta: ' ', className: 'sm-acc-panel' },
+      el('p', { className: 'sm-fine' }, icon('info', { size: 14 }),
+        el('span', {}, 'Simpan akun bisnis Anda agar Satu Alur bisa membuka profil dan aplikasinya. Unggahan tetap Anda lakukan sendiri: salin teks, lalu buka aplikasinya.')),
+      grid,
+    )
+    const meta = panel.querySelector('.panel-meta')
+    const editing = new Set()
+
+    function card(p) {
+      const a = accounts[p.value]
+      const label = shortLabel(p.value)
+      const on = Boolean(a) && !editing.has(p.value)
+      const head = el('div', { className: 'sm-acc-head' },
+        el('span', { className: `sm-acc-mark is-${p.value}`, 'aria-hidden': 'true' }, p.mark),
+        el('div', { className: 'sm-acc-name' },
+          el('h3', {}, label),
+          a ? el('span', { className: 'sm-acc-handle' }, a.name ? `${a.name} · ${a.display}` : a.display) : el('span', { className: 'muted small' }, 'Belum terhubung'),
+        ),
+        C.tag(a ? 'Terhubung' : 'Belum', a ? 'ok' : 'neutral'),
+      )
+      if (on) {
+        const openA = el('a', { className: 'btn btn-soft btn-sm', href: Acc.profileUrl(p.value, a), target: '_blank', rel: 'noopener noreferrer' },
+          icon('arrowUpRight'), el('span', { className: 'btn-label' }, 'Buka profil'))
+        const edit = C.button({ label: 'Ubah', icon: 'pencil', size: 'sm', variant: 'ghost' })
+        edit.addEventListener('click', () => { editing.add(p.value); draw(); grid.querySelector(`[data-platform="${p.value}"] input`)?.focus() })
+        const off = C.button({ label: 'Putuskan', icon: 'x', size: 'sm', variant: 'ghost', className: 'sm-del' })
+        confirmAction(off, 'Yakin putuskan?', () => {
+          Acc.disconnectAccount(userId, p.value)
+          showToast(`${label} diputuskan.`, 'info')
+        })
+        return el('li', { className: 'sm-acc-card is-on', dataset: { platform: p.value } }, head, el('div', { className: 'sm-acc-actions' }, openA, edit, off))
+      }
+      const handle = C.field({ label: p.value === 'whatsapp' ? 'Nomor WhatsApp bisnis' : 'Nama pengguna atau tautan', name: `acc_${p.value}`, placeholder: p.placeholder, value: a?.display?.replace(/^\+/, '') || '', attrs: { autocomplete: 'off', spellcheck: 'false', inputmode: p.value === 'whatsapp' ? 'tel' : undefined } })
+      const name = C.field({ label: 'Nama tampilan', name: `acc_${p.value}_name`, placeholder: 'Opsional', value: a?.name || '', attrs: { autocomplete: 'off' } })
+      const msg = C.message()
+      const save = C.button({ label: a ? 'Simpan' : 'Hubungkan', icon: a ? 'check' : 'plug', size: 'sm', variant: 'primary', type: 'submit' })
+      const actions = el('div', { className: 'form-actions' }, save)
+      if (a) {
+        const cancel = C.button({ label: 'Batal', size: 'sm', variant: 'ghost' })
+        cancel.addEventListener('click', () => { editing.delete(p.value); draw() })
+        actions.append(cancel)
+      }
+      const form = el('form', { className: 'form sm-acc-form', novalidate: true }, handle.wrap, name.wrap, actions, msg)
+      form.addEventListener('submit', (e) => {
+        e.preventDefault()
+        const res = Acc.connectAccount(userId, p.value, handle.input.value, name.input.value)
+        if (res.error) {
+          handle.input.setAttribute('aria-invalid', 'true')
+          msg.show('danger', res.error)
+          handle.input.focus()
+          return
+        }
+        editing.delete(p.value)
+        showToast(`${label} terhubung.`, 'success')
+      })
+      return el('li', { className: 'sm-acc-card', dataset: { platform: p.value } }, head, form)
+    }
+
+    function draw() {
+      const n = Acc.connectedPlatforms(accounts).length
+      meta.textContent = n ? `${n} dari ${Acc.ACCOUNT_PLATFORMS.length} terhubung` : 'Belum ada akun'
+      grid.replaceChildren(...Acc.ACCOUNT_PLATFORMS.map(card))
+    }
+    accountSubs.add(draw)
+    draw()
     return { root: panel, onShow: draw }
   }
 

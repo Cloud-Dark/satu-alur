@@ -4,18 +4,6 @@
    panel, stage-grid, console, note, tag) and tokens.css.
    ========================================================= */
 
-/* ---- Header pill ---- */
-.sm-pill { padding-left: 6px; }
-.sm-pill-ico {
-  width: 22px; height: 22px;
-  display: inline-grid; place-items: center;
-  border-radius: 50%;
-  background: var(--accent-50);
-  color: var(--accent-600);
-  border: 1px solid var(--accent-100);
-}
-:root[data-theme='dark'] .sm-pill-ico { color: var(--accent); }
-
 /* ---- Tabs ---- */
 .sm-wrap { display: flex; flex-direction: column; gap: var(--s-5); }
 .sm-tabs, .sm-panel { scroll-margin-top: calc(var(--topbar-h, 72px) + var(--s-4)); }
@@ -28,7 +16,10 @@
   background: var(--surface-sunken);
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.sm-tabs::-webkit-scrollbar { display: none; }
 .sm-tab {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 40px;
@@ -302,6 +293,45 @@
 .sm-lib-actions .sm-del:not(.is-armed) { padding: 6px 10px; }
 .sm-lib-actions .sm-del:not(.is-armed) .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+/* ---- Akun terhubung ---- */
+.sm-acc-panel .sm-fine { margin-bottom: var(--s-4); }
+.sm-acc-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--s-4);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.sm-acc-card {
+  display: flex; flex-direction: column; gap: var(--s-4);
+  padding: var(--s-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.sm-acc-card.is-on { border-color: color-mix(in srgb, var(--success) 35%, var(--line)); }
+.sm-acc-head { display: flex; align-items: center; gap: var(--s-3); }
+.sm-acc-head .tag.status { margin-left: auto; flex-shrink: 0; }
+.sm-acc-mark {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: inline-grid; place-items: center;
+  border-radius: var(--r-md);
+  background: var(--brand-50); color: var(--brand-600);
+  font-weight: 700; font-size: 0.9rem; letter-spacing: -0.02em;
+}
+.sm-acc-mark.is-instagram { background: #fbe7ef; color: #b1316b; }
+.sm-acc-mark.is-tiktok { background: #e8f6f7; color: #13636b; }
+.sm-acc-mark.is-facebook { background: #e7eefb; color: #2953a6; }
+.sm-acc-mark.is-threads { background: var(--surface-sunken); color: var(--text); font-size: 1.15rem; }
+.sm-acc-mark.is-linkedin { background: #e4effa; color: #1b5c96; }
+.sm-acc-mark.is-whatsapp { background: var(--success-bg); color: var(--success); }
+.sm-acc-mark.is-x { background: var(--surface-sunken); color: var(--text); }
+:root[data-theme='dark'] .sm-acc-mark:not(.is-threads):not(.is-x) { background: var(--surface-2); }
+.sm-acc-name { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sm-acc-name h3 { font-size: 0.98rem; font-weight: 700; margin: 0; }
+.sm-acc-handle { font-size: 0.84rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.sm-acc-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: auto; }
+.sm-acc-actions .sm-del { margin-left: auto; }
+.sm-acc-form { gap: var(--s-3); }
+
 /* ---- Responsive ---- */
 @media (max-width: 1279px) {
   .sm-grid { grid-template-columns: minmax(0, 1fr); }
@@ -315,6 +345,9 @@
     border-radius: var(--r-lg);
   }
   .sm-tab { padding: 0 8px; font-size: 0.8rem; gap: 6px; border-radius: var(--r-md); }
+  .sm-tab:last-child:nth-child(3n + 1) { grid-column: 1 / -1; }
+  .sm-acc-grid { grid-template-columns: minmax(0, 1fr); }
+  .sm-acc-card { padding: var(--s-4); }
   .sm-tab:focus-visible { border-radius: var(--r-md); }
   .sm-ideas, .sm-copies, .sm-lib-list { grid-template-columns: minmax(0, 1fr); }
   .sm-idea, .sm-partner, .sm-copy { padding: var(--s-4); }
