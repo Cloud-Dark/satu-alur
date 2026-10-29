@@ -73,6 +73,14 @@ module.exports = async function support(t) {
   t.check(await sthread.locator('select[id$="-status"]').inputValue() === 'in_progress', 'staff: a reply on Terbuka moves it to Diproses')
   await s.waitForFunction(() => !/tiket menunggu/.test(document.querySelector('.of-nav')?.textContent || ''), null, { timeout: 8000 }).catch(() => {})
   t.check(!/tiket menunggu/.test(await s.locator('.of-nav').textContent()), 'staff: the badge clears once staff replied')
+  // an unsent staff reply makes switching sections ask first; dismissing stays on the thread
+  await sthread.getByLabel('Balasan').fill('draf')
+  let asked = ''
+  s.once('dialog', (d) => { asked = d.message(); d.dismiss() })
+  await s.getByRole('button', { name: 'Contact Us', exact: true }).click()
+  await s.waitForTimeout(300)
+  t.check(/belum disimpan/.test(asked) && await sthread.getByLabel('Balasan').inputValue() === 'draf', 'staff: an unsent reply asks before switching sections')
+  await sthread.getByLabel('Balasan').fill('')
 
   // business sees the reply and Diproses
   await row.click()
@@ -98,6 +106,12 @@ module.exports = async function support(t) {
 
   // staff closes it; the business has no reply box
   await setStatus('closed')
+  // A still has the open thread on screen: sending now says why and reloads it closed
+  await thread.getByLabel('Balasan').fill('Halo?')
+  await thread.getByRole('button', { name: 'Kirim balasan' }).click()
+  await a.getByText('Tiket ditutup. Buat tiket baru bila masih butuh bantuan.').waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await a.getByText('Tiket sudah ditutup.').count() >= 1 && await thread.getByLabel('Balasan').count() === 0 && await thread.locator('.sp-msg').count() === 3,
+    'business: a reply sent after staff closed it says "Tiket sudah ditutup.", reloads closed, no message added')
   await a.getByRole('button', { name: 'Kembali ke daftar tiket' }).click()
   await row.locator('.tag', { hasText: 'Ditutup' }).waitFor({ timeout: 8000 })
   await row.click()

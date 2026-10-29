@@ -246,6 +246,8 @@ function mockThread(db, id, ownerId) {
   if (!ticket) throw new Error(TICKET_NOT_FOUND)
   return { ticket, messages: (db.ticket_messages || []).filter((m) => m.ticket_id === ticket.id) }
 }
+// No status guard needed here, unlike the Worker: read, nextStatusOnReply and write run in one synchronous turn on
+// localStorage, so another page can't change the ticket in between. A closed ticket throws TICKET_CLOSED_MESSAGE.
 function mockReply(db, ticket, author, name, body) {
   const now = new Date().toISOString()
   const msgs = db.ticket_messages || []

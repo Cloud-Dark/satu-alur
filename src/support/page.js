@@ -6,7 +6,7 @@
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { listTickets, getTicket, createTicket, replyTicket } from '../customers/api.js'
-import { TICKET_STATUS_LABEL, TICKET_CATEGORY_LABEL, validateTicket, validateReply } from './rules.js'
+import { TICKET_STATUS_LABEL, TICKET_CATEGORY_LABEL, TICKET_CLOSED_MESSAGE, validateTicket, validateReply } from './rules.js'
 
 const { el } = C
 const TONE = { open: 'brand', in_progress: 'warn', resolved: 'ok', closed: 'neutral' }
@@ -25,9 +25,17 @@ export function messageList(messages) {
       el('p', { className: 'sp-msg-body' }, m.body))))
 }
 
-/** Reply box; onSend(body) saves and redraws the thread (errors show under the box). */
-export function replyForm(onSend) {
-  const box = C.textarea({ label: 'Balasan', id: `sp-reply-${++seq}`, rows: 4, required: true, attrs: { maxlength: '3000' } })
+/** A reply that lost a race (409) or hit a ticket closed meanwhile: show why, then reload the thread. */
+export const staleReply = (ex) => ex?.status === 409 || ex?.message === TICKET_CLOSED_MESSAGE
+
+/**
+ * Reply box; onSend(body) saves and redraws the thread (errors show under the box).
+ * draft: initial text (kept across a reload); onDraft(hasText) reports unsent text for leave guards.
+ */
+export function replyForm(onSend, { draft = '', onDraft = () => {} } = {}) {
+  const box = C.textarea({ label: 'Balasan', id: `sp-reply-${++seq}`, rows: 4, required: true, value: draft, attrs: { maxlength: '3000' } })
+  box.input.addEventListener('input', () => onDraft(box.input.value.trim() !== ''))
+  onDraft(draft.trim() !== '')
   const err = el('p', { className: 'field-error', role: 'alert' })
   const send = C.button({ label: 'Kirim balasan', icon: 'send', variant: 'primary', type: 'submit' })
   const form = el('form', { className: 'form sp-reply', noValidate: true }, box.wrap, err, send)
@@ -105,6 +113,7 @@ export async function render(container, ctx) {
 
   async function showList() {
     const mine = ++run
+    hasDraft = false
     const add = C.button({ label: 'Buat tiket', icon: 'plus', variant: 'primary', size: 'sm' })
     add.addEventListener('click', () => openCreate(add, (id) => { if (!ctx.signal.aborted) showThread(id) }))
     const panel = (...kids) => C.panel({ title: 'Tiket saya', actions: add }, ...kids)
@@ -123,8 +132,9 @@ export async function render(container, ctx) {
       : C.emptyState({ title: 'Belum ada tiket', body: 'Buat tiket bila ada kendala teknis, tagihan, atau akun.', iconName: 'inbox' })))
   }
 
-  async function showThread(id) {
+  async function showThread(id, draft = '') {
     const mine = ++run
+    hasDraft = false
     body.replaceChildren(C.skeletonRows(3))
     let th
     try { th = await getTicket(id) } catch (e) {
@@ -139,15 +149,29 @@ export async function render(container, ctx) {
       const foot = t.status === 'closed'
         ? el('p', { className: 'note sp-closed' }, 'Tiket ditutup. Buat tiket baru bila masih butuh bantuan.')
         : replyForm(async (text) => {
-          const next = await replyTicket(t.id, { body: text })
+          let next
+          try { next = await replyTicket(t.id, { body: text }) } catch (ex) {
+            if (!staleReply(ex)) throw ex
+            showToast(ex.message, 'error')
+            if (live(mine)) showThread(t.id, text)
+            return
+          }
           if (!live(mine)) return
           draw(next)
           showToast('Balasan terkirim.', 'success')
-        })
+        }, { draft, onDraft: (has) => { hasDraft = has } })
+      if (t.status === 'closed') hasDraft = false
+      draft = ''
       body.replaceChildren(threadView(t, { onBack: showList, foot, messages }))
     }
     draw(th)
   }
+
+  // The shell has no shared leave guard, so an unsent reply only guards closing or reloading the tab.
+  let hasDraft = false
+  const onUnload = (e) => { if (hasDraft) { e.preventDefault(); e.returnValue = '' } }
+  window.addEventListener('beforeunload', onUnload)
+  ctx.signal.addEventListener('abort', () => window.removeEventListener('beforeunload', onUnload))
 
   // A deep link opens that ticket once; drop the query so a reload shows the list.
   const deep = new URLSearchParams(location.hash.split('?')[1] || '').get('tiket')

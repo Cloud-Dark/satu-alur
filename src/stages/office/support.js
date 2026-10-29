@@ -2,7 +2,7 @@ import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import { adminListTickets, adminGetTicket, adminReplyTicket, adminUpdateTicket, PAGE_SIZE } from '../../customers/api.js'
 import { TICKET_STATUS_LABEL } from '../../support/rules.js'
-import { statusTag, replyForm, threadView } from '../../support/page.js'
+import { statusTag, replyForm, threadView, staleReply } from '../../support/page.js'
 
 const { el } = C
 const STATUS_OPTIONS = Object.entries(TICKET_STATUS_LABEL).map(([value, label]) => ({ value, label }))
@@ -35,6 +35,7 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
 
   async function load(page) {
     const mine = ++run
+    setDirty(false)
     view.replaceChildren(seg, body, pg.root)
     body.replaceChildren(C.skeletonRows(3))
     let data
@@ -55,8 +56,9 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
       : C.emptyState({ title: 'Tidak ada tiket', body: 'Belum ada tiket dengan status ini.', iconName: 'inbox' }))
   }
 
-  async function showThread(id) {
+  async function showThread(id, draft = '') {
     const mine = ++run
+    setDirty(false)
     view.replaceChildren(C.skeletonRows(3))
     let th
     try { th = await adminGetTicket(id) } catch (e) {
@@ -80,13 +82,21 @@ export function draw(host, ctx, setDirty, onChanged = () => {}) {
           if (live(mine)) { drawThread(next); onChanged() }
         } catch (ex) { err.textContent = ex.message } finally { restore() }
       })
+      // Unsent text marks the section dirty, so switching sections asks first (office/index.js).
       const reply = replyForm(async (text) => {
-        const next = await adminReplyTicket(t.id, { body: text })
+        let next
+        try { next = await adminReplyTicket(t.id, { body: text }) } catch (ex) {
+          if (!staleReply(ex)) throw ex
+          showToast(ex.message, 'error')
+          if (live(mine)) showThread(t.id, text)
+          return
+        }
         if (!live(mine)) return
         drawThread(next)
         onChanged()
         showToast('Balasan terkirim.', 'success')
-      })
+      }, { draft, onDraft: setDirty })
+      draft = ''
       const who = el('span', { className: 'muted small' }, [t.company, t.email].filter(Boolean).join(' · '))
       view.replaceChildren(threadView(t, {
         onBack: () => load(pg.page), messages, meta: who,

@@ -6,6 +6,8 @@ export const OPEN_TICKET_LIMIT = 20
 export const TICKET_LIMIT_MESSAGE = 'Terlalu banyak tiket terbuka.'
 export const TICKET_CLOSED_MESSAGE = 'Tiket sudah ditutup.'
 export const TICKET_NOT_FOUND = 'Tiket tidak ditemukan.'
+/** A reply raced another change to the ticket's status (HTTP 409). */
+export const TICKET_RACE_MESSAGE = 'Tiket baru saja diperbarui. Muat ulang lalu coba lagi.'
 
 function fail(message) {
   throw Object.assign(new Error(message), { validation: true })

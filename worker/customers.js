@@ -9,8 +9,8 @@ import {
   validateContact, validateContactUpdate, isHoneypot, contactRateLimited, CONTACT_STATUS_LABEL, CONTACT_OK_MESSAGE, CONTACT_LIMIT_MESSAGE,
 } from '../src/customers/rules.js';
 import {
-  validateTicket, validateReply, validateTicketStatus, nextStatusOnReply, customerAuthorName, staffAuthorName, ticketLimitReached,
-  TICKET_STATUS_LABEL, TICKET_LIMIT_MESSAGE, TICKET_NOT_FOUND,
+  validateTicket, validateReply, validateTicketStatus, nextStatusOnReply, customerAuthorName, staffAuthorName,
+  TICKET_STATUS_LABEL, TICKET_LIMIT_MESSAGE, TICKET_NOT_FOUND, TICKET_CLOSED_MESSAGE, TICKET_RACE_MESSAGE, OPEN_TICKET_LIMIT,
 } from '../src/support/rules.js';
 import { requireAdmin } from './office.js';
 import { realUser } from './social.js';
@@ -256,16 +256,19 @@ async function staffThread(env, deps, id) {
   return { ticket, messages: await messagesOf(env, id) };
 }
 
-// Inserts the message and moves the ticket (status, updated_at, last_reply_by). ownerId scopes customer writes.
-function saveReply(env, { id, author, name, body, status, ownerId }) {
+// Moves the ticket (status, updated_at, last_reply_by) only while it still has the status we read (`from`), and
+// inserts the message only when that UPDATE hit a row: changes() of the previous statement, since a D1 batch runs
+// as one transaction on one connection. ownerId scopes customer writes. Returns false when the ticket moved.
+async function saveReply(env, { id, author, name, body, from, status, ownerId }) {
   const now = new Date().toISOString();
-  const update = ownerId === undefined
-    ? env.DB.prepare('UPDATE support_tickets SET status = ?, updated_at = ?, last_reply_by = ? WHERE id = ?').bind(status, now, author, id)
-    : env.DB.prepare('UPDATE support_tickets SET status = ?, updated_at = ?, last_reply_by = ? WHERE id = ? AND owner_id = ?').bind(status, now, author, id, ownerId);
-  return env.DB.batch([
-    env.DB.prepare('INSERT INTO support_messages (ticket_id, author, author_name, body, created_at) VALUES (?, ?, ?, ?, ?)').bind(id, author, name, body, now),
-    update,
+  const owner = ownerId === undefined ? [] : [ownerId];
+  const [upd] = await env.DB.batch([
+    env.DB.prepare(`UPDATE support_tickets SET status = ?, updated_at = ?, last_reply_by = ? WHERE id = ?${owner.length ? ' AND owner_id = ?' : ''} AND status = ?`)
+      .bind(status, now, author, id, ...owner, from),
+    env.DB.prepare('INSERT INTO support_messages (ticket_id, author, author_name, body, created_at) SELECT ?, ?, ?, ?, ? WHERE changes() = 1')
+      .bind(id, author, name, body, now),
   ]);
+  return upd.meta.changes === 1;
 }
 
 async function customerName(env, user) {
@@ -291,16 +294,20 @@ export async function handleSupportCreate(request, env, deps) {
   const user = await realUser(request, env, deps);
   const body = await deps.readJson(request);
   const v = checked(() => validateTicket(body), deps.HttpError);
-  const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM support_tickets WHERE owner_id = ? AND status != 'closed'").bind(user.id).first();
-  if (ticketLimitReached(open.n)) throw new deps.HttpError(400, TICKET_LIMIT_MESSAGE);
   const name = await customerName(env, user);
   const now = new Date().toISOString();
+  // The cap is checked inside the INSERT, so parallel creates can't pass it together; the first message follows
+  // only when the ticket row was inserted (changes() = 1, so last_insert_rowid() is that ticket).
   const [ins] = await env.DB.batch([
-    env.DB.prepare("INSERT INTO support_tickets (owner_id, category, subject, status, created_at, updated_at, last_reply_by) VALUES (?, ?, ?, 'open', ?, ?, 'customer')")
-      .bind(user.id, v.category, v.subject, now, now),
-    env.DB.prepare("INSERT INTO support_messages (ticket_id, author, author_name, body, created_at) VALUES (last_insert_rowid(), 'customer', ?, ?, ?)")
+    env.DB.prepare(
+      `INSERT INTO support_tickets (owner_id, category, subject, status, created_at, updated_at, last_reply_by)
+       SELECT ?, ?, ?, 'open', ?, ?, 'customer'
+       WHERE (SELECT COUNT(*) FROM support_tickets WHERE owner_id = ? AND status != 'closed') < ?`,
+    ).bind(user.id, v.category, v.subject, now, now, user.id, OPEN_TICKET_LIMIT),
+    env.DB.prepare("INSERT INTO support_messages (ticket_id, author, author_name, body, created_at) SELECT last_insert_rowid(), 'customer', ?, ?, ? WHERE changes() = 1")
       .bind(name, v.body, now),
   ]);
+  if (ins.meta.changes !== 1) throw new deps.HttpError(400, TICKET_LIMIT_MESSAGE);
   return deps.ok(await ownThread(env, deps, ins.meta.last_row_id, user.id));
 }
 
@@ -311,7 +318,11 @@ export async function handleSupportReply(request, env, deps, params) {
   const reqBody = await deps.readJson(request);
   const body = checked(() => validateReply(reqBody), deps.HttpError);
   const status = checked(() => nextStatusOnReply(ticket.status, 'customer'), deps.HttpError);
-  await saveReply(env, { id, author: 'customer', name: await customerName(env, user), body, status, ownerId: user.id });
+  const name = await customerName(env, user);
+  if (!(await saveReply(env, { id, author: 'customer', name, body, from: ticket.status, status, ownerId: user.id }))) {
+    const now = await ownThread(env, deps, id, user.id);
+    throw now.ticket.status === 'closed' ? new deps.HttpError(400, TICKET_CLOSED_MESSAGE) : new deps.HttpError(409, TICKET_RACE_MESSAGE);
+  }
   return deps.ok(await ownThread(env, deps, id, user.id));
 }
 
@@ -349,7 +360,8 @@ export async function handleAdminSupportReply(request, env, deps, params) {
   const { ticket } = await staffThread(env, deps, id);
   const reqBody = await deps.readJson(request);
   const body = checked(() => validateReply(reqBody), deps.HttpError);
-  await saveReply(env, { id, author: 'staff', name: staffAuthorName(admin.name), body, status: nextStatusOnReply(ticket.status, 'staff') });
+  const saved = await saveReply(env, { id, author: 'staff', name: staffAuthorName(admin.name), body, from: ticket.status, status: nextStatusOnReply(ticket.status, 'staff') });
+  if (!saved) throw new deps.HttpError(409, TICKET_RACE_MESSAGE);
   return deps.ok(await staffThread(env, deps, id));
 }
 
