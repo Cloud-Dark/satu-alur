@@ -5,9 +5,9 @@ import { showToast } from '../ui/animations.js'
 import { getAccount } from '../social/api.js'
 import * as Account from './social-media/account.js'
 import * as Content from './social-media/content.js'
+import * as Schedule from './social-media/schedule.js'
 
 const { el } = C
-const PLATFORMS = ['Instagram', 'Facebook'].map((label) => ({ value: label.toLowerCase(), label }))
 const TABS = [
   { value: 'account', label: 'Akun' }, { value: 'content', label: 'Konten' }, { value: 'schedule', label: 'Jadwal' },
   { value: 'brainstorm', label: 'Brainstorm' }, { value: 'ads', label: 'Iklan' }, { value: 'collab', label: 'Kolaborasi' },
@@ -41,60 +41,6 @@ export async function render(container, ctx = {}) {
     tabs, status, host)
   ctx.signal?.addEventListener('abort', () => controller?.abort(), { once: true })
 
-  function read(key) {
-    try {
-      const items = JSON.parse(localStorage.getItem(key) || '[]')
-      if (!Array.isArray(items)) throw new Error('Format data tidak valid.')
-      return items
-    } catch {
-      status.show('danger', 'Data lokal tidak dapat dibaca. Data lama tidak akan ditimpa.')
-      return null
-    }
-  }
-  function write(key, items) {
-    try { localStorage.setItem(key, JSON.stringify(items)); return true }
-    catch { status.show('danger', 'Tidak dapat menyimpan. Periksa izin atau kapasitas penyimpanan browser.'); return false }
-  }
-  function scheduleTab() {
-    const platform = C.select({ label: 'Platform', id: 'sched-platform', options: PLATFORMS })
-    const content = C.textarea({ label: 'Konten atau caption', id: 'sched-content', required: true, attrs: { maxlength: '8000' } })
-    const date = C.field({ label: 'Tanggal dan waktu', id: 'sched-date', type: 'datetime-local', required: true })
-    const type = C.select({ label: 'Jenis', id: 'sched-type', options: [{ value: 'organic', label: 'Posting organik' }, { value: 'ads', label: 'Iklan' }, { value: 'story', label: 'Story / Reels' }] })
-    const list = el('div')
-    const submit = C.button({ label: 'Tambahkan jadwal', icon: 'calendar', variant: 'primary', type: 'submit' })
-    const form = el('form', { className: 'form' }, platform.wrap, content.wrap, date.wrap, type.wrap,
-      el('p', { className: 'field-hint' }, 'Jadwal adalah catatan lokal. Posting dan pengingat otomatis belum terhubung.'), submit)
-    function drawList() {
-      const items = read('satualur_schedules')
-      if (!items) { list.replaceChildren(C.errorState('Jadwal belum dapat dibaca.')); return }
-      list.replaceChildren()
-      if (!items.length) list.appendChild(C.emptyState({ title: 'Belum ada jadwal', iconName: 'calendar', body: 'Tambahkan konten dan waktu untuk merencanakan posting berikutnya.' }))
-      items.sort((a, b) => new Date(a.datetime) - new Date(b.datetime)).forEach((s) => list.appendChild(
-        el('article', { className: 'workspace-entry' },
-          el('div', { className: 'workspace-entry-head' }, el('strong', {}, s.platform), C.tag(new Date(s.datetime) < new Date() ? 'Lewat' : 'Terjadwal', 'brand')),
-          el('p', { className: 'muted small' }, `${C.formatDateTime(s.datetime)} · ${s.type}`),
-          el('p', { className: 'workspace-preview' }, s.content),
-          C.button({ label: 'Hapus jadwal', icon: 'x', variant: 'ghost', size: 'sm', onClick: () => {
-            const all = read('satualur_schedules')
-            if (all && write('satualur_schedules', all.filter((x) => x.id !== s.id))) drawList()
-          } }))))
-    }
-    form.addEventListener('submit', (e) => {
-      e.preventDefault()
-      status.hide()
-      if (!content.input.value.trim()) { content.input.focus(); return }
-      const items = read('satualur_schedules')
-      if (!items) return
-      if (!write('satualur_schedules', [...items, { id: Date.now(), platform: platform.input.value, content: content.input.value.trim(), datetime: date.input.value,
-        type: type.input.value, created_at: new Date().toISOString() }])) return
-      content.input.value = ''
-      date.input.value = ''
-      drawList()
-      showToast('Jadwal tersimpan.', 'success')
-    })
-    host.replaceChildren(el('div', { className: 'stage-grid workspace-grid' }, C.panel({ title: 'Rencanakan posting', raised: true }, form), C.panel({ title: 'Jadwal konten', meta: 'Waktu lokal perangkat' }, list)))
-    drawList()
-  }
   function adsTab() {
     const service = C.field({ label: 'Layanan atau produk', id: 'ads-service', required: true, placeholder: 'Pembersihan AC rumah' })
     const location = C.field({ label: 'Lokasi target', id: 'ads-location', placeholder: 'Jakarta Selatan' })
@@ -158,7 +104,7 @@ export async function render(container, ctx = {}) {
     controller = new AbortController()
     if (currentTab === 'account') Account.render(host, tabCtx())
     else if (currentTab === 'content' || currentTab === 'brainstorm') Content.render(host, tabCtx(), currentTab === 'brainstorm')
-    else if (currentTab === 'schedule') scheduleTab()
+    else if (currentTab === 'schedule') Schedule.render(host, tabCtx())
     else if (currentTab === 'ads') adsTab()
     else partnershipTab()
   }
