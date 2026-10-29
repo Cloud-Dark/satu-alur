@@ -208,3 +208,45 @@ CREATE TABLE IF NOT EXISTS support_messages (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id, created_at);
+
+-- Agensi influencer: one campaign per collab request. Staff-only; a business reads only campaignProjection
+-- (src/agency/rules.js) through GET /api/office/requests/:id/campaign. Never in TABLES.
+-- status: draft | active | completed | cancelled. Dates: YYYY-MM-DD or NULL.
+CREATE TABLE IF NOT EXISTS campaigns (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  request_id INTEGER NOT NULL UNIQUE REFERENCES service_requests(id),
+  owner_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  brief TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'completed', 'cancelled')),
+  start_date TEXT,
+  end_date TEXT,
+  client_fee_idr INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_campaigns_owner_id ON campaigns(owner_id);
+CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status, updated_at);
+
+CREATE TABLE IF NOT EXISTS campaign_influencers (
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  influencer_id INTEGER NOT NULL REFERENCES influencers(id),
+  payout_idr INTEGER,
+  PRIMARY KEY (campaign_id, influencer_id)
+);
+
+-- status: planned | briefed | in_progress | submitted | approved | published. link: https:// only, required when published.
+CREATE TABLE IF NOT EXISTS campaign_deliverables (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  influencer_id INTEGER NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('feed', 'reel', 'story', 'tiktok', 'youtube', 'lainnya')),
+  due_date TEXT,
+  status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'briefed', 'in_progress', 'submitted', 'approved', 'published')),
+  link TEXT,
+  note TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL,
+  updated_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_campaign_deliverables_campaign_id ON campaign_deliverables(campaign_id, influencer_id);

@@ -3,6 +3,8 @@ import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
 import { REQUEST_STATUS_LABEL } from '../../social/rules.js'
 import { GOALS } from '../social-media/requests.js'
+import { adminCreateCampaign } from '../../agency/api.js'
+import { openCampaignEditor } from './campaigns.js'
 
 const { el } = C
 const FILTERS = [{ value: 'new', label: 'Baru' }, { value: 'in_progress', label: 'Diproses' }, { value: 'done', label: 'Selesai' }, { value: 'all', label: 'Semua' }]
@@ -22,7 +24,8 @@ function payloadPairs(r) {
   })
 }
 
-function requestCard(r, onSaved, signal) {
+function requestCard(r, onSaved, ctx, setDirty) {
+  const { signal } = ctx
   const id = `of-req-${r.id}`
   const status = C.select({ label: 'Status', id: `${id}-status`, value: r.status,
     options: Object.entries(REQUEST_STATUS_LABEL).map(([value, label]) => ({ value, label })) })
@@ -38,6 +41,21 @@ function requestCard(r, onSaved, signal) {
       if (!signal.aborted) onSaved()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
+  let camp = null
+  if (r.kind === 'collab') {
+    camp = C.button({ label: r.campaign_id ? 'Lihat kampanye' : 'Buat kampanye', icon: 'users', variant: 'soft', size: 'sm' })
+    camp.addEventListener('click', async () => {
+      if (r.campaign_id) { openCampaignEditor(ctx, r.campaign_id, camp, setDirty, onSaved); return }
+      err.textContent = ''
+      const restore = C.setBusy(camp, 'Membuat…') // disabled at once: a double-click sends one request
+      const story = String(r.payload?.campaign || '').trim()
+      try {
+        const { id: cid } = await adminCreateCampaign({ request_id: r.id, title: (story.split('\n')[0].slice(0, 120).trim() || `Kolaborasi ${r.influencer_name || ''}`.trim()), brief: story.slice(0, 3000) })
+        showToast('Kampanye dibuat.', 'success')
+        if (!signal.aborted) openCampaignEditor(ctx, cid, null, setDirty, onSaved)
+      } catch (ex) { err.textContent = ex.message; restore() }
+    })
+  }
   return el('article', { className: 'workspace-entry of-request', dataset: { id: String(r.id) } },
     el('div', { className: 'workspace-entry-head' },
       el('strong', {}, r.business_name || 'Bisnis'),
@@ -46,10 +64,10 @@ function requestCard(r, onSaved, signal) {
       C.tag(REQUEST_STATUS_LABEL[r.status] || r.status, TONE[r.status] || 'neutral'),
       el('span', { className: 'muted small' }, C.formatDateTime(r.created_at))),
     r.influencer_name ? el('p', {}, el('strong', {}, 'Influencer: '), r.influencer_name) : null,
-    C.defList(payloadPairs(r)), status.wrap, note.wrap, err, save)
+    C.defList(payloadPairs(r)), status.wrap, note.wrap, err, el('div', { className: 'of-row-actions' }, save, camp))
 }
 
-export function draw(host, ctx) {
+export function draw(host, ctx, setDirty) {
   const list = el('div')
   let run = 0
   async function load() {
@@ -62,7 +80,7 @@ export function draw(host, ctx) {
     }
     if (ctx.signal.aborted || mine !== run) return
     rows.sort((a, b) => (b.created_at < a.created_at ? -1 : b.created_at > a.created_at ? 1 : b.id - a.id))
-    list.replaceChildren(...(rows.length ? rows.map((r) => requestCard(r, load, ctx.signal))
+    list.replaceChildren(...(rows.length ? rows.map((r) => requestCard(r, load, ctx, setDirty))
       : [C.emptyState({ title: 'Tidak ada permintaan', iconName: 'inbox', body: 'Belum ada permintaan dengan status ini.' })]))
   }
   const seg = C.segmented({ options: FILTERS, value: filter, label: 'Filter status', onChange: (v) => { filter = v; load() } })

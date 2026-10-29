@@ -68,11 +68,13 @@ export async function handleRequestCreate(request, env, deps) {
 
 export async function handleRequestList(request, env, { authenticate, ok }) {
   const { user } = await authenticate(request, env);
+  // has_campaign only: the campaign itself is read through GET /api/office/requests/:id/campaign (projection).
   const { results } = await env.DB.prepare(
-    `${REQUEST_SELECT} FROM service_requests r LEFT JOIN influencers i ON i.id = r.influencer_id
+    `${REQUEST_SELECT}, EXISTS (SELECT 1 FROM campaigns c WHERE c.request_id = r.id) AS has_campaign
+     FROM service_requests r LEFT JOIN influencers i ON i.id = r.influencer_id
      WHERE r.owner_id = ? ORDER BY r.created_at DESC, r.id DESC`,
   ).bind(user.id).all();
-  return ok(results.map(withPayload));
+  return ok(results.map((r) => ({ ...withPayload(r), has_campaign: r.has_campaign === 1 })));
 }
 
 export async function handleAdminInfluencers(request, env, deps) {
@@ -115,10 +117,11 @@ export async function handleAdminRequests(request, env, deps) {
   const status = new URL(request.url).searchParams.get('status');
   if (status && !REQUEST_STATUSES.includes(status)) throw new deps.HttpError(400, 'Status tidak dikenal.');
   const { results } = await env.DB.prepare(
-    `${REQUEST_SELECT}, r.owner_id, u.name AS business_name, u.email AS business_email
+    `${REQUEST_SELECT}, r.owner_id, u.name AS business_name, u.email AS business_email, c.id AS campaign_id
      FROM service_requests r
      LEFT JOIN influencers i ON i.id = r.influencer_id
      LEFT JOIN users u ON u.id = r.owner_id
+     LEFT JOIN campaigns c ON c.request_id = r.id
      ${status ? 'WHERE r.status = ?' : ''} ORDER BY r.created_at DESC, r.id DESC`,
   ).bind(...(status ? [status] : [])).all();
   return deps.ok(results.map(withPayload));

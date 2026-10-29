@@ -1582,6 +1582,18 @@ h2.sp-subject { font-size: 1.15rem; }
 .sp-closed { margin: 0; }
 .of-row-wrap { flex-wrap: wrap; }
 .of-row-wrap > .field { flex: 1 1 140px; }
+
+/* Agensi influencer: campaign editor (staff) and the business progress view */
+.ag-summary { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ag-inf, .ag-del, .ag-add { display: grid; gap: var(--s-2); min-width: 0; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); overflow-wrap: anywhere; }
+.ag-add, .ag-del.is-new { border-style: dashed; }
+.ag-group { display: grid; gap: var(--s-3); justify-items: start; min-width: 0; }
+.ag-group > .of-list { justify-self: stretch; margin: 0; }
+.ag-group > h4 { margin: 0; }
+.ag-check { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.ag-check li { display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-3); align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.sm-progress { display: grid; gap: var(--s-2); min-width: 0; margin-top: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.sm-progress[hidden] { display: none; }
 @media (max-width: 768px) {
   .of-layout { grid-template-columns: minmax(0, 1fr); }
   .of-nav { display: none; }

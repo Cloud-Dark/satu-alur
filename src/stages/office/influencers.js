@@ -93,7 +93,7 @@ function influencerDialog(ctx, inf, opener, onSaved, setDirty) {
     if (!f0) return
     err.textContent = ''
     save.disabled = true
-    try { photoKey = await Social.uploadImage((await toJpeg(f0)).blob); showPhoto() } catch (ex) { err.textContent = ex.message } finally { save.disabled = false }
+    try { photoKey = await Social.uploadImage((await toJpeg(f0)).blob); showPhoto(); touch() } catch (ex) { err.textContent = ex.message } finally { save.disabled = false }
   })
   cancel.addEventListener('click', () => { if (!dirty() || confirm(LEAVE_MSG)) close() })
   form.addEventListener('submit', async (e) => {

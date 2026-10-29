@@ -18,6 +18,11 @@ import {
   handleInfluencers, handleRequestCreate, handleRequestList, handleAdminInfluencers, handleAdminInfluencerCreate,
   handleAdminInfluencerUpdate, handleAdminRequests, handleAdminRequestUpdate,
 } from './office.js';
+import {
+  handleAdminCampaignCreate, handleAdminCampaigns, handleAdminCampaignGet, handleAdminCampaignUpdate, handleAdminCampaignInfluencer,
+  handleAdminCampaignInfluencerDelete, handleAdminDeliverableCreate, handleAdminDeliverableUpdate, handleAdminDeliverableDelete,
+  handleRequestCampaign,
+} from './agency.js';
 import { handleSiteGet, handleSitePut } from './site.js';
 import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
 import {
@@ -901,6 +906,16 @@ const ROUTES = {
   'PATCH /api/office/admin/influencers/:id': (req, env, params) => handleAdminInfluencerUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/office/admin/requests': (req, env) => handleAdminRequests(req, env, ROUTE_DEPS),
   'PATCH /api/office/admin/requests/:id': (req, env, params) => handleAdminRequestUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/office/requests/:id/campaign': (req, env, params) => handleRequestCampaign(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/campaigns': (req, env) => handleAdminCampaignCreate(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/campaigns': (req, env) => handleAdminCampaigns(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/campaigns/:id': (req, env, params) => handleAdminCampaignGet(req, env, ROUTE_DEPS, params),
+  'PATCH /api/office/admin/campaigns/:id': (req, env, params) => handleAdminCampaignUpdate(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/campaigns/:id/influencers': (req, env, params) => handleAdminCampaignInfluencer(req, env, ROUTE_DEPS, params),
+  'DELETE /api/office/admin/campaigns/:id/influencers/:influencerId': (req, env, params) => handleAdminCampaignInfluencerDelete(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/campaigns/:id/deliverables': (req, env, params) => handleAdminDeliverableCreate(req, env, ROUTE_DEPS, params),
+  'PATCH /api/office/admin/deliverables/:id': (req, env, params) => handleAdminDeliverableUpdate(req, env, ROUTE_DEPS, params),
+  'DELETE /api/office/admin/deliverables/:id': (req, env, params) => handleAdminDeliverableDelete(req, env, ROUTE_DEPS, params),
   'GET /api/site/:key': (req, env, params) => handleSiteGet(req, env, ROUTE_DEPS, params),
   'PUT /api/office/admin/site/:key': (req, env, params) => handleSitePut(req, env, ROUTE_DEPS, params),
   'GET /api/plans': (req, env) => handlePlansPublic(req, env, ROUTE_DEPS),

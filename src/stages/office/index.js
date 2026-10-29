@@ -9,6 +9,7 @@ import * as Customers from './customers.js'
 import * as Users from './users.js'
 import * as Contact from './contact.js'
 import * as Support from './support.js'
+import * as Campaigns from './campaigns.js'
 import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
 const { el } = C
@@ -28,7 +29,8 @@ const GROUPS = [
     { key: 'tickets', label: 'Pengaduan CS', draw: Support.draw }] },
   { title: 'Agensi influencer', items: [
     { key: 'influencers', label: 'Influencer', draw: Influencers.draw },
-    { key: 'requests', label: 'Permintaan', draw: Requests.draw }] },
+    { key: 'requests', label: 'Permintaan', draw: Requests.draw },
+    { key: 'campaigns', label: 'Kampanye', draw: Campaigns.draw }] },
 ]
 const ITEMS = GROUPS.flatMap((g) => g.items)
 

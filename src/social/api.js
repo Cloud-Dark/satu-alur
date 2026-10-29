@@ -256,9 +256,22 @@ export async function listInfluencers() {
   return call('/api/office/influencers')
 }
 
+// Demo requests carry the session user's id like the Worker's owner_id; campaigns live in the agency demo store.
+async function sessionUser() {
+  const u = (await getCloud().auth.getSession())?.data?.user
+  if (!u) throw new Error('Belum masuk.')
+  return u
+}
+const campaignIdOf = (rid) => {
+  let a = null
+  try { a = JSON.parse(localStorage.getItem('satualur_agency_demo_v1')) } catch { /* none yet */ }
+  return (a?.campaigns || []).find((c) => c.request_id === rid)?.id ?? null
+}
+
 export async function sendRequest(body) {
   if (isUsingMockCloud()) {
     const v = validateServiceRequest(body)
+    const u = await sessionUser()
     return demo((s) => {
       let inf = null
       if (v.kind === 'collab') {
@@ -267,8 +280,8 @@ export async function sendRequest(body) {
       }
       const at = new Date(now()).toISOString()
       const id = ++s.seq
-      s.requests.push({ id, kind: v.kind, influencer_id: v.influencer_id, influencer_name: inf?.name ?? null, payload: v.payload,
-        status: 'new', admin_note: '', created_at: at, updated_at: at, business_name: 'Pengguna Demo', business_email: 'demo@satualur.id' })
+      s.requests.push({ id, owner_id: u.id, kind: v.kind, influencer_id: v.influencer_id, influencer_name: inf?.name ?? null, payload: v.payload,
+        status: 'new', admin_note: '', created_at: at, updated_at: at, business_name: u.name || 'Pengguna Demo', business_email: u.email })
       return { id }
     })
   }
@@ -276,7 +289,11 @@ export async function sendRequest(body) {
 }
 
 export async function listMyRequests() {
-  if (isUsingMockCloud()) return demo((s) => s.requests.map(({ business_name, business_email, ...r }) => r).sort(newestFirst))
+  if (isUsingMockCloud()) {
+    const u = await sessionUser()
+    return demo((s) => s.requests.filter((r) => r.owner_id === u.id)
+      .map(({ business_name, business_email, owner_id, ...r }) => ({ ...r, has_campaign: campaignIdOf(r.id) !== null })).sort(newestFirst))
+  }
   return call('/api/office/requests')
 }
 
@@ -306,7 +323,7 @@ export async function adminSaveInfluencer(row) {
 export async function adminListRequests(status) {
   if (isUsingMockCloud()) {
     if (status && !REQUEST_STATUSES.includes(status)) throw new Error('Status tidak dikenal.')
-    return demo((s) => s.requests.filter((r) => !status || r.status === status).map((r) => ({ ...r })).sort(newestFirst))
+    return demo((s) => s.requests.filter((r) => !status || r.status === status).map((r) => ({ ...r, campaign_id: campaignIdOf(r.id) })).sort(newestFirst))
   }
   return call(`/api/office/admin/requests${status ? `?status=${encodeURIComponent(status)}` : ''}`)
 }
