@@ -85,7 +85,7 @@ const httpAuth = {
       if (res.error?.status === 401) setToken(null)
       return { data: null, error: res.error || { message: 'Belum masuk.' } }
     }
-    return { data: { user: res.data.user, access_token: token }, error: null }
+    return { data: { user: res.data.user, access_token: token, is_admin: res.data.is_admin === true }, error: null }
   },
 
   async refreshSession() {

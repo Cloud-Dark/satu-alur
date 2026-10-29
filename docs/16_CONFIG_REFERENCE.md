@@ -107,3 +107,37 @@ Key tidak pernah dikirim ke klien; Worker memanggil `places:searchText` dengan h
 - Validasi: titik harus di kotak batas Indonesia, radius 0,5–40 km, 1–8 kata kunci (2–40 karakter).
 - Tabel D1 `leads` (migrasi `0006_leads.sql`, satu indeks `owner_id`) hanya terisi saat pengguna menekan **Simpan prospek** atau **Simpan ke alur**; hasil pencarian tidak disimpan.
 - Mode demo (mock cloud) tidak memanggil jaringan: hasil contoh deterministik di sekitar titik, berlabel "Data contoh (mode demo)".
+
+## Social Media - Publikasi Meta (Facebook Page + Instagram)
+
+Rute Worker ada di `worker/social.js`; enkripsi token dan `state` OAuth di `src/social/crypto.js`. Integrasi dianggap **terkonfigurasi** hanya bila `META_APP_ID`, `META_APP_SECRET`, `TOKEN_KEY`, dan `PUBLIC_BASE_URL` semuanya terisi; selain itu `GET /api/social/account` mengembalikan `configured: false` dan tab Akun menampilkan "Belum dikonfigurasi".
+
+| Nama | Jenis | Contoh | Fungsi |
+|------|-------|--------|--------|
+| `META_APP_ID` | var | `1234567890` | App ID aplikasi Meta. |
+| `ADMIN_EMAILS` | var | `ops@satualur.id,cs@satualur.id` | Email staf kantor Satu Alur (dipisah koma, tidak peka huruf besar). Hanya mereka yang mendapat `is_admin: true` dari `GET /api/auth/session`. |
+| `PUBLIC_BASE_URL` | var | `https://app.satualur.id` | Origin publik tanpa garis miring di akhir. Dipakai untuk redirect OAuth dan URL gambar yang diambil Meta. |
+| `META_APP_SECRET` | secret | - | App Secret Meta. Juga menandatangani `state` OAuth (berlaku 10 menit). |
+| `TOKEN_KEY` | secret | keluaran `openssl rand -base64 32` | Kunci AES-GCM 32 byte (base64) untuk mengenkripsi token Page di tabel `social_accounts`. Mengganti kunci memutus semua koneksi (pengguna harus menghubungkan ulang). |
+| `MEDIA` | binding R2 | bucket `satu-alur-media` | Gambar posting (JPEG, maks. 8 MB), disajikan publik di `/api/media/<kunci acak 32 hex>`. |
+| `[triggers] crons` | cron | `*/5 * * * *` | Menerbitkan posting terjadwal yang jatuh tempo (maks. 25 baris per putaran). |
+
+```bash
+npx wrangler secret put META_APP_SECRET
+npx wrangler secret put TOKEN_KEY
+npx wrangler r2 bucket create satu-alur-media
+```
+
+Untuk `wrangler dev` lokal, taruh secret di `.dev.vars` (jangan di-commit).
+
+Token Meta tidak pernah dikirim ke klien atau ditulis ke log. Tabel `social_accounts` tidak ada di whitelist `/api/db`; `social_schedules` hanya bisa dibaca lewat `/api/db` (semua penulisan lewat `/api/social/*`).
+
+### Menyiapkan aplikasi Meta
+
+1. Di [developers.facebook.com](https://developers.facebook.com/apps), buat aplikasi bertipe **Business** dan tambahkan produk **Facebook Login for Business**.
+2. Di pengaturan Facebook Login for Business, isi **Valid OAuth Redirect URIs** dengan `${PUBLIC_BASE_URL}/api/social/oauth/callback` (mis. `https://app.satualur.id/api/social/oauth/callback`).
+3. Izin (scope) yang diminta: `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`, `instagram_basic`, `instagram_content_publish`, `business_management`.
+4. Salin App ID ke `META_APP_ID` dan App Secret ke secret `META_APP_SECRET`, lalu deploy ulang.
+5. Instagram harus akun Business/Creator yang ditautkan ke Halaman Facebook. Bila Halaman tidak punya IG tertaut, koneksi tetap berhasil (hanya Facebook).
+
+Selama aplikasi dalam mode pengembangan, hanya pengguna yang terdaftar sebagai admin/developer/tester aplikasi yang bisa menghubungkan Halaman. **App Review Meta (izin di atas, akses lanjutan) wajib** sebelum bisnis lain (bukan tester) bisa terhubung.

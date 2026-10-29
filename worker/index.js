@@ -8,6 +8,11 @@
  */
 
 import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.js';
+import {
+  handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
+  handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
+} from './social.js';
+import { isAdmin } from '../src/social/rules.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -72,11 +77,14 @@ const TABLES = {
     json: ['summary_json'],
   },
   social_contents: {
-    columns: ['id', 'owner_id', 'kind', 'platform', 'title', 'body', 'meta_json', 'status', 'created_at'],
+    columns: ['id', 'owner_id', 'kind', 'platform', 'title', 'body', 'meta_json', 'status', 'image_key', 'created_at'],
     json: ['meta_json'],
   },
   social_schedules: {
-    columns: ['id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'created_at'],
+    columns: [
+      'id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'content_id', 'image_key', 'page_id',
+      'platform_post_id', 'permalink', 'error', 'attempts', 'published_at', 'claimed_at', 'created_at',
+    ],
   },
   ai_messages: {
     columns: ['id', 'owner_id', 'agent', 'role', 'content', 'model', 'latency_ms', 'error', 'created_at'],
@@ -89,6 +97,9 @@ const TABLES = {
     json: ['meta_json'],
   },
 };
+// social_accounts is deliberately absent from TABLES (it holds Page tokens).
+// Tables /api/db may only select from; writes go through /api/social/*.
+const READ_ONLY_TABLES = new Set(['social_schedules']);
 // Columns the client may never set directly.
 const PROTECTED_COLUMNS = new Set(['id', 'owner_id']);
 
@@ -315,7 +326,7 @@ async function handleDemoLogin(request, env) {
 
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
-  return ok({ user });
+  return ok({ user, is_admin: isAdmin(user.email, env.ADMIN_EMAILS) });
 }
 
 async function handleSignout(request, env) {
@@ -507,6 +518,7 @@ async function handleDb(request, env) {
   const spec = TABLES[table];
   const action = body.action;
   const uid = user.id;
+  if (action !== 'select' && READ_ONLY_TABLES.has(table)) throw bad('Tabel ini hanya bisa dibaca.');
 
   if (action === 'insert') {
     const values = Array.isArray(body.values) ? body.values : body.values ? [body.values] : [];
@@ -823,7 +835,7 @@ function sseResponse(stream) {
 
 // ------------------------------------------------------------------- router
 
-// Helpers handed to the lead-finder routes in ./leads.js (avoids a circular import).
+// Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
 const LEAD_DEPS = { authenticate, readJson, ok, HttpError };
 
 const ROUTES = {
@@ -838,12 +850,40 @@ const ROUTES = {
   'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, LEAD_DEPS),
   'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, LEAD_DEPS),
   'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, LEAD_DEPS),
+  'GET /api/social/account': (req, env) => handleSocialAccount(req, env, LEAD_DEPS),
+  'DELETE /api/social/account': (req, env) => handleSocialDisconnect(req, env, LEAD_DEPS),
+  'POST /api/social/oauth/start': (req, env) => handleSocialOauthStart(req, env, LEAD_DEPS),
+  'GET /api/social/oauth/callback': handleSocialOauthCallback,
+  'GET /api/social/oauth/pages': (req, env) => handleSocialOauthPages(req, env, LEAD_DEPS),
+  'POST /api/social/oauth/pick': (req, env) => handleSocialOauthPick(req, env, LEAD_DEPS),
+  'POST /api/social/media': (req, env) => handleSocialMediaUpload(req, env, LEAD_DEPS),
+  'GET /api/media/:key': handleMediaGet,
 };
+
+// Matches '/api/media/:key' against a path; returns the params or null.
+function matchPath(pattern, path) {
+  const a = pattern.split('/');
+  const b = path.split('/');
+  if (a.length !== b.length) return null;
+  const params = {};
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].startsWith(':') && b[i]) params[a[i].slice(1)] = b[i];
+    else if (a[i] !== b[i]) return null;
+  }
+  return params;
+}
 
 async function handleApi(request, env, path) {
   const handler = ROUTES[`${request.method} ${path}`];
-  if (handler) return handler(request, env);
-  const pathKnown = Object.keys(ROUTES).some((k) => k.slice(k.indexOf(' ') + 1) === path);
+  if (handler) return handler(request, env, {});
+  let pathKnown = false;
+  for (const [key, h] of Object.entries(ROUTES)) {
+    const sp = key.indexOf(' ');
+    const params = matchPath(key.slice(sp + 1), path);
+    if (!params) continue;
+    if (key.slice(0, sp) === request.method) return h(request, env, params);
+    pathKnown = true;
+  }
   if (pathKnown) return fail(405, 'Method tidak diizinkan.');
   return fail(404, 'Endpoint tidak ditemukan.');
 }

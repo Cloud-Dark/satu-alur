@@ -25,3 +25,19 @@ migrations_dir = "migrations"
 DEMO_OTP = "true"
 # Demo accounts: one-click login to the seeded demo businesses (POST /api/auth/demo-login).
 DEMO_LOGIN = "true"
+# Meta publishing (Social Media). Secrets (wrangler secret put): META_APP_SECRET, TOKEN_KEY (32-byte base64).
+# The integration stays "not configured" until META_APP_ID, META_APP_SECRET, TOKEN_KEY and PUBLIC_BASE_URL are all set.
+META_APP_ID = ""
+# Comma-separated emails of Satu Alur office staff (admin screen).
+ADMIN_EMAILS = ""
+# Public origin without a trailing slash (OAuth redirect + media URLs Meta fetches).
+PUBLIC_BASE_URL = ""
+
+# Images for Meta posts, served publicly at /api/media/<random key>.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "satu-alur-media"
+
+# Publishes due scheduled posts (at most 25 rows per run).
+[triggers]
+crons = ["*/5 * * * *"]
