@@ -81,17 +81,24 @@ export async function listPages(userToken, fetchFn) {
   }))
 }
 
+// The post already exists by now: a failed lookup must not fail it (a retry would double post).
+async function permalinkOf(fetchFn, id, field, pageToken) {
+  try {
+    return (await get(fetchFn, `/${id}`, { fields: field, access_token: pageToken }))[field] ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function postFacebook({ pageId, pageToken, message, imageUrl }, fetchFn) {
   const r = imageUrl
     ? await post(fetchFn, `/${pageId}/photos`, { url: imageUrl, caption: message, access_token: pageToken })
     : await post(fetchFn, `/${pageId}/feed`, { message, access_token: pageToken })
-  const p = await get(fetchFn, `/${r.id}`, { fields: 'permalink_url', access_token: pageToken })
-  return { id: r.id, permalink: p.permalink_url }
+  return { id: r.id, permalink: await permalinkOf(fetchFn, r.id, 'permalink_url', pageToken) }
 }
 
 export async function postInstagram({ igUserId, pageToken, caption, imageUrl }, fetchFn) {
   const c = await post(fetchFn, `/${igUserId}/media`, { image_url: imageUrl, caption, access_token: pageToken })
   const m = await post(fetchFn, `/${igUserId}/media_publish`, { creation_id: c.id, access_token: pageToken })
-  const p = await get(fetchFn, `/${m.id}`, { fields: 'permalink', access_token: pageToken })
-  return { id: m.id, permalink: p.permalink }
+  return { id: m.id, permalink: await permalinkOf(fetchFn, m.id, 'permalink', pageToken) }
 }

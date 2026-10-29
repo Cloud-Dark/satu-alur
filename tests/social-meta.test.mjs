@@ -95,6 +95,16 @@ test('exchangeCode does code then long-lived exchange', async () => {
   assert.equal(new URL(f.calls[1].url).searchParams.get('grant_type'), 'fb_exchange_token')
 })
 
+test('postFacebook: permalink lookup failure still resolves with null permalink', async () => {
+  const f = stub([{ json: { id: 'PAGE_1' } }, { status: 500, json: {} }])
+  assert.deepEqual(await postFacebook({ pageId: 'PAGE', pageToken: 'T', message: 'hi' }, f), { id: 'PAGE_1', permalink: null })
+})
+
+test('postInstagram: permalink fetch rejection still resolves with null permalink', async () => {
+  const f = stub([{ json: { id: 'C1' } }, { json: { id: 'M1' } }, new Error('boom')])
+  assert.deepEqual(await postInstagram({ igUserId: 'IG', pageToken: 'T', caption: 'c', imageUrl: 'u' }, f), { id: 'M1', permalink: null })
+})
+
 test('listPages parses /me/accounts', async () => {
   const f = stub([{ json: { data: [{ id: '1', name: 'A', access_token: 't' }] } }])
   const pages = await listPages('UT', f)
