@@ -76,6 +76,18 @@ Respons 200:
 
 Kesalahan: 400 "Kode OTP salah atau sudah kadaluarsa." (kode salah, kedaluwarsa, email tidak cocok, atau melebihi 5 percobaan). `access_token` berlaku 30 hari.
 
+### POST /api/auth/staff-login
+
+Login staf Satu Alur dari halaman `/super-admin-login` (kode: `worker/staff.js`). Akun dibuat dengan `npm run staff` (lihat [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md)).
+
+```json
+{ "username": "budi", "password": "minimal-12-karakter" }
+```
+
+Respons 200 sama seperti `verify-otp` (`user` dengan email `<username>@staff.satualur.internal`, `access_token`). Sesi ditandai `sessions.is_staff = 1` dan berlaku 12 jam. Hanya sesi ini yang mendapat `is_admin: true`.
+
+Kesalahan: 401 "Username atau password salah." (username tidak ada, password salah, atau akun nonaktif; pesan sama agar username tidak bisa ditebak), 429 "Terlalu banyak percobaan. Coba lagi dalam 15 menit." (5 kali salah berturut-turut).
+
 ### GET /api/auth/session
 
 Respons 200: `{ "data": { "user": { ... } }, "error": null }`. 401 bila tidak valid.
@@ -205,6 +217,45 @@ data: [DONE]
 ```
 
 Kesalahan sebelum stream dimulai berupa JSON biasa (400/401/502). Pembatalan: tutup koneksi (`AbortController` di klien).
+
+## Social Media: Publikasi Meta
+
+Semua rute wajib masuk, kecuali `oauth/callback` (dipanggil Meta; dicek lewat `state` + cookie) dan `GET /api/media/:key` (publik, agar Meta bisa mengambil gambar). Kode: `worker/social.js`; konfigurasi: [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md). `social_posts` hanya bisa dibaca lewat `/api/db` (tulis lewat rute di bawah); `social_accounts` tidak bisa diakses lewat `/api/db`.
+
+Akun demo bersama (`DEMO_EMAILS`, dipakai `demo-login`) mendapat 403 "Tidak tersedia di akun demo." pada `oauth/start`, `oauth/pick`, `publish`, `schedule` dan `media`, dan `GET /api/social/account` untuk mereka selalu `configured: false`. Selama `DEMO_OTP` = `"true"` integrasi dianggap belum dikonfigurasi dan tidak ada admin (lihat [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md)).
+
+| Rute | Fungsi | Kesalahan |
+|------|--------|-----------|
+| `GET /api/social/account` | `{ configured, account: { page_name, ig_username, ig_connected, needs_reconnect } }`; `account` null bila belum terhubung | - |
+| `DELETE /api/social/account` | Putuskan akun | - |
+| `POST /api/social/oauth/start` | `{ url }` ke dialog Meta. Sekaligus memasang cookie sekali pakai `__Host-social_nonce` (HttpOnly, 10 menit) yang dicocokkan callback | 400 bila belum dikonfigurasi |
+| `GET /api/social/oauth/callback` | Mengalihkan (302) ke aplikasi: `?social=connected`, `?social_pick=<id>` bila ada lebih dari satu Halaman, atau pesan galat. Menolak `state` kedaluwarsa atau cookie tidak cocok | - |
+| `GET /api/social/oauth/pages?pick=<id>` | Daftar Halaman `[{ id, name, ig_username }]` (pilihan disimpan terenkripsi di D1 `social_oauth_picks`, sekali pakai) | 404 bila pilihan kedaluwarsa (10 menit) |
+| `POST /api/social/oauth/pick` | Body `{ pick, page_id }`; menyimpan Halaman terpilih | 400 Halaman tak dikenal, 404 |
+| `POST /api/social/media` | Unggah JPEG mentah (`content-type: image/jpeg`, maks. 8 MB); `{ key }`. Hanya bila integrasi terkonfigurasi dan pemanggil punya akun Facebook terhubung atau admin | 403 "Hubungkan akun Facebook terlebih dahulu.", 400 bukan JPEG, 413, 415, 503 bila R2 belum ada |
+| `GET /api/media/:key` | Gambar publik (kunci 32 hex) | 404 |
+| `POST /api/social/publish` | Body `{ content_id, platforms: ["facebook","instagram"] }`; terbit sekarang, mengembalikan baris `social_posts` hasilnya. Tidak pernah dicoba ulang: galat sementara langsung `failed` | 400, 404 konten tak ditemukan |
+| `POST /api/social/schedule` | Body sama + `scheduled_at` (ISO; 1 menit sampai 75 hari ke depan); mengembalikan baris berstatus `scheduled` | 400 |
+| `DELETE /api/social/schedule/:id` | Batalkan baris yang masih `scheduled` | 409 bila sudah diproses |
+
+Satu baris `social_posts` per platform. Instagram wajib bergambar dan butuh akun IG tertaut. Status baris: `scheduled`, `publishing`, `posted`, `failed`, `cancelled`.
+
+**Cron** (`*/5 * * * *`): menerbitkan maks. 15 baris jatuh tempo per putaran (batas 50 subrequest Workers Free; satu baris IG bisa memakai hingga 8 panggilan Meta). Wadah IG ditunggu sampai `FINISHED` (5 kali, jeda 1,5 detik); `ERROR`/`EXPIRED` gagal dengan "Instagram menolak gambar ini.". Galat batas laju atau wadah IG yang belum siap dicoba ulang sampai 3 percobaan. Cron tidak berjalan selama `DEMO_OTP` = `"true"`. Galat tak pasti pada panggilan publikasi terakhir tidak pernah diulang (risiko posting ganda) dan tampil "Status tidak pasti, periksa halaman Anda"; baris `publishing` lebih dari 15 menit diberi pesan yang sama. Halaman berganti atau terputus: "Akun Facebook berubah atau terputus, jadwalkan ulang". Token ditolak Meta menandai akun perlu hubungkan ulang.
+
+## Kantor Satu Alur
+
+Kode: `worker/office.js`. Rute `admin/*` hanya untuk sesi dari `POST /api/auth/staff-login` (username + password di `/super-admin-login`); selain itu 403 "Khusus tim Satu Alur.". Login OTP biasa (`#/masuk`) tidak pernah menjadi admin. `GET /api/auth/session` mengembalikan `is_admin`. Login akun demo bukan admin di Worker asli; di mode mock/demo akun staf diatur lewat `VITE_STAFF_USERS` (kosong secara bawaan).
+
+| Rute | Fungsi |
+|------|--------|
+| `GET /api/office/influencers` | Katalog influencer yang `visible` |
+| `POST /api/office/requests` | Bisnis mengajukan `{ kind: "collab" \| "ads", influencer_id?, payload }`; `{ id }`. 400 bila validasi gagal atau influencer tidak tersedia |
+| `GET /api/office/requests` | Permintaan milik sendiri (dengan `payload`, `status`, `admin_note`) |
+| `GET /api/office/admin/influencers` | Semua influencer termasuk tersembunyi |
+| `POST /api/office/admin/influencers` | Tambah; `{ id }` |
+| `PATCH /api/office/admin/influencers/:id` | Ubah sebagian kolom |
+| `GET /api/office/admin/requests[?status=]` | Kotak masuk semua bisnis (`new`, `in_progress`, `done`), dengan nama dan email bisnis |
+| `PATCH /api/office/admin/requests/:id` | Ubah `status` dan/atau `admin_note` (maks. 2000 karakter); 404 bila tidak ada |
 
 ## Pemakaian dari Klien
 

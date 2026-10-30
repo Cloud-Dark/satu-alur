@@ -17,7 +17,8 @@
     "deploy": "vite build && wrangler deploy",
     "cf:dev": "vite build && wrangler dev",
     "db:migrate:local": "wrangler d1 migrations apply satu-alur-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply satu-alur-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply satu-alur-db --remote",
+    "staff": "node scripts/staff.mjs"
   },
   "devDependencies": {
     "vite": "^5.4.0",

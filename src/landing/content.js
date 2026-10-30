@@ -12,6 +12,13 @@ export const NAV = [
   { id: 'faq', label: 'FAQ' },
 ]
 
+/** Hero copy as first rendered in the landing markup (the editor's "bawaan"). */
+export const HERO = {
+  badge: 'Untuk bisnis jasa di Indonesia · ditenagai AI',
+  title: 'Bisnis jasa Anda, *tumbuh* dalam satu alur.',
+  subtitle: 'Satu Alur menyatukan permintaan pelanggan, penawaran, penugasan, pembukuan, dan laporan dalam satu alur kerja. AI mengerjakan yang berulang; Anda fokus melayani dan bertumbuh.',
+}
+
 /** Honest, verifiable facts shown under the hero CTAs. */
 export const HERO_POINTS = [
   'Masuk cukup dengan email (OTP)',

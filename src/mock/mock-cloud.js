@@ -3,6 +3,7 @@
  * memory + localStorage. Used for local development and e2e tests
  * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
+import { isBlocked, isStaffEmail, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
 
 const STORAGE_KEY = 'satualur_mock_v1'
 const OTP_STORE = 'satualur_mock_otp'
@@ -61,9 +62,23 @@ function notifyAuth(event) {
   if (_sessionCb) _sessionCb(event, _session)
 }
 
+// Same rules as the Worker: flags are written by src/customers/api.js (staff › Pengguna) under
+// `satualur_customers_demo_v1`.flags[userId] = { suspended, reason, revoked_at, … }.
+function userFlag(userId) {
+  try { return (JSON.parse(localStorage.getItem('satualur_customers_demo_v1')) || {}).flags?.[userId] || null } catch { return null }
+}
+function refuseSuspended(user) {
+  if (isBlocked(userFlag(user.id))) throw new Error(SUSPENDED_MESSAGE)
+}
+function startSession(user, extra) {
+  _session = { user, access_token: 'mock_' + crypto.randomUUID(), created_at: new Date().toISOString(), ...extra }
+  notifyAuth('SIGNED_IN')
+}
+
 const mockAuth = {
   async sendOtp({ email }) {
-    if (!email || !email.includes('@')) throw new Error('Email tidak valid.')
+    // Same rule as the Worker: staff addresses come only from staff login.
+    if (!email || !email.includes('@') || isStaffEmail(email)) throw new Error('Email tidak valid.')
     const code = String(Math.floor(100000 + Math.random() * 900000))
     const id = crypto.randomUUID()
     const otpData = JSON.parse(localStorage.getItem(OTP_STORE) || '{}')
@@ -77,6 +92,7 @@ const mockAuth = {
   },
 
   async verifyOtp({ email, verificationId, isExistingUser, token }) {
+    if (isStaffEmail(email)) throw new Error('Email tidak valid.')
     const otpData = JSON.parse(localStorage.getItem(OTP_STORE) || '{}')
     const rec = otpData[verificationId]
     if (!rec || rec.email !== email || rec.code !== token) {
@@ -92,8 +108,8 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
-    notifyAuth('SIGNED_IN')
+    refuseSuspended(user)
+    startSession(user)
     return { data: { user }, error: null }
   },
 
@@ -105,13 +121,49 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
-    notifyAuth('SIGNED_IN')
+    refuseSuspended(user)
+    startSession(user)
+    return { data: { user }, error: null }
+  },
+
+  /**
+   * Staff login for dev/e2e. Accounts come from VITE_STAFF_USERS ("user:password,user2:password2");
+   * the real Worker uses hashed passwords in staff_accounts (worker/staff.js). None by default.
+   */
+  async staffLogin({ username, password }) {
+    const name = String(username || '').trim().toLowerCase()
+    const accounts = String(import.meta.env?.VITE_STAFF_USERS || '').split(',').map((s) => s.trim()).filter(Boolean)
+    if (!name || !accounts.some((a) => a === `${name}:${password}`)) throw new Error('Username atau password salah.')
+    const email = `${name}@staff.satualur.internal`
+    const users = ensureTable('users')
+    let user = users.find(u => u.email === email)
+    if (!user) {
+      user = { id: crypto.randomUUID(), email, name, created_at: new Date().toISOString() }
+      users.push(user)
+      persist()
+    }
+    startSession(user, { is_staff: true })
     return { data: { user }, error: null }
   },
 
   async getSession() {
-    if (_session) return { data: _session, error: null }
+    if (_session) {
+      const flag = userFlag(_session.user.id)
+      if (isBlocked(flag) || (flag?.revoked_at && flag.revoked_at >= _session.created_at)) {
+        _session = null
+        notifyAuth('SIGNED_OUT')
+        if (isBlocked(flag)) {
+          try { sessionStorage.setItem(AUTH_NOTICE_KEY, SUSPENDED_MESSAGE) } catch { /* storage unavailable */ }
+          return { data: null, error: { message: SUSPENDED_MESSAGE, status: 403 } }
+        }
+        return { data: null, error: { message: 'Sesi tidak valid atau sudah berakhir.', status: 401 } }
+      }
+    }
+    // Same rule as the Worker: only a staff-login session is an admin.
+    if (_session) {
+      const { is_staff, ...pub } = _session
+      return { data: { ...pub, is_admin: is_staff === true }, error: null }
+    }
     return { data: null, error: { message: 'Belum masuk.' } }
   },
 

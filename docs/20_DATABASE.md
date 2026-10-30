@@ -39,8 +39,24 @@ Tidak dapat diakses lewat `POST /api/db`.
 | `user_id` | TEXT NOT NULL | FK `users(id)` ON DELETE CASCADE |
 | `expires_at` | TEXT NOT NULL | 30 hari sejak dibuat |
 | `created_at` | TEXT NOT NULL | |
+| `is_staff` | INTEGER NOT NULL DEFAULT 0 | 1 = dibuat `POST /api/auth/staff-login` (migrasi 0007); satu-satunya sumber hak admin |
 
 Indeks: `idx_sessions_user_id`, `idx_sessions_expires_at`.
+
+### staff_accounts
+
+Akun staf Kantor Satu Alur (migrasi 0007). Dikelola hanya lewat `npm run staff`; tidak pernah ada di whitelist `/api/db`.
+
+| Kolom | Tipe | Catatan |
+|-------|------|---------|
+| `id` | INTEGER PK | |
+| `username` | TEXT NOT NULL UNIQUE | `[a-z0-9._-]{3,32}` |
+| `password_hash` | TEXT NOT NULL | `pbkdf2-sha256$<iterasi>$<salt>$<hash>` |
+| `active` | INTEGER NOT NULL DEFAULT 1 | 0 = dinonaktifkan |
+| `failed_attempts` | INTEGER NOT NULL DEFAULT 0 | direset saat login berhasil atau saat terkunci |
+| `locked_until` | TEXT | terkunci 15 menit setelah 5 kali salah |
+| `last_login_at` | TEXT | |
+| `created_at` | TEXT NOT NULL | |
 
 ### otp_codes
 
@@ -195,6 +211,18 @@ erDiagram
 ```
 
 Catatan: `owner_id` pada tabel domain tidak dideklarasikan sebagai foreign key ke `users` di migrasi; konsistensinya dijaga Worker.
+
+## Tabel Publikasi Meta dan Kantor (migrasi `0007_social_meta.sql`)
+
+| Tabel | Isi | Akses |
+|-------|-----|-------|
+| `social_accounts` | Satu Halaman Facebook per bisnis (`owner_id` PK): `page_id`, `page_name`, `page_token_enc` (AES-GCM), `ig_user_id`, `ig_username`, `needs_reconnect`, `connected_at` | Tidak ada di whitelist `/api/db`; hanya lewat `/api/social/*` |
+| `social_oauth_picks` | Pilihan Halaman yang tertunda setelah OAuth (lebih dari satu Halaman): `id` (32 hex), `owner_id`, `blob` (daftar Halaman + token, AES-GCM), `expires_at` (10 menit). Dihapus saat dipakai; baris kedaluwarsa dibersihkan saat callback berikutnya | Tidak ada di whitelist `/api/db`; hanya lewat `/api/social/oauth/*` |
+| `social_posts` | Satu baris per platform per terbit/jadwal: `content_id`, `platform`, `content`, `image_key`, `page_id`, `scheduled_at`, `status` (`scheduled`, `publishing`, `posted`, `failed`, `cancelled`), `platform_post_id`, `permalink`, `error`, `attempts`, `published_at`, `claimed_at`. Indeks `owner_id` dan `(status, scheduled_at)` | Baca-saja lewat `/api/db`; tulis lewat `/api/social/*` dan cron |
+| `influencers` | Katalog global: `name`, `photo_key`, `niche`, `city`, `ig_followers`, `tiktok_followers`, `bio`, `visible` | Hanya lewat `/api/office/*`; tulis oleh admin |
+| `service_requests` | Permintaan bisnis ke kantor: `kind` (`collab`/`ads`), `influencer_id`, `payload_json`, `status` (`new`/`in_progress`/`done`), `admin_note`, `updated_at`. Indeks `owner_id` | Hanya lewat `/api/office/*` |
+
+Migrasi ini juga menambah `social_contents.image_key`. `social_schedules` tidak berubah: tetap pengingat bebas tahap "Media sosial" dan tidak pernah diproses cron.
 
 ## Migrasi
 

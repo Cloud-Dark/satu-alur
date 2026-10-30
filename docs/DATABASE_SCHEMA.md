@@ -4,6 +4,8 @@
 
 Skema database lama Satu Alur (desain awal) memakai PostgreSQL via WorkBuddy Cloud Service. Sejak 2026-10-28 aplikasi memakai Cloudflare D1 (SQLite); lihat [20_DATABASE.md](20_DATABASE.md).
 
+> Tabel Meta (`social_accounts`, `social_posts`, `influencers`, `service_requests`, migrasi `0007`) hanya didokumentasikan di [20_DATABASE.md](20_DATABASE.md).
+
 ## Tables
 
 ### requests

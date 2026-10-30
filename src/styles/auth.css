@@ -733,6 +733,16 @@
   .auth-scene-canvas { transition: none; }
 }
 
+/* ================= /super-admin-login: one centred column, no illustration panel ================= */
+.auth.auth-staff {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'bar' 'main' 'foot';
+}
+.auth-staff .auth-main { justify-self: center; width: min(440px, 100%); }
+.auth-staff .auth-form { margin-top: var(--s-5); }
+.auth-staff .auth-input { padding-left: 16px; } /* no leading icon here */
+
 /* ================= Mode switch: Live / Akun demo ================= */
 .auth-mode {
   position: relative;

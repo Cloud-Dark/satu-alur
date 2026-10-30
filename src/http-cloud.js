@@ -3,6 +3,8 @@
  * Antarmuka sama dengan mock cloud: auth, database (builder ala supabase), llm.
  */
 
+import { SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from './customers/rules.js'
+
 const TOKEN_KEY = 'satualur_token'
 
 function getToken() {
@@ -20,6 +22,17 @@ function authHeaders(extra = {}) {
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra
 }
 
+/**
+ * Suspended mid-session: drop the token and let the app fall back to the login page, which shows the message.
+ * Shared by every API client (customers, social) so a 403 from any endpoint signs out the same way.
+ */
+export function signOutIfSuspended(status, message) {
+  if (status !== 403 || message !== SUSPENDED_MESSAGE || !getToken()) return
+  setToken(null)
+  try { sessionStorage.setItem(AUTH_NOTICE_KEY, message) } catch { /* storage tidak tersedia */ }
+  notifyAuth('SIGNED_OUT', null)
+}
+
 // Panggil endpoint JSON; tidak pernah throw — selalu {data, count, error}
 async function request(path, { method = 'GET', body, signal } = {}) {
   try {
@@ -33,6 +46,7 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     try { json = await res.json() } catch { /* body kosong / bukan JSON */ }
     if (!res.ok) {
       const message = json?.error?.message || (typeof json?.error === 'string' ? json.error : null) || json?.message || `HTTP ${res.status}`
+      signOutIfSuspended(res.status, message)
       return { data: null, error: { message, status: res.status } }
     }
     return { data: json?.data ?? null, count: json?.count, error: json?.error ?? null }
@@ -68,6 +82,15 @@ const httpAuth = {
     return { data: { user }, error: null }
   },
 
+  async staffLogin({ username, password }) {
+    const res = await request('/api/auth/staff-login', { method: 'POST', body: { username, password } })
+    if (res.error) throw new Error(res.error.message)
+    const { user, access_token } = res.data
+    setToken(access_token)
+    notifyAuth('SIGNED_IN', { user, access_token })
+    return { data: { user }, error: null }
+  },
+
   async demoLogin({ email }) {
     const res = await request('/api/auth/demo-login', { method: 'POST', body: { email } })
     if (res.error) throw new Error(res.error.message)
@@ -85,7 +108,7 @@ const httpAuth = {
       if (res.error?.status === 401) setToken(null)
       return { data: null, error: res.error || { message: 'Belum masuk.' } }
     }
-    return { data: { user: res.data.user, access_token: token }, error: null }
+    return { data: { user: res.data.user, access_token: token, is_admin: res.data.is_admin === true }, error: null }
   },
 
   async refreshSession() {

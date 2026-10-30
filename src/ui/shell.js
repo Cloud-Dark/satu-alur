@@ -18,7 +18,6 @@ import * as StageComplete from '../stages/complete.js'
 import * as StageBookkeeping from '../stages/bookkeeping.js'
 import * as StageReport from '../stages/report.js'
 import * as StageSettings from '../stages/settings.js'
-import * as StageSocial from '../stages/social.js'
 import * as StageAdvisor from '../stages/advisor.js'
 import * as StageRadar from '../stages/radar.js'
 import * as StageLeads from '../stages/leads.js'
@@ -26,6 +25,8 @@ import * as StageLeads from '../stages/leads.js'
 import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
+import * as Office from '../stages/office/index.js'
+import * as StageSupport from '../support/page.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home', module: StageDashboard,
@@ -46,20 +47,27 @@ export const STAGES = [
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
   { key: 'leads', group: 'growth', label: 'Pencari prospek', sub: 'Peta & radius', icon: 'mapPin', module: StageLeads,
     action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'social', group: 'growth', label: 'Media sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocial,
+  { key: 'social-media', group: 'growth', label: 'Media Sosial', sub: 'Konten & jadwal', icon: 'megaphone', module: StageSocialMedia,
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
   { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot', module: StageAdvisor,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 
-  { key: 'social-media', group: 'growth', label: 'Social Media', icon: 'message', module: StageSocialMedia,
-    action: { label: 'Asisten AI', icon: 'bot', to: 'ai-assistant' } },
   { key: 'ai-assistant', group: 'growth', label: 'AI Superpowers', icon: 'bot', module: StageAIAssistant,
-    action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
+    action: { label: 'Media Sosial', icon: 'megaphone', to: 'social-media' } },
   { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
+  // Every signed-in user (staff too, harmless); drawn last in the nav, just above Pengaturan.
+  { key: 'support', group: 'help', label: 'Bantuan', sub: 'Tiket ke tim Satu Alur', icon: 'message', module: StageSupport,
+    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 ]
 
+// Staff (admin sessions) see only the office sections, one sidebar item each.
+const STAFF_STAGES = Office.ITEMS.map((i) => ({
+  key: i.key, group: i.group, label: i.label, icon: i.icon, module: { render: (view, c) => Office.render(view, c, i.key) },
+}))
+
 const STAGE_KEY = 'satualur_stage'
+const STAFF_KEY = 'satualur_office_section'
 const COLLAPSE_KEY = 'satualur_sidebar_collapsed'
 const DESKTOP = '(min-width: 1024px)'
 
@@ -77,6 +85,9 @@ function initials(user) {
 
 export function renderShell(root, ctx) {
   const user = ctx.user || {}
+  const staff = ctx.isAdmin === true
+  const stages = staff ? STAFF_STAGES : STAGES
+  const storeKey = staff ? STAFF_KEY : STAGE_KEY
   const prevTitle = document.title
   const isMock = isUsingMockCloud()
   const mq = window.matchMedia(DESKTOP)
@@ -86,9 +97,10 @@ export function renderShell(root, ctx) {
     disposers.push(() => target.removeEventListener(type, fn, opts))
   }
 
-  let current = store.get(sessionStorage, STAGE_KEY)
-  if (!STAGES.some((s) => s.key === current)) current = 'dashboard'
+  let current = store.get(sessionStorage, storeKey)
+  if (!stages.some((s) => s.key === current)) current = stages[0].key
   let viewCtl = null
+  let leaveGuard = null
   let lastFocus = null
 
   /* ------------------------------------------------------------ Sidebar */
@@ -142,21 +154,27 @@ export function renderShell(root, ctx) {
     try { await ctx.signOut() } finally { signOutBtn.disabled = false }
   })
 
-  const [dash, ...rest] = STAGES
+  const [dash, ...rest] = stages
   const flow = rest.filter((s) => !s.group)
   const growth = rest.filter((s) => s.group === 'growth')
-  const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': 'Navigasi alur' },
-    el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
-    el('nav', { className: 'side-nav', 'aria-label': 'Tahap alur' },
+  const help = rest.filter((s) => s.group === 'help')
+  const navLists = staff
+    ? Office.GROUPS.map((g) => [
+      el('div', { className: 'side-label' }, el('span', {}, g.title)),
+      el('ol', { className: 'flow-list' }, stages.filter((s) => s.group === g.title).map(navItem))])
+    : [
       el('ol', { className: 'flow-list flow-list-top' }, navItem(dash)),
       el('div', { className: 'side-label' }, el('span', {}, 'Alur kerja'), el('span', { className: 'side-label-count tnum' }, '6 tahap')),
       el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
       el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
       el('ol', { className: 'flow-list flow-list-growth' }, growth.map(navItem)),
-    ),
+      el('ol', { className: 'flow-list flow-list-help' }, help.map(navItem))]
+  const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': staff ? 'Menu Kantor Satu Alur' : 'Navigasi alur' },
+    el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
+    el('nav', { className: 'side-nav', 'aria-label': staff ? 'Bagian Kantor Satu Alur' : 'Tahap alur' }, ...navLists.flat()),
     el('div', { className: 'side-foot' },
-      settingsBtn,
-      modeBadge,
+      staff ? null : settingsBtn,
+      staff ? null : modeBadge,
       el('div', { className: 'side-user' },
         el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials(user)),
         el('span', { className: 'side-user-text' },
@@ -318,20 +336,26 @@ export function renderShell(root, ctx) {
   async function refreshCounts() {
     const seq = ++countsSeq
     try {
-      const m = await loadFlow()
-      if (seq !== countsSeq) return
-      const pending = {
+      const m = staff ? null : await loadFlow()
+      const pending = staff ? await Office.badgeCounts() : {
         offer: m.requestsWithoutOffer().length + m.draftOffers().length,
         assign: m.approvedWithoutAssignment().length,
         complete: m.activeAssignments().length,
         bookkeeping: m.completionsWithoutLedger().length,
       }
+      if (seq !== countsSeq) return
       for (const [k, countEl] of navCounts) {
         const n = pending[k] || 0
         countEl.hidden = n === 0
         countEl.textContent = String(n)
         navButtons.get(k).classList.toggle('has-pending', n > 0)
-        countEl.title = n ? `${n} menunggu tindakan` : ''
+        countEl.title = n ? (staff ? Office.BADGE_TITLES[k](n) : `${n} menunggu tindakan`) : ''
+        // The count is a bare number; staff items also announce what it counts.
+        if (staff) {
+          const btn = navButtons.get(k)
+          if (n) btn.setAttribute('aria-label', `${btn.querySelector('.flow-name').textContent}, ${Office.BADGE_TITLES[k](n)}`)
+          else btn.removeAttribute('aria-label')
+        }
       }
     } catch { /* counters are best-effort */ }
   }
@@ -340,9 +364,10 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    crumbNum.textContent = stage.key === 'dashboard' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
+    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' || stage.group === 'help' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
     const a = stage.action
+    if (!a) { actionSlot.replaceChildren(); return }
     const b = button({
       label: a.label, icon: a.icon, iconRight: a.iconRight, size: 'sm',
       variant: a.primary ? 'primary' : 'soft', className: 'topbar-cta',
@@ -353,12 +378,15 @@ export function renderShell(root, ctx) {
   }
 
   async function show(key, params = {}, { focus = false } = {}) {
-    const stage = STAGES.find((s) => s.key === key) || STAGES[0]
+    const stage = stages.find((s) => s.key === key) || stages[0]
+    // The current stage may veto leaving (unsaved changes); it registers the guard through ctx.setLeaveGuard.
+    if (leaveGuard && !leaveGuard()) { closeNav({ restore: false }); return }
+    leaveGuard = null
     viewCtl?.abort()
     viewCtl = new AbortController()
     const signal = viewCtl.signal
     current = stage.key
-    store.set(sessionStorage, STAGE_KEY, stage.key)
+    store.set(sessionStorage, storeKey, stage.key)
 
     for (const [k, b] of navButtons) {
       const active = k === stage.key
@@ -381,6 +409,8 @@ export function renderShell(root, ctx) {
       isMock,
       navigate: (to, p) => show(to, p, { focus: true }),
       openSettings,
+      setLeaveGuard: (fn) => { if (!signal.aborted) leaveGuard = fn },
+      refreshBadges: refreshCounts,
     }
     try {
       const done = stage.module.render(view, stageCtx)
@@ -393,7 +423,7 @@ export function renderShell(root, ctx) {
         el('div', { className: 'note-body' }, el('p', {}, `Gagal memuat tahap ${stage.label}: ${err.message}`))))
     }
     if (focus && !signal.aborted) {
-      const h = view.querySelector('.page-title, h1')
+      const h = staff ? null : view.querySelector('.page-title, h1')
       ;(h || host).focus({ preventScroll: true })
     }
   }

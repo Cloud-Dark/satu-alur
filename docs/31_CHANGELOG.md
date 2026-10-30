@@ -8,6 +8,18 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-10-29 - Publikasi Meta dan Kantor Satu Alur
+
+#### Ditambahkan
+- Tahap **Media sosial** dengan tab Akun, Konten, Jadwal (Daftar konten / Laporan tayang), Brainstorm, Iklan, Kolaborasi: hubungkan Halaman Facebook (+ Instagram tertaut) lewat OAuth Meta, terbit sekarang atau jadwalkan (1 menit sampai 75 hari), unggah gambar JPEG ke R2 (maks. 8 MB), laporan tayang.
+- Rute `/api/social/*` dan `GET /api/media/:key` (`worker/social.js`); cron 5 menit yang menerbitkan maks. 25 posting jatuh tempo, mengulang galat batas laju sampai 3 kali, dan tidak mengulang galat tak pasti ("Status tidak pasti, periksa halaman Anda").
+- Tahap admin **Kantor Satu Alur** dan rute `/api/office/*` (`worker/office.js`): katalog influencer, permintaan Kolaborasi dan Iklan dari bisnis, kotak masuk admin (status Baru/Diproses/Selesai + catatan). Khusus staf: login username + password di `/super-admin-login` (`POST /api/auth/staff-login`, tabel `staff_accounts`, perintah `npm run staff`); `GET /api/auth/session` mengembalikan `is_admin`.
+- Migrasi `0007_social_meta.sql`: `social_accounts`, `social_posts`, `influencers`, `service_requests`, dan kolom `social_contents.image_key`. Konfigurasi baru: `META_APP_ID`, `META_APP_SECRET`, `TOKEN_KEY`, `PUBLIC_BASE_URL`, binding R2 `MEDIA` ([16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md)).
+- Mode demo: konten berisi `#gagal` sengaja gagal diterbitkan.
+
+#### Catatan
+- Pakai di bisnis lain butuh App Review Meta; sebelum itu hanya admin/developer/tester aplikasi yang bisa terhubung.
+
 ### 2026-10-29 - Tindak lanjut audit kode
 
 #### Diperbaiki

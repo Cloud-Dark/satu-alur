@@ -35,6 +35,13 @@ export async function submitEmailOtp(email, verificationCode) {
   return completed.data
 }
 
+/** Satu Alur staff sign-in (/super-admin-login): username + password, staff-only session. */
+export async function staffLogin(username, password) {
+  const res = await getCloud().auth.staffLogin({ username, password })
+  if (res?.error) throw new Error(res.error.message)
+  return res.data
+}
+
 /** Signs in to one of the seeded demo accounts (no OTP). */
 export async function loginWithDemo(email) {
   const res = await getCloud().auth.demoLogin({ email })

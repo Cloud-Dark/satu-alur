@@ -15,6 +15,10 @@ import { observeReveal, prefersReducedMotion } from '../ui/reveal.js'
 import { mountFlowScene } from '../three/flow-scene.js'
 import { mountAgentDemo } from './terminal.js'
 import { PRICING_TIERS, PRICING_NOTE } from './pricing.js'
+import { getSite } from '../site/api.js'
+import { getPlans } from '../business/api.js'
+import { renderPlanCard } from '../business/plan-card.js'
+import { renderHero } from '../site/hero.js'
 import { NAV, HERO_POINTS, STAGES, TICKER, FEATURES, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
@@ -283,7 +287,7 @@ function pricingHTML() {
     const variant = { primary: 'btn-primary', accent: 'btn-accent', soft: 'btn-soft' }[t.cta.variant] || ''
     const cta = t.cta.href
       ? `<a class="btn btn-lg ${variant} lp-tier-cta" href="${t.cta.href}">${esc(t.cta.label)} ${iconHTML('arrowRight', { className: 'icon-trailing' })}</a>`
-      : `<a class="btn btn-lg ${variant} lp-tier-cta" href="#" data-placeholder aria-describedby="lp-contact-note">${esc(t.cta.label)} ${iconHTML('arrowUpRight', { className: 'icon-trailing' })}</a>`
+      : `<a class="btn btn-lg ${variant} lp-tier-cta" href="#/kontak" aria-describedby="lp-contact-note">${esc(t.cta.label)} ${iconHTML('arrowUpRight', { className: 'icon-trailing' })}</a>`
     return `
     <article class="lp-tier reveal${t.recommended ? ' is-recommended' : ''}" style="--d: ${i * 90}ms" aria-labelledby="tier-${t.id}">
       <header class="lp-tier-head">
@@ -309,10 +313,10 @@ function pricingHTML() {
       <header class="lp-head lp-head-center">
         <p class="eyebrow reveal">Harga</p>
         <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-price-title">Mulai gratis. <em>Naik kelas</em> saat tumbuh.</h2>
-        <p class="lp-lede reveal" style="--d: 120ms">Tiga paket untuk tiga tahap usaha. Pilih yang sesuai sekarang, pindah paket kapan saja.</p>
+        <p class="lp-lede reveal" id="lp-price-lede" style="--d: 120ms">Tiga paket untuk tiga tahap usaha. Pilih yang sesuai sekarang, pindah paket kapan saja.</p>
       </header>
       <div class="lp-tiers">${tiers}</div>
-      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}${esc(PRICING_NOTE)} <span id="lp-contact-note">Kontak penjualan Enterprise segera tersedia.</span></p>
+      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}<span id="lp-draft-note">${esc(PRICING_NOTE)} </span><span id="lp-contact-note">Untuk paket Enterprise, hubungi kami lewat halaman Kontak.</span></p>
     </div>
   </section>`
 }
@@ -392,13 +396,14 @@ function footerHTML() {
             ['FAQ', 'href="#faq" data-scroll="faq"'],
           ])}
           ${col('Perusahaan', [
-            ['Tentang kami', 'href="#" data-placeholder aria-disabled="true"'],
+            ['Tentang kami', 'href="#/tentang"'],
             ['Roadmap', 'href="#ide-besar" data-scroll="ide-besar"'],
-            ['Kontak', 'href="#" data-placeholder aria-disabled="true"'],
+            ['Kontak', 'href="#/kontak"'],
           ])}
           ${col('Legal', [
-            ['Kebijakan privasi', 'href="#" data-placeholder aria-disabled="true"'],
-            ['Syarat & ketentuan', 'href="#" data-placeholder aria-disabled="true"'],
+            ['Kebijakan privasi', 'href="#/privasi"'],
+            ['Syarat & ketentuan', 'href="#/syarat"'],
+            ['Kebijakan cookie', 'href="#/cookie"'],
           ])}
         </div>
       </div>
@@ -653,15 +658,58 @@ export function renderLanding(root, ctx = {}) {
   menu.querySelectorAll('a[href^="#/"]').forEach((a) => on(a, 'click', () => closeMenu(false)))
 
   /* --- FAQ accordion (height animates via grid rows in CSS) --- */
-  page.querySelectorAll('[data-faq]').forEach((btn) => {
-    on(btn, 'click', () => {
-      const open = btn.getAttribute('aria-expanded') === 'true'
-      const panel = document.getElementById(btn.getAttribute('aria-controls'))
-      btn.setAttribute('aria-expanded', String(!open))
-      btn.closest('.lp-faq-item').classList.toggle('is-open', !open)
-      panel.inert = open
-    })
+  // Delegated, so FAQ rows swapped in from the API keep working.
+  const faqList = page.querySelector('.lp-faq')
+  on(faqList, 'click', (e) => {
+    const btn = e.target.closest('[data-faq]')
+    if (!btn) return
+    const open = btn.getAttribute('aria-expanded') === 'true'
+    const panel = document.getElementById(btn.getAttribute('aria-controls'))
+    btn.setAttribute('aria-expanded', String(!open))
+    btn.closest('.lp-faq-item').classList.toggle('is-open', !open)
+    panel.inert = open
   })
+
+  /* --- Editable content: defaults are already rendered; swap in stored fields (text nodes only) --- */
+  let disposed = false
+  getSite('landing').then((row) => {
+    const v = row?.value
+    if (disposed || !v) return
+    renderHero(page.querySelector('.lp-hero-copy'), v.hero)
+    const faqs = (Array.isArray(v.faqs) ? v.faqs : []).filter((f) => f && typeof f.q === 'string' && typeof f.a === 'string' && f.q.trim() && f.a.trim())
+    if (!faqs.length) return
+    faqList.replaceChildren(...faqs.map((f, i) => {
+      const item = document.createElement('div')
+      item.className = 'lp-faq-item'
+      item.innerHTML = `
+        <h3 class="lp-faq-q">
+          <button type="button" id="faq-q-${i}" aria-expanded="false" aria-controls="faq-a-${i}" data-faq>
+            <span class="lp-faq-text"></span>
+            <span class="lp-faq-icon" aria-hidden="true">${iconHTML('plus', { size: 16, stroke: 2 })}</span>
+          </button>
+        </h3>
+        <div class="lp-faq-a" id="faq-a-${i}" role="region" aria-labelledby="faq-q-${i}" inert><div><p></p></div></div>`
+      item.querySelector('.lp-faq-text').textContent = f.q.trim()
+      item.querySelector('p').textContent = f.a.trim()
+      return item
+    }))
+  }).catch(() => {})
+
+  // Pricing: the built-in cards stay unless the API returns at least one active plan.
+  getPlans().then((plans) => {
+    if (disposed || !plans?.length) return
+    page.querySelector('.lp-tiers').replaceChildren(...plans.map(renderPlanCard))
+    // The built-in copy says "three plans" and "draft prices"; neither is true of live plans.
+    page.querySelector('#lp-price-lede').textContent = 'Pilih paket sesuai tahap usaha Anda. Pindah paket kapan saja.'
+    page.querySelector('#lp-draft-note').remove()
+    // "Kontak penjualan Enterprise" and "Mulai gratis" only make sense when such a plan exists.
+    if (!plans.some((p) => p.cta_kind === 'contact')) {
+      page.querySelector('#lp-contact-note').remove()
+      page.querySelector('.lp-tiers').querySelectorAll('[aria-describedby="lp-contact-note"]').forEach((a) => a.removeAttribute('aria-describedby'))
+      page.querySelector('#harga .lp-note')?.remove()
+    }
+    if (!plans.some((p) => p.price_idr === 0)) page.querySelector('#lp-price-title').textContent = 'Pilih paket Anda.'
+  }).catch(() => {})
 
   /* --- Counters (real counts only: stages, AI agents, data flows) --- */
   if (!reduced && 'IntersectionObserver' in window) {
@@ -690,7 +738,6 @@ export function renderLanding(root, ctx = {}) {
   disposers.push(observeReveal(page))
   disposers.push(mountAgentDemo(page.querySelector('[data-agent]'), AGENT_DEMO))
 
-  let disposed = false
   let sceneCleanup = null
   mountFlowScene(page.querySelector('[data-scene]'), { highlight: 1 })
     .then((fn) => { if (disposed) fn?.(); else sceneCleanup = fn })
