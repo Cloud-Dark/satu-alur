@@ -13,93 +13,44 @@ import * as Campaigns from './campaigns.js'
 import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
 const { el } = C
-const STORE = 'satualur_office_section'
-const GROUPS = [
-  { title: 'Konten situs', items: [
-    { key: 'landing', label: 'Landing page', draw: Landing.draw },
-    { key: 'about', label: 'Tentang kami', draw: Doc.drawAbout },
-    { key: 'legal', label: 'Legal', draw: Doc.drawLegal }] },
+
+// Single source of the staff menu: the shell turns each section into a sidebar item.
+export const GROUPS = [
+  { title: 'Konten Situs', items: [
+    { key: 'landing', label: 'Landing page', icon: 'home', draw: Landing.draw },
+    { key: 'about', label: 'Tentang kami', icon: 'building', draw: Doc.drawAbout },
+    { key: 'legal', label: 'Legal', icon: 'file', draw: Doc.drawLegal }] },
   { title: 'Bisnis', items: [
-    { key: 'plans', label: 'Paket langganan', draw: Plans.draw },
-    { key: 'gateway', label: 'Payment gateway', draw: Payment.draw }] },
+    { key: 'plans', label: 'Paket langganan', icon: 'ledger', draw: Plans.draw },
+    { key: 'gateway', label: 'Payment gateway', icon: 'wallet', draw: Payment.draw }] },
   { title: 'Pelanggan', items: [
-    { key: 'customers', label: 'Pelanggan & mitra', draw: Customers.draw },
-    { key: 'users', label: 'Pengguna', draw: Users.draw },
-    { key: 'contact', label: 'Contact Us', draw: Contact.draw },
-    { key: 'tickets', label: 'Pengaduan CS', draw: Support.draw }] },
-  { title: 'Agensi influencer', items: [
-    { key: 'influencers', label: 'Influencer', draw: Influencers.draw },
-    { key: 'requests', label: 'Permintaan', draw: Requests.draw },
-    { key: 'campaigns', label: 'Kampanye', draw: Campaigns.draw }] },
+    { key: 'customers', label: 'Pelanggan & mitra', icon: 'users', draw: Customers.draw },
+    { key: 'users', label: 'Pengguna', icon: 'shield', draw: Users.draw },
+    { key: 'contact', label: 'Contact Us', icon: 'mail', draw: Contact.draw },
+    { key: 'tickets', label: 'Pengaduan CS', icon: 'message', draw: Support.draw }] },
+  { title: 'Agensi Influencer', items: [
+    { key: 'influencers', label: 'Influencer', icon: 'sparkles', draw: Influencers.draw },
+    { key: 'requests', label: 'Permintaan', icon: 'inbox', draw: Requests.draw },
+    { key: 'campaigns', label: 'Kampanye', icon: 'megaphone', draw: Campaigns.draw }] },
 ]
-const ITEMS = GROUPS.flatMap((g) => g.items)
+export const ITEMS = GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.title })))
 
-function stored() {
-  let k = null
-  try { k = sessionStorage.getItem(STORE) } catch { /* storage unavailable */ }
-  return ITEMS.some((i) => i.key === k && !i.soon) ? k : 'landing'
+// Sidebar badges: new Contact Us messages and tickets waiting on staff.
+export async function badgeCounts() {
+  const [contact, tickets] = await Promise.all([adminContactCounts(), adminTicketCounts()])
+  return { contact: contact.new, tickets: tickets.open }
 }
+export const BADGE_TITLES = { contact: (n) => `${n} pesan baru`, tickets: (n) => `${n} tiket menunggu` }
 
-export async function render(container, ctx) {
-  let current = stored()
+/** Draws one section into the shell's view; ctx.setLeaveGuard / ctx.refreshBadges come from the shell. */
+export function render(container, ctx, key) {
   let dirty = false
-  const host = el('div', { className: 'of-content' })
-
-  const buttons = {}
-  // Badges: new Contact Us messages and tickets waiting on staff; refreshed on render, when an inbox loads and after changes.
-  const BADGES = {
-    contact: { el: el('span'), count: async () => (await adminContactCounts()).new, sr: ' pesan baru', option: (n) => `Contact Us (${n} baru)` },
-    tickets: { el: el('span'), count: async () => (await adminTicketCounts()).open, sr: ' tiket menunggu', option: (n) => `Pengaduan CS (${n} menunggu)` },
-  }
-  const refreshCount = () => Promise.all(Object.entries(BADGES).map(async ([key, b]) => {
-    try {
-      const n = await b.count()
-      if (ctx.signal.aborted) return
-      b.el.replaceChildren(...(n ? [C.tag(String(n), 'brand'), el('span', { className: 'sr-only' }, b.sr)] : []))
-      select.querySelector(`option[value="${key}"]`).textContent = n ? b.option(n) : ITEMS.find((i) => i.key === key).label
-    } catch { /* the badge is optional */ }
-  }))
-  const nav = el('nav', { className: 'of-nav', 'aria-label': 'Bagian Kantor Satu Alur' }, ...GROUPS.map((g) =>
-    el('div', { className: 'of-nav-group' }, el('h2', { className: 'of-nav-title' }, g.title),
-      el('ul', {}, ...g.items.map((i) => {
-        const b = el('button', { type: 'button', className: 'of-nav-item', disabled: Boolean(i.soon) }, el('span', {}, i.label), i.soon ? el('span', { className: 'of-soon' }, 'Segera') : null)
-        buttons[i.key] = b
-        if (BADGES[i.key]) b.append(BADGES[i.key].el)
-        b.addEventListener('click', () => go(i.key))
-        return el('li', {}, b)
-      })))))
-  const selectId = 'of-section-select'
-  const select = el('select', { id: selectId, className: 'input' }, ...ITEMS.map((i) => el('option', { value: i.key, disabled: Boolean(i.soon) }, i.soon ? `${i.label} (segera)` : i.label)))
-  select.addEventListener('change', () => go(select.value))
-  const mobile = el('div', { className: 'field of-nav-select' }, el('label', { className: 'field-label', htmlFor: selectId }, 'Bagian'), select)
-
-  function show() {
-    for (const [k, b] of Object.entries(buttons)) {
-      if (k === current) b.setAttribute('aria-current', 'page')
-      else b.removeAttribute('aria-current')
-    }
-    select.value = current
-    dirty = false
-    // Each section draws into its own box; a slow load from a section we left lands in a detached box.
-    const box = el('div')
-    host.replaceChildren(box)
-    ITEMS.find((i) => i.key === current).draw(box, ctx, (d) => { if (box.parentNode === host) dirty = d }, refreshCount)
-  }
-  function go(key) {
-    if (key === current) return
-    if (dirty && !confirm(Doc.LEAVE_MSG)) { select.value = current; return }
-    current = key
-    try { sessionStorage.setItem(STORE, key) } catch { /* storage unavailable */ }
-    show()
-  }
-
+  ctx.setLeaveGuard(() => !dirty || confirm(Doc.LEAVE_MSG))
   const onUnload = (e) => { if (dirty) { e.preventDefault(); e.returnValue = '' } }
   window.addEventListener('beforeunload', onUnload)
   ctx.signal.addEventListener('abort', () => window.removeEventListener('beforeunload', onUnload))
-
-  container.replaceChildren(
-    C.pageHeader({ title: 'Kantor Satu Alur', description: 'Kelola konten situs, influencer, dan permintaan dari bisnis.' }),
-    mobile, el('div', { className: 'of-layout' }, nav, host))
-  show()
-  refreshCount()
+  // The box is detached when the shell replaces the view, so a slow load from a left section never paints over the next one.
+  const box = el('div', { className: 'of-content' })
+  container.replaceChildren(box)
+  ITEMS.find((i) => i.key === key).draw(box, ctx, (d) => { if (box.parentNode === container) dirty = d }, ctx.refreshBadges)
 }

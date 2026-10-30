@@ -25,7 +25,7 @@ import * as StageLeads from '../stages/leads.js'
 import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
-import * as StageOffice from '../stages/office/index.js'
+import * as Office from '../stages/office/index.js'
 import * as StageSupport from '../support/page.js'
 
 export const STAGES = [
@@ -56,14 +56,18 @@ export const STAGES = [
     action: { label: 'Media Sosial', icon: 'megaphone', to: 'social-media' } },
   { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
-  { key: 'office', group: 'growth', label: 'Kantor Satu Alur', sub: 'Influencer & permintaan', icon: 'users', module: StageOffice, adminOnly: true,
-    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
   // Every signed-in user (staff too, harmless); drawn last in the nav, just above Pengaturan.
   { key: 'support', group: 'help', label: 'Bantuan', sub: 'Tiket ke tim Satu Alur', icon: 'message', module: StageSupport,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
 ]
 
+// Staff (admin sessions) see only the office sections, one sidebar item each.
+const STAFF_STAGES = Office.ITEMS.map((i) => ({
+  key: i.key, group: i.group, label: i.label, icon: i.icon, module: { render: (view, c) => Office.render(view, c, i.key) },
+}))
+
 const STAGE_KEY = 'satualur_stage'
+const STAFF_KEY = 'satualur_office_section'
 const COLLAPSE_KEY = 'satualur_sidebar_collapsed'
 const DESKTOP = '(min-width: 1024px)'
 
@@ -81,7 +85,9 @@ function initials(user) {
 
 export function renderShell(root, ctx) {
   const user = ctx.user || {}
-  const stages = STAGES.filter((s) => !s.adminOnly || ctx.isAdmin)
+  const staff = ctx.isAdmin === true
+  const stages = staff ? STAFF_STAGES : STAGES
+  const storeKey = staff ? STAFF_KEY : STAGE_KEY
   const prevTitle = document.title
   const isMock = isUsingMockCloud()
   const mq = window.matchMedia(DESKTOP)
@@ -91,9 +97,10 @@ export function renderShell(root, ctx) {
     disposers.push(() => target.removeEventListener(type, fn, opts))
   }
 
-  let current = store.get(sessionStorage, STAGE_KEY)
-  if (!stages.some((s) => s.key === current)) current = 'dashboard'
+  let current = store.get(sessionStorage, storeKey)
+  if (!stages.some((s) => s.key === current)) current = stages[0].key
   let viewCtl = null
+  let leaveGuard = null
   let lastFocus = null
 
   /* ------------------------------------------------------------ Sidebar */
@@ -151,19 +158,23 @@ export function renderShell(root, ctx) {
   const flow = rest.filter((s) => !s.group)
   const growth = rest.filter((s) => s.group === 'growth')
   const help = rest.filter((s) => s.group === 'help')
-  const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': 'Navigasi alur' },
-    el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
-    el('nav', { className: 'side-nav', 'aria-label': 'Tahap alur' },
+  const navLists = staff
+    ? Office.GROUPS.map((g) => [
+      el('div', { className: 'side-label' }, el('span', {}, g.title)),
+      el('ol', { className: 'flow-list' }, stages.filter((s) => s.group === g.title).map(navItem))])
+    : [
       el('ol', { className: 'flow-list flow-list-top' }, navItem(dash)),
       el('div', { className: 'side-label' }, el('span', {}, 'Alur kerja'), el('span', { className: 'side-label-count tnum' }, '6 tahap')),
       el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
       el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
       el('ol', { className: 'flow-list flow-list-growth' }, growth.map(navItem)),
-      el('ol', { className: 'flow-list flow-list-help' }, help.map(navItem)),
-    ),
+      el('ol', { className: 'flow-list flow-list-help' }, help.map(navItem))]
+  const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': staff ? 'Menu Kantor Satu Alur' : 'Navigasi alur' },
+    el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
+    el('nav', { className: 'side-nav', 'aria-label': staff ? 'Bagian Kantor Satu Alur' : 'Tahap alur' }, ...navLists.flat()),
     el('div', { className: 'side-foot' },
-      settingsBtn,
-      modeBadge,
+      staff ? null : settingsBtn,
+      staff ? null : modeBadge,
       el('div', { className: 'side-user' },
         el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials(user)),
         el('span', { className: 'side-user-text' },
@@ -325,20 +336,20 @@ export function renderShell(root, ctx) {
   async function refreshCounts() {
     const seq = ++countsSeq
     try {
-      const m = await loadFlow()
-      if (seq !== countsSeq) return
-      const pending = {
+      const m = staff ? null : await loadFlow()
+      const pending = staff ? await Office.badgeCounts() : {
         offer: m.requestsWithoutOffer().length + m.draftOffers().length,
         assign: m.approvedWithoutAssignment().length,
         complete: m.activeAssignments().length,
         bookkeeping: m.completionsWithoutLedger().length,
       }
+      if (seq !== countsSeq) return
       for (const [k, countEl] of navCounts) {
         const n = pending[k] || 0
         countEl.hidden = n === 0
         countEl.textContent = String(n)
         navButtons.get(k).classList.toggle('has-pending', n > 0)
-        countEl.title = n ? `${n} menunggu tindakan` : ''
+        countEl.title = n ? (staff ? Office.BADGE_TITLES[k](n) : `${n} menunggu tindakan`) : ''
       }
     } catch { /* counters are best-effort */ }
   }
@@ -347,9 +358,10 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    crumbNum.textContent = stage.key === 'dashboard' || stage.group === 'help' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
+    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' || stage.group === 'help' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
     const a = stage.action
+    if (!a) { actionSlot.replaceChildren(); return }
     const b = button({
       label: a.label, icon: a.icon, iconRight: a.iconRight, size: 'sm',
       variant: a.primary ? 'primary' : 'soft', className: 'topbar-cta',
@@ -361,11 +373,14 @@ export function renderShell(root, ctx) {
 
   async function show(key, params = {}, { focus = false } = {}) {
     const stage = stages.find((s) => s.key === key) || stages[0]
+    // The current stage may veto leaving (unsaved changes); it registers the guard through ctx.setLeaveGuard.
+    if (leaveGuard && !leaveGuard()) return
+    leaveGuard = null
     viewCtl?.abort()
     viewCtl = new AbortController()
     const signal = viewCtl.signal
     current = stage.key
-    store.set(sessionStorage, STAGE_KEY, stage.key)
+    store.set(sessionStorage, storeKey, stage.key)
 
     for (const [k, b] of navButtons) {
       const active = k === stage.key
@@ -388,6 +403,8 @@ export function renderShell(root, ctx) {
       isMock,
       navigate: (to, p) => show(to, p, { focus: true }),
       openSettings,
+      setLeaveGuard: (fn) => { if (!signal.aborted) leaveGuard = fn },
+      refreshBadges: refreshCounts,
     }
     try {
       const done = stage.module.render(view, stageCtx)

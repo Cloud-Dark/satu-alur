@@ -3,6 +3,8 @@
 // username + password sign-in at /super-admin-login; the normal #/masuk login never grants it.
 const { loginLive, goStage } = require('./lib.cjs')
 
+const KEYS = { 'Landing page': 'landing', 'Tentang kami': 'about', Legal: 'legal', 'Paket langganan': 'plans', 'Payment gateway': 'gateway', 'Pelanggan & mitra': 'customers', Pengguna: 'users', 'Contact Us': 'contact', 'Pengaduan CS': 'tickets', Influencer: 'influencers', Permintaan: 'requests', Kampanye: 'campaigns' }
+
 async function staffLogin(page, base, username, password) {
   await page.goto(`${base}/super-admin-login`, { waitUntil: 'load' })
   await page.waitForSelector('#staff-username')
@@ -15,7 +17,9 @@ module.exports = async function office(t) {
   // regular business user: no menu entry, and the URL falls back to the dashboard
   const u = await t.page()
   await loginLive(u, t.base, 'pemilik@usaha.id')
-  t.check(await u.locator('.flow-item[data-stage="office"]').count() === 0, 'regular user: no "Kantor Satu Alur" in the menu')
+  t.check(await u.locator('.flow-item[data-stage="office"]').count() === 0 && await u.locator('.flow-item[data-stage="landing"], .flow-item[data-stage="contact"]').count() === 0, 'regular user: no "Kantor Satu Alur" or office items in the menu')
+  const bizNames = await u.locator('.side .flow-name').allTextContents()
+  t.check(bizNames.includes('Ringkasan') && bizNames.includes('Media Sosial') && bizNames.includes('Bantuan') && await u.locator('.side-label').count() === 2 && await u.getByRole('button', { name: 'Pengaturan' }).count() >= 1, 'business sidebar unchanged: Ringkasan, Media Sosial, Bantuan, Pengaturan, two group labels', bizNames.join())
   await u.evaluate(() => sessionStorage.setItem('satualur_stage', 'office'))
   await u.goto(`${t.base}/#/app`)
   await u.waitForSelector('.app-shell')
@@ -67,36 +71,45 @@ module.exports = async function office(t) {
   await p.waitForFunction(() => location.pathname === '/' && location.hash.startsWith('#/app'), null, { timeout: 10000 })
   await p.waitForSelector('.app-shell')
   await p.waitForTimeout(800)
-  t.check(await p.locator('.flow-item[aria-current="page"]').getAttribute('data-stage') === 'office', 'staff login lands on Kantor Satu Alur')
+  t.check(await p.locator('.flow-item[aria-current="page"]').getAttribute('data-stage') === 'landing', 'staff login lands on the Landing page item')
   const radio = (name) => p.getByRole('radio', { name, exact: true })
-  const sec = (name) => p.getByRole('button', { name, exact: true }).click()
+  const sec = (name) => p.locator(`.side .flow-item[data-stage="${KEYS[name]}"]`).click()
+  // The business side runs in its own page of the same context (same demo store).
+  let biz = null
   const kolaborasi = async () => {
-    await goStage(p, 'social-media')
-    await radio('Kolaborasi').click()
-    await p.waitForSelector('.sm-inf-card')
+    if (!biz) { biz = await p.context().newPage(); await loginLive(biz, t.base, 'pemilik@usaha.id') }
+    await goStage(biz, 'social-media')
+    await biz.getByRole('radio', { name: 'Kolaborasi', exact: true }).click()
+    await biz.waitForSelector('.sm-inf-card')
   }
 
-  t.check(await p.locator('.flow-item[data-stage="office"]', { hasText: 'Kantor Satu Alur' }).count() === 1, 'nav shows "Kantor Satu Alur" for an admin')
+  const crumb = async () => `${await p.locator('.crumb-pre').textContent()} › ${await p.locator('.crumb-title').textContent()}`
+
+  // staff sidebar: only the four office groups, no business menus
+  const labels = (await p.locator('.side-label').allTextContents()).map((x) => x.trim())
+  t.check(labels.join() === 'Konten Situs,Bisnis,Pelanggan,Agensi Influencer', 'staff sidebar: exactly the four groups, in order', labels.join())
+  const names = await p.locator('.side .flow-name').allTextContents()
+  t.check(names.join() === 'Landing page,Tentang kami,Legal,Paket langganan,Payment gateway,Pelanggan & mitra,Pengguna,Contact Us,Pengaduan CS,Influencer,Permintaan,Kampanye', 'staff sidebar: the twelve office sections', names.join())
+  t.check(await p.locator('.side').getByText(/Ringkasan|Media Sosial|Bantuan|Pengaturan|Kantor Satu Alur|Mode demo/).count() === 0, 'staff sidebar: no Ringkasan, Media Sosial, Bantuan, Pengaturan or demo badge')
+  t.check(await p.locator('.side-user').count() === 1 && await p.getByRole('button', { name: 'Keluar' }).count() === 1 && await p.locator('.topbar-cta').count() === 0, 'staff: user card and sign-out kept, no topbar action button')
+  t.check(await p.locator('.of-nav, .of-nav-select').count() === 0, 'staff: no internal section nav')
+  t.check(await crumb() === 'Konten Situs › Landing page', 'topbar breadcrumb shows group › section', await crumb())
 
   // business sends a collab request first
   await kolaborasi()
-  t.check(await p.locator('.sm-inf-card').count() === 6, 'Kolaborasi starts with 6 cards')
-  await p.locator('.sm-inf-card').first().getByRole('button', { name: 'Ajukan kolaborasi' }).click()
-  const cd = p.getByRole('dialog', { name: /Ajukan kolaborasi/ })
+  t.check(await biz.locator('.sm-inf-card').count() === 6, 'Kolaborasi starts with 6 cards')
+  await biz.locator('.sm-inf-card').first().getByRole('button', { name: 'Ajukan kolaborasi' }).click()
+  const cd = biz.getByRole('dialog', { name: /Ajukan kolaborasi/ })
   await cd.getByLabel('Ceritakan kampanye Anda').fill('Promosi kedai baru')
   await cd.getByLabel('Kisaran anggaran').fill('Rp2-5 juta')
   await cd.getByLabel('Waktu kampanye').fill('Desember 2026')
   await cd.getByRole('button', { name: 'Kirim permintaan' }).click()
   await cd.waitFor({ state: 'hidden' })
-  await p.locator('.sm-request', { hasText: 'Baru' }).first().waitFor({ timeout: 8000 })
+  await biz.locator('.sm-request', { hasText: 'Baru' }).first().waitFor({ timeout: 8000 })
 
   // add an influencer
-  await goStage(p, 'office')
-  for (const h of ['Konten situs', 'Bisnis', 'Pelanggan', 'Agensi influencer']) {
-    t.check(await p.getByRole('heading', { name: h, exact: true }).count() === 1, `nav heading "${h}"`)
-  }
-  t.check(await p.getByRole('button', { name: 'Landing page' }).getAttribute('aria-current') === 'page', 'landing is the default section')
-  t.check(!(await p.getByRole('button', { name: 'Payment gateway', exact: true }).isDisabled()) && await p.getByRole('button', { name: /^Pelanggan & mitra$/ }).isEnabled() && await p.getByRole('button', { name: 'Pengguna', exact: true }).isEnabled() && await p.getByRole('button', { name: /^Pengaduan CS/ }).isEnabled(), 'Payment gateway, Pelanggan & mitra, Pengguna and Pengaduan CS are enabled')
+  t.check(await p.locator('.flow-item[data-stage="landing"]').getAttribute('aria-current') === 'page', 'landing is the default section')
+  t.check(await p.locator('.flow-item[aria-current="page"]').count() === 1 && await p.locator('.side .flow-item:disabled').count() === 0, 'one active sidebar item; every office section is enabled')
   await sec('Influencer')
   await p.getByRole('button', { name: 'Tambah influencer' }).click()
   const dlg = p.getByRole('dialog', { name: 'Tambah influencer' })
@@ -117,10 +130,9 @@ module.exports = async function office(t) {
   await p.locator('.of-inf', { hasText: 'Rina' }).waitFor({ timeout: 8000 })
   t.check(await p.locator('.of-inf', { hasText: 'Rina' }).count() === 1, 'Rina listed in the Influencer tab')
   await kolaborasi()
-  t.check(await p.locator('.sm-inf-card').count() === 7, 'Kolaborasi shows 7 cards after adding Rina')
+  t.check(await biz.locator('.sm-inf-card').count() === 7, 'Kolaborasi shows 7 cards after adding Rina')
 
   // staff-only fields: saved, reopened, and never shown to businesses
-  await goStage(p, 'office')
   await p.getByRole('button', { name: 'Ubah Rina' }).click()
   const pr = p.getByRole('dialog', { name: 'Ubah Rina' })
   await pr.getByLabel('Instagram', { exact: true }).fill('@rinamakan')
@@ -137,11 +149,10 @@ module.exports = async function office(t) {
   t.check(await pr2.getByLabel('Telepon / WhatsApp').inputValue() === '081234567890' && await pr2.getByLabel('Harga (Rp) 1').inputValue() === '750000' && await pr2.getByLabel('Instagram', { exact: true }).inputValue() === 'rinamakan', 'reopened editor shows the saved phone, handle and rate')
   await pr2.getByRole('button', { name: 'Batal' }).click()
   await kolaborasi()
-  const html = await p.content()
-  t.check(await p.locator('.sm-inf-card', { hasText: 'Rina' }).count() === 1 && !html.includes('081234567890') && !html.includes('750000') && !html.includes('rinamakan'), 'business Kolaborasi DOM has no phone, rate or handle')
+  const html = await biz.content()
+  t.check(await biz.locator('.sm-inf-card', { hasText: 'Rina' }).count() === 1 && !html.includes('081234567890') && !html.includes('750000') && !html.includes('rinamakan'), 'business Kolaborasi DOM has no phone, rate or handle')
 
   // hide Rina
-  await goStage(p, 'office')
   await p.getByRole('button', { name: 'Ubah Rina' }).click()
   const ed = p.getByRole('dialog', { name: 'Ubah Rina' })
   await ed.getByLabel('Tampilkan di katalog').uncheck()
@@ -150,10 +161,9 @@ module.exports = async function office(t) {
   await p.locator('.of-inf', { hasText: 'Disembunyikan' }).waitFor({ timeout: 8000 })
   t.check(await p.locator('.of-inf', { hasText: 'Rina' }).locator('.tag', { hasText: 'Disembunyikan' }).count() === 1, 'hidden influencer is tagged Disembunyikan')
   await kolaborasi()
-  t.check(await p.locator('.sm-inf-card').count() === 6, 'hidden influencer is gone from Kolaborasi')
+  t.check(await biz.locator('.sm-inf-card').count() === 6, 'hidden influencer is gone from Kolaborasi')
 
   // process the request
-  await goStage(p, 'office')
   await sec('Permintaan')
   const req = p.locator('.of-request').first()
   await req.waitFor({ timeout: 8000 })
@@ -169,12 +179,11 @@ module.exports = async function office(t) {
   t.check(await p.locator('.of-request').count() === 1, 'Diproses filter lists it')
 
   await kolaborasi()
-  await p.locator('.sm-request', { hasText: 'Diproses' }).first().waitFor({ timeout: 8000 })
-  t.check((await p.locator('.sm-request').first().textContent()).includes('Kami hubungi lusa'), 'business sees Diproses and the admin note')
+  await biz.locator('.sm-request', { hasText: 'Diproses' }).first().waitFor({ timeout: 8000 })
+  t.check((await biz.locator('.sm-request').first().textContent()).includes('Kami hubungi lusa'), 'business sees Diproses and the admin note')
 
   // failed load: error + Coba lagi, never a Simpan button
   await p.evaluate(() => localStorage.setItem('satualur_site_fail', '1'))
-  await goStage(p, 'office')
   await sec('Tentang kami')
   await sec('Landing page')
   await p.getByRole('button', { name: 'Coba lagi' }).waitFor({ timeout: 8000 })
@@ -195,7 +204,6 @@ module.exports = async function office(t) {
   await p.evaluate(() => localStorage.removeItem('satualur_site_delay'))
 
   // landing editor
-  await goStage(p, 'office')
   await sec('Landing page')
   await p.getByLabel('Judul', { exact: true }).fill('Uji *judul* baru')
   t.check((await p.locator('.of-preview .lp-hero-title em').textContent()) === 'judul', 'live preview renders <em>')
@@ -215,9 +223,12 @@ module.exports = async function office(t) {
   await sec('Legal')
   await p.getByLabel('Judul', { exact: true }).fill('Privasi uji')
   await p.getByLabel('Isi', { exact: true }).fill('## Data\n- email')
-  p.once('dialog', (d) => d.dismiss())
+  let leaveMsg = ''
+  p.once('dialog', (d) => { leaveMsg = d.message(); d.dismiss() })
   await sec('Landing page')
-  t.check(await p.getByLabel('Isi', { exact: true }).count() === 1, 'dirty form: declining the confirm stays')
+  t.check(await p.getByLabel('Isi', { exact: true }).count() === 1 && await p.getByLabel('Isi', { exact: true }).inputValue() === '## Data\n- email', 'dirty form: declining the confirm stays')
+  t.check(/belum disimpan/.test(leaveMsg) && await p.locator('.flow-item[data-stage="legal"]').getAttribute('aria-current') === 'page' && await p.locator('.flow-item[data-stage="landing"]').getAttribute('aria-current') === null, 'dirty form: sidebar confirm shows the leave message and keeps Legal active')
+  t.check(await crumb() === 'Konten Situs › Legal', 'breadcrumb stays on Konten Situs › Legal')
   await p.getByRole('button', { name: 'Simpan' }).click()
   await p.getByText(/Terakhir diubah .* oleh staff/).waitFor({ timeout: 8000 }).catch(() => {})
   await p.evaluate(() => { location.hash = '#/privasi' })
@@ -227,7 +238,6 @@ module.exports = async function office(t) {
   // subscription plans: import defaults, edit, recommend, deactivate; the landing follows
   await p.evaluate(() => { location.hash = '#/app' })
   await p.waitForSelector('.app-shell')
-  await goStage(p, 'office')
   await sec('Paket langganan')
   await p.getByRole('button', { name: 'Impor paket dari landing saat ini' }).click()
   await p.locator('.of-plan').nth(2).waitFor({ timeout: 8000 })
@@ -302,7 +312,6 @@ module.exports = async function office(t) {
   await p.waitForSelector('.app-shell')
 
   // payment gateway: a saved key is never shown again; Tes koneksi uses the saved settings
-  await goStage(p, 'office')
   await sec('Payment gateway')
   await radio('Midtrans').waitFor({ timeout: 8000 })
   const serverKey = p.getByLabel('Server key', { exact: true })
@@ -339,7 +348,6 @@ module.exports = async function office(t) {
   t.check(true, 'Tes koneksi with a wrong key: rejected (danger note)')
 
   await p.waitForSelector('.app-shell')
-  await goStage(p, 'office')
   await sec('Pelanggan & mitra')
   await p.locator('.of-cust').first().waitFor({ timeout: 8000 })
   t.check(await p.locator('.of-cust').count() === 3 && await p.locator('.of-cust', { hasText: 'staff.satualur.internal' }).count() === 0, 'customers: three business users listed, no staff account', await p.locator('.of-cust').allTextContents())
@@ -450,9 +458,10 @@ module.exports = async function office(t) {
   await p.waitForSelector('.lp-hero')
   await p.evaluate(() => { location.hash = '#/app' })
   await p.waitForSelector('.app-shell')
-  await p.waitForFunction(() => /1\s*pesan baru/.test(document.querySelector('.of-nav')?.textContent || ''), null, { timeout: 8000 }).catch(() => {})
-  t.check(await p.getByRole('button', { name: /^Contact Us/ }).isEnabled() && /Contact Us.*1/.test(await p.getByRole('button', { name: /^Contact Us/ }).textContent()), 'contact: Contact Us is enabled and shows a badge of 1 new message')
-  await p.getByRole('button', { name: /^Contact Us/ }).click()
+  await p.waitForFunction(() => document.querySelector('.flow-item[data-stage="contact"] .flow-count')?.textContent === '1', null, { timeout: 8000 }).catch(() => {})
+  const cbadge = p.locator('.flow-item[data-stage="contact"] .flow-count')
+  t.check(await cbadge.isVisible() && await cbadge.textContent() === '1' && await cbadge.getAttribute('title') === '1 pesan baru', 'contact: the sidebar item shows a badge of 1 new message')
+  await sec('Contact Us')
   const crow = p.locator('.of-contact', { hasText: 'Paket Enterprise' })
   await crow.waitFor({ timeout: 8000 })
   t.check(await crow.locator('.tag', { hasText: 'Baru' }).count() === 1, 'contact: the message is listed under Baru')
@@ -462,8 +471,8 @@ module.exports = async function office(t) {
   t.check(await crow.locator('.of-contact-msg').textContent() === XSS && await crow.locator('img').count() === 0 && await crow.locator('b').count() === 0, 'contact: <img onerror> and <b> in the message and name show as text, no element')
   t.check(await crow.locator('.of-contact-msg').evaluate((n) => getComputedStyle(n).whiteSpace) === 'pre-wrap', 'contact: message keeps its line breaks (pre-wrap)')
   t.check(await crow.getByRole('link', { name: 'Balas lewat email' }).getAttribute('href') === 'mailto:sari%40contoh.id?subject=Re%3A%20Paket%20Enterprise', 'contact: Balas lewat email is a mailto: with the encoded address and Re: subject')
-  await p.waitForFunction(() => !/pesan baru/.test(document.querySelector('.of-nav')?.textContent || ''), null, { timeout: 8000 }).catch(() => {})
-  t.check(!/pesan baru/.test(await p.locator('.of-nav').textContent()), 'contact: the badge clears after the status change')
+  await p.waitForFunction(() => document.querySelector('.flow-item[data-stage="contact"] .flow-count')?.hidden === true, null, { timeout: 8000 }).catch(() => {})
+  t.check(await cbadge.isHidden(), 'contact: the badge clears after the status change')
   await crow.getByLabel('Catatan internal').fill('Sudah dihubungi')
   await crow.locator('select[id$="-status"]').evaluate((sel) => { sel.value = 'replied'; sel.dispatchEvent(new Event('change', { bubbles: true })) })
   await crow.getByRole('button', { name: 'Simpan' }).click()
@@ -482,12 +491,25 @@ module.exports = async function office(t) {
 
   await p.evaluate(() => { location.hash = '#/app' })
   await p.waitForSelector('.app-shell')
-  // 360px: the section picker is a labelled select and nothing scrolls sideways
+  // a stored business stage never opens for staff; the last office section is remembered
+  await p.evaluate(() => sessionStorage.setItem('satualur_stage', 'social-media'))
+  await p.evaluate(() => { location.hash = '#/' })
+  await p.waitForSelector('.lp-hero')
+  await p.evaluate(() => { location.hash = '#/app' })
+  await p.waitForSelector('.app-shell')
+  await p.waitForTimeout(600)
+  t.check(await p.locator('.flow-item[aria-current="page"]').getAttribute('data-stage') === 'contact' && await p.locator('.flow-item[data-stage="social-media"]').count() === 0, 'staff: a stored business stage is ignored and the last office section (Contact Us) is reopened')
+  // 360px: the drawer menu lists the staff items and nothing scrolls sideways
   await p.setViewportSize({ width: 360, height: 800 })
   await p.evaluate(() => { location.hash = '#/app' })
   await p.waitForSelector('.app-shell')
-  t.check(await p.getByLabel('Bagian', { exact: true }).isVisible(), '360px: section select is shown')
   await p.waitForTimeout(500)
+  await p.click('.topbar-menu')
+  await p.waitForTimeout(400)
+  t.check(await p.locator('.side .flow-item:visible').count() === 12 && await p.locator('.flow-item[data-stage="campaigns"]').isVisible() && await p.locator('.side-label:visible').count() === 4, '360px: the drawer shows the twelve staff items under four groups')
+  await p.locator('.flow-item[data-stage="requests"]').click()
+  await p.waitForTimeout(500)
+  t.check(await p.locator('.scrim:not(.scrim-drawer)').isHidden() && await crumb() === 'Agensi Influencer › Permintaan', '360px: choosing an item closes the drawer and updates the breadcrumb')
   t.check(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), '360px: no horizontal scroll')
   await t.noErrors(p)
 }

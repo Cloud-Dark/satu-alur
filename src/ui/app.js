@@ -53,8 +53,8 @@ function currentPath() {
   return ROUTES[path] ? path : '/'
 }
 
+// Staff sessions get the office menu in the shell, on the remembered section.
 function openOffice() {
-  try { sessionStorage.setItem('satualur_stage', 'office') } catch { /* storage unavailable */ }
   navigate('/app')
 }
 
