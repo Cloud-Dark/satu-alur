@@ -54,7 +54,7 @@ function composer(ctx, item, initialBody, onCreated) {
     syncElig()
   }
   function drawShare() {
-    const platforms = connectedPlatforms(ctx.account)
+    const platforms = connectedPlatforms(ctx)
     if (!platforms.length) {
       const go = C.button({ label: 'Hubungkan akun di tab Akun untuk membagikan.', variant: 'ghost', size: 'sm' })
       go.addEventListener('click', () => ctx.goto('account'))
@@ -71,7 +71,7 @@ function composer(ctx, item, initialBody, onCreated) {
         return el('div', {}, el('label', { className: 'check-row', htmlFor: input.id }, input, PLATFORM_LABEL[p]), ' ', hint)
       })))
     syncElig()
-    if (!canShare(ctx.account)) now.disabled = true
+    if (!canShare(ctx)) now.disabled = true
   }
 
   // Returns the content id, saving first when needed.
@@ -87,7 +87,7 @@ function composer(ctx, item, initialBody, onCreated) {
   async function guarded(button, busy, fn) {
     const restore = C.setBusy(button, busy)
     ctx.status.hide()
-    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore(); if (!canShare(ctx.account)) now.disabled = true }
+    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore(); if (!canShare(ctx)) now.disabled = true }
   }
 
   body.input.addEventListener('input', syncElig)

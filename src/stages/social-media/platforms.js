@@ -2,11 +2,12 @@
 export const PLATFORM_LABEL = { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads' }
 export const RECONNECT = 'Hubungkan ulang akun di tab Akun.'
 
-export function connectedPlatforms(account) {
+// Takes the tab ctx: a platform shows only when it is connected and its integration is configured.
+export function connectedPlatforms({ account, configured, threadsConfigured }) {
   if (!account) return []
   return [
-    ...(account.fb_connected ? ['facebook', ...(account.ig_connected ? ['instagram'] : [])] : []),
-    ...(account.threads_connected ? ['threads'] : []),
+    ...(account.fb_connected && configured !== false ? ['facebook', ...(account.ig_connected ? ['instagram'] : [])] : []),
+    ...(account.threads_connected && threadsConfigured !== false ? ['threads'] : []),
   ]
 }
 
@@ -18,4 +19,4 @@ export function platformReason(account, platform, elig = {}) {
 }
 
 // True when at least one connected platform does not need reconnecting first.
-export const canShare = (account) => connectedPlatforms(account).some((p) => platformReason(account, p) !== RECONNECT)
+export const canShare = (ctx) => connectedPlatforms(ctx).some((p) => platformReason(ctx.account, p) !== RECONNECT)

@@ -29,7 +29,7 @@ import {
 } from '../src/social/meta.js';
 import { encryptToken, decryptToken, signState, verifyState } from '../src/social/crypto.js';
 import { PLATFORMS, validateScheduleAt, igEligibility, threadsEligibility } from '../src/social/rules.js';
-import { publishRow, runDue, sweepStuck } from '../src/social/runner.js';
+import { publishRow, cronTick, refreshThreads } from '../src/social/runner.js';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 const PICK_TTL_S = 10 * 60;
@@ -309,13 +309,15 @@ export async function handleMediaGet(request, env, params) {
 function d1Store(env) {
   const db = env.DB;
   return {
-    async listDue(nowIso, limit) {
+    async listDue(nowIso, limit, platforms) {
+      if (!platforms.length) return [];
       const { results } = await db.prepare(
         // Suspension cancels scheduled rows; this also skips one scheduled in a race with the suspend.
         `SELECT * FROM social_posts WHERE status = 'scheduled' AND scheduled_at <= ?
+           AND platform IN (${platforms.map(() => '?').join(',')})
            AND NOT EXISTS (SELECT 1 FROM user_flags f WHERE f.user_id = social_posts.owner_id AND f.suspended = 1)
          ORDER BY scheduled_at LIMIT ?`,
-      ).bind(nowIso, limit).all();
+      ).bind(nowIso, ...platforms, limit).all();
       return results;
     },
     async claim(id, nowIso) {
@@ -352,52 +354,59 @@ function d1Store(env) {
 function runnerDeps(env) {
   return {
     store: d1Store(env),
-    async getAccount(ownerId) {
+    // Decrypts only the token the row's platform needs: a bad Facebook token cannot fail a Threads post, or the reverse.
+    async getAccount(ownerId, platform) {
       const row = await env.DB.prepare(
         'SELECT page_id, page_token_enc, ig_user_id, threads_user_id, threads_token_enc FROM social_accounts WHERE owner_id = ?',
       ).bind(ownerId).first();
       if (!row) return null;
-      const open = (blob) => (blob ? decryptToken(blob, env.TOKEN_KEY) : null);
+      const th = platform === 'threads';
+      const open = (blob, needed) => (blob && needed ? decryptToken(blob, env.TOKEN_KEY) : null);
       return {
-        page_id: row.page_id, pageToken: await open(row.page_token_enc), ig_user_id: row.ig_user_id,
-        threads_user_id: row.threads_user_id, threadsToken: await open(row.threads_token_enc),
+        page_id: row.page_id, pageToken: await open(row.page_token_enc, !th), ig_user_id: row.ig_user_id,
+        threads_user_id: row.threads_user_id, threadsToken: await open(row.threads_token_enc, th),
       };
     },
     mediaUrl: (key) => `${env.PUBLIC_BASE_URL}/api/media/${key}`,
     fetchFn: fetch,
     now: Date.now,
+    enabled: { facebook: isConfigured(env), instagram: isConfigured(env), threads: isThreadsConfigured(env) },
   };
 }
 
-// Long-lived Threads tokens last about 60 days; refresh them 10 days ahead. A token error asks the user to reconnect.
-async function refreshThreadsTokens(env, now = Date.now()) {
-  const { results } = await env.DB.prepare(
-    `SELECT owner_id, threads_token_enc FROM social_accounts
-     WHERE threads_user_id IS NOT NULL AND threads_needs_reconnect = 0 AND threads_expires_at < ?
-     ORDER BY threads_expires_at LIMIT ?`,
-  ).bind(new Date(now + REFRESH_AHEAD_MS).toISOString(), REFRESH_BATCH).all();
-  for (const row of results) {
-    try {
-      const { token, expiresIn } = await refreshThreadsToken(await decryptToken(row.threads_token_enc, env.TOKEN_KEY), fetch);
-      // Matching on the old blob skips the write if the user reconnected meanwhile.
-      await env.DB.prepare('UPDATE social_accounts SET threads_token_enc = ?, threads_expires_at = ? WHERE owner_id = ? AND threads_token_enc = ?')
-        .bind(await encryptToken(token, env.TOKEN_KEY), new Date(now + (Number(expiresIn) || 60 * 24 * 60 * 60) * 1000).toISOString(),
-          row.owner_id, row.threads_token_enc).run();
-    } catch (e) {
-      if (e instanceof MetaError && e.kind === 'token') {
-        await env.DB.prepare('UPDATE social_accounts SET threads_needs_reconnect = 1 WHERE owner_id = ? AND threads_token_enc = ?')
-          .bind(row.owner_id, row.threads_token_enc).run();
-      } else console.error('Threads token refresh failed', e?.name); // name only: never the token
-    }
-  }
+// D1 store for refreshThreads (src/social/runner.js). Writes match the old blob, so a reconnect made meanwhile is never overwritten.
+function threadsRefreshStore(env, now) {
+  const db = env.DB;
+  return {
+    async listRefreshable() {
+      const { results } = await db.prepare(
+        `SELECT owner_id, threads_token_enc, threads_expires_at FROM social_accounts
+         WHERE threads_user_id IS NOT NULL AND threads_needs_reconnect = 0 AND threads_expires_at < ?
+         ORDER BY threads_expires_at LIMIT ?`,
+      ).bind(new Date(now + REFRESH_AHEAD_MS).toISOString(), REFRESH_BATCH).all();
+      return results;
+    },
+    async saveToken(row, token, expiresAt) {
+      await db.prepare('UPDATE social_accounts SET threads_token_enc = ?, threads_expires_at = ? WHERE owner_id = ? AND threads_token_enc = ?')
+        .bind(await encryptToken(token, env.TOKEN_KEY), expiresAt, row.owner_id, row.threads_token_enc).run();
+    },
+    async flagThreads(row) {
+      await db.prepare('UPDATE social_accounts SET threads_needs_reconnect = 1 WHERE owner_id = ? AND threads_token_enc = ?')
+        .bind(row.owner_id, row.threads_token_enc).run();
+    },
+  };
 }
 
 export async function runCron(env) {
   if (!isConfigured(env) && !isThreadsConfigured(env)) return;
-  if (isThreadsConfigured(env)) await refreshThreadsTokens(env);
-  const deps = runnerDeps(env);
-  await sweepStuck(deps);
-  await runDue(deps);
+  const now = Date.now();
+  // Long-lived Threads tokens last about 60 days; refresh them 10 days ahead.
+  const refresh = isThreadsConfigured(env) ? () => refreshThreads({
+    store: threadsRefreshStore(env, now),
+    refresh: async (row) => refreshThreadsToken(await decryptToken(row.threads_token_enc, env.TOKEN_KEY), fetch),
+    now: () => now,
+  }) : null;
+  await cronTick(runnerDeps(env), refresh);
 }
 
 // Validates the request and inserts one social_posts row per platform.

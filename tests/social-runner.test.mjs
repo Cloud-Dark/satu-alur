@@ -18,8 +18,8 @@ function memStore(rows) {
   return {
     rows,
     flagged,
-    async listDue(nowIso, limit) {
-      return rows.filter((r) => r.status === 'scheduled' && r.scheduled_at <= nowIso).slice(0, limit).map((r) => ({ ...r }))
+    async listDue(nowIso, limit, platforms) {
+      return rows.filter((r) => r.status === 'scheduled' && r.scheduled_at <= nowIso && platforms.includes(r.platform)).slice(0, limit).map((r) => ({ ...r }))
     },
     async claim(id, nowIso) {
       const r = byId(id)
@@ -255,4 +255,76 @@ test('Threads: token error flags the Threads connection, not Facebook', async ()
   const f = stubFetch([{ status: 400, json: { error: { message: 'Token kedaluwarsa', code: 190 } } }])
   assert.equal(await publishRow(store.rows[0], deps(store, f, TH_ACCOUNT)), 'failed')
   assert.deepEqual(store.flagged, ['u1:threads'])
+})
+
+// ------------------------------------------------------------------ Threads token refresh + cron + enabled platforms
+const R = await import('../src/social/runner.js')
+const { MetaError } = await import('../src/social/meta.js')
+
+function refreshStore(rows) {
+  const saved = []
+  const flagged = []
+  return {
+    saved, flagged,
+    async listRefreshable() { return rows },
+    async saveToken(row, token, expiresAt) { saved.push([row.owner_id, token, expiresAt]) },
+    async flagThreads(row) { flagged.push(row.owner_id) },
+  }
+}
+const quiet = async (fn) => { const o = console.error; console.error = () => {}; try { return await fn() } finally { console.error = o } }
+
+test('refreshThreads: saves a refreshed token with its new expiry', async () => {
+  const store = refreshStore([{ owner_id: 'a', threads_expires_at: '2026-11-03T00:00:00.000Z' }])
+  await R.refreshThreads({ store, now: () => NOW, refresh: async () => ({ token: 'new', expiresIn: 86400 }) })
+  assert.deepEqual(store.saved, [['a', 'new', new Date(NOW + 86400e3).toISOString()]])
+  assert.deepEqual(store.flagged, [])
+})
+
+test('refreshThreads: an already-expired token is flagged without calling the API', async () => {
+  const store = refreshStore([{ owner_id: 'a', threads_expires_at: '2026-10-29T09:00:00.000Z' }])
+  let calls = 0
+  await R.refreshThreads({ store, now: () => NOW, refresh: async () => { calls++; return { token: 'x' } } })
+  assert.equal(calls, 0)
+  assert.deepEqual(store.flagged, ['a'])
+})
+
+test('refreshThreads: fatal, token and unexpected errors flag; a transient error does not', async () => {
+  const rows = ['fatal', 'token', 'decrypt', 'transient'].map((owner_id) => ({ owner_id, threads_expires_at: '2026-11-03T00:00:00.000Z' }))
+  const store = refreshStore(rows)
+  const refresh = async (row) => {
+    if (row.owner_id === 'decrypt') throw new DOMException('bad', 'OperationError')
+    throw new MetaError('x', { kind: row.owner_id })
+  }
+  await quiet(() => R.refreshThreads({ store, now: () => NOW, refresh }))
+  assert.deepEqual(store.flagged, ['fatal', 'token', 'decrypt'])
+  assert.deepEqual(store.saved, [])
+})
+
+test('cronTick: a throwing refresh still sweeps and runs due posts', async () => {
+  const store = memStore([row()])
+  const f = stubFetch([{ json: { id: 'P' } }, { json: { permalink_url: 'u' } }])
+  const tally = await quiet(() => R.cronTick(deps(store, f), async () => { throw new Error('D1 down') }))
+  assert.equal(tally.posted, 1)
+  assert.equal(store.rows[0].status, 'posted')
+})
+
+test('runDue leaves rows of an unconfigured platform scheduled and untouched', async () => {
+  const store = memStore([thRow({ id: 1 }), row({ id: 2 })])
+  const f = stubFetch([{ json: { id: 'P' } }, { json: { permalink_url: 'u' } }])
+  const tally = await runDue({ ...deps(store, f), enabled: { facebook: true, instagram: true, threads: false } })
+  assert.equal(tally.posted, 1)
+  assert.equal(store.rows[0].status, 'scheduled')
+  assert.equal(store.rows[0].claimed_at, null)
+  assert.equal(store.rows[1].status, 'posted')
+  // publishRow refuses a disabled platform too
+  assert.equal(await publishRow(store.rows[0], { ...deps(store, f), enabled: { threads: false } }), 'skipped')
+  assert.equal(store.rows[0].status, 'scheduled')
+})
+
+test('getAccount is asked for the row platform', async () => {
+  const store = memStore([thRow()])
+  const seen = []
+  const f = stubFetch([{ json: { id: 'C' } }, { json: { status: 'FINISHED' } }, { json: { id: 'T' } }, { json: {} }])
+  await publishRow(store.rows[0], { ...deps(store, f), getAccount: async (...a) => { seen.push(a); return TH_ACCOUNT }, wait: async () => {} })
+  assert.deepEqual(seen, [['u1', 'threads']])
 })

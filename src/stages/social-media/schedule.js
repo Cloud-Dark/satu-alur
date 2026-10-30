@@ -23,7 +23,7 @@ function openDialog(ctx, item, opener) {
   const platErr = el('p', { className: 'field-error', role: 'alert' })
   const save = C.button({ label: 'Simpan jadwal', icon: 'calendar', variant: 'primary', type: 'submit' })
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
-  const connected = connectedPlatforms(ctx.account)
+  const connected = connectedPlatforms(ctx)
   // A platform waiting for a reconnect is not offered at all; say so when that leaves nothing.
   const platforms = connected.filter((p) => platformReason(ctx.account, p) !== RECONNECT)
   if (connected.length && !platforms.length) platErr.textContent = RECONNECT
