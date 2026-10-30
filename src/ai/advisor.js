@@ -9,6 +9,7 @@
  * model text.
  */
 import { getCloud } from '../cloud.js'
+import { isQuotaError } from '../quota/errors.js'
 
 export const AUTO = 'auto'
 export const HISTORY_FOR_CONTEXT = 20
@@ -139,7 +140,7 @@ const isAbort = (e) => e?.name === 'AbortError'
 
 /** Network failures and 5xx responses are worth one more try; 4xx are not. */
 export function isRetryable(err) {
-  if (!err || isAbort(err)) return false
+  if (!err || isAbort(err) || isQuotaError(err)) return false
   if (err instanceof TypeError) return true
   return /HTTP 5\d\d|\b50[0-9]\b|jaringan|network|failed to fetch|load failed|timeout|tidak tersedia|overload|unavailable|ECONN/i.test(String(err.message || ''))
 }
@@ -179,14 +180,15 @@ async function* raceAbort(stream, signal) {
  * { type: 'retry', error } events; resolves with { full, latency, retried }.
  * Retries once when the call fails before any text arrives.
  */
-export async function* streamAnswer({ messages, model, temperature = 0.6, maxTokens = 1500, signal }) {
+// feature: 'advisor' for the advisor chat, 'radar' for Radar peluang explanations (metered separately).
+export async function* streamAnswer({ messages, model, temperature = 0.6, maxTokens = 1500, signal, feature = 'advisor' }) {
   const started = performance.now()
   let full = ''
   let retried = false
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const stream = getCloud().llm.chat.completions.create({
-        model, messages, stream: true, temperature, max_tokens: maxTokens, signal,
+        model, messages, stream: true, temperature, max_tokens: maxTokens, signal, feature,
       })
       for await (const chunk of raceAbort(stream, signal)) {
         const delta = chunk?.choices?.[0]?.delta?.content

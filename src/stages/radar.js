@@ -502,7 +502,7 @@ export async function render(container, ctx = {}) {
     const paint = () => { frame = 0; const t = full.replace(EMOJI_RE, ''); if (onText) onText(t, con); else con.write(t) }
     try {
       const params = getAgentParams()
-      const gen = streamAnswer({ messages, model: m.id, temperature, maxTokens: Math.min(params.maxTokens || maxTokens, maxTokens), signal: ac.signal })
+      const gen = streamAnswer({ messages, model: m.id, feature: 'radar', temperature, maxTokens: Math.min(params.maxTokens || maxTokens, maxTokens), signal: ac.signal })
       for (;;) {
         const step = await gen.next()
         if (step.done) { full = step.value?.full || full; break }

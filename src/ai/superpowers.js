@@ -1,5 +1,6 @@
 import { getCloud } from '../cloud.js'
 import { loadModels, pickDefaultModel, getModels } from './models.js'
+import { isQuotaError } from '../quota/errors.js'
 
 /**
  * =========================================================
@@ -319,7 +320,7 @@ export function getAgents() {
 }
 
 // ---- Smart Retry with Fallback ----
-async function* smartStream({ modelId, messages, options = {}, signal }) {
+async function* smartStream({ modelId, messages, options = {}, signal, feature }) {
   const cloud = getCloud()
   const models = getModels().length ? getModels() : await loadModels()
   const primaryModel = modelId || pickDefaultModel()?.id
@@ -341,6 +342,7 @@ async function* smartStream({ modelId, messages, options = {}, signal }) {
         stream: true,
         ...options,
         signal,
+        feature,
       })
 
       for await (const chunk of stream) {
@@ -351,7 +353,8 @@ async function* smartStream({ modelId, messages, options = {}, signal }) {
       return
     } catch (err) {
       lastError = err
-      if (err.name === 'AbortError' || emitted) throw err
+      // A used-up quota fails the same way on every model, so don't burn retries on it.
+      if (err.name === 'AbortError' || emitted || isQuotaError(err)) throw err
       // Exponential backoff before retry
       if (attempt < candidates.length - 1) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000)
@@ -396,8 +399,12 @@ export function getAnalyticsSummary() {
 }
 
 // ---- Main Chat with Superpowers ----
+// Metered feature per agent (src/quota/rules.js); the general/analyst chats count as the advisor.
+const FEATURE_OF_AGENT = { offer: 'offer', report: 'report', social: 'social' }
+
 export async function* chatWithAgent({ agentKey, message, modelId, signal, useMemory = true, useTools = true }) {
   const agent = AGENTS[agentKey] || AGENTS.general
+  const feature = FEATURE_OF_AGENT[agentKey] || 'advisor'
   const startTime = performance.now()
   let error = null
 
@@ -427,7 +434,7 @@ export async function* chatWithAgent({ agentKey, message, modelId, signal, useMe
 
     let fullText = ''
 
-    for await (const { type, chunk } of smartStream({ modelId, messages, options, signal })) {
+    for await (const { type, chunk } of smartStream({ modelId, messages, options, signal, feature })) {
       if (type === 'chunk') {
         signal?.throwIfAborted()
         const delta = chunk.choices?.[0]?.delta?.content
@@ -449,7 +456,7 @@ export async function* chatWithAgent({ agentKey, message, modelId, signal, useMe
           { role: 'assistant', content: fullText },
           { role: 'system', content: `Hasil tool: ${JSON.stringify(toolResult)}\nBerikan respons akhir berdasarkan hasil tool.` }
         ]
-        for await (const { type: t, chunk } of smartStream({ modelId, messages: toolMessages, options, signal })) {
+        for await (const { type: t, chunk } of smartStream({ modelId, messages: toolMessages, options, signal, feature })) {
           if (t === 'chunk') {
             const delta = chunk.choices?.[0]?.delta?.content
             if (delta) {

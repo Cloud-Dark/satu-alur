@@ -967,26 +967,43 @@ const mockLLM = {
   },
   chat: {
     completions: {
-      create({ messages, stream, response_format }) {
-        const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || ''
-        const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
-        if (system.includes('agen penawaran') || userMsg.includes('Permintaan jasa')) return mockStreamOffer(parseRequest(userMsg))
-        if (response_format?.type === 'json_schema' || response_format?.type === 'json_object') {
-          return streamText(schemaJson(response_format), { step: 10, delay: 14 })
-        }
-        const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
-        if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
-        if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
-        // Untagged prompts from Media Sosial, AI Superpowers and Pertumbuhan (src/ai/superpowers.js)
-        if (system.includes('analis laporan') || userMsg.includes('Data laporan')) return mockStreamExplain(parseReport(userMsg))
-        if (system.includes('pertumbuhan') || system.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
-        if (system.includes('social media') || system.includes('media sosial') || ['caption', 'brainstorm', 'hashtag', 'iklan'].some((w) => userMsg.includes(w))) return mockStreamSocial(lastUserText(messages))
-        if (system.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
-        if (system.includes('Asisten AI') || system.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
-        return mockStreamExplain(parseReport(userMsg))
+      // Metered like the Worker: the quota check runs before the first chunk (see src/quota/api.js mockMeter).
+      create(opts) {
+        return metered(opts.feature, () => mockAnswer(opts))
       }
     }
   }
+}
+
+async function* metered(feature, answer) {
+  const { mockMeter, announceQuota, isQuotaError } = await import('../quota/api.js')
+  try {
+    await mockMeter(feature)
+  } catch (err) {
+    if (isQuotaError(err)) announceQuota(err)
+    throw err
+  }
+  yield* answer()
+}
+
+// The canned answer for a prompt (matched on its system/user text).
+function mockAnswer({ messages, response_format }) {
+  const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || ''
+  const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
+  if (system.includes('agen penawaran') || userMsg.includes('Permintaan jasa')) return mockStreamOffer(parseRequest(userMsg))
+  if (response_format?.type === 'json_schema' || response_format?.type === 'json_object') {
+    return streamText(schemaJson(response_format), { step: 10, delay: 14 })
+  }
+  const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
+  if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
+  if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
+  // Untagged prompts from Media Sosial, AI Superpowers and Pertumbuhan (src/ai/superpowers.js)
+  if (system.includes('analis laporan') || userMsg.includes('Data laporan')) return mockStreamExplain(parseReport(userMsg))
+  if (system.includes('pertumbuhan') || system.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
+  if (system.includes('social media') || system.includes('media sosial') || ['caption', 'brainstorm', 'hashtag', 'iklan'].some((w) => userMsg.includes(w))) return mockStreamSocial(lastUserText(messages))
+  if (system.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
+  if (system.includes('Asisten AI') || system.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
+  return mockStreamExplain(parseReport(userMsg))
 }
 
 const SEED_WORKERS = [

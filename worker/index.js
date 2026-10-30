@@ -25,6 +25,10 @@ import {
   handleRequestCampaign,
 } from './agency.js';
 import { handleSiteGet, handleSitePut } from './site.js';
+import {
+  featureFrom, meter, handleMyPlan, handleVoucherRedeem, handleAdminVouchers, handleAdminVoucherCreate, handleAdminVoucherUpdate,
+  handleAdminRedemptions, handleAdminCustomerQuota, handleAdminCustomerCredit,
+} from './quota.js';
 import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
 import {
   handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
@@ -735,7 +739,8 @@ function translateStream(aiStream) {
 }
 
 async function handleChat(request, env) {
-  await authenticate(request, env);
+  const { user } = await authenticate(request, env);
+  const feature = featureFrom(request, HttpError);
   const body = await readJson(request, MAX_CHAT_BODY_BYTES);
 
   if (typeof body.model !== 'string' || !LLM_MODELS.some((m) => m.id === body.model && !m.disabled)) {
@@ -763,13 +768,14 @@ async function handleChat(request, env) {
   }
   const rf = body.response_format;
   if (rf !== undefined && rf !== null && (typeof rf !== 'object' || Array.isArray(rf))) throw bad('response_format tidak valid.');
-  if (rf && rf.type === 'json_schema') {
-    const schema = rf.json_schema;
-    if (!schema || typeof schema !== 'object' || Array.isArray(schema) || JSON.stringify(schema).length > 8000) {
-      throw bad('json_schema tidak valid.');
-    }
-    return structuredChat(env, body.model, params, schema);
+  const schema = rf && rf.type === 'json_schema' ? rf.json_schema : null;
+  if (rf && rf.type === 'json_schema' && (!schema || typeof schema !== 'object' || Array.isArray(schema) || JSON.stringify(schema).length > 8000)) {
+    throw bad('json_schema tidak valid.');
   }
+  // Counted only once the request is valid; a model that never starts gives the call back.
+  const usage = await meter(env, user, feature, ROUTE_DEPS);
+  const refund = () => usage.refund().catch((e) => console.error('Quota refund failed', e));
+  if (schema) return structuredChat(env, body.model, params, schema, refund);
   if (rf && rf.type === 'json_object') {
     // Workers AI JSON mode does not support streaming, so steer via a system hint.
     params.messages = [{ role: 'system', content: JSON_HINT }, ...messages];
@@ -780,6 +786,7 @@ async function handleChat(request, env) {
     aiStream = await env.AI.run(body.model, params);
   } catch (e) {
     console.error('AI.run failed', e);
+    await refund();
     return fail(502, 'Layanan AI tidak tersedia.');
   }
   if (!(aiStream instanceof ReadableStream)) {
@@ -802,7 +809,7 @@ async function handleChat(request, env) {
 // without streaming, then replay the JSON to the client as SSE chunks so the UI
 // keeps its typing effect. Falls back to a hinted streaming call when the model
 // cannot satisfy JSON mode.
-async function structuredChat(env, model, params, schema) {
+async function structuredChat(env, model, params, schema, refund = async () => {}) {
   const { stream: _stream, ...rest } = params;
   const keepAlive = new TextEncoder().encode(': keepalive\n\n');
   // Open the SSE response right away and send comment keep-alives while the
@@ -844,6 +851,7 @@ async function structuredChat(env, model, params, schema) {
         } catch (e) {
           console.error('AI.run failed', e);
           clearInterval(timer);
+          await refund();
           c.enqueue(sse({ error: { message: 'Layanan AI tidak tersedia.' } }));
           c.enqueue(sse('[DONE]'));
           c.close();
@@ -952,6 +960,14 @@ const ROUTES = {
   'POST /api/office/admin/support/:id/messages': (req, env, params) => handleAdminSupportReply(req, env, ROUTE_DEPS, params),
   'PATCH /api/office/admin/support/:id': (req, env, params) => handleAdminSupportUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
+  'GET /api/me/plan': (req, env) => handleMyPlan(req, env, ROUTE_DEPS),
+  'POST /api/vouchers/redeem': (req, env) => handleVoucherRedeem(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/vouchers': (req, env) => handleAdminVouchers(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/vouchers': (req, env) => handleAdminVoucherCreate(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/vouchers/redemptions': (req, env) => handleAdminRedemptions(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/vouchers/:id': (req, env, params) => handleAdminVoucherUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/customers/:userId/quota': (req, env, params) => handleAdminCustomerQuota(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/customers/:userId/credit': (req, env, params) => handleAdminCustomerCredit(req, env, ROUTE_DEPS, params),
 };
 
 // Matches '/api/media/:key' against a path; returns the params or null.

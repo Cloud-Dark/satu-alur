@@ -1,5 +1,6 @@
 import { getCloud } from '../cloud.js'
 import { getAgentPrompts, getAgentParams } from '../stages/settings.js'
+import { isQuotaError } from '../quota/errors.js'
 
 const OFFER_SCHEMA = {
   type: 'object',
@@ -68,6 +69,7 @@ export async function generateOffer({ request, modelId, signal, onChunk }) {
       messages,
       stream: true,
       response_format: { type: 'json_schema', json_schema: OFFER_SCHEMA },
+      feature: 'offer',
       temperature: params.temperature ?? 0.4,
       max_tokens: params.maxTokens ?? 2000,
       signal,
@@ -79,7 +81,7 @@ export async function generateOffer({ request, modelId, signal, onChunk }) {
       }
     }
   } catch (err) {
-    if (err.name === 'AbortError') throw err
+    if (err.name === 'AbortError' || isQuotaError(err)) throw err
     throw new Error(`Gagal menghasilkan penawaran: ${err.message}`)
   }
   try {
@@ -106,6 +108,7 @@ export async function explainReport({ report, modelId, signal, onChunk }) {
       model: modelId,
       messages,
       stream: true,
+      feature: 'report',
       temperature: params.temperature ?? 0.7,
       max_tokens: params.maxTokens ?? 2000,
       signal,
@@ -117,7 +120,7 @@ export async function explainReport({ report, modelId, signal, onChunk }) {
       }
     }
   } catch (err) {
-    if (err.name === 'AbortError') throw err
+    if (err.name === 'AbortError' || isQuotaError(err)) throw err
     throw new Error(`Gagal menjelaskan laporan: ${err.message}`)
   }
   return fullText
