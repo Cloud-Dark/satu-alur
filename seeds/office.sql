@@ -1,8 +1,8 @@
 -- =====================================================================
 -- Satu Alur: DATA CONTOH (DUMMY) untuk Kantor Satu Alur. Semua nama, email, telepon, dan angka FIKTIF.
 -- Dibuat oleh scripts/seed-office.mjs. Jangan edit manual; ubah skripnya lalu jalankan ulang.
--- 87 baris; perkiraan D1 rows written <= 261 (termasuk entri indeks).
--- Butuh migrasi 0007_social_meta.sql. Aman dijalankan ulang (upsert dengan id/kunci tetap).
+-- 103 baris; perkiraan D1 rows written <= 309 (termasuk entri indeks).
+-- Butuh migrasi 0007_social_meta.sql dan 0008_quota_vouchers.sql. Aman dijalankan ulang (upsert dengan id/kunci tetap).
 -- Tidak berisi akun staf atau kunci pembayaran. Buat staf dengan: npm run staff -- add <username>
 -- =====================================================================
 
@@ -16,11 +16,11 @@ INSERT INTO site_content (key, value_json, updated_at, updated_by) VALUES
 ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
 
 -- subscription_plans: 3 baris
-INSERT INTO subscription_plans (slug, name, tagline, price_idr, period, period_label, recommended, badge, limits_json, features_json, cta_label, cta_kind, sort, active, updated_at, updated_by) VALUES
-('free', 'Free', 'Coba seluruh alur kerja tanpa biaya, dengan kuota AI kecil.', 0, 'month', 'selamanya', 0, '', '[{"label":"Pengguna","value":"1 orang"},{"label":"Transaksi","value":"50 per bulan"},{"label":"Penawaran AI","value":"3 per bulan"},{"label":"Laporan AI","value":"3 per bulan"},{"label":"Pencari prospek","value":"3 pencarian per bulan"},{"label":"Penasihat AI","value":"3 pesan per bulan"}]', '["Alur kerja 6 tahap lengkap","Radar peluang (ringkasan)","Media sosial: tulis konten manual","Data aman di cloud","Tidak termasuk saldo AI"]', 'Mulai gratis', 'signup', 1, 1, '2026-10-30T09:00:00.000Z', 'seed-office'),
-('lite', 'Lite', 'Untuk usaha jasa yang mulai rutin menerima pesanan.', 99000, 'month', 'per bulan', 0, '', '[{"label":"Pengguna","value":"3 orang"},{"label":"Transaksi","value":"300 per bulan"},{"label":"Penawaran AI","value":"50 per bulan"},{"label":"Laporan AI","value":"20 per bulan"},{"label":"Pencari prospek","value":"20 pencarian per bulan"},{"label":"Penasihat AI","value":"100 pesan per bulan"}]', '["Semua fitur Free","Radar peluang lengkap","Jadwal konten media sosial","Kelola petugas lapangan","Ekspor laporan","Tidak termasuk saldo AI"]', 'Pilih Lite', 'signup', 2, 1, '2026-10-30T09:00:00.000Z', 'seed-office'),
-('pro', 'Pro', 'Alur kerja tanpa batas untuk tim yang sedang tumbuh.', 249000, 'month', 'per bulan', 1, 'Paling populer', '[{"label":"Pengguna","value":"10 orang"},{"label":"Transaksi","value":"Tanpa batas"},{"label":"Penawaran AI","value":"300 per bulan"},{"label":"Laporan AI","value":"100 per bulan"},{"label":"Pencari prospek","value":"100 pencarian per bulan"},{"label":"Penasihat AI","value":"500 pesan per bulan"}]', '["Semua fitur Lite","Publikasi ke Facebook, Instagram, dan Threads","Permintaan kolaborasi influencer","Permintaan iklan Meta","Prioritas bantuan","Tidak termasuk saldo AI"]', 'Pilih Pro', 'signup', 3, 1, '2026-10-30T09:00:00.000Z', 'seed-office')
-ON CONFLICT(slug) DO UPDATE SET name = excluded.name, tagline = excluded.tagline, price_idr = excluded.price_idr, period = excluded.period, period_label = excluded.period_label, recommended = excluded.recommended, badge = excluded.badge, limits_json = excluded.limits_json, features_json = excluded.features_json, cta_label = excluded.cta_label, cta_kind = excluded.cta_kind, sort = excluded.sort, active = excluded.active, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
+INSERT INTO subscription_plans (slug, name, tagline, price_idr, period, period_label, recommended, badge, limits_json, features_json, quota_json, cta_label, cta_kind, sort, active, updated_at, updated_by) VALUES
+('free', 'Free', 'Coba seluruh alur kerja tanpa biaya, dengan kuota AI kecil.', 0, 'month', 'selamanya', 0, '', '[{"label":"Pengguna","value":"1 orang"},{"label":"Transaksi","value":"50 per bulan"},{"label":"Penawaran AI","value":"10 per bulan"},{"label":"Laporan AI","value":"10 per bulan"},{"label":"Pencari prospek","value":"10 pencarian per bulan"},{"label":"Penasihat AI","value":"5 pesan per bulan"}]', '["Alur kerja 6 tahap lengkap","Radar peluang (ringkasan)","Media sosial: tulis konten manual","Data aman di cloud","Tidak termasuk saldo AI"]', '{"offer":10,"report":10,"leads":10,"radar":10,"advisor":5,"social":10}', 'Mulai gratis', 'signup', 1, 1, '2026-10-30T09:00:00.000Z', 'seed-office'),
+('lite', 'Lite', 'Untuk usaha jasa yang mulai rutin menerima pesanan.', 99000, 'month', 'per bulan', 0, '', '[{"label":"Pengguna","value":"3 orang"},{"label":"Transaksi","value":"300 per bulan"},{"label":"Penawaran AI","value":"50 per bulan"},{"label":"Laporan AI","value":"20 per bulan"},{"label":"Pencari prospek","value":"20 pencarian per bulan"},{"label":"Penasihat AI","value":"100 pesan per bulan"}]', '["Semua fitur Free","Radar peluang lengkap","Jadwal konten media sosial","Kelola petugas lapangan","Ekspor laporan","Tidak termasuk saldo AI"]', '{"offer":50,"report":20,"leads":20,"radar":30,"advisor":100,"social":60}', 'Pilih Lite', 'signup', 2, 1, '2026-10-30T09:00:00.000Z', 'seed-office'),
+('pro', 'Pro', 'Alur kerja tanpa batas untuk tim yang sedang tumbuh.', 249000, 'month', 'per bulan', 1, 'Paling populer', '[{"label":"Pengguna","value":"10 orang"},{"label":"Transaksi","value":"Tanpa batas"},{"label":"Penawaran AI","value":"Tanpa batas"},{"label":"Laporan AI","value":"Tanpa batas"},{"label":"Pencari prospek","value":"100 pencarian per bulan"},{"label":"Penasihat AI","value":"500 pesan per bulan"}]', '["Semua fitur Lite","Publikasi ke Facebook, Instagram, dan Threads","Permintaan kolaborasi influencer","Permintaan iklan Meta","Prioritas bantuan","Tidak termasuk saldo AI"]', '{"offer":null,"report":null,"leads":100,"radar":null,"advisor":500,"social":null}', 'Pilih Pro', 'signup', 3, 1, '2026-10-30T09:00:00.000Z', 'seed-office')
+ON CONFLICT(slug) DO UPDATE SET name = excluded.name, tagline = excluded.tagline, price_idr = excluded.price_idr, period = excluded.period, period_label = excluded.period_label, recommended = excluded.recommended, badge = excluded.badge, limits_json = excluded.limits_json, features_json = excluded.features_json, quota_json = excluded.quota_json, cta_label = excluded.cta_label, cta_kind = excluded.cta_kind, sort = excluded.sort, active = excluded.active, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
 
 -- payment_settings: 1 baris
 INSERT INTO payment_settings (id, provider, mode, client_key, server_key_enc, server_key_last4, webhook_token_enc, updated_at, updated_by) VALUES
@@ -56,7 +56,7 @@ INSERT INTO customer_accounts (owner_id, plan_id, status, period_end, company, p
 ((SELECT id FROM users WHERE email = 'demo-rs@satualur.id'), (SELECT id FROM subscription_plans WHERE slug = 'pro'), 'trial', '2026-11-10', 'PT Sehat Bersih Medika', '021-5550-0009', 'Akun demo. Trial Pro; jadwalkan demo dengan tim housekeeping.', '2026-10-30T09:00:00.000Z', 'seed-office'),
 ((SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), (SELECT id FROM subscription_plans WHERE slug = 'free'), 'active', NULL, 'Sari Laundry Kiloan', '0857-2000-0001', 'Daftar dari soft launch. Belum pernah membuat penawaran.', '2026-10-30T09:00:00.000Z', 'seed-office'),
 ((SELECT id FROM users WHERE email = 'agus.servispompa@contoh.satualur.id'), (SELECT id FROM subscription_plans WHERE slug = 'lite'), 'cancelled', '2026-10-24', 'Agus Servis Pompa Air', '0857-2000-0002', 'Berhenti: musim sepi. Tawarkan voucher bila kembali.', '2026-10-30T09:00:00.000Z', 'seed-office'),
-((SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), (SELECT id FROM subscription_plans WHERE slug = 'lite'), 'trial', '2026-11-09', 'Dewi Cuci Sofa & Karpet', '0857-2000-0003', 'Trial Lite dari voucher soft launch.', '2026-10-30T09:00:00.000Z', 'seed-office')
+((SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), (SELECT id FROM subscription_plans WHERE slug = 'lite'), 'active', '2026-11-26', 'Dewi Cuci Sofa & Karpet', '0857-2000-0003', 'Lite 30 hari dari voucher SATU-COMBO (soft launch).', '2026-10-30T09:00:00.000Z', 'seed-office')
 ON CONFLICT(owner_id) DO UPDATE SET plan_id = excluded.plan_id, status = excluded.status, period_end = excluded.period_end, company = excluded.company, phone = excluded.phone, notes = excluded.notes, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
 
 -- user_flags: 1 baris
@@ -147,3 +147,39 @@ INSERT INTO campaign_deliverables (id, campaign_id, influencer_id, kind, due_dat
 (50005, 5003, 7008, 'feed', '2026-09-30', 'published', 'https://www.instagram.com/p/contoh-satualur-2/', '', '2026-10-30T09:00:00.000Z', 'seed-office'),
 (50006, 5003, 7008, 'youtube', '2026-10-18', 'published', 'https://www.youtube.com/watch?v=contoh-satualur', 'Video 8 menit.', '2026-10-30T09:00:00.000Z', 'seed-office')
 ON CONFLICT(id) DO UPDATE SET campaign_id = excluded.campaign_id, influencer_id = excluded.influencer_id, kind = excluded.kind, due_date = excluded.due_date, status = excluded.status, link = excluded.link, note = excluded.note, updated_at = excluded.updated_at, updated_by = excluded.updated_by;
+
+-- vouchers: 3 baris
+INSERT INTO vouchers (id, code, type, plan_id, plan_days, credit_idr, max_redemptions, redeemed_count, expires_on, active, note, created_by, created_at) VALUES
+(1, 'SATU-LAUNCH-PRO', 'plan', (SELECT id FROM subscription_plans WHERE slug = 'pro'), 30, 0, 20, 0, '2026-12-31', 1, 'Soft launch: Pro 30 hari untuk 20 usaha terpilih.', 'seed-office', '2026-10-22T02:00:00.000Z'),
+(2, 'SATU-AI-50K', 'credit', NULL, NULL, 50000, 20, 1, '2026-12-31', 1, 'Saldo AI Rp50.000 untuk mencoba fitur AI setelah kuota habis.', 'seed-office', '2026-10-22T02:00:00.000Z'),
+(3, 'SATU-COMBO', 'bundle', (SELECT id FROM subscription_plans WHERE slug = 'lite'), 30, 25000, 10, 1, '2026-11-30', 1, 'Lite 30 hari + saldo AI Rp25.000 untuk peserta demo.', 'seed-office', '2026-10-24T02:00:00.000Z')
+ON CONFLICT(id) DO UPDATE SET code = excluded.code, type = excluded.type, plan_id = excluded.plan_id, plan_days = excluded.plan_days, credit_idr = excluded.credit_idr, max_redemptions = excluded.max_redemptions, redeemed_count = excluded.redeemed_count, expires_on = excluded.expires_on, active = excluded.active, note = excluded.note, created_by = excluded.created_by, created_at = excluded.created_at;
+
+-- voucher_redemptions: 2 baris
+INSERT INTO voucher_redemptions (voucher_id, user_id, redeemed_at) VALUES
+(2, (SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), '2026-10-26T07:00:00.000Z'),
+(3, (SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), '2026-10-27T03:00:00.000Z')
+ON CONFLICT(voucher_id, user_id) DO UPDATE SET redeemed_at = excluded.redeemed_at;
+
+-- ai_credits: 2 baris
+INSERT INTO ai_credits (user_id, balance_idr, updated_at) VALUES
+((SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), 48000, '2026-10-29T08:00:00.000Z'),
+((SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), 25000, '2026-10-27T03:00:00.000Z')
+ON CONFLICT(user_id) DO UPDATE SET balance_idr = excluded.balance_idr, updated_at = excluded.updated_at;
+
+-- ai_credit_entries: 4 baris
+INSERT INTO ai_credit_entries (id, user_id, amount_idr, reason, ref, created_at) VALUES
+(90001, (SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), 50000, 'voucher', 'SATU-AI-50K', '2026-10-26T07:00:00.000Z'),
+(90002, (SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), -1000, 'offer', '2026-10', '2026-10-28T04:00:00.000Z'),
+(90003, (SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), -1000, 'offer', '2026-10', '2026-10-29T08:00:00.000Z'),
+(90004, (SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), 25000, 'voucher', 'SATU-COMBO', '2026-10-27T03:00:00.000Z')
+ON CONFLICT(id) DO UPDATE SET user_id = excluded.user_id, amount_idr = excluded.amount_idr, reason = excluded.reason, ref = excluded.ref, created_at = excluded.created_at;
+
+-- usage_counters: 5 baris
+INSERT INTO usage_counters (user_id, feature, period, count) VALUES
+((SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), 'offer', '2026-10', 10),
+((SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), 'report', '2026-10', 3),
+((SELECT id FROM users WHERE email = 'sari.laundrykiloan@contoh.satualur.id'), 'advisor', '2026-10', 5),
+((SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), 'offer', '2026-10', 4),
+((SELECT id FROM users WHERE email = 'dewi.cucisofa@contoh.satualur.id'), 'leads', '2026-10', 2)
+ON CONFLICT(user_id, feature, period) DO UPDATE SET count = excluded.count;

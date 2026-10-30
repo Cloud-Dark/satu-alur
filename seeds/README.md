@@ -16,18 +16,18 @@ Berisi **data demo DUMMY** untuk D1. Semua pelanggan, telepon, alamat, pekerja, 
 | `demo-summary.json` | Ringkasan mode penuh per usaha: asumsi `macro`, pendapatan/biaya/laba bulanan, tren nominal vs volume riil, CV, struktur biaya, laba sebelum pajak dan estimasi setelah pajak, headcount, jumlah baris, estimasi tulis. **Sumber tabel dokumen.** |
 | `demo-lean.part1of3.sql` … `part3of3.sql` | Mode `--lean` dibagi 3 file (17.763 baris total). Masing-masing ±34–36 ribu writes bila mengganti seed penuh. Terapkan **satu file per hari** di akun Free. |
 | `demo-lean-summary.json` | Ringkasan mode lean, termasuk `write_estimate`. |
-| `office.sql` | Data contoh Kantor Satu Alur (halaman staf): konten situs, paket Free/Lite/Pro, pelanggan, kontak, tiket, influencer, permintaan, kampanye. 87 baris. Lihat [Data Kantor](#data-kantor-officesql). |
+| `office.sql` | Data contoh Kantor Satu Alur (halaman staf): konten situs, paket Free/Lite/Pro dengan kuota AI, pelanggan, kontak, tiket, influencer, permintaan, kampanye, voucher, saldo AI. 103 baris. Lihat [Data Kantor](#data-kantor-officesql). |
 
 ## Data Kantor (`office.sql`)
 
-> **Jangan terapkan ke produksi** sebelum migrasi `0007_social_meta.sql` (dan `0003_workers.sql`) diterapkan ke D1 produksi dan lead memutuskan jadwalnya.
+> **Jangan terapkan ke produksi** sebelum migrasi `0007_social_meta.sql`, `0008_quota_vouchers.sql` (dan `0003_workers.sql`) diterapkan ke D1 produksi dan lead memutuskan jadwalnya.
 
 Dibuat oleh `node scripts/seed-office.mjs` (jangan edit `office.sql` manual). Semua data **fiktif**; email pendaftar contoh memakai domain `@contoh.satualur.id`.
 
 | Tabel | Baris | Isi |
 |-------|------:|-----|
 | `site_content` | 5 | `landing` (hero + FAQ, sama dengan teks bawaan `src/landing/content.js`, FAQ paket diperbarui ke Free/Lite/Pro) dan draf `about`, `privacy`, `terms`, `cookies` (ditandai "Draf contoh", perlu ditinjau penasihat hukum). |
-| `subscription_plans` | 3 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi). Kuota AI per bulan di `limits`; setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
+| `subscription_plans` | 3 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi). Kuota AI yang berlaku di `quota_json` (Free = kuota coba: 10 per fitur, Penasihat AI 5; Pro tanpa batas kecuali prospek 100 dan penasihat 500); teks kartu di `limits_json`. Setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
 | `payment_settings` | 1 | Penyedia `none`, mode sandbox, **tanpa kunci**. Gateway tetap mati sampai staf mengisi kunci asli di halaman Payment gateway. |
 | `users` | 13 | 9 akun demo (`INSERT OR IGNORE`, tidak mengubah baris yang sudah ada) + 4 pendaftar contoh. |
 | `customer_accounts` | 12 | Paket dan status campuran: aktif, uji coba, tertunggak, berhenti. Pendaftar ke-13 sengaja "Belum diatur". |
@@ -37,10 +37,14 @@ Dibuat oleh `node scripts/seed-office.mjs` (jangan edit `office.sql` manual). Se
 | `influencers` | 10 | Dengan kontak, handle, tarif (`rates_json`), catatan internal; 1 disembunyikan. |
 | `service_requests` | 8 | 4 kolaborasi + 4 iklan Meta, status baru/diproses/selesai. |
 | `campaigns` / `campaign_influencers` / `campaign_deliverables` | 3 / 4 / 6 | Kampanye berjalan dan selesai dengan konten direncanakan sampai tayang. |
+| `vouchers` | 3 | Satu per jenis: `SATU-LAUNCH-PRO` (Pro 30 hari, maks. 20), `SATU-AI-50K` (saldo AI Rp50.000, maks. 20), `SATU-COMBO` (Lite 30 hari + Rp25.000, maks. 10). |
+| `voucher_redemptions` | 2 | Sari menukar `SATU-AI-50K`, Dewi menukar `SATU-COMBO` (akunnya jadi Lite aktif 30 hari). |
+| `ai_credits` / `ai_credit_entries` | 2 / 4 | Saldo AI kedua pendaftar dan riwayatnya (voucher +, pemakaian −). |
+| `usage_counters` | 5 | Pemakaian bulan seed (2026-10): Sari sudah menghabiskan kuota Penawaran AI Free. |
 
 Semua baris memakai id/kunci tetap dan upsert, jadi aman dijalankan ulang. Baris yang dimiliki akun memakai `owner_id` hasil `SELECT id FROM users WHERE email = …`, jadi tetap tepat walau akun demo di database punya UUID lain. Tidak ada akun staf di file ini; buat dengan `npm run staff -- add <username>`.
 
-**Perkiraan tulis D1:** ±87 baris, paling banyak ±260 rows written termasuk entri indeks (jauh di bawah kuota 100.000/hari).
+**Perkiraan tulis D1:** ±103 baris, paling banyak ±310 rows written termasuk entri indeks (jauh di bawah kuota 100.000/hari). Menjalankan ulang seed mengembalikan hitungan pemakaian dan saldo contoh ke nilai di atas.
 
 Terapkan di lokal:
 
@@ -49,6 +53,8 @@ npm run db:migrate:local
 npx wrangler d1 execute satu-alur-db --local --file seeds/office.sql
 npm run staff -- add <username>
 ```
+
+Model kuota dan voucher: [docs/superpowers/plans/2026-10-30-trial-quota-vouchers.md](../docs/superpowers/plans/2026-10-30-trial-quota-vouchers.md).
 
 Penomoran migrasi: ada dua file `0003` (`0003_growth_tools.sql` dan `0003_workers.sql`). Wrangler mencatat migrasi per nama file di tabel `d1_migrations`, jadi keduanya diterapkan (dicek di lokal: semua 0001–0007 berstatus ✅). Di produksi, `0003_growth_tools.sql` sudah tercatat; `0003_workers.sql` dan `0007_social_meta.sql` akan ikut diterapkan pada `npm run db:migrate:remote` berikutnya.
 

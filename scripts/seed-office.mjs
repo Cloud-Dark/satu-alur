@@ -7,12 +7,14 @@
  *
  * Isi: konten situs (landing + 4 halaman dokumen), paket Free/Lite/Pro, pengaturan pembayaran
  * (tanpa kunci), akun pelanggan, pesan kontak, tiket bantuan, influencer, permintaan layanan,
- * dan kampanye. Aman dijalankan ulang: setiap baris memakai id/kunci tetap dan upsert.
- * Butuh migrasi 0007_social_meta.sql. Lihat seeds/README.md.
+ * kampanye, kuota AI per paket, voucher (paket / saldo AI / gabungan) beserta contoh penukaran.
+ * Aman dijalankan ulang: setiap baris memakai id/kunci tetap dan upsert.
+ * Butuh migrasi 0007_social_meta.sql dan 0008_quota_vouchers.sql. Lihat seeds/README.md.
  */
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { HERO, HERO_POINTS, FAQS } from '../src/landing/content.js'
+import { periodOf } from '../src/quota/rules.js'
 
 const OUT = fileURLToPath(new URL('../seeds/office.sql', import.meta.url))
 const BY = 'seed-office'
@@ -142,11 +144,13 @@ const PLANS = [
     limits: [
       { label: 'Pengguna', value: '1 orang' },
       { label: 'Transaksi', value: '50 per bulan' },
-      { label: 'Penawaran AI', value: '3 per bulan' },
-      { label: 'Laporan AI', value: '3 per bulan' },
-      { label: 'Pencari prospek', value: '3 pencarian per bulan' },
-      { label: 'Penasihat AI', value: '3 pesan per bulan' },
+      { label: 'Penawaran AI', value: '10 per bulan' },
+      { label: 'Laporan AI', value: '10 per bulan' },
+      { label: 'Pencari prospek', value: '10 pencarian per bulan' },
+      { label: 'Penasihat AI', value: '5 pesan per bulan' },
     ],
+    // Trial quota (src/quota/rules.js FREE_QUOTA): try every AI feature; the advisor costs most, so fewer messages.
+    quota: { offer: 10, report: 10, leads: 10, radar: 10, advisor: 5, social: 10 },
     features: ['Alur kerja 6 tahap lengkap', 'Radar peluang (ringkasan)', 'Media sosial: tulis konten manual', 'Data aman di cloud', 'Tidak termasuk saldo AI'],
     cta_label: 'Mulai gratis', cta_kind: 'signup', sort: 1,
   },
@@ -161,6 +165,7 @@ const PLANS = [
       { label: 'Pencari prospek', value: '20 pencarian per bulan' },
       { label: 'Penasihat AI', value: '100 pesan per bulan' },
     ],
+    quota: { offer: 50, report: 20, leads: 20, radar: 30, advisor: 100, social: 60 },
     features: ['Semua fitur Free', 'Radar peluang lengkap', 'Jadwal konten media sosial', 'Kelola petugas lapangan', 'Ekspor laporan', 'Tidak termasuk saldo AI'],
     cta_label: 'Pilih Lite', cta_kind: 'signup', sort: 2,
   },
@@ -170,11 +175,13 @@ const PLANS = [
     limits: [
       { label: 'Pengguna', value: '10 orang' },
       { label: 'Transaksi', value: 'Tanpa batas' },
-      { label: 'Penawaran AI', value: '300 per bulan' },
-      { label: 'Laporan AI', value: '100 per bulan' },
+      { label: 'Penawaran AI', value: 'Tanpa batas' },
+      { label: 'Laporan AI', value: 'Tanpa batas' },
       { label: 'Pencari prospek', value: '100 pencarian per bulan' },
       { label: 'Penasihat AI', value: '500 pesan per bulan' },
     ],
+    // null = unlimited; the two most expensive features keep a ceiling.
+    quota: { offer: null, report: null, leads: 100, radar: null, advisor: 500, social: null },
     features: ['Semua fitur Lite', 'Publikasi ke Facebook, Instagram, dan Threads', 'Permintaan kolaborasi influencer', 'Permintaan iklan Meta', 'Prioritas bantuan', 'Tidak termasuk saldo AI'],
     cta_label: 'Pilih Pro', cta_kind: 'signup', sort: 3,
   },
@@ -183,7 +190,7 @@ const PLANS = [
 section('subscription_plans', 'subscription_plans', 'slug', PLANS.map((p) => ({
   slug: q(p.slug), name: q(p.name), tagline: q(p.tagline), price_idr: q(p.price_idr), period: q(p.period),
   period_label: q(p.period_label), recommended: q(p.recommended), badge: q(p.badge),
-  limits_json: json(p.limits), features_json: json(p.features), cta_label: q(p.cta_label), cta_kind: q(p.cta_kind),
+  limits_json: json(p.limits), features_json: json(p.features), quota_json: json(p.quota), cta_label: q(p.cta_label), cta_kind: q(p.cta_kind),
   sort: q(p.sort), active: q(1), updated_at: q(NOW), updated_by: q(BY),
 })))
 
@@ -242,7 +249,7 @@ const CUSTOMERS = [
   ['demo-rs', 'pro', 'trial', day(11), 'PT Sehat Bersih Medika', '021-5550-0009', 'Akun demo. Trial Pro; jadwalkan demo dengan tim housekeeping.'],
   ['sari.laundrykiloan', 'free', 'active', null, 'Sari Laundry Kiloan', '0857-2000-0001', 'Daftar dari soft launch. Belum pernah membuat penawaran.'],
   ['agus.servispompa', 'lite', 'cancelled', day(-6), 'Agus Servis Pompa Air', '0857-2000-0002', 'Berhenti: musim sepi. Tawarkan voucher bila kembali.'],
-  ['dewi.cucisofa', 'lite', 'trial', day(10), 'Dewi Cuci Sofa & Karpet', '0857-2000-0003', 'Trial Lite dari voucher soft launch.'],
+  ['dewi.cucisofa', 'lite', 'active', day(27), 'Dewi Cuci Sofa & Karpet', '0857-2000-0003', 'Lite 30 hari dari voucher SATU-COMBO (soft launch).'],
 ]
 section('customer_accounts', 'customer_accounts', 'owner_id', CUSTOMERS.map(([u, p, status, end, company, phone, notes]) => ({
   owner_id: owner(E[u]), plan_id: plan(p), status: q(status), period_end: q(end), company: q(company), phone: q(phone),
@@ -374,6 +381,39 @@ section('campaign_deliverables', 'campaign_deliverables', 'id', CAMPAIGNS.flatMa
     note: q(note), updated_at: q(NOW), updated_by: q(BY),
   }))))
 
+/* --------------------------------------------------------- Vouchers & credit */
+
+// One voucher per type. Codes are readable on stage; staff make real ones in Kantor › Voucher.
+const VOUCHERS = [
+  [1, 'SATU-LAUNCH-PRO', 'plan', 'pro', 30, 0, 20, 0, '2026-12-31', 'Soft launch: Pro 30 hari untuk 20 usaha terpilih.', 8],
+  [2, 'SATU-AI-50K', 'credit', null, null, 50000, 20, 1, '2026-12-31', 'Saldo AI Rp50.000 untuk mencoba fitur AI setelah kuota habis.', 8],
+  [3, 'SATU-COMBO', 'bundle', 'lite', 30, 25000, 10, 1, '2026-11-30', 'Lite 30 hari + saldo AI Rp25.000 untuk peserta demo.', 6],
+]
+section('vouchers', 'vouchers', 'id', VOUCHERS.map(([id, code, type, p, days, credit, max, used, exp, note, ago]) => ({
+  id: q(id), code: q(code), type: q(type), plan_id: p ? plan(p) : 'NULL', plan_days: q(days), credit_idr: q(credit),
+  max_redemptions: q(max), redeemed_count: q(used), expires_on: q(exp), active: q(1), note: q(note), created_by: q(BY), created_at: q(ts(ago)),
+})))
+section('voucher_redemptions', 'voucher_redemptions', ['voucher_id', 'user_id'], [
+  { voucher_id: q(2), user_id: owner(E['sari.laundrykiloan']), redeemed_at: q(ts(4, 14)) },
+  { voucher_id: q(3), user_id: owner(E['dewi.cucisofa']), redeemed_at: q(ts(3, 10)) },
+])
+// Sari spent Rp2.000 of her Rp50.000 after using up the Free offer quota; Dewi still has the bundle's Rp25.000.
+section('ai_credits', 'ai_credits', 'user_id', [
+  { user_id: owner(E['sari.laundrykiloan']), balance_idr: q(48000), updated_at: q(ts(1, 15)) },
+  { user_id: owner(E['dewi.cucisofa']), balance_idr: q(25000), updated_at: q(ts(3, 10)) },
+])
+section('ai_credit_entries', 'ai_credit_entries', 'id', [
+  [90001, 'sari.laundrykiloan', 50000, 'voucher', 'SATU-AI-50K', ts(4, 14)],
+  [90002, 'sari.laundrykiloan', -1000, 'offer', periodOf(new Date(NOW)), ts(2, 11)],
+  [90003, 'sari.laundrykiloan', -1000, 'offer', periodOf(new Date(NOW)), ts(1, 15)],
+  [90004, 'dewi.cucisofa', 25000, 'voucher', 'SATU-COMBO', ts(3, 10)],
+].map(([id, u, amount, reason, ref, at]) => ({ id: q(id), user_id: owner(E[u]), amount_idr: q(amount), reason: q(reason), ref: q(ref), created_at: q(at) })))
+// This month's usage for two sign-ups (period of the seed date), so the quota bars aren't empty.
+section('usage_counters', 'usage_counters', ['user_id', 'feature', 'period'], [
+  ['sari.laundrykiloan', 'offer', 10], ['sari.laundrykiloan', 'report', 3], ['sari.laundrykiloan', 'advisor', 5],
+  ['dewi.cucisofa', 'offer', 4], ['dewi.cucisofa', 'leads', 2],
+].map(([u, f, n]) => ({ user_id: owner(E[u]), feature: q(f), period: q(periodOf(new Date(NOW))), count: q(n) })))
+
 /* -------------------------------------------------------------------- Write */
 
 // Index entries add writes; this is a rough upper bound for the D1 free-tier quota.
@@ -382,7 +422,7 @@ const header = `-- =============================================================
 -- Satu Alur: DATA CONTOH (DUMMY) untuk Kantor Satu Alur. Semua nama, email, telepon, dan angka FIKTIF.
 -- Dibuat oleh scripts/seed-office.mjs. Jangan edit manual; ubah skripnya lalu jalankan ulang.
 -- ${rowCount} baris; perkiraan D1 rows written <= ${estimate} (termasuk entri indeks).
--- Butuh migrasi 0007_social_meta.sql. Aman dijalankan ulang (upsert dengan id/kunci tetap).
+-- Butuh migrasi 0007_social_meta.sql dan 0008_quota_vouchers.sql. Aman dijalankan ulang (upsert dengan id/kunci tetap).
 -- Tidak berisi akun staf atau kunci pembayaran. Buat staf dengan: npm run staff -- add <username>
 -- =====================================================================
 `
