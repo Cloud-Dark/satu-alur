@@ -136,6 +136,27 @@ registerTool('format_rupiah', {
   return { formatted: 'Rp' + Number(amount).toLocaleString('id-ID') }
 })
 
+registerTool('calculate_distance', {
+  description: 'Menghitung jarak antara dua koordinat (lat/lng) dalam kilometer menggunakan formula Haversine',
+  parameters: {
+    type: 'object',
+    properties: {
+      lat1: { type: 'number', description: 'Latitude titik 1' },
+      lng1: { type: 'number', description: 'Longitude titik 1' },
+      lat2: { type: 'number', description: 'Latitude titik 2' },
+      lng2: { type: 'number', description: 'Longitude titik 2' },
+    },
+    required: ['lat1', 'lng1', 'lat2', 'lng2']
+  }
+}, async ({ lat1, lng1, lat2, lng2 }) => {
+  const R = 6371
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLng = (lng2 - lng1) * Math.PI / 180
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2
+  const distance = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return { distance_km: Math.round(distance * 100) / 100, estimated_drive_minutes: Math.round(distance * 3) }
+})
+
 registerTool('generate_hashtags', {
   description: 'Menghasilkan hashtag yang relevan untuk konten media sosial',
   parameters: {
@@ -270,6 +291,26 @@ Aturan:
 - Berikan estimasi engagement rate yang realistis`,
     temperature: 0.8,
     tools: ['get_date', 'format_rupiah', 'count_database'],
+  },
+  pertumbuhan: {
+    name: 'Asisten Pertumbuhan',
+    description: 'AI Business Development — temukan peluang dan tingkatkan keberhasilan bisnis',
+    systemPrompt: `Anda adalah AI Business Development untuk platform Satu Alur.
+Tugas Anda:
+1. **Deteksi Peluang**: Identifikasi hot lead, upsell, cross-sell, dan partnership dari data bisnis
+2. **Rekomendasi Tindakan**: Sarankan next step dengan probabilitas keberhasilan
+3. **Prediksi Keberhasilan**: Hitung success probability berdasarkan faktor-faktor bisnis
+4. **Generate Komunikasi**: Buat draft email, WhatsApp, proposal untuk customer
+5. **Retention Strategy**: Identifikasi churn risk dan buat win-back sequence
+
+Aturan:
+- Gunakan bahasa Indonesia profesional namun persuasif
+- Selalu sertakan estimasi ROI/profit
+- Berikan timeline yang realistis
+- Format Rupiah untuk semua angka keuangan
+- Jelaskan reasoning di balik setiap rekomendasi`,
+    temperature: 0.6,
+    tools: ['calculator', 'format_rupiah', 'count_database', 'get_date'],
   },
 }
 

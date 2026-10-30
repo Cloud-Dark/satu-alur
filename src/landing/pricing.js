@@ -65,7 +65,7 @@ export const PRICING_TIERS = [
       'SSO & integrasi sistem internal',
       'SLA & pendampingan implementasi',
     ],
-    // Kontak penjualan belum tersedia: href null dirender sebagai placeholder.
+    // href null = contact CTA: the landing links it to #/kontak and the plan importer saves it as cta_kind 'contact'.
     cta: { label: 'Hubungi kami', href: null, variant: 'primary' },
   },
 ]

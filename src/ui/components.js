@@ -264,6 +264,50 @@ export function setOptions(selectEl, options, value) {
   if (value !== undefined && value !== null) selectEl.value = String(value)
 }
 
+/**
+ * Checkbox or radio group: the group label (legend) sits above the options,
+ * like every other field. options: [{value, label, checked?, disabled?, hint?}].
+ * Returns { wrap, inputs } with inputs keyed by value.
+ */
+export function choiceGroup({ legend, type = 'checkbox', name, options = [], required = false, hint }) {
+  const gname = name || nextId('choice')
+  const inputs = {}
+  const rows = options.map((o) => {
+    const id = `${gname}-${o.value}`
+    const input = el('input', { type, id, name: gname, value: String(o.value), checked: Boolean(o.checked), disabled: Boolean(o.disabled) })
+    inputs[o.value] = input
+    const h = o.hint ? el('span', { className: 'field-hint', id: `${id}-hint` }, o.hint) : null
+    if (h) input.setAttribute('aria-describedby', h.id)
+    return el('div', { className: 'choice' }, el('label', { className: 'choice-label', htmlFor: id }, input, el('span', {}, o.label)), h)
+  })
+  const wrap = el('fieldset', { className: 'field choice-group' },
+    el('legend', { className: 'field-label' }, el('span', {}, legend), required ? el('span', { className: 'field-req' }, 'Wajib') : null),
+    hint ? el('span', { className: 'field-hint' }, hint) : null,
+    el('div', { className: 'choice-list' }, rows))
+  return { wrap, inputs }
+}
+
+/**
+ * Modal dialog with the app's form styles. Mounted inside .app-shell (field
+ * styles are scoped there; showModal still lifts it to the top layer).
+ * Returns { dialog, form, close }; content goes in `children`, buttons in `actions`.
+ */
+export function modal({ title, description, children = [], actions = [], opener, wide = false }) {
+  const tid = nextId('modal-title')
+  const dialog = el('dialog', { className: `modal${wide ? ' modal-wide' : ''}`, 'aria-labelledby': tid })
+  const form = el('form', { className: 'form modal-form', method: 'dialog', noValidate: true },
+    el('header', { className: 'modal-head' },
+      el('h2', { className: 'modal-title', id: tid }, title),
+      description ? el('p', { className: 'modal-desc' }, description) : null),
+    el('div', { className: 'modal-body' }, children),
+    el('footer', { className: 'modal-actions' }, actions))
+  dialog.append(form)
+  dialog.addEventListener('close', () => { dialog.remove(); opener?.focus() })
+  ;(document.querySelector('.app-shell') || document.body).append(dialog)
+  dialog.showModal()
+  return { dialog, form, close: () => dialog.close() }
+}
+
 /* Legacy field APIs (kept for compatibility). */
 export function inputField({ label, type = 'text', id, placeholder, required = false, value = '', onInput }) {
   const f = field({ label, type, id, placeholder, required, value, attrs: onInput ? { onInput: (e) => onInput(e.target.value) } : {} })

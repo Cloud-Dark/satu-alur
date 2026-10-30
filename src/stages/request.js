@@ -14,6 +14,7 @@ export async function render(container, ctx = {}) {
   const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
   const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
   const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
+  const requested = C.field({ label: 'Jadwal yang diminta klien', name: 'requested_at', type: 'datetime-local', hint: 'Opsional. Dipakai sebagai jadwal awal di tahap Penugasan.' })
   const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
   const reviewBox = el('div', { className: 'proposal' })
 
@@ -32,7 +33,11 @@ export async function render(container, ctx = {}) {
     if (d.phone && !PHONE_RE.test(d.phone)) errs.push({ text: 'Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.', input: phone.input })
     return errs
   }
-  const needErrors = () => (values().service_type ? [] : [{ text: 'Jenis layanan wajib diisi.', input: service.input }])
+  const needErrors = () => {
+    const errs = values().service_type ? [] : [{ text: 'Jenis layanan wajib diisi.', input: service.input }]
+    if (requested.input.value && Number.isNaN(new Date(requested.input.value).getTime())) errs.push({ text: 'Isi jadwal yang diminta klien dengan tanggal yang valid.', input: requested.input })
+    return errs
+  }
 
   const wiz = C.wizard({
     label: 'Permintaan baru',
@@ -48,7 +53,7 @@ export async function render(container, ctx = {}) {
         key: 'need',
         title: 'Kebutuhan',
         description: 'Layanan yang diminta dan rinciannya.',
-        content: [service.wrap, desc.wrap],
+        content: [service.wrap, requested.wrap, desc.wrap],
         validate: needErrors,
       },
       {
@@ -96,6 +101,7 @@ export async function render(container, ctx = {}) {
           { icon: 'layers', text: d.service_type || '—', title: `Layanan: ${d.service_type || '—'}` },
           d.location ? { icon: 'mapPin', text: d.location, title: `Lokasi: ${d.location}` } : null,
           d.phone ? { icon: 'phone', text: d.phone, title: `Telepon: ${d.phone}` } : null,
+          requested.input.value ? { icon: 'calendar', text: C.formatDateTime(requested.input.value) } : null,
         ],
         note: d.description || 'Tanpa deskripsi kebutuhan.',
         noteLines: 4,
@@ -106,6 +112,7 @@ export async function render(container, ctx = {}) {
 
   async function save() {
     const data = values()
+    if (requested.input.value) data.requested_at = new Date(requested.input.value).toISOString()
     const restore = wiz.busy('Menyimpan…')
     try {
       const { data: created, error } = await getCloud().database.from('requests').insert(data)
@@ -120,7 +127,7 @@ export async function render(container, ctx = {}) {
       }
       const again = C.button({ label: 'Catat permintaan lain', icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
-        for (const f of [name, location, phone, service, desc]) f.input.value = ''
+        for (const f of [name, location, phone, service, requested, desc]) f.input.value = ''
         reviewBox.replaceChildren()
         wiz.reset()
       })
@@ -171,6 +178,7 @@ export async function render(container, ctx = {}) {
             stack.querySelector('.cell-primary').prepend(el('span', { className: 'cell-id tnum' }, `#${r.id}`))
             if (r.description) stack.appendChild(el('span', { className: 'cell-note', title: r.description }, r.description))
             if (r.phone) stack.appendChild(el('span', { className: 'cell-secondary tnum' }, r.phone))
+            if (r.requested_at) stack.appendChild(el('span', { className: 'cell-secondary' }, `Jadwal: ${C.formatDateTime(r.requested_at)}`))
             return stack
           },
         },

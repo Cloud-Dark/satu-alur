@@ -51,7 +51,7 @@ async function main() {
     const config = path.join(__dirname, 'vite.e2e.config.mjs') // project config + HMR off
     server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort', '--config', config], {
       cwd: ROOT,
-      env: { ...process.env, VITE_USE_MOCK: 'true', BROWSER: 'none' },
+      env: { ...process.env, VITE_USE_MOCK: 'true', VITE_STAFF_USERS: 'staff:rahasia-staf-123', BROWSER: 'none' },
       stdio: ['ignore', 'pipe', 'pipe'],
       detached: true,
     })

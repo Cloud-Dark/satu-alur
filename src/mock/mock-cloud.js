@@ -3,6 +3,7 @@
  * memory + localStorage. Used for local development and e2e tests
  * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
+import { isBlocked, isStaffEmail, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
 
 const STORAGE_KEY = 'satualur_mock_v1'
 const OTP_STORE = 'satualur_mock_otp'
@@ -61,9 +62,23 @@ function notifyAuth(event) {
   if (_sessionCb) _sessionCb(event, _session)
 }
 
+// Same rules as the Worker: flags are written by src/customers/api.js (staff › Pengguna) under
+// `satualur_customers_demo_v1`.flags[userId] = { suspended, reason, revoked_at, … }.
+function userFlag(userId) {
+  try { return (JSON.parse(localStorage.getItem('satualur_customers_demo_v1')) || {}).flags?.[userId] || null } catch { return null }
+}
+function refuseSuspended(user) {
+  if (isBlocked(userFlag(user.id))) throw new Error(SUSPENDED_MESSAGE)
+}
+function startSession(user, extra) {
+  _session = { user, access_token: 'mock_' + crypto.randomUUID(), created_at: new Date().toISOString(), ...extra }
+  notifyAuth('SIGNED_IN')
+}
+
 const mockAuth = {
   async sendOtp({ email }) {
-    if (!email || !email.includes('@')) throw new Error('Email tidak valid.')
+    // Same rule as the Worker: staff addresses come only from staff login.
+    if (!email || !email.includes('@') || isStaffEmail(email)) throw new Error('Email tidak valid.')
     const code = String(Math.floor(100000 + Math.random() * 900000))
     const id = crypto.randomUUID()
     const otpData = JSON.parse(localStorage.getItem(OTP_STORE) || '{}')
@@ -77,6 +92,7 @@ const mockAuth = {
   },
 
   async verifyOtp({ email, verificationId, isExistingUser, token }) {
+    if (isStaffEmail(email)) throw new Error('Email tidak valid.')
     const otpData = JSON.parse(localStorage.getItem(OTP_STORE) || '{}')
     const rec = otpData[verificationId]
     if (!rec || rec.email !== email || rec.code !== token) {
@@ -92,8 +108,8 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
-    notifyAuth('SIGNED_IN')
+    refuseSuspended(user)
+    startSession(user)
     return { data: { user }, error: null }
   },
 
@@ -105,13 +121,49 @@ const mockAuth = {
       users.push(user)
       persist()
     }
-    _session = { user, access_token: 'mock_' + crypto.randomUUID() }
-    notifyAuth('SIGNED_IN')
+    refuseSuspended(user)
+    startSession(user)
+    return { data: { user }, error: null }
+  },
+
+  /**
+   * Staff login for dev/e2e. Accounts come from VITE_STAFF_USERS ("user:password,user2:password2");
+   * the real Worker uses hashed passwords in staff_accounts (worker/staff.js). None by default.
+   */
+  async staffLogin({ username, password }) {
+    const name = String(username || '').trim().toLowerCase()
+    const accounts = String(import.meta.env?.VITE_STAFF_USERS || '').split(',').map((s) => s.trim()).filter(Boolean)
+    if (!name || !accounts.some((a) => a === `${name}:${password}`)) throw new Error('Username atau password salah.')
+    const email = `${name}@staff.satualur.internal`
+    const users = ensureTable('users')
+    let user = users.find(u => u.email === email)
+    if (!user) {
+      user = { id: crypto.randomUUID(), email, name, created_at: new Date().toISOString() }
+      users.push(user)
+      persist()
+    }
+    startSession(user, { is_staff: true })
     return { data: { user }, error: null }
   },
 
   async getSession() {
-    if (_session) return { data: _session, error: null }
+    if (_session) {
+      const flag = userFlag(_session.user.id)
+      if (isBlocked(flag) || (flag?.revoked_at && flag.revoked_at >= _session.created_at)) {
+        _session = null
+        notifyAuth('SIGNED_OUT')
+        if (isBlocked(flag)) {
+          try { sessionStorage.setItem(AUTH_NOTICE_KEY, SUSPENDED_MESSAGE) } catch { /* storage unavailable */ }
+          return { data: null, error: { message: SUSPENDED_MESSAGE, status: 403 } }
+        }
+        return { data: null, error: { message: 'Sesi tidak valid atau sudah berakhir.', status: 401 } }
+      }
+    }
+    // Same rule as the Worker: only a staff-login session is an admin.
+    if (_session) {
+      const { is_staff, ...pub } = _session
+      return { data: { ...pub, is_admin: is_staff === true }, error: null }
+    }
     return { data: null, error: { message: 'Belum masuk.' } }
   },
 
@@ -244,6 +296,8 @@ const mockDatabase = {
         return resolve({ data: null, error: { message: 'Filter diperlukan untuk update/delete.' } })
       }
       if (builder._update) {
+        const bad = ['id', 'owner_id'].find((c) => c in builder._update)
+        if (bad) return resolve({ data: null, error: { message: `Kolom tidak boleh diubah: ${bad}` } })
         let affected = 0
         ensureTable(table).forEach((row, i) => {
           if (filters.every(f => {
@@ -583,6 +637,112 @@ Yuk booking sekarang! Link di bio 👆
   }
 }
 
+async function* mockStreamPertumbuhan(userMsg) {
+  const lower = userMsg.toLowerCase()
+  let text = ''
+
+  if (lower.includes('hotel horizon') || lower.includes('penawaran')) {
+    text = `✅ **Tindakan: Kirim Penawaran ke Hotel Horizon**
+
+Saya telah menyiapkan draft penawaran:
+
+• **Layanan:** Daily cleaning kamar + lobby + common area
+• **Frekuensi:** 6 hari/minggu
+• **Tim:** 4 orang (2 cleaning, 1 supervisor, 1 backup)
+• **Harga:** Rp 54.000.000/bulan (all-in)
+• **Nilai tambah:** Free disinfection monthly + laporan foto harian
+
+**Probabilitas deal: 78%** → **Expected close dalam 3-5 hari**
+
+Langkah selanjutnya:
+1. Kirim email proposal (sudah saya draft)
+2. Follow-up WhatsApp dalam 24 jam
+3. Offer site visit gratis untuk survey
+
+Apakah Anda ingin saya kirim sekarang?`
+  } else if (lower.includes('maju jaya') || lower.includes('paket tahunan')) {
+    text = `💰 **Tindakan: Upsell Paket Tahunan PT Maju Jaya**
+
+Berdasarkan analisis riwayat:
+• Rata-rata order: Rp 350rb/bulan
+• Total 12 bulan: Rp 4.200.000
+• **Paket tahunan: Rp 3.360.000 (hemat 20%)**
+• **Bonus:** 2× free deep cleaning (Rp 700rb value)
+
+**Pitch rekomendasi:**
+"Pak Budi, dengan paket tahunan Anda hemat Rp 840rb + dapat 2× deep cleaning gratis. Saya lock harga ini sampai akhir bulan."
+
+**Prediksi keberhasilan: 82%**
+
+Ingin saya generate draft WhatsApp/Email?`
+  } else if (lower.includes('klinik') || lower.includes('retention')) {
+    text = `⚠️ **Tindakan: Retention Klinik Sehat Sentosa**
+
+Skenario churn terdeteksi:
+• Gap order: 45 hari (normal: 30 hari)
+• Last contact: 12 September
+• Competitor probability: 55%
+
+**Rekomendasi win-back sequence:**
+
+**Hari 1 (hari ini):** Telepon langsung ke manager operasional
+→ Tanyakan kebutuhan terbaru, offer audit kebersihan GRATIS
+
+**Hari 2:** Kirim voucher Rp 50rb untuk order berikutnya
+
+**Hari 5:** Follow-up email dengan portfolio hasil kerja terbaru
+
+**Win-back probability: 62%** → Jika tidak merespons dalam 7 hari, flag sebagai "lost customer"
+
+Mulai dengan telepon sekarang?`
+  } else if (lower.includes('bsd') || lower.includes('partnership')) {
+    text = `🤝 **Tindakan: Partnership BSD AC Service**
+
+Analisis partnership:
+• Overflow demand: 12 request/minggu (kapasitas penuh)
+• Partner track record: 4.8⭐, 200+ job
+• Margin bersih: 18%
+• Estimasi: 5 job/minggu pertama
+
+**Draft MOU:**
+• Periode: 3 bulan trial
+• Revenue share: 82% Anda, 18% partner
+• SLA: Response < 2 jam, selesai < 24 jam
+• Branding: Satu Alur tetap sebagai front-facing brand
+
+**Expected value: Rp 12 juta/bulan**
+
+Saya bisa generate draft MOU dan kontak BSD AC. Mulai?`
+  } else {
+    text = `🤖 **Asisten Pertumbuhan**
+
+Saya membantu Anda menemukan dan mengeksekusi peluang bisnis. Berikut yang bisa saya lakukan:
+
+• 📊 **Analisis peluang** — Scan data untuk hot lead, upsell, churn risk
+• 🎯 **Rekomendasi tindakan** — Suggest next step dengan probabilitas keberhasilan
+• 📞 **Generate draft komunikasi** — Email, WhatsApp, proposal untuk customer
+• 📈 **Tracking prediksi** — Monitor progress dan update probability real-time
+
+**6 peluang aktif terdeteksi dengan total potensi Rp 106.3 juta/bulan.**
+
+Apa yang ingin Anda tindaklanjuti?`
+  }
+
+  for (let i = 0; i < text.length; i += 3) {
+    await new Promise(r => setTimeout(r, 20))
+    yield {
+      choices: [{
+        delta: { content: text.slice(i, i + 3) },
+        finish_reason: null,
+      }],
+    }
+  }
+  yield {
+    choices: [{ delta: {}, finish_reason: 'stop' }],
+    usage: { prompt_tokens: 25, completion_tokens: text.length / 3, total_tokens: 25 + text.length / 3 },
+  }
+}
+
 function parseRequest(text) {
   try { return JSON.parse(String(text).replace(/^Permintaan jasa:\s*/, '')) } catch { return { description: text } }
 }
@@ -817,14 +977,38 @@ const mockLLM = {
         const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
         if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
         if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
-        // Untagged prompts from the Social Media workspace and AI Superpowers (src/ai/superpowers.js)
+        // Untagged prompts from Media Sosial, AI Superpowers and Pertumbuhan (src/ai/superpowers.js)
         if (system.includes('analis laporan') || userMsg.includes('Data laporan')) return mockStreamExplain(parseReport(userMsg))
-        const isSocial = system.includes('social media') || system.includes('media sosial') || ['caption', 'brainstorm', 'hashtag', 'iklan'].some((w) => userMsg.includes(w))
-        if (isSocial) return mockStreamSocial(userMsg)
-        if (system.includes('analis bisnis')) return mockStreamAnalyst(userMsg)
-        return mockStreamGeneral(userMsg)
+        if (system.includes('pertumbuhan') || system.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
+        if (system.includes('social media') || system.includes('media sosial') || ['caption', 'brainstorm', 'hashtag', 'iklan'].some((w) => userMsg.includes(w))) return mockStreamSocial(lastUserText(messages))
+        if (system.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
+        if (system.includes('Asisten AI') || system.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
+        return mockStreamExplain(parseReport(userMsg))
       }
     }
+  }
+}
+
+const SEED_WORKERS = [
+  { id: 6001, name: 'Budi Santoso', phone: '0812-3456-7890', skills: ['ac', 'cleaning'], zone: 'Jakarta Selatan', address: 'Jl. Fatmawati No.15, Jakarta Selatan', lat: -6.2673, lng: 106.7976, status: 'active', age: 60 },
+  { id: 6002, name: 'Agus Wijaya', phone: '0821-9876-5432', skills: ['waterproofing', 'roof'], zone: 'Jakarta Pusat', address: 'Jl. Salemba Raya No.42, Jakarta Pusat', lat: -6.1965, lng: 106.8478, status: 'active', age: 55 },
+  { id: 6003, name: 'Siti Rahayu', phone: '0838-1234-5678', skills: ['cleaning', 'carpet', 'sofa'], zone: 'Tangerang', address: 'Jl. MH Thamrin No.8, Tangerang', lat: -6.1777, lng: 106.6296, status: 'active', age: 90 },
+  { id: 6004, name: 'Dedi Kurniawan', phone: '0856-7890-1234', skills: ['ac', 'electrical'], zone: 'Jakarta Selatan', address: 'Jl. Sisingamangaraja No.22, Jakarta Selatan', lat: -6.2436, lng: 106.8006, status: 'inactive', age: 45 },
+  { id: 6005, name: 'Rina Puspita', phone: '0877-4567-8901', skills: ['pool', 'garden'], zone: 'Bogor', address: 'Jl. Pajajaran No.55, Bogor', lat: -6.5942, lng: 106.7892, status: 'active', age: 70 },
+  { id: 6006, name: 'Eko Prasetyo', phone: '0813-5678-9012', skills: ['pest', 'cleaning'], zone: 'Surabaya', address: 'Jl. Darmo Permai Selatan No.12, Surabaya', lat: -7.2905, lng: 112.7271, status: 'active', age: 40 },
+]
+// [assignment_id, worker_id]; inactive 6004 only on an old completed job.
+const SEED_LINKS = [[3001, 6001], [3001, 6003], [3002, 6002], [3003, 6005], [3004, 6004], [3005, 6006], [3006, 6005]]
+
+function addSeedWorkers(state, daysAgo) {
+  state.workers = SEED_WORKERS.map(({ age, ...w }) => ({ owner_id: 'anon', ...w, created_at: daysAgo(age) }))
+  const have = new Set((state.assignments || []).map((a) => a.id))
+  state.assignment_workers = SEED_LINKS.filter(([a]) => have.has(a))
+    .map(([assignment_id, worker_id], i) => ({ id: 7001 + i, owner_id: 'anon', assignment_id, worker_id, created_at: daysAgo(10) }))
+  for (const a of state.assignments || []) {
+    const names = state.assignment_workers.filter((l) => l.assignment_id === a.id)
+      .map((l) => state.workers.find((w) => w.id === l.worker_id).name)
+    if (names.length) a.worker_name = names.join(', ')
   }
 }
 
@@ -833,15 +1017,19 @@ const mockLLM = {
  */
 export function seedDemoData() {
   const state = loadState()
-  if (state._seeded) return
-
   const now = new Date()
   const daysAgo = (d) => new Date(now.getTime() - d * 86400000).toISOString()
+  if (state._seeded) {
+    // Older seeded states have no workers, or legacy ones (string ids, old statuses).
+    const legacy = !state.workers?.length || state.workers.some((w) => typeof w.id !== 'number' || !['active', 'inactive'].includes(w.status))
+    if (legacy) { addSeedWorkers(state, daysAgo); saveState(state) }
+    return
+  }
 
   // --- Requests ---
   state.requests = [
-    { id: 1001, customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
-    { id: 1002, customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
+    { id: 1001, customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', requested_at: daysAgo(14), location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
+    { id: 1002, customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', requested_at: daysAgo(12), location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
     { id: 1003, customer_name: 'Kost exclusive 99', service_type: 'Pembersihan Kolam Renang', location: 'Depok', description: 'Perawatan rutin kolam renang bulanan, termasuk pengecekan pH dan backwash.', created_at: daysAgo(10) },
     { id: 1004, customer_name: 'PT Sinar Abadi', service_type: 'Pest Control', location: 'Tangerang', description: 'Pengendalian hama rayap dan kecoa untuk gudang 500m2.', created_at: daysAgo(8) },
     { id: 1005, customer_name: 'Apartemen GreenView', service_type: 'Pembersihan Kaca Gedung', location: 'Jakarta Pusat', description: 'Pembersihan kaca eksterior 12 lantai menggunakan gondola.', created_at: daysAgo(6) },
@@ -863,12 +1051,12 @@ export function seedDemoData() {
 
   // --- Assignments ---
   state.assignments = [
-    { id: 3001, offer_id: 2001, worker_name: 'Ahmad & Team', scheduled_at: daysAgo(11), status: 'done', created_at: daysAgo(12) },
-    { id: 3002, offer_id: 2002, worker_name: 'Budi Santoso', scheduled_at: daysAgo(9), status: 'done', created_at: daysAgo(10) },
-    { id: 3003, offer_id: 2003, worker_name: 'Candra Pool Service', scheduled_at: daysAgo(8), status: 'done', created_at: daysAgo(9) },
-    { id: 3004, offer_id: 2004, worker_name: 'Dedi Pest Control', scheduled_at: daysAgo(5), status: 'done', created_at: daysAgo(7) },
-    { id: 3005, offer_id: 2001, worker_name: 'Eko Maintenance', scheduled_at: daysAgo(3), status: 'assigned', created_at: daysAgo(4) },
-    { id: 3006, offer_id: 2003, worker_name: 'Fajar Pool Service', scheduled_at: daysAgo(2), status: 'assigned', created_at: daysAgo(3) },
+    { id: 3001, offer_id: 2001, worker_name: 'Budi Santoso, Siti Rahayu', scheduled_at: daysAgo(11), status: 'done', created_at: daysAgo(12) },
+    { id: 3002, offer_id: 2002, worker_name: 'Agus Wijaya', scheduled_at: daysAgo(9), status: 'done', created_at: daysAgo(10) },
+    { id: 3003, offer_id: 2003, worker_name: 'Rina Puspita', scheduled_at: daysAgo(8), status: 'done', created_at: daysAgo(9) },
+    { id: 3004, offer_id: 2004, worker_name: 'Dedi Kurniawan', scheduled_at: daysAgo(5), status: 'done', created_at: daysAgo(7) },
+    { id: 3005, offer_id: 2001, worker_name: 'Eko Prasetyo', scheduled_at: daysAgo(3), status: 'assigned', created_at: daysAgo(4) },
+    { id: 3006, offer_id: 2003, worker_name: 'Rina Puspita', scheduled_at: daysAgo(2), status: 'assigned', created_at: daysAgo(3) },
   ]
 
   // --- Completions ---
@@ -895,10 +1083,12 @@ export function seedDemoData() {
     { id: 5012, completion_id: 4004, amount: 650000, category: 'biaya_bahan', status: 'posted', posted_at: daysAgo(3), created_at: daysAgo(3) },
   ]
 
+  addSeedWorkers(state, daysAgo)
+
   state.users = [{ id: 'demo-user', email: 'demo@satualur.id', name: 'Demo User', created_at: daysAgo(30) }]
   state._seeded = true
   saveState(state)
-  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries')
+  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries, 6 workers')
 }
 
 export function createMockWorkBuddyCloud() {

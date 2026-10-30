@@ -54,6 +54,25 @@ Aturan: teks di atas `--accent` memakai `--text-on-accent`; teks di atas `--bran
 
 `.btn` + `.btn-primary | .btn-accent | .btn-soft | .btn-ghost | .btn-danger`, ukuran `.btn-sm | .btn-lg`; `.icon-btn`; `.tag` / `.tag-accent`; `.surface`; `.eyebrow`; `.pulse-dot`; `.ambient` (glow hero); `.reveal`; toast.
 
+## 5a. Formulir & dialog (di `src/ui/components.js`, gaya di `styles.css`)
+
+**Aturan utama: label selalu di atas komponen interaksi**, untuk semua jenis input:
+
+```
+Label field                    Wajib      ← .field-label (label kiri, "Wajib" kanan)
+┌──────────────────────────────────┐
+│ placeholder / nilai              │      ← .input (textfield, textarea, dropdown, tanggal, file)
+└──────────────────────────────────┘
+Petunjuk singkat                          ← .field-hint (opsional)
+⚠ Pesan galat                             ← .field-error (role="alert")
+```
+
+- **Textfield / textarea / dropdown / tanggal / file**: `C.field()`, `C.textarea()`, `C.select()` menghasilkan `.field` (kolom vertikal, jarak 7px). Jangan menyusun `<label>` manual di samping input.
+- **Checkbox & radio**: `C.choiceGroup({ legend, type: 'checkbox' | 'radio', options })` → `<fieldset>` dengan `<legend>` di atas, pilihan bertumpuk di bawah. Tiap pilihan: kotak 18px + teks, area sentuh ≥ 44px, petunjuk/alasan nonaktif di bawahnya. Checkbox tunggal tetap memakai grup berlegend (mis. "Visibilitas → Tampilkan di katalog").
+- **Dua field pendek berdampingan**: bungkus dengan `.form-row` (otomatis satu kolom di layar kecil).
+- **Dialog**: selalu `C.modal({ title, description?, children, actions, opener })`. Struktur: kepala (judul + deskripsi), badan bergulir berisi field, kaki dengan tombol rata kanan (**Batal** ghost lalu aksi utama primary). Lebar 560px (`wide` 720px), radius `--r-lg`, bayangan `--shadow-lg`, latar `--surface`, backdrop gelap 50%. Dialog dipasang di dalam `.app-shell` agar gaya formulir berlaku; Esc menutup; fokus kembali ke tombol pembuka. Di layar < 480px tombol kaki melebar penuh.
+- Galat validasi ditampilkan di dalam dialog (dialog tetap terbuka), bukan toast.
+
 ## 6. Gerak
 
 - Easing utama `--ease` (ease-out lembut), `--ease-spring` untuk pop kecil.

@@ -83,6 +83,8 @@ Ringkasan (langkah lengkap dan verifikasi di [docs/18_INSTALLATION.md](docs/18_I
 3. Terapkan migrasi: `npm run db:migrate:remote`
 4. Deploy: `npm run deploy`
 
+Urutan penting: `npm run db:migrate:remote` (termasuk `0003_workers.sql`) harus dijalankan SEBELUM `npm run deploy`, kalau tidak halaman Penugasan gagal dimuat.
+
 Catatan: `DEMO_OTP="true"` di `wrangler.toml` membuat kode OTP dikembalikan di respons API karena belum ada provider email. Mode ini hanya untuk uji; jangan dipakai untuk produksi. Lihat [docs/10_RISK_REGISTER.md](docs/10_RISK_REGISTER.md).
 
 ## Struktur Project

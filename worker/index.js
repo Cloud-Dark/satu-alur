@@ -8,6 +8,32 @@
  */
 
 import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.js';
+import { handleStaffLogin } from './staff.js';
+import {
+  handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
+  handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
+  handleSocialPublish, handleSocialSchedule, handleSocialScheduleCancel, runCron, isAdminUser,
+  handleThreadsStart, handleThreadsCallback, handleThreadsDisconnect,
+} from './social.js';
+import {
+  handleInfluencers, handleRequestCreate, handleRequestList, handleAdminInfluencers, handleAdminInfluencerCreate,
+  handleAdminInfluencerUpdate, handleAdminRequests, handleAdminRequestUpdate,
+} from './office.js';
+import {
+  handleAdminCampaignCreate, handleAdminCampaigns, handleAdminCampaignGet, handleAdminCampaignUpdate, handleAdminCampaignInfluencer,
+  handleAdminCampaignInfluencerDelete, handleAdminDeliverableCreate, handleAdminDeliverableUpdate, handleAdminDeliverableDelete,
+  handleRequestCampaign,
+} from './agency.js';
+import { handleSiteGet, handleSitePut } from './site.js';
+import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
+import {
+  handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
+  handleAdminUsers, handleAdminUserSuspend, handleAdminUserRestore, handleAdminUserRevokeSessions,
+  handleContactPost, handleAdminContact, handleAdminContactCounts, handleAdminContactUpdate,
+  handleSupportList, handleSupportGet, handleSupportCreate, handleSupportReply,
+  handleAdminSupport, handleAdminSupportCounts, handleAdminSupportGet, handleAdminSupportReply, handleAdminSupportUpdate,
+} from './customers.js';
+import { SUSPENDED_MESSAGE, isStaffEmail } from '../src/customers/rules.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -39,7 +65,7 @@ const JSON_HINT =
 // Whitelisted tables -> columns. `json` columns are stored as TEXT JSON.
 const TABLES = {
   requests: {
-    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'created_at'],
+    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'created_at'],
   },
   offers: {
     columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'created_at'],
@@ -49,6 +75,14 @@ const TABLES = {
   assignments: {
     columns: ['id', 'owner_id', 'offer_id', 'worker_name', 'scheduled_at', 'status', 'created_at'],
     fks: { offer_id: 'offers' },
+  },
+  workers: {
+    columns: ['id', 'owner_id', 'name', 'phone', 'address', 'skills', 'lat', 'lng', 'zone', 'status', 'created_at'],
+    json: ['skills'],
+  },
+  assignment_workers: {
+    columns: ['id', 'owner_id', 'assignment_id', 'worker_id', 'created_at'],
+    fks: { assignment_id: 'assignments', worker_id: 'workers' },
   },
   completions: {
     columns: ['id', 'owner_id', 'assignment_id', 'notes', 'photos_path', 'status', 'completed_at', 'created_at'],
@@ -64,11 +98,17 @@ const TABLES = {
     json: ['summary_json'],
   },
   social_contents: {
-    columns: ['id', 'owner_id', 'kind', 'platform', 'title', 'body', 'meta_json', 'status', 'created_at'],
+    columns: ['id', 'owner_id', 'kind', 'platform', 'title', 'body', 'meta_json', 'status', 'image_key', 'created_at'],
     json: ['meta_json'],
   },
   social_schedules: {
     columns: ['id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'created_at'],
+  },
+  social_posts: {
+    columns: [
+      'id', 'owner_id', 'content_id', 'platform', 'content', 'image_key', 'page_id', 'scheduled_at', 'status',
+      'platform_post_id', 'permalink', 'error', 'attempts', 'published_at', 'claimed_at', 'created_at',
+    ],
   },
   ai_messages: {
     columns: ['id', 'owner_id', 'agent', 'role', 'content', 'model', 'latency_ms', 'error', 'created_at'],
@@ -81,6 +121,9 @@ const TABLES = {
     json: ['meta_json'],
   },
 };
+// social_accounts is deliberately absent from TABLES (it holds Page and Threads tokens).
+// Tables /api/db may only select from; writes go through /api/social/*.
+const READ_ONLY_TABLES = new Set(['social_posts']);
 // Columns the client may never set directly.
 const PROTECTED_COLUMNS = new Set(['id', 'owner_id']);
 
@@ -180,6 +223,12 @@ function normalizeEmail(v) {
 
 const nowIso = () => new Date().toISOString();
 
+// Login routes call this before creating a session (after the OTP check, so the 403 never leaks account state).
+async function refuseSuspended(env, userId) {
+  const f = await env.DB.prepare('SELECT suspended FROM user_flags WHERE user_id = ?').bind(userId).first();
+  if (f?.suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+}
+
 // --------------------------------------------------------------------- auth
 
 async function authenticate(request, env) {
@@ -188,20 +237,24 @@ async function authenticate(request, env) {
   if (!m) throw new HttpError(401, 'Belum masuk.');
   const tokenHash = await sha256Hex(m[1]);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at
+    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended
        FROM sessions s JOIN users u ON u.id = s.user_id
+       LEFT JOIN user_flags f ON f.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
   )
     .bind(tokenHash, nowIso())
     .first();
   if (!row) throw new HttpError(401, 'Sesi tidak valid atau sudah berakhir.');
-  return { user: row, tokenHash };
+  const { suspended, ...user } = row;
+  if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+  return { user, tokenHash };
 }
 
 async function handleSendOtp(request, env) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
-  if (!email) throw new HttpError(400, 'Email tidak valid.');
+  // Staff addresses are created only by staff login; an OTP sign-up must never claim one.
+  if (!email || isStaffEmail(email)) throw new HttpError(400, 'Email tidak valid.');
 
   const now = Date.now();
   // Opportunistic cleanup of expired rows.
@@ -245,6 +298,7 @@ async function handleSendOtp(request, env) {
 async function handleVerifyOtp(request, env) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
+  if (email && isStaffEmail(email)) throw new HttpError(400, 'Email tidak valid.');
   const verificationId = typeof body.verificationId === 'string' ? body.verificationId : '';
   const token = typeof body.token === 'string' ? body.token.trim() : String(body.token ?? '').trim();
   const bad = new HttpError(400, 'Kode OTP salah atau sudah kadaluarsa.');
@@ -273,6 +327,7 @@ async function handleVerifyOtp(request, env) {
     .run();
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new Error('user missing after upsert');
+  await refuseSuspended(env, user.id);
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -297,6 +352,7 @@ async function handleDemoLogin(request, env) {
   if (!email || !DEMO_EMAILS.has(email)) throw new HttpError(400, 'Akun demo tidak dikenal.');
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
+  await refuseSuspended(env, user.id);
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -307,7 +363,8 @@ async function handleDemoLogin(request, env) {
 
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
-  return ok({ user });
+  const { is_staff, ...pub } = user;
+  return ok({ user: pub, is_admin: isAdminUser(user) });
 }
 
 async function handleSignout(request, env) {
@@ -499,6 +556,7 @@ async function handleDb(request, env) {
   const spec = TABLES[table];
   const action = body.action;
   const uid = user.id;
+  if (action !== 'select' && READ_ONLY_TABLES.has(table)) throw bad('Tabel ini hanya bisa dibaca.');
 
   if (action === 'insert') {
     const values = Array.isArray(body.values) ? body.values : body.values ? [body.values] : [];
@@ -815,27 +873,111 @@ function sseResponse(stream) {
 
 // ------------------------------------------------------------------- router
 
-// Helpers handed to the lead-finder routes in ./leads.js (avoids a circular import).
-const LEAD_DEPS = { authenticate, readJson, ok, HttpError };
+// Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
   'POST /api/auth/verify-otp': handleVerifyOtp,
   'POST /api/auth/demo-login': handleDemoLogin,
+  'POST /api/auth/staff-login': (req, env) => handleStaffLogin(req, env, ROUTE_DEPS),
   'GET /api/auth/session': handleSession,
   'POST /api/auth/signout': handleSignout,
   'POST /api/db': handleDb,
   'GET /api/llm/models': handleModels,
   'POST /api/llm/chat': handleChat,
-  'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, LEAD_DEPS),
-  'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, LEAD_DEPS),
-  'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, LEAD_DEPS),
+  'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, ROUTE_DEPS),
+  'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, ROUTE_DEPS),
+  'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, ROUTE_DEPS),
+  'GET /api/social/account': (req, env) => handleSocialAccount(req, env, ROUTE_DEPS),
+  'DELETE /api/social/account': (req, env) => handleSocialDisconnect(req, env, ROUTE_DEPS),
+  'POST /api/social/oauth/start': (req, env) => handleSocialOauthStart(req, env, ROUTE_DEPS),
+  'GET /api/social/oauth/callback': handleSocialOauthCallback,
+  'POST /api/social/threads/start': (req, env) => handleThreadsStart(req, env, ROUTE_DEPS),
+  'GET /api/social/threads/callback': handleThreadsCallback,
+  'DELETE /api/social/threads': (req, env) => handleThreadsDisconnect(req, env, ROUTE_DEPS),
+  'GET /api/social/oauth/pages': (req, env) => handleSocialOauthPages(req, env, ROUTE_DEPS),
+  'POST /api/social/oauth/pick': (req, env) => handleSocialOauthPick(req, env, ROUTE_DEPS),
+  'POST /api/social/media': (req, env) => handleSocialMediaUpload(req, env, ROUTE_DEPS),
+  'POST /api/social/publish': (req, env) => handleSocialPublish(req, env, ROUTE_DEPS),
+  'POST /api/social/schedule': (req, env) => handleSocialSchedule(req, env, ROUTE_DEPS),
+  'DELETE /api/social/schedule/:id': (req, env, params) => handleSocialScheduleCancel(req, env, ROUTE_DEPS, params),
+  'GET /api/office/influencers': (req, env) => handleInfluencers(req, env, ROUTE_DEPS),
+  'POST /api/office/requests': (req, env) => handleRequestCreate(req, env, ROUTE_DEPS),
+  'GET /api/office/requests': (req, env) => handleRequestList(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/influencers': (req, env) => handleAdminInfluencers(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/influencers': (req, env) => handleAdminInfluencerCreate(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/influencers/:id': (req, env, params) => handleAdminInfluencerUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/requests': (req, env) => handleAdminRequests(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/requests/:id': (req, env, params) => handleAdminRequestUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/office/requests/:id/campaign': (req, env, params) => handleRequestCampaign(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/campaigns': (req, env) => handleAdminCampaignCreate(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/campaigns': (req, env) => handleAdminCampaigns(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/campaigns/:id': (req, env, params) => handleAdminCampaignGet(req, env, ROUTE_DEPS, params),
+  'PATCH /api/office/admin/campaigns/:id': (req, env, params) => handleAdminCampaignUpdate(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/campaigns/:id/influencers': (req, env, params) => handleAdminCampaignInfluencer(req, env, ROUTE_DEPS, params),
+  'DELETE /api/office/admin/campaigns/:id/influencers/:influencerId': (req, env, params) => handleAdminCampaignInfluencerDelete(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/campaigns/:id/deliverables': (req, env, params) => handleAdminDeliverableCreate(req, env, ROUTE_DEPS, params),
+  'PATCH /api/office/admin/deliverables/:id': (req, env, params) => handleAdminDeliverableUpdate(req, env, ROUTE_DEPS, params),
+  'DELETE /api/office/admin/deliverables/:id': (req, env, params) => handleAdminDeliverableDelete(req, env, ROUTE_DEPS, params),
+  'GET /api/site/:key': (req, env, params) => handleSiteGet(req, env, ROUTE_DEPS, params),
+  'PUT /api/office/admin/site/:key': (req, env, params) => handleSitePut(req, env, ROUTE_DEPS, params),
+  'GET /api/plans': (req, env) => handlePlansPublic(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/plans': (req, env) => handleAdminPlans(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/plans': (req, env) => handleAdminPlanCreate(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/plans/reorder': (req, env) => handleAdminPlanReorder(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/plans/:id': (req, env, params) => handleAdminPlanUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/payment': (req, env) => handleAdminPaymentGet(req, env, ROUTE_DEPS),
+  'PUT /api/office/admin/payment': (req, env) => handleAdminPaymentPut(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/payment/test': (req, env) => handleAdminPaymentTest(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/customers': (req, env) => handleAdminCustomers(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/customers/:userId': (req, env, params) => handleAdminCustomerGet(req, env, ROUTE_DEPS, params),
+  'PUT /api/office/admin/customers/:userId': (req, env, params) => handleAdminCustomerPut(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/users': (req, env) => handleAdminUsers(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/users/:userId/suspend': (req, env, params) => handleAdminUserSuspend(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/users/:userId/restore': (req, env, params) => handleAdminUserRestore(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/users/:userId/revoke-sessions': (req, env, params) => handleAdminUserRevokeSessions(req, env, ROUTE_DEPS, params),
+  'POST /api/contact': (req, env) => handleContactPost(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/contact': (req, env) => handleAdminContact(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/contact/counts': (req, env) => handleAdminContactCounts(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/contact/:id': (req, env, params) => handleAdminContactUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/support/tickets': (req, env) => handleSupportList(req, env, ROUTE_DEPS),
+  'POST /api/support/tickets': (req, env) => handleSupportCreate(req, env, ROUTE_DEPS),
+  'GET /api/support/tickets/:id': (req, env, params) => handleSupportGet(req, env, ROUTE_DEPS, params),
+  'POST /api/support/tickets/:id/messages': (req, env, params) => handleSupportReply(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/support': (req, env) => handleAdminSupport(req, env, ROUTE_DEPS),
+  // Exact keys win before the :id patterns are tried (handleApi), so /counts never reaches :id.
+  'GET /api/office/admin/support/counts': (req, env) => handleAdminSupportCounts(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/support/:id': (req, env, params) => handleAdminSupportGet(req, env, ROUTE_DEPS, params),
+  'POST /api/office/admin/support/:id/messages': (req, env, params) => handleAdminSupportReply(req, env, ROUTE_DEPS, params),
+  'PATCH /api/office/admin/support/:id': (req, env, params) => handleAdminSupportUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/media/:key': handleMediaGet,
 };
+
+// Matches '/api/media/:key' against a path; returns the params or null.
+function matchPath(pattern, path) {
+  const a = pattern.split('/');
+  const b = path.split('/');
+  if (a.length !== b.length) return null;
+  const params = {};
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].startsWith(':') && b[i]) params[a[i].slice(1)] = b[i];
+    else if (a[i] !== b[i]) return null;
+  }
+  return params;
+}
 
 async function handleApi(request, env, path) {
   const handler = ROUTES[`${request.method} ${path}`];
-  if (handler) return handler(request, env);
-  const pathKnown = Object.keys(ROUTES).some((k) => k.slice(k.indexOf(' ') + 1) === path);
+  if (handler) return handler(request, env, {});
+  let pathKnown = false;
+  for (const [key, h] of Object.entries(ROUTES)) {
+    const sp = key.indexOf(' ');
+    const params = matchPath(key.slice(sp + 1), path);
+    if (!params) continue;
+    if (key.slice(0, sp) === request.method) return h(request, env, params);
+    pathKnown = true;
+  }
   if (pathKnown) return fail(405, 'Method tidak diizinkan.');
   return fail(404, 'Endpoint tidak ditemukan.');
 }
@@ -857,5 +999,8 @@ export default {
       }
     }
     return env.ASSETS.fetch(request);
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runCron(env));
   },
 };
