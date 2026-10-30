@@ -22,6 +22,8 @@ import * as StageSocial from '../stages/social.js'
 import * as StageAdvisor from '../stages/advisor.js'
 import * as StageRadar from '../stages/radar.js'
 import * as StageLeads from '../stages/leads.js'
+import * as StageAIAssistant from '../stages/ai-assistant.js'
+import * as StageSocialMedia from '../stages/social-media.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home',
@@ -57,6 +59,12 @@ export const STAGES = [
   { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot',
     hint: 'Penasihat AI yang membaca angka bisnis Anda. Percakapan tersimpan di perangkat ini.', module: StageAdvisor,
     action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
+  { key: 'social-media', group: 'growth', label: 'Social Media', sub: 'Konten AI & iklan', icon: 'message',
+    hint: 'Buat konten dengan AI, brainstorming ide, jadwal lokal, rekomendasi Meta Ads, dan partnership.', module: StageSocialMedia,
+    action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
+  { key: 'ai-assistant', group: 'growth', label: 'AI Superpowers', sub: 'Asisten & tool', icon: 'bot',
+    hint: 'Asisten AI dengan tool kalkulator, data bisnis, dan format rupiah. Percakapan tersimpan di memori sesi.', module: StageAIAssistant,
+    action: { label: 'Social Media', icon: 'message', to: 'social-media' } },
 ]
 
 const STAGE_KEY = 'satualur_stage'
