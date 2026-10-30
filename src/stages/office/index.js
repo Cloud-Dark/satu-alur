@@ -37,8 +37,8 @@ export const ITEMS = GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.
 
 // Sidebar badges: new Contact Us messages and tickets waiting on staff.
 export async function badgeCounts() {
-  const [contact, tickets] = await Promise.all([adminContactCounts(), adminTicketCounts()])
-  return { contact: contact.new, tickets: tickets.open }
+  const [contact, tickets] = await Promise.allSettled([adminContactCounts(), adminTicketCounts()])
+  return { contact: contact.value?.new || 0, tickets: tickets.value?.open || 0 }
 }
 export const BADGE_TITLES = { contact: (n) => `${n} pesan baru`, tickets: (n) => `${n} tiket menunggu` }
 
@@ -49,8 +49,9 @@ export function render(container, ctx, key) {
   const onUnload = (e) => { if (dirty) { e.preventDefault(); e.returnValue = '' } }
   window.addEventListener('beforeunload', onUnload)
   ctx.signal.addEventListener('abort', () => window.removeEventListener('beforeunload', onUnload))
-  // The box is detached when the shell replaces the view, so a slow load from a left section never paints over the next one.
+  const item = ITEMS.find((i) => i.key === key)
+  // Each visit has its own view, so a slow load from a left section lands in a detached box.
   const box = el('div', { className: 'of-content' })
-  container.replaceChildren(box)
-  ITEMS.find((i) => i.key === key).draw(box, ctx, (d) => { if (box.parentNode === container) dirty = d }, ctx.refreshBadges)
+  container.replaceChildren(el('h1', { className: 'sr-only' }, item.label), box)
+  item.draw(box, ctx, (d) => { dirty = d }, ctx.refreshBadges)
 }

@@ -350,6 +350,12 @@ export function renderShell(root, ctx) {
         countEl.textContent = String(n)
         navButtons.get(k).classList.toggle('has-pending', n > 0)
         countEl.title = n ? (staff ? Office.BADGE_TITLES[k](n) : `${n} menunggu tindakan`) : ''
+        // The count is a bare number; staff items also announce what it counts.
+        if (staff) {
+          const btn = navButtons.get(k)
+          if (n) btn.setAttribute('aria-label', `${btn.querySelector('.flow-name').textContent}, ${Office.BADGE_TITLES[k](n)}`)
+          else btn.removeAttribute('aria-label')
+        }
       }
     } catch { /* counters are best-effort */ }
   }
@@ -374,7 +380,7 @@ export function renderShell(root, ctx) {
   async function show(key, params = {}, { focus = false } = {}) {
     const stage = stages.find((s) => s.key === key) || stages[0]
     // The current stage may veto leaving (unsaved changes); it registers the guard through ctx.setLeaveGuard.
-    if (leaveGuard && !leaveGuard()) return
+    if (leaveGuard && !leaveGuard()) { closeNav({ restore: false }); return }
     leaveGuard = null
     viewCtl?.abort()
     viewCtl = new AbortController()
@@ -417,7 +423,7 @@ export function renderShell(root, ctx) {
         el('div', { className: 'note-body' }, el('p', {}, `Gagal memuat tahap ${stage.label}: ${err.message}`))))
     }
     if (focus && !signal.aborted) {
-      const h = view.querySelector('.page-title, h1')
+      const h = staff ? null : view.querySelector('.page-title, h1')
       ;(h || host).focus({ preventScroll: true })
     }
   }

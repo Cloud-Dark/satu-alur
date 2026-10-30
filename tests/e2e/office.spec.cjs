@@ -92,6 +92,9 @@ module.exports = async function office(t) {
   t.check(names.join() === 'Landing page,Tentang kami,Legal,Paket langganan,Payment gateway,Pelanggan & mitra,Pengguna,Contact Us,Pengaduan CS,Influencer,Permintaan,Kampanye', 'staff sidebar: the twelve office sections', names.join())
   t.check(await p.locator('.side').getByText(/Ringkasan|Media Sosial|Bantuan|Pengaturan|Kantor Satu Alur|Mode demo/).count() === 0, 'staff sidebar: no Ringkasan, Media Sosial, Bantuan, Pengaturan or demo badge')
   t.check(await p.locator('.side-user').count() === 1 && await p.getByRole('button', { name: 'Keluar' }).count() === 1 && await p.locator('.topbar-cta').count() === 0, 'staff: user card and sign-out kept, no topbar action button')
+  t.check(await p.locator('.view > h1').count() === 1 && (await p.locator('.view > h1').textContent()) === 'Landing page', 'staff page has one h1 with the section label')
+  await p.waitForTimeout(500)
+  await t.shot(p, 'landing-editor')
   t.check(await p.locator('.of-nav, .of-nav-select').count() === 0, 'staff: no internal section nav')
   t.check(await crumb() === 'Konten Situs › Landing page', 'topbar breadcrumb shows group › section', await crumb())
 
@@ -460,6 +463,7 @@ module.exports = async function office(t) {
   await p.waitForSelector('.app-shell')
   await p.waitForFunction(() => document.querySelector('.flow-item[data-stage="contact"] .flow-count')?.textContent === '1', null, { timeout: 8000 }).catch(() => {})
   const cbadge = p.locator('.flow-item[data-stage="contact"] .flow-count')
+  t.check(await p.locator('.flow-item[data-stage="contact"]').getAttribute('aria-label') === 'Contact Us, 1 pesan baru', 'contact: the sidebar item announces its count')
   t.check(await cbadge.isVisible() && await cbadge.textContent() === '1' && await cbadge.getAttribute('title') === '1 pesan baru', 'contact: the sidebar item shows a badge of 1 new message')
   await sec('Contact Us')
   const crow = p.locator('.of-contact', { hasText: 'Paket Enterprise' })

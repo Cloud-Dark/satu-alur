@@ -1531,6 +1531,8 @@ body.scroll-lock { overflow: hidden; }
 
 /* Kantor Satu Alur: content editors */
 .of-content { display: grid; gap: var(--s-5); min-width: 0; }
+/* Stacked fields, filters and lists inside editor panels breathe like .form */
+.of-content .panel-body { display: flex; flex-direction: column; gap: var(--s-5); }
 .of-row { display: flex; gap: var(--s-3); align-items: flex-end; }
 .of-row > .field { flex: 1 1 auto; min-width: 0; }
 .of-list { display: grid; gap: var(--s-4); margin-bottom: var(--s-4); }
