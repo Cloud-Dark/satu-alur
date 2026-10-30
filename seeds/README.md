@@ -16,6 +16,41 @@ Berisi **data demo DUMMY** untuk D1. Semua pelanggan, telepon, alamat, pekerja, 
 | `demo-summary.json` | Ringkasan mode penuh per usaha: asumsi `macro`, pendapatan/biaya/laba bulanan, tren nominal vs volume riil, CV, struktur biaya, laba sebelum pajak dan estimasi setelah pajak, headcount, jumlah baris, estimasi tulis. **Sumber tabel dokumen.** |
 | `demo-lean.part1of3.sql` … `part3of3.sql` | Mode `--lean` dibagi 3 file (17.763 baris total). Masing-masing ±34–36 ribu writes bila mengganti seed penuh. Terapkan **satu file per hari** di akun Free. |
 | `demo-lean-summary.json` | Ringkasan mode lean, termasuk `write_estimate`. |
+| `office.sql` | Data contoh Kantor Satu Alur (halaman staf): konten situs, paket Free/Lite/Pro, pelanggan, kontak, tiket, influencer, permintaan, kampanye. 87 baris. Lihat [Data Kantor](#data-kantor-officesql). |
+
+## Data Kantor (`office.sql`)
+
+> **Jangan terapkan ke produksi** sebelum migrasi `0007_social_meta.sql` (dan `0003_workers.sql`) diterapkan ke D1 produksi dan lead memutuskan jadwalnya.
+
+Dibuat oleh `node scripts/seed-office.mjs` (jangan edit `office.sql` manual). Semua data **fiktif**; email pendaftar contoh memakai domain `@contoh.satualur.id`.
+
+| Tabel | Baris | Isi |
+|-------|------:|-----|
+| `site_content` | 5 | `landing` (hero + FAQ, sama dengan teks bawaan `src/landing/content.js`, FAQ paket diperbarui ke Free/Lite/Pro) dan draf `about`, `privacy`, `terms`, `cookies` (ditandai "Draf contoh", perlu ditinjau penasihat hukum). |
+| `subscription_plans` | 3 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi). Kuota AI per bulan di `limits`; setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
+| `payment_settings` | 1 | Penyedia `none`, mode sandbox, **tanpa kunci**. Gateway tetap mati sampai staf mengisi kunci asli di halaman Payment gateway. |
+| `users` | 13 | 9 akun demo (`INSERT OR IGNORE`, tidak mengubah baris yang sudah ada) + 4 pendaftar contoh. |
+| `customer_accounts` | 12 | Paket dan status campuran: aktif, uji coba, tertunggak, berhenti. Pendaftar ke-13 sengaja "Belum diatur". |
+| `user_flags` | 1 | Satu pendaftar contoh ditangguhkan (contoh spam). |
+| `contact_messages` | 6 | Status baru, dibaca, dibalas, arsip. |
+| `support_tickets` / `support_messages` | 5 / 10 | Kategori teknis, tagihan, akun, lainnya; status terbuka sampai ditutup. |
+| `influencers` | 10 | Dengan kontak, handle, tarif (`rates_json`), catatan internal; 1 disembunyikan. |
+| `service_requests` | 8 | 4 kolaborasi + 4 iklan Meta, status baru/diproses/selesai. |
+| `campaigns` / `campaign_influencers` / `campaign_deliverables` | 3 / 4 / 6 | Kampanye berjalan dan selesai dengan konten direncanakan sampai tayang. |
+
+Semua baris memakai id/kunci tetap dan upsert, jadi aman dijalankan ulang. Baris yang dimiliki akun memakai `owner_id` hasil `SELECT id FROM users WHERE email = …`, jadi tetap tepat walau akun demo di database punya UUID lain. Tidak ada akun staf di file ini; buat dengan `npm run staff -- add <username>`.
+
+**Perkiraan tulis D1:** ±87 baris, paling banyak ±260 rows written termasuk entri indeks (jauh di bawah kuota 100.000/hari).
+
+Terapkan di lokal:
+
+```bash
+npm run db:migrate:local
+npx wrangler d1 execute satu-alur-db --local --file seeds/office.sql
+npm run staff -- add <username>
+```
+
+Penomoran migrasi: ada dua file `0003` (`0003_growth_tools.sql` dan `0003_workers.sql`). Wrangler mencatat migrasi per nama file di tabel `d1_migrations`, jadi keduanya diterapkan (dicek di lokal: semua 0001–0007 berstatus ✅). Di produksi, `0003_growth_tools.sql` sudah tercatat; `0003_workers.sql` dan `0007_social_meta.sql` akan ikut diterapkan pada `npm run db:migrate:remote` berikutnya.
 
 ## Akun demo
 
