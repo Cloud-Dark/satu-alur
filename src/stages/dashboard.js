@@ -61,19 +61,11 @@ export async function render(container, ctx = {}) {
   /* ---------------------------------------------------------- Header */
   const syncLine = el('span', { className: 'sync-line' },
     el('span', { className: 'pulse-dot', 'aria-hidden': 'true' }),
-    el('span', {}, `${ctx.isMock ? 'Mode demo · data lokal' : 'Cloudflare D1'} · memuat…`),
+    el('span', {}, 'Memuat…'),
   )
   const refreshBtn = C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost' })
   const name = displayName(ctx.user)
-  const head = el('header', { className: 'page-head dash-head' },
-    el('div', { className: 'page-head-text' },
-      el('span', { className: 'date-pill' }, icon('calendar', { size: 14 }), now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })),
-      el('h1', { className: 'page-title display', tabindex: '-1' },
-        `${greeting(now)}${name ? ', ' : ''}`, name ? el('em', {}, name) : null, '.'),
-      el('p', { className: 'page-desc' }, 'Ringkasan alur kerja dan keuangan Anda, dihitung langsung dari data.'),
-    ),
-    el('div', { className: 'page-head-actions' }, syncLine, refreshBtn),
-  )
+  const head = C.pageHeader({ title: `${greeting(now)}${name ? `, ${name}` : ''}`, actions: [syncLine, refreshBtn], className: 'dash-head' })
 
   const body = el('div', { className: 'dash-body' })
   container.replaceChildren(head, body)
@@ -98,7 +90,7 @@ export async function render(container, ctx = {}) {
   if (ctx.signal?.aborted) return
 
   const syncedAt = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-  syncLine.lastChild.textContent = `${ctx.isMock ? 'Mode demo · data lokal' : 'Terhubung · Cloudflare D1'} · sinkron ${syncedAt}`
+  syncLine.lastChild.textContent = `Diperbarui ${syncedAt}`
 
   const isEmpty = !m.requests.length && !m.offers.length && !m.assignments.length && !m.completions.length && !m.ledger.length
 

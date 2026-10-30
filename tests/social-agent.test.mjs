@@ -62,3 +62,26 @@ test('labels and option lists', () => {
   assert.ok(S.PLATFORMS.length >= 4)
   assert.equal(S.SOCIAL_MARKER, '[agent:social]')
 })
+
+test('Threads is a platform: 500 characters, one topic tag', () => {
+  const t = S.PLATFORMS.find((p) => p.value === 'threads')
+  assert.ok(t, 'threads listed')
+  assert.equal(t.label, 'Threads')
+  assert.equal(t.limit, 500)
+  assert.equal(t.maxTags, 1)
+  assert.equal(S.platformLabel('threads'), 'Threads')
+})
+
+test('capHashtags follows each platform budget', () => {
+  const tags = ['#a', '#b', '#c', '#d', '#e', '#f', '#g']
+  assert.deepEqual(S.capHashtags('threads', tags), ['#a'])
+  assert.deepEqual(S.capHashtags('whatsapp', tags), [])
+  assert.deepEqual(S.capHashtags('x', tags), ['#a', '#b'])
+  assert.equal(S.capHashtags('instagram', tags).length, 7)
+  assert.deepEqual(S.capHashtags('unknown', tags), tags)
+  assert.deepEqual(S.capHashtags('threads', null), [])
+})
+
+test('every platform has a hashtag budget', () => {
+  for (const p of S.PLATFORMS) assert.ok(Number.isInteger(p.maxTags) && p.maxTags >= 0, p.value)
+})

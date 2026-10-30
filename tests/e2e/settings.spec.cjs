@@ -1,5 +1,5 @@
 // E2E: Pengaturan drawer — open/close (Esc, focus return, focus trap), tabs Konektor /
-// Agen AI / Cloud, edits persist in localStorage, "Kembalikan default", mobile sidebar,
+// Agen AI, edits persist in localStorage, "Kembalikan default", mobile sidebar,
 // sidebar collapse. TC-SET-*, FR-020.
 const { loginLive, norm } = require('./lib.cjs')
 
@@ -11,7 +11,7 @@ module.exports = async function settings(t) {
   t.check(await p.getAttribute('.drawer', 'role') === 'dialog' && await p.getAttribute('.drawer', 'aria-modal') === 'true', 'drawer is a modal dialog')
   t.check(await p.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Tutup pengaturan', 'focus moves to the close button')
   const tabs = await p.$$eval('.drawer .seg-btn', (b) => b.map((x) => x.textContent.trim()))
-  t.check(tabs.join('|') === 'Konektor|Agen AI|Cloud', 'tabs Konektor, Agen AI, Cloud', tabs.join('|'))
+  t.check(tabs.join('|') === 'Konektor|Agen AI', 'tabs Konektor, Agen AI (no technical Cloud tab)', tabs.join('|'))
 
   // Konektor: WhatsApp toggle persists
   await p.click('label[for="whatsapp-enabled"]')
@@ -39,10 +39,7 @@ module.exports = async function settings(t) {
   await p.waitForTimeout(300)
   t.check(/agen penawaran/i.test(await p.inputValue('#offer-prompt')), '"Kembalikan default" restores the default prompt')
 
-  // Cloud
-  await p.click('.drawer .seg-btn[data-value="cloud"]')
-  await p.waitForTimeout(200)
-  t.check(/Mock lokal/.test(norm(await p.textContent('.drawer'))), 'Cloud tab shows mock mode')
+  t.check(!/Cloudflare|localStorage|JSON|MCP/.test(norm(await p.textContent('.drawer'))), 'drawer has no technical wording')
 
   // focus trap: Tab stays inside the drawer
   for (let i = 0; i < 15; i++) await p.keyboard.press('Tab')

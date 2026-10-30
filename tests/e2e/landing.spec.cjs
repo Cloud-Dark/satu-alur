@@ -78,7 +78,8 @@ module.exports = async function landing(t) {
   await m.click('[data-menu-open]')
   await m.waitForTimeout(400)
   await m.click('.lp-menu-nav a[data-scroll="harga"]')
-  await m.waitForTimeout(1500)
+  // Smooth scroll starts after the menu's close transition; wait for it instead of a fixed delay.
+  await m.waitForFunction(() => scrollY > 500, null, { timeout: 5000 }).catch(() => {})
   const mm = await m.evaluate(() => ({ hidden: document.querySelector('[data-menu]').hidden, hash: location.hash, y: scrollY, lock: document.documentElement.classList.contains('lp-lock') }))
   t.check(mm.hidden && !mm.lock, 'mobile: menu link closes menu and unlocks scroll', JSON.stringify(mm))
   t.check(mm.y > 500 && (mm.hash === '#/' || mm.hash === ''), 'mobile: menu link scrolls and keeps hash', JSON.stringify(mm))

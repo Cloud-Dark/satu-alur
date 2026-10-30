@@ -1,11 +1,10 @@
 /**
  * Settings (rendered inside the shell's right drawer):
- * MCP connectors (WhatsApp WAPilot, Email SMTP), agent prompts + parameters,
- * cloud status. Everything is stored in this browser's localStorage.
+ * connectors (WhatsApp WAPilot, Email SMTP) and agent prompts + parameters.
+ * Everything is stored in this browser's localStorage.
  */
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
-import { isUsingMockCloud } from '../cloud.js'
 import { loadModels } from '../ai/models.js'
 
 const { el, icon } = C
@@ -90,13 +89,13 @@ export function render(container) {
   if (!currentTab) {
     try { currentTab = localStorage.getItem(STORAGE_KEYS.tab) || 'mcp' } catch { currentTab = 'mcp' }
   }
+  if (!['mcp', 'agent'].includes(currentTab)) currentTab = 'mcp'
   const tabs = C.segmented({
     label: 'Bagian pengaturan',
     value: currentTab,
     options: [
       { value: 'mcp', label: 'Konektor' },
       { value: 'agent', label: 'Agen AI' },
-      { value: 'cloud', label: 'Cloud' },
     ],
     onChange: (v) => {
       currentTab = v
@@ -111,7 +110,6 @@ export function render(container) {
   function draw() {
     content.replaceChildren()
     if (currentTab === 'agent') renderAgentTab(content, draw)
-    else if (currentTab === 'cloud') renderCloudTab(content)
     else renderMcpTab(content)
   }
   draw()
@@ -179,7 +177,7 @@ function renderMcpTab(container) {
   container.append(
     el('p', { className: 'set-lead' }, 'Konektor dipakai untuk mengirim notifikasi ke pelanggan dan tenaga kerja. Kredensial tersimpan lokal di browser ini.'),
     setSection({
-      num: 'MCP · 01', title: 'WhatsApp (WAPilot)', desc: 'Notifikasi otomatis lewat WhatsApp Business.',
+      num: 'Konektor · 01', title: 'WhatsApp (WAPilot)', desc: 'Notifikasi otomatis lewat WhatsApp Business.',
       toggle: switchControl({ id: 'whatsapp-enabled', label: 'Aktif', checked: wa.enabled, onChange: (v) => { wa.enabled = v; save() } }),
     },
       textField('WAPilot API key', 'whatsapp-apikey', wa.apiKey, 'password', (v) => { wa.apiKey = v; save() }, 'Dari dasbor WAPilot.'),
@@ -191,7 +189,7 @@ function renderMcpTab(container) {
       el('div', { className: 'form-actions' }, C.button({ label: 'Periksa konfigurasi', icon: 'plug', size: 'sm', onClick: () => testConnection('whatsapp', wa) })),
     ),
     setSection({
-      num: 'MCP · 02', title: 'Email (SMTP)', desc: 'Kirim penawaran, invoice, dan laporan lewat email.',
+      num: 'Konektor · 02', title: 'Email (SMTP)', desc: 'Kirim penawaran, invoice, dan laporan lewat email.',
       toggle: switchControl({ id: 'email-enabled', label: 'Aktif', checked: em.enabled, onChange: (v) => { em.enabled = v; save() } }),
     },
       el('div', { className: 'form-row form-row-2-1' },
@@ -242,7 +240,7 @@ function renderAgentTab(container, redraw) {
   }).catch(() => C.setOptions(modelSel.input, [{ value: 'auto', label: 'Otomatis' }], 'auto'))
 
   container.append(
-    promptBlock('Agen · 01', 'Prompt penawaran', 'Instruksi untuk AI saat menyusun penawaran (tahap 02). Output wajib JSON: scope, price, terms, notes.', 'offerPrompt', 'offer', 'offer-prompt'),
+    promptBlock('Agen · 01', 'Prompt penawaran', 'Instruksi untuk AI saat menyusun penawaran (tahap 02). Hasilnya berisi ruang lingkup, harga, syarat, dan catatan.', 'offerPrompt', 'offer', 'offer-prompt'),
     promptBlock('Agen · 02', 'Prompt laporan', 'Instruksi untuk AI saat menjelaskan laporan (tahap 06). Output HTML disanitasi sebelum ditampilkan.', 'reportPrompt', 'report', 'report-prompt'),
     setSection({ num: 'Agen · 03', title: 'Parameter', desc: 'Pengaturan teknis output AI.' },
       rangeField({ label: 'Temperature', id: 'agent-temp', value: settings.temperature, min: 0, max: 1, step: 0.1, hint: '0 = konsisten, 1 = lebih kreatif.', onChange: (v) => { settings.temperature = parseFloat(v); save() } }),
@@ -250,31 +248,6 @@ function renderAgentTab(container, redraw) {
       modelSel.wrap,
     ),
   )
-}
-
-/* ----------------------------------------------------------- Cloud tab */
-function renderCloudTab(container) {
-  const mock = isUsingMockCloud()
-  container.append(
-    setSection({ num: 'Cloud · 01', title: 'Infrastruktur', desc: 'Satu Alur berjalan di Cloudflare Workers + D1. Data dan AI diakses lewat API same-origin (/api), tanpa konfigurasi tambahan di browser.' },
-      el('div', { className: `cloud-status ${mock ? 'is-demo' : 'is-live'}` },
-        el('span', { className: 'pulse-dot mode-dot', 'aria-hidden': 'true' }),
-        el('div', {},
-          el('span', { className: 'set-num' }, 'Mode aktif'),
-          el('p', { className: 'cloud-mode' }, mock ? 'Mock lokal — data disimpan di browser ini' : 'Cloudflare Worker + D1'),
-        ),
-      ),
-      C.defList([
-        ['Database', mock ? 'localStorage (satualur_mock_v1)' : 'Cloudflare D1'],
-        ['AI', mock ? 'Simulasi streaming lokal' : 'Workers AI melalui /api/llm'],
-        ['Sesi', mock ? 'Di memori; hilang saat halaman dimuat ulang' : 'Token di localStorage'],
-      ]),
-    ),
-  )
-  if (mock) {
-    container.append(el('div', { className: 'note note-info' }, icon('info'),
-      el('div', { className: 'note-body' }, el('p', {}, 'Mode demo cocok untuk mencoba alur. Data contoh dibuat otomatis pada kunjungan pertama.'))))
-  }
 }
 
 /* ---------------------------------------------- Public API (ai/agent.js) */

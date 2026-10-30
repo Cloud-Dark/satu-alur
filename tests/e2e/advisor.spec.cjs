@@ -64,6 +64,24 @@ module.exports = async function advisor(t) {
   const flags = await p.$$eval('.adv-flag', (f) => f.map((x) => x.textContent.trim()))
   t.check(flags.some((f) => /henti/i.test(f)), 'stopped answer flagged', flags.join(' | '))
 
+  // leaving the page mid-answer: the answer keeps streaming and is there on return
+  const nBg = await count()
+  await p.fill('.adv-input', 'Pekerjaan mana yang tertahan paling lama?')
+  await p.press('.adv-input', 'Enter')
+  await p.waitForTimeout(250)
+  await goStage(p, 'dashboard')
+  await p.waitForTimeout(400)
+  await goStage(p, 'advisor')
+  await p.waitForSelector('.adv-grid')
+  const resumed = await p.evaluate(() => Boolean(document.querySelector('.adv-msg.is-assistant[aria-busy="true"]')) || document.querySelector('.adv-stop')?.hidden === false)
+  await waitIdle()
+  await p.waitForTimeout(300)
+  t.check(await count() === nBg + 2, 'answer finished in the background while away (question + answer shown on return)', `${await count()} vs ${nBg + 2}, resumedMidStream=${resumed}`)
+  const stored = await p.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('satualur_advisor_v1:')).map((k) => JSON.parse(localStorage.getItem(k)).length))
+  t.check(stored.length === 1 && stored[0] >= nBg + 2, 'conversation stored in the browser under a per-user key', JSON.stringify(stored))
+  const foot = norm(await p.$$eval('.adv-msg-foot', (f) => f.map((x) => x.textContent).join(' | ')))
+  t.check(!/@cf\/|llama|mock-/i.test(foot), 'no model ids shown under answers', foot.slice(0, 120))
+
   // calculator (side panel tab)
   await p.click('.adv-tab[data-tab="calc"]')
   t.check(await p.isVisible('.adv-preset[data-pct="2"]') && !(await p.isVisible('.adv-snap')), 'Kalkulator tab shows the calculator and hides the snapshot')
@@ -88,7 +106,7 @@ module.exports = async function advisor(t) {
   t.check(autoCount >= 4, 'other agents keep their messages (Otomatis view)', autoCount)
   t.check(/\d/.test(norm(await p.textContent('.adv-stat-row').catch(() => ''))), 'usage stats shown')
 
-  // memory survives reload (mock D1 in localStorage)
+  // memory survives reload (browser storage)
   await p.reload({ waitUntil: 'load' })
   await loginLive(p, t.base)
   await goStage(p, 'advisor')

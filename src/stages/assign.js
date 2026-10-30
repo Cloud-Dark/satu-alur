@@ -42,7 +42,7 @@ export async function render(container, ctx = {}) {
   tabs.classList.add('workspace-tabs')
 
   container.replaceChildren(
-    C.pageHeader({ num: '03', label: 'Penugasan', title: 'Penugasan Pintar', em: 'Pintar', description: 'Tugaskan petugas dengan AI matching, visualisasi peta, dan tracking performa.' }),
+    C.pageHeader({ title: 'Penugasan Pintar' }),
     tabs, status, host,
   )
 

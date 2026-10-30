@@ -3,12 +3,6 @@
    Built only on tokens.css variables; light/dark come for free.
    ========================================================= */
 
-.adv-pill { padding-left: 8px; }
-.adv-pill-ico {
-  width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%;
-  background: var(--accent-50); color: var(--accent-600); border: 1px solid var(--accent-100);
-}
-:root[data-theme='dark'] .adv-pill-ico { color: var(--accent); }
 .adv-model-pill { max-width: 320px; }
 .adv-model-pill span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

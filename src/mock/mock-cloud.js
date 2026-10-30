@@ -959,30 +959,30 @@ const mockLLM = {
   models: {
     async list() {
       return { data: [
-        { id: 'mock-gpt-4o', name: 'GPT-4o (Mock)', disabled: false, temperature: 0.7, supportsToolCall: false },
-        { id: 'mock-claude-3', name: 'Claude 3 (Mock)', disabled: false, temperature: 0.7 },
+        { id: 'mock-gpt-4o', name: 'GPT-4o (Mock)', disabled: false, temperature: 0.7, supportsToolCall: true, contextWindow: 128000 },
+        { id: 'mock-claude-3', name: 'Claude 3 (Mock)', disabled: false, temperature: 0.7, supportsToolCall: true, contextWindow: 200000 },
+        { id: 'mock-gpt-4o-mini', name: 'GPT-4o Mini (Mock)', disabled: false, temperature: 0.7, supportsToolCall: false, contextWindow: 128000 },
       ], error: null }
     }
   },
   chat: {
     completions: {
       create({ messages, stream, response_format }) {
-        const userMsg = messages.find(m => m.role === 'user')?.content || ''
-        const isOffer = messages.some(m => m.role === 'system' && m.content.includes('agen penawaran')) || userMsg.includes('Permintaan jasa')
-        if (isOffer) return mockStreamOffer(parseRequest(userMsg))
+        const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || ''
+        const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
+        if (system.includes('agen penawaran') || userMsg.includes('Permintaan jasa')) return mockStreamOffer(parseRequest(userMsg))
         if (response_format?.type === 'json_schema' || response_format?.type === 'json_object') {
           return streamText(schemaJson(response_format), { step: 10, delay: 14 })
         }
-        const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
         const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
         if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
         if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
-        const sysMsg = system
-        if (sysMsg.includes('analis laporan') || userMsg.includes('Data laporan')) return mockStreamExplain(parseReport(userMsg))
-        if (sysMsg.includes('social media') || sysMsg.includes('media sosial')) return mockStreamSocial(lastUserText(messages))
-        if (sysMsg.includes('pertumbuhan') || sysMsg.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
-        if (sysMsg.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
-        if (sysMsg.includes('Asisten AI') || sysMsg.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
+        // Untagged prompts from Media Sosial, AI Superpowers and Pertumbuhan (src/ai/superpowers.js)
+        if (system.includes('analis laporan') || userMsg.includes('Data laporan')) return mockStreamExplain(parseReport(userMsg))
+        if (system.includes('pertumbuhan') || system.includes('business development')) return mockStreamPertumbuhan(lastUserText(messages))
+        if (system.includes('social media') || system.includes('media sosial') || ['caption', 'brainstorm', 'hashtag', 'iklan'].some((w) => userMsg.includes(w))) return mockStreamSocial(lastUserText(messages))
+        if (system.includes('analis bisnis')) return mockStreamAnalyst(lastUserText(messages))
+        if (system.includes('Asisten AI') || system.includes('asisten AI')) return mockStreamGeneral(lastUserText(messages))
         return mockStreamExplain(parseReport(userMsg))
       }
     }

@@ -20,7 +20,7 @@ const http = require('http')
 const { makeContext } = require('./lib.cjs')
 
 const ROOT = process.env.E2E_ROOT ? path.resolve(process.env.E2E_ROOT) : path.resolve(__dirname, '..', '..')
-const PORT = 5199
+const PORT = Number(process.env.E2E_PORT) || 5199
 const filters = process.argv.slice(2)
 
 let chromium

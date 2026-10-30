@@ -19,11 +19,15 @@ import { loadFlow, notifyDataChanged } from './data.js'
 import { validateOffer } from '../domain/rules.js'
 import { PRESET_CHIPS, MAX_KEYWORDS, DEFAULT_RADIUS_KM, MAX_RADIUS_KM, normalizeKeyword, inIndonesia } from '../leads/osm.js'
 import {
-  serviceStats, serviceNames, scoreLead, estimateValue, heuristicRank, sortLeads, SORTS,
+  serviceStats, serviceNames, scoreLead, estimateValue, sortLeads, SORTS,
   DEFAULT_CONVERSION, MIN_CONVERSION, MAX_CONVERSION,
 } from '../leads/scoring.js'
-import { getSources, geocode, searchLeads } from '../leads/api.js'
-import { rankLeads, draftLeadOffer, AI_RANK_LIMIT } from '../ai/leads-agent.js'
+import { getSources, geocode } from '../leads/api.js'
+import { draftLeadOffer, AI_RANK_LIMIT } from '../ai/leads-agent.js'
+import {
+  JOB_EVENT, startLeadJob, cancelLeadJob, getLeadJob, isJobRunning, setLeadsPageMounted,
+  loadLeadsStore, saveLeadsStore, removeHistory, lastEntry,
+} from '../leads/job.js'
 
 const { el, icon } = C
 
@@ -40,7 +44,7 @@ export const LEAD_STATUSES = [
   { value: 'ditolak', label: 'Ditolak', tone: 'neutral' },
 ]
 const statusOf = (v) => LEAD_STATUSES.find((s) => s.value === v) || LEAD_STATUSES[0]
-const SOURCE_LABEL = { osm: 'OpenStreetMap', google: 'Google Places', demo: 'Data contoh (mode demo)' }
+const SOURCE_LABEL = { osm: 'peta', google: 'Google', demo: 'data contoh' }
 
 const store = {
   get(k, fallback = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback } catch { return fallback } },
@@ -128,16 +132,7 @@ export async function render(container, ctx = {}) {
   const sourcesReady = getSources({ signal }).then((s) => { sources = s || sources }).catch(() => {})
 
   /* ------------------------------------------------------------- Header */
-  const header = el('header', { className: 'page-head' },
-    el('div', { className: 'page-head-text' },
-      el('span', { className: 'step-pill ld-pill' },
-        el('span', { className: 'ld-pill-ico', 'aria-hidden': 'true' }, icon('mapPin', { size: 14 })),
-        el('span', { className: 'step-text' }, 'Pertumbuhan', el('span', { 'aria-hidden': 'true' }, '·'), el('b', {}, 'Pencari prospek')),
-      ),
-      el('h1', { className: 'page-title display', tabindex: '-1' }, 'Pencari ', el('em', {}, 'prospek')),
-      el('p', { className: 'page-desc' }, 'Pilih titik dan radius, tentukan jenis usaha yang ingin Anda dekati. Satu Alur mencari usaha di peta, AI menilai kecocokannya dengan layanan Anda, lalu membantu menyusun draf penawaran. Tidak ada pesan yang dikirim otomatis.'),
-    ),
-  )
+  const header = C.pageHeader({ title: 'Pencari prospek' })
 
   /* --------------------------------------------------------------- Tabs */
   const TABS = [
@@ -407,42 +402,43 @@ export async function render(container, ctx = {}) {
   const sourceBox = el('div', { className: 'ld-source' })
   function drawSource() {
     if (ctx.isMock) {
-      sourceBox.replaceChildren(el('span', { className: 'field-label' }, el('span', {}, 'Sumber data')),
-        el('span', { className: 'tag status status-live' }, el('i', { className: 'status-dot', 'aria-hidden': 'true' }), 'Data contoh (mode demo)'),
-        el('span', { className: 'field-hint' }, 'Mode demo tidak memanggil peta sungguhan. Hasil dibuat acak di sekitar titik.'))
+      sourceBox.hidden = false
+      sourceBox.replaceChildren(el('span', { className: 'field-hint' }, 'Mode demo: hasil berupa data contoh di sekitar titik.'))
       return
     }
-    const children = [el('span', { className: 'field-label' }, el('span', {}, 'Sumber data'))]
-    if (sources.google) {
-      children.push(C.segmented({
+    sourceBox.hidden = !sources.google
+    if (!sources.google) { sourceBox.replaceChildren(); return }
+    sourceBox.replaceChildren(el('span', { className: 'field-label' }, el('span', {}, 'Sumber data')),
+      C.segmented({
         label: 'Sumber data', value: state.source,
-        options: [{ value: 'osm', label: 'OpenStreetMap' }, { value: 'google', label: 'Google Places' }],
+        options: [{ value: 'osm', label: 'Peta terbuka' }, { value: 'google', label: 'Google' }],
         onChange: (v) => { state.source = v },
       }))
-    } else {
-      children.push(el('span', { className: 'tag' }, icon('mapPin', { size: 13 }), 'OpenStreetMap'))
-    }
-    children.push(el('span', { className: 'field-hint' }, 'Data terbuka OpenStreetMap. Cakupan usaha di Indonesia belum lengkap, terutama usaha kecil dan nomor telepon.'))
-    sourceBox.replaceChildren(...children)
   }
 
   const formMsg = C.message()
   const searchBtn = C.button({ label: 'Cari prospek', icon: 'search', variant: 'primary', type: 'submit', className: 'ld-search-btn' })
-  const controlsForm = el('form', { className: 'form ld-form', novalidate: true, 'aria-label': 'Kriteria pencarian prospek' },
+  // display: contents, so disabling it during a search locks every control.
+  const controlsSet = el('fieldset', { className: 'ld-fieldset' },
     locField, radiusField, kwField, sourceBox,
     el('details', { className: 'ld-more' },
       el('summary', {}, icon('chevronRight', { size: 14 }), 'Dasar perhitungan nilai'),
       el('div', { className: 'ld-more-body' }, valueBox, convField)),
+  )
+  const controlsForm = el('form', { className: 'form ld-form', novalidate: true, 'aria-label': 'Kriteria pencarian prospek' },
+    controlsSet,
     formMsg,
     el('div', { className: 'form-actions' }, searchBtn),
   )
-  controlsForm.addEventListener('submit', (e) => { e.preventDefault(); runSearch() })
+  controlsForm.addEventListener('submit', (e) => { e.preventDefault(); if (!locked) runSearch() })
   const controlsPanel = C.panel({ title: 'Area & kriteria', meta: 'Titik, radius, jenis usaha', raised: true, className: 'form-panel ld-controls' }, controlsForm)
 
   /* ================================================================ Map */
   const mapEl = el('div', { className: 'ld-map', role: 'region', 'aria-label': 'Peta prospek. Klik peta untuk memilih titik pencarian.' })
   const mapNote = el('div', { className: 'ld-map-note', 'aria-hidden': 'true' }, icon('mapPin', { size: 14 }), 'Klik peta untuk memilih titik')
-  const mapWrap = el('div', { className: 'ld-map-wrap' }, mapEl, mapNote)
+  const mapBusy = el('div', { className: 'ld-map-busy', hidden: true },
+    el('span', { className: 'ld-map-busy-pill' }, el('span', { className: 'ld-spinner', 'aria-hidden': 'true' }), 'Mengambil data…'))
+  const mapWrap = el('div', { className: 'ld-map-wrap', 'aria-busy': 'false' }, mapEl, mapNote, mapBusy)
   const mapFallback = el('div', { className: 'ld-map-fallback', hidden: true })
   const mapPanel = el('section', { className: 'panel ld-map-panel', 'aria-label': 'Peta' }, mapWrap, mapFallback)
 
@@ -474,17 +470,26 @@ export async function render(container, ctx = {}) {
     map.attributionControl.setPrefix(false)
     markerLayer = L.layerGroup().addTo(map)
     map.on('click', (e) => {
+      if (locked) return
       const p = { lat: e.latlng.lat, lon: e.latlng.lng }
       if (!inIndonesia(p.lat, p.lon)) { formMsg.show('warn', 'Titik di luar Indonesia. Pilih titik di wilayah Indonesia.'); return }
       setPoint(p, 'Titik di peta')
     })
-    onAbort(() => { map?.remove(); map = null })
+    // Stop pan/zoom animations first: removing a map mid-animation makes
+    // Leaflet's pending transition callbacks read positions of removed panes.
+    onAbort(() => {
+      const m = map
+      map = null
+      if (!m) return
+      try { m.stop(); m.off(); m.remove() } catch { /* already torn down */ }
+    })
     const onTheme = () => drawCircle()
     window.addEventListener('themechange', onTheme)
     onAbort(() => window.removeEventListener('themechange', onTheme))
     drawCircle()
     if (state.point) fitCircle({ animate: false })
     drawMarkers()
+    if (locked) { locked = false; setLocked(true) }
   }
 
   function drawCircle() {
@@ -609,7 +614,7 @@ export async function render(container, ctx = {}) {
     const src = state.search?.source
     sortSeg.hidden = vis.length < 2
     resultsMeta.textContent = state.search
-      ? `${vis.length} prospek${hid.length ? ` · ${hid.length} disaring` : ''} · ${SOURCE_LABEL[src] || src}${state.search.cached ? ' · dari cache 24 jam' : ''}`
+      ? `${vis.length} prospek${hid.length ? ` · ${hid.length} disaring` : ''}${src === 'demo' ? ' · data contoh' : ''}`
       : 'Belum ada pencarian'
     drawInfo()
     const shown = resultsPager.slice(vis, { resetKey: state.sort, focusIndex })
@@ -634,12 +639,12 @@ export async function render(container, ctx = {}) {
         el('p', {}, el('b', {}, 'Data contoh (mode demo). '), 'Nama, lokasi, dan kontak di bawah dibuat acak di sekitar titik Anda, bukan usaha sungguhan.'))))
     } else if (src === 'osm') {
       nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }),
-        el('span', {}, `Data dari OpenStreetMap (${state.search.attribution}). Cakupan usaha di Indonesia belum lengkap dan kontak sering kosong; periksa ulang sebelum menghubungi.${state.search.truncated ? ' Hasil dibatasi 150 terdekat; perkecil radius untuk area padat.' : ''}`)))
+        el('span', {}, `Data usaha di peta belum lengkap dan kontak sering kosong; periksa ulang sebelum menghubungi.${state.search.truncated ? ' Hasil dibatasi 150 terdekat; perkecil radius untuk area padat.' : ''}`)))
     } else if (src === 'google') {
-      nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, 'Data dari Google Places. Hasil tidak disimpan di server; simpan hanya prospek yang Anda pilih.')))
+      nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, 'Data dari Google. Simpan hanya prospek yang Anda pilih.')))
     }
     if (state.rankBasis === 'heuristik') {
-      nodes.push(el('p', { className: 'ld-fine' }, icon('alert', { size: 14 }), el('span', {}, 'Penilaian AI tidak tersedia untuk pencarian ini; relevansi memakai aturan sederhana (kecocokan jenis usaha dengan layanan Anda).')))
+      nodes.push(el('p', { className: 'ld-fine' }, icon('alert', { size: 14 }), el('span', {}, 'Penilaian AI tidak tersedia; relevansi memakai kecocokan jenis usaha dengan layanan Anda.')))
     } else if (state.rankBasis === 'mixed') {
       nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, `AI menilai ${Math.min(AI_RANK_LIMIT, state.leads.length)} prospek terdekat; sisanya dinilai dengan aturan sederhana.`)))
     }
@@ -708,107 +713,203 @@ export async function render(container, ctx = {}) {
   }
 
   /* --------------------------------------------------------- Run search */
-  let searchCtl = null
-  onAbort(() => searchCtl?.abort())
+  // The search runs in src/leads/job.js so it survives page changes; this
+  // page only starts it and draws whatever state the job is in.
+  const owner = ctx.user?.id || 'anon'
+  let stored = loadLeadsStore(owner)
+  let consoleUI = null
 
-  async function runSearch() {
+  function runSearch() {
     formMsg.hide()
     const errs = []
     if (!state.point) errs.push('Pilih titik pencarian: cari alamat, pakai lokasi Anda, atau klik peta.')
     if (!state.keywords.length) errs.push('Pilih minimal satu kriteria usaha.')
     if (errs.length) { formMsg.show('danger', errs[0], errs.length > 1 ? errs.slice(1) : undefined); return }
-
-    searchCtl?.abort()
-    const ac = new AbortController()
-    searchCtl = ac
-    const restore = C.setBusy(searchBtn, 'Mencari…')
-    state.leads = []
-    state.search = null
     state.focusId = null
-    state.rankBasis = null
+    state.showHidden = false
     resultsPager.reset()
-    resultsList.replaceChildren()
-    hiddenToggle.hidden = true
-    sortSeg.hidden = true
-    resultsInfo.replaceChildren()
-    drawMarkers()
-    const srcName = ctx.isMock ? 'data contoh' : state.source === 'google' ? 'Google Places' : 'OpenStreetMap'
-    statusSlot.replaceChildren(statusLine(`Mencari ${state.keywords.join(', ')} dalam ${km(state.radiusKm)} di ${srcName}…`), C.skeletonRows(3))
-    resultsMeta.textContent = 'Mencari…'
+    consoleUI = null
+    startLeadJob({
+      owner,
+      isMock: Boolean(ctx.isMock),
+      criteria: { point: state.point, pointLabel: state.pointLabel, radiusKm: state.radiusKm, keywords: state.keywords, source: state.source },
+      prepare: async () => {
+        await businessReady
+        if (!model) { try { await modelReady } catch { /* no model */ } }
+        return { services: servicesForAI(), model }
+      },
+    })
     if (window.matchMedia('(max-width: 1023px)').matches) resultsPanel.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })
+  }
 
-    let res
-    try {
-      res = await searchLeads({ lat: state.point.lat, lon: state.point.lon, radiusKm: state.radiusKm, keywords: state.keywords, source: ctx.isMock ? 'osm' : state.source, signal: ac.signal })
-    } catch (err) {
-      restore()
-      if (err.name === 'AbortError') return
-      statusSlot.replaceChildren()
-      resultsMeta.textContent = 'Pencarian gagal'
-      resultsInfo.replaceChildren(C.errorState(err.message))
-      return
-    }
-    state.search = res
-    await businessReady
-    const svc = servicesForAI()
-    const svcNames = svc.map((s) => s.name)
-    const raw = res.results || []
-    if (!raw.length) {
-      restore()
-      statusSlot.replaceChildren()
-      resultsMeta.textContent = `0 prospek · ${SOURCE_LABEL[res.source] || res.source}`
+  /** Shows a stored search (from the job or the history) without a request. */
+  function showEntry(entry, { fit = false } = {}) {
+    state.search = entry.search
+    state.rankBasis = entry.rankBasis
+    state.leads = scoreAll(entry.leads)
+    activeEntryId = entry.id
+    statusSlot.replaceChildren()
+    if (!state.leads.length) {
+      resultsMeta.textContent = '0 prospek'
+      resultsList.replaceChildren()
+      sortSeg.hidden = true
+      hiddenToggle.hidden = true
+      drawMarkers()
       resultsInfo.replaceChildren(C.emptyState({
         kicker: 'Tidak ada hasil', iconName: 'search',
         title: 'Tidak ada usaha yang cocok di area ini.',
-        body: 'OpenStreetMap belum memetakan semua usaha. Perbesar radius, pindahkan titik ke pusat keramaian, atau coba kriteria lain.',
+        body: 'Peta belum mencakup semua usaha. Perbesar radius, pindahkan titik ke pusat keramaian, atau coba kriteria lain.',
       }))
-      return
-    }
-
-    // Show heuristic results right away; AI refines them below.
-    state.leads = scoreAll(raw.map((l) => ({ ...l, ai: heuristicRank(l, svcNames) })))
-    state.rankBasis = 'heuristik'
-    drawResults()
-    if (map && circle) fitCircle()
-
-    if (!model) { try { await modelReady } catch { /* handled below */ } }
-    if (!model || ac.signal.aborted) {
-      restore()
-      statusSlot.replaceChildren()
+    } else {
       drawResults()
+      if (fit && map && circle) fitCircle()
+    }
+    drawHistory()
+  }
+
+  let lastStatus = null
+  function syncJob(j) {
+    const running = isJobRunning(j)
+    setLocked(running)
+    if (!j) return
+    const changed = j.status !== lastStatus
+    lastStatus = j.status
+    if (j.status === 'fetching') {
+      if (!changed) return
+      state.leads = []
+      state.search = null
+      state.rankBasis = null
+      resultsList.replaceChildren()
+      hiddenToggle.hidden = true
+      sortSeg.hidden = true
+      resultsInfo.replaceChildren()
+      drawMarkers()
+      const stop = C.button({ label: 'Batalkan', icon: 'x', size: 'sm', variant: 'ghost', onClick: () => cancelLeadJob() })
+      statusSlot.replaceChildren(el('div', { className: 'ld-status-row' }, statusLine(`Mencari ${j.criteria.keywords.join(', ')} dalam ${km(j.criteria.radiusKm)}…`), stop), C.skeletonRows(3))
+      resultsMeta.textContent = 'Mencari…'
       return
     }
-    const ui = C.aiConsole({ model: model.id })
-    ui.onStop(() => ac.abort())
-    ui.setStatus(`Menilai ${Math.min(AI_RANK_LIMIT, raw.length)} prospek…`, true)
-    ui.write('')
-    ui.root.classList.add('ld-console')
-    statusSlot.replaceChildren(ui.root)
-    try {
-      const ranked = await abortable(rankLeads({
-        leads: raw, services: svc, criteria: state.keywords, modelId: model.id, signal: ac.signal,
-        onChunk: (_d, full) => { if (!ac.signal.aborted) ui.write(full) },
-      }), ac.signal)
-      ui.done()
-      if (ranked.aiCount === 0) {
-        ui.setStatus(ctx.isMock ? 'Demo: tanpa nilai AI' : 'Tidak terbaca', false)
-        state.rankBasis = 'heuristik'
-      } else {
-        ui.setStatus(`${ranked.aiCount} dinilai AI`, false)
-        state.rankBasis = ranked.aiCount < raw.length ? 'mixed' : 'ai'
-        state.leads = scoreAll(ranked.leads)
+    if (j.status === 'ranking') {
+      if (changed) {
+        state.search = j.search
+        state.rankBasis = j.rankBasis
+        state.leads = scoreAll(j.leads)
+        drawResults()
+        if (map && circle) fitCircle()
+        consoleUI = C.aiConsole({ model: 'Penilai prospek' })
+        consoleUI.onStop(() => cancelLeadJob())
+        consoleUI.setStatus(`Menilai ${Math.min(AI_RANK_LIMIT, j.aiTotal)} prospek…`, true)
+        consoleUI.root.classList.add('ld-console')
+        statusSlot.replaceChildren(consoleUI.root)
       }
-      ui.root.classList.add('is-folded')
-    } catch (err) {
-      ui.done()
-      ui.setStatus(err.name === 'AbortError' ? 'Dihentikan' : 'Gagal', false)
-      ui.root.classList.add('is-folded')
-      if (err.name !== 'AbortError') showToast(err.message, 'error')
-    } finally {
-      restore()
-      if (searchCtl === ac) searchCtl = null
+      consoleUI?.write(j.aiText || '')
+      return
     }
-    if (!signal?.aborted) drawResults()
+    if (!changed) return
+    consoleUI?.done()
+    if (j.status === 'done' && j.entry) {
+      stored = loadLeadsStore(owner)
+      const ui = consoleUI
+      showEntry(j.entry)
+      if (ui) {
+        ui.setStatus(j.aiCount > 0 ? `${j.aiCount} dinilai AI` : 'Penilaian AI tidak tersedia', false)
+        ui.root.classList.add('is-folded')
+        statusSlot.replaceChildren(ui.root)
+      }
+      if (j.error) showToast(j.error, 'error')
+    } else if (j.status === 'error') {
+      statusSlot.replaceChildren()
+      resultsMeta.textContent = 'Pencarian gagal'
+      resultsInfo.replaceChildren(C.errorState(j.error || 'Pencarian gagal.'))
+    } else if (j.status === 'cancelled') {
+      statusSlot.replaceChildren()
+      const prev = lastEntry(stored)
+      if (prev) showEntry(prev)
+      else { resultsMeta.textContent = 'Pencarian dibatalkan'; state.leads = []; state.search = null; emptyResults(); drawMarkers() }
+      showToast('Pencarian dibatalkan.', 'info')
+    }
+    consoleUI = null
+  }
+
+  /* ------------------------------------------------------------ History */
+  let activeEntryId = null
+  const historyList = el('ul', { className: 'ld-history-list' })
+  const historyBox = el('div', { className: 'ld-history', hidden: true },
+    el('span', { className: 'field-label' }, el('span', {}, 'Pencarian terakhir')),
+    historyList)
+  const ago = (iso) => {
+    const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+    if (!Number.isFinite(m) || m < 1) return 'baru saja'
+    if (m < 60) return `${m} mnt lalu`
+    const h = Math.round(m / 60)
+    if (h < 24) return `${h} jam lalu`
+    return C.formatDate(iso)
+  }
+  function drawHistory() {
+    const items = stored.history
+    historyBox.hidden = items.length === 0
+    historyList.replaceChildren(...items.map((e) => {
+      const n = e.leads.filter((l) => l.ai?.keep !== false).length
+      const open = el('button', {
+        type: 'button', className: `ld-history-item ${e.id === activeEntryId ? 'is-active' : ''}`.trim(),
+        'aria-current': e.id === activeEntryId ? 'true' : 'false',
+        title: 'Tampilkan hasil ini lagi',
+      },
+        icon('clock', { size: 14 }),
+        el('span', { className: 'ld-history-text' },
+          el('b', {}, e.criteria.keywords.join(', ')),
+          el('span', { className: 'muted' }, `${km(e.criteria.radiusKm)} · ${e.criteria.pointLabel || 'Titik di peta'} · ${ago(e.at)}`)),
+        el('span', { className: 'ld-history-n tnum' }, String(n)))
+      open.addEventListener('click', () => restoreEntry(e))
+      const del = el('button', { type: 'button', className: 'ld-chip-x', 'aria-label': `Hapus riwayat ${e.criteria.keywords.join(', ')}`, title: 'Hapus dari riwayat' }, icon('x', { size: 12 }))
+      del.addEventListener('click', () => {
+        stored = saveLeadsStore(owner, removeHistory(stored, e.id))
+        drawHistory()
+      })
+      return el('li', {}, open, del)
+    }))
+  }
+  function restoreEntry(e) {
+    if (isJobRunning(getLeadJob(owner))) return
+    const c = e.criteria
+    if (c.point && inIndonesia(c.point.lat, c.point.lon)) {
+      state.point = c.point
+      state.pointLabel = c.pointLabel
+      addrInput.value = ''
+    }
+    state.radiusKm = Math.min(MAX_RADIUS_KM, Math.max(1, Number(c.radiusKm) || state.radiusKm))
+    radiusInput.value = String(state.radiusKm)
+    radiusOut.textContent = km(state.radiusKm)
+    syncRadiusFill()
+    state.keywords = c.keywords.slice(0, MAX_KEYWORDS)
+    if (c.source === 'google' && sources.google) state.source = 'google'
+    persist()
+    drawPointLine()
+    drawChips()
+    drawCircle()
+    stored = saveLeadsStore(owner, { ...stored, lastId: e.id })
+    state.focusId = null
+    resultsPager.reset()
+    showEntry(e, { fit: true })
+  }
+
+  /* --------------------------------------------------------- Map lock */
+  let locked = false
+  let restoreBtn = null
+  function setLocked(on) {
+    if (on === locked) return
+    locked = on
+    controlsSet.disabled = on
+    if (on) restoreBtn = C.setBusy(searchBtn, 'Mencari…')
+    else { restoreBtn?.(); restoreBtn = null }
+    mapBusy.hidden = !on
+    mapWrap.setAttribute('aria-busy', on ? 'true' : 'false')
+    mapWrap.classList.toggle('is-locked', on)
+    historyBox.classList.toggle('is-locked', on)
+    historyList.querySelectorAll('button').forEach((b) => { b.disabled = on })
+    if (!map) return
+    const handlers = [map.dragging, map.touchZoom, map.doubleClickZoom, map.scrollWheelZoom, map.boxZoom, map.keyboard]
+    handlers.forEach((h) => { if (h) on ? h.disable() : h.enable() })
   }
 
   function statusLine(text) {
@@ -1082,7 +1183,7 @@ export async function render(container, ctx = {}) {
       const ac = new AbortController()
       current = ac
       const restore = wiz.busy('Menyusun…')
-      const ui = C.aiConsole({ model: model.id })
+      const ui = C.aiConsole({ model: 'Penyusun penawaran' })
       ui.onStop(() => ac.abort())
       ui.setStatus('Menulis…', true)
       ui.write('')
@@ -1275,7 +1376,7 @@ export async function render(container, ctx = {}) {
   /* ============================================================= Layout */
   const searchPanel = tabPanels.get('search')
   searchPanel.appendChild(el('div', { className: 'ld-grid' },
-    controlsPanel,
+    el('div', { className: 'ld-side' }, controlsPanel, historyBox),
     el('div', { className: 'ld-main' }, mapPanel, resultsPanel)))
   tabPanels.get('saved').appendChild(savedPanel)
 
@@ -1292,6 +1393,20 @@ export async function render(container, ctx = {}) {
 
   sourcesReady.then(() => { if (!signal?.aborted) drawSource() })
   businessReady.then(() => { if (!signal?.aborted) { drawValueBox(); rescore() } })
+
+  // Restore: a running job wins, otherwise the last stored search.
+  setLeadsPageMounted(true)
+  const onJob = (e) => { if (!signal?.aborted && e.detail?.owner === owner) syncJob(e.detail) }
+  window.addEventListener(JOB_EVENT, onJob)
+  onAbort(() => { window.removeEventListener(JOB_EVENT, onJob); setLeadsPageMounted(false) })
+  const running = getLeadJob(owner)
+  if (isJobRunning(running)) syncJob(running)
+  else {
+    const last = lastEntry(stored)
+    if (last) showEntry(last)
+    else drawHistory()
+  }
+
   initMap()
   await loadSaved()
 }

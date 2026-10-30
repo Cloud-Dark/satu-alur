@@ -20,6 +20,15 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 #### Catatan
 - Pakai di bisnis lain butuh App Review Meta; sebelum itu hanya admin/developer/tester aplikasi yang bisa terhubung.
 
+### 2026-10-29 - Tampilan ringkas, data tetap di perangkat
+
+#### Diubah
+- Header besar di setiap halaman (pil tahap, judul besar, paragraf penjelasan) diganti tooltip ⓘ di samping nama halaman pada topbar. Judul tetap ada untuk pembaca layar; baris aksi hanya muncul bila halaman punya aksi.
+- Tulisan teknis dihapus dari UI: "Terhubung · Cloudflare D1", nama model AI, tab Cloud di Pengaturan, "JSON mentah", label sumber data peta.
+- Pencari prospek: hasil dan riwayat pencarian (maks. 8) disimpan di localStorage per pengguna; pencarian berjalan di belakang layar walau pindah halaman (`src/leads/job.js`); peta dan form dikunci selama mengambil data.
+- Penasihat AI: percakapan disimpan di localStorage per pengguna (maks. 60 pesan per agen) dan jawaban tetap mengalir saat pindah halaman; riwayat chat tidak lagi ditulis ke D1.
+- Media sosial: Threads ditambahkan, plus tab "Akun terhubung" untuk menyimpan akun media sosial. (Catatan merge: tahap Media sosial lama digabung ke menu Media Sosial, jadi Threads dan tab ini tidak tampil lagi; `src/stages/social-accounts.js` belum dipakai.)
+
 ### 2026-10-29 - Tindak lanjut audit kode
 
 #### Diperbaiki
@@ -33,6 +42,16 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 #### Pengujian
 - `tests/flow-rules.test.mjs`: 7 tes untuk aturan uang dan alur (total 152 unit test).
+
+### Integrasi Tumbuh dan ruang kerja AI
+
+- Menggabungkan `Cloud-Dark/satu-alur` main pada `e5beb83`, termasuk backend Cloudflare, landing/login, desain Tumbuh, dan combobox pencarian.
+- Memindahkan Social Media dan AI Superpowers ke grup navigasi Ruang kerja tanpa mengubah enam tahap operasional.
+- Menyesuaikan halaman konten, brainstorming, jadwal lokal, rekomendasi Meta Ads, partnership, dan percakapan AI ke panel, tipografi, ikon, tema terang/gelap, serta layout responsif yang sama.
+- Hasil AI disanitasi dengan helper bersama. Pembatalan diteruskan ke stream HTTP; fallback tidak menggabungkan jawaban parsial; hasil tool lengkap disimpan dalam memori.
+- Menjaga key konten/jadwal lokal yang sudah ada, menambahkan pesan kegagalan penyimpanan dan menyimpan hasil brainstorming ke pustaka ide.
+- `npm test` menjalankan pemeriksaan integrasi AI berbasis Node/Vite: mock, tool, pembatalan, fallback, dan memori. Build serta smoke browser desktop (login mock, chat, generate/simpan konten) lulus.
+- Belum diuji: layanan Cloudflare/Workers AI langsung dan layout perangkat seluler. Jadwal tetap berupa catatan lokal, bukan publikasi otomatis; percakapan memakai satu spesialis per sesi.
 
 ### 2026-10-28 - Port ke Cloudflare
 

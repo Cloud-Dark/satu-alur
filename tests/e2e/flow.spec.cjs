@@ -117,7 +117,7 @@ module.exports = async function flow(t) {
   await p.waitForTimeout(400)
   const profit = norm(await kpiValue(p, 'Laba sebelum pajak')).replace(/\s/g, '')
   t.check(profit === 'Rp7.450.000', 'report "Semua": laba = 5.950.000 + 1.750.000 − 250.000', profit)
-  await p.waitForFunction(() => /Model: (?!memuat)/.test(document.querySelector('.model-note')?.textContent || ''), null, { timeout: 10000 })
+  t.check(await p.$eval('.model-note', (n) => n.hidden), 'no model id shown next to the AI button')
   await p.getByRole('button', { name: 'Jelaskan dengan AI' }).click()
   await p.waitForSelector('.report-ai-out .console', { timeout: 8000 })
   await p.waitForFunction(() => /Selesai|Dihentikan|Gagal/.test(document.querySelector('.report-ai-out .console-status')?.textContent || ''), null, { timeout: 40000 })

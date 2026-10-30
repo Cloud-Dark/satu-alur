@@ -81,7 +81,7 @@ export async function render(container, ctx = {}) {
   const msg = wiz.msg
 
   container.replaceChildren(
-    C.pageHeader({ num: '05', label: 'Pembukuan', title: 'Pembukuan & saldo', em: 'saldo', description: 'Catat pendapatan dan biaya dari setiap pekerjaan selesai. Saldo dihitung berjalan dari jurnal tertua.' }),
+    C.pageHeader({ title: 'Pembukuan & saldo' }),
     el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
   )
 

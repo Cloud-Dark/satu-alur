@@ -98,17 +98,7 @@ export async function render(container, ctx = {}) {
   const asOf = el('span', { className: 'date-pill' }, icon('calendar', { size: 15 }), el('span', {}, 'Memuat data…'))
   const refreshBtn = C.iconButton({ iconName: 'refresh', label: 'Hitung ulang radar' })
   refreshBtn.addEventListener('click', () => load({ fresh: true }))
-  const header = el('header', { className: 'page-head' },
-    el('div', { className: 'page-head-text' },
-      el('span', { className: 'step-pill rd-pill' },
-        el('span', { className: 'rd-pill-ico', 'aria-hidden': 'true' }, icon('radar', { size: 14 })),
-        el('span', { className: 'step-text' }, 'Pertumbuhan', el('span', { 'aria-hidden': 'true' }, '·'), el('b', {}, 'Radar peluang')),
-      ),
-      el('h1', { className: 'page-title display', tabindex: '-1' }, C.displayTitle('Radar peluang', 'peluang')),
-      el('p', { className: 'page-desc' }, 'Peluang yang tersembunyi di transaksi Anda sendiri: layanan rutin yang jatuh tempo, pelanggan yang mulai menghilang, kandidat paket berkala, penawaran yang tertahan, dan musim ramai. Setiap peluang menunjukkan buktinya.'),
-    ),
-    el('div', { className: 'page-head-actions' }, asOf, refreshBtn),
-  )
+  const header = C.pageHeader({ title: 'Radar peluang', actions: [asOf, refreshBtn] })
 
   /* ----------------------------------------------------------- Summary */
   const summaryHost = el('div', { className: 'kpis rd-kpis is-loading', 'aria-live': 'polite' },
@@ -502,7 +492,7 @@ export async function render(container, ctx = {}) {
     aiCtl = ac
     const m = await modelReady
     if (!m) { msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu coba lagi.'); return null }
-    const con = C.aiConsole({ model: m.id })
+    const con = C.aiConsole({ model: 'Analis peluang' })
     out.replaceChildren(con.root)
     con.setStatus('Menyusun…', true)
     con.onStop(() => ac.abort())

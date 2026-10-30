@@ -4,16 +4,6 @@
    and data-table from styles.css + tokens.css.
    ========================================================= */
 
-/* ---- Header pill ---- */
-.rd-pill { padding-left: 6px; }
-.rd-pill-ico {
-  width: 22px; height: 22px;
-  display: inline-grid; place-items: center;
-  border-radius: 50%;
-  background: var(--brand-50);
-  color: var(--brand-600);
-  border: 1px solid var(--brand-100);
-}
 
 /* ---- Summary ---- */
 .rd-kpis .kpi-sub { line-height: 1.4; }
