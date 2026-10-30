@@ -1,12 +1,35 @@
 # Changelog
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-28
+> Terakhir diperbarui: 2026-10-29
 > Pemilik: _TBD_
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Versi mengikuti `package.json` (saat ini `0.1.0`); penetapan nomor versi rilis: _TBD_.
 
 ## [Unreleased]
+
+### 2026-10-29 - Tampilan ringkas, data tetap di perangkat
+
+#### Diubah
+- Header besar di setiap halaman (pil tahap, judul besar, paragraf penjelasan) diganti tooltip ⓘ di samping nama halaman pada topbar. Judul tetap ada untuk pembaca layar; baris aksi hanya muncul bila halaman punya aksi.
+- Tulisan teknis dihapus dari UI: "Terhubung · Cloudflare D1", nama model AI, tab Cloud di Pengaturan, "JSON mentah", label sumber data peta.
+- Pencari prospek: hasil dan riwayat pencarian (maks. 8) disimpan di localStorage per pengguna; pencarian berjalan di belakang layar walau pindah halaman (`src/leads/job.js`); peta dan form dikunci selama mengambil data.
+- Penasihat AI: percakapan disimpan di localStorage per pengguna (maks. 60 pesan per agen) dan jawaban tetap mengalir saat pindah halaman; riwayat chat tidak lagi ditulis ke D1.
+- Media sosial: Threads ditambahkan, plus tab "Akun terhubung" untuk menyimpan akun media sosial.
+
+### 2026-10-29 - Tindak lanjut audit kode
+
+#### Diperbaiki
+- Worker menolak jurnal dengan jumlah nol/negatif atau kategori tak dikenal, pendapatan ganda untuk satu pekerjaan selesai (409), dan penyelesaian ganda untuk satu penugasan (409). Mock memakai aturan yang sama.
+- Pembukuan memberi pesan validasi bila pendapatan pekerjaan itu sudah diposting; biaya tetap boleh berkali-kali.
+- Penyelesaian menampilkan peringatan bila status penugasan gagal diperbarui (sebelumnya hanya `console.warn`).
+- Mock menolak `update`/`delete` tanpa filter, sama seperti Worker.
+
+#### Dihapus
+- `scripts/setup.js` dan skrip `npm run setup` (sisa WorkBuddy), serta helper mati `typewriterEffect` dan `createParticleBackground`.
+
+#### Pengujian
+- `tests/flow-rules.test.mjs`: 7 tes untuk aturan uang dan alur (total 152 unit test).
 
 ### Integrasi Tumbuh dan ruang kerja AI
 
@@ -69,7 +92,31 @@ Tanggal rilis: _TBD_ (riwayat git: `initial project`, `initiate main feature and
 - Routing hash: `#/` landing, `#/masuk` login, `#/app` aplikasi.
 - Semua dropdown kini memakai combobox dengan pencarian (`src/ui/combobox.js`): ketik untuk menyaring, sorotan teks cocok, navigasi keyboard, tetap memakai `<select>` asli sebagai sumber nilai.
 
+- Grup "Pertumbuhan" di sidebar: **Media sosial** (konten, jadwal, ide, iklan Meta, kolaborasi, pustaka) dan **Penasihat AI** (5 agen + routing otomatis, snapshot bisnis dari data asli, kalkulator target pertumbuhan, memori di D1). Diport selektif dari PR #3 (maszulfikarsuweleh/satu-alur); fitur dengan angka karangan tidak dibawa. Migrasi `0003_growth_tools.sql`.
+- Form tahap menjadi wizard 2–3 langkah (`C.wizard`) sehingga muat dalam satu layar.
+- Data demo 9 bisnis (3 Sole Trader, 3 UKM, 3 Enterprise) selama 12 bulan dengan target pertumbuhan dan musiman Indonesia: `scripts/seed-demo.mjs`, `seeds/`, [specs/2026-10-28-demo-growth-data-design.md](specs/2026-10-28-demo-growth-data-design.md); analisis kecukupan form: [specs/2026-10-28-form-data-sufficiency-review.md](specs/2026-10-28-form-data-sufficiency-review.md).
+
+- Halaman login punya dua mode: **Live** (email + OTP) dan **Akun demo** (pilih skala dan bisnis dari dropdown yang bisa dicari, masuk tanpa OTP lewat `POST /api/auth/demo-login`, hanya untuk 9 email demo; nonaktifkan dengan `DEMO_LOGIN="false"`). Tautan langsung: `#/masuk?demo`.
+
+- **Radar peluang**: peluang dihitung dari transaksi asli (layanan berulang jatuh tempo, risiko churn, upsell kontrak, cross-sell, penawaran tertunda, tawarkan ulang, musiman) dengan skor transparan dan bukti; migrasi `0005_opportunity_states.sql`.
+- **Pencari prospek** (MVP B2B): titik + radius + kriteria di peta OpenStreetMap (Google Places opsional lewat secret), ranking AI, estimasi nilai dari rata-rata pekerjaan asli, draf penawaran ke alur; migrasi `0006_leads.sql`. Tidak ada pengiriman otomatis.
+- Pagination (`C.pager`/`C.paginate`) di semua daftar panjang; Penasihat AI muat satu layar (pemilih penasihat di header chat, panel bertab Snapshot/Kalkulator/Statistik).
+- Label "Laba bersih" menjadi "Laba sebelum pajak".
+- Test suite: `npm test` (unit + e2e), master test case, `docs/ENVIRONMENTS.md`, `docs/DEMO_SCRIPT.md`; generator seed dengan lapisan makro (riil vs nominal, inflasi, upah, pajak).
+
 ### Fixed
+
+- Pencari prospek: server Overpass publik timeout dari Cloudflare; kini mencoba mirror lalu otomatis memakai cadangan Nominatim (dibatasi kotak radius), dengan jeda 5 menit sebelum mencoba Overpass lagi.
+- Ranking AI prospek diputus (502) karena JSON mode tidak streaming; Worker kini membuka SSE segera dan mengirim keep-alive selama model bekerja; batch ranking 25 prospek.
+
+- Hemat kuota D1: paging data memakai keyset (`id > last`) sehingga D1 hanya membaca baris yang dikirim (sebelumnya OFFSET/sort membaca 3–6× lebih banyak); migrasi `0004_drop_unused_fk_indexes.sql` menghapus 4 indeks relasi yang tidak dipakai query sehingga setiap insert hanya 2 tulisan (sebelumnya 3).
+
+- Error D1 "daily row write limit" (paket Free) kini dikembalikan sebagai 503 dengan pesan jelas, bukan 500 generik.
+
+- Data hanya memuat 1.000 baris terbaru per tabel sehingga total dashboard dan "Perlu tindakan" salah untuk akun besar; kini dimuat per halaman.
+- Penawaran berstatus `rejected` dihitung sebagai draf; kini tampil "Ditolak" dan tidak masuk antrean.
+- "Pelanggan teratas" di laporan dikelompokkan per pelanggan (bukan per permintaan); `period_start/end` laporan memakai tanggal lokal.
+- Aksi AI yang diklik sebelum daftar model termuat kini menunggu, bukan gagal.
 
 - Penawaran AI sering gagal "bukan JSON yang valid": Worker kini memakai JSON mode Workers AI dengan skema (`scope`, `price`, `terms`, `notes`) lalu mengalirkan hasilnya sebagai SSE; klien memakai parser toleran yang memperbaiki key tanpa kutip penutup, code fence, dan koma berlebih, serta membuang key di luar skema.
 - Pratinjau permintaan di tahap Penawaran menampilkan nomor telepon sebagai lokasi.

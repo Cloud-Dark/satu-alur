@@ -1,10 +1,12 @@
 # UAT Deploy Cloudflare
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-28
+> Terakhir diperbarui: 2026-10-29
 > Pemilik: _TBD_
 
 Template UAT pasca-deploy Satu Alur di Cloudflare. Semua hasil berstatus `_PENDING_` sampai diisi oleh pelaksana deployment. Jangan mengubah status tanpa menjalankan skenario. Referensi: [18_INSTALLATION.md](../18_INSTALLATION.md), [03_FRD.md](../03_FRD.md), [API.md](../API.md).
+
+Daftar induk test case per modul (termasuk Media sosial, Penasihat AI, Radar peluang, Pencari prospek, dan skenario bisnis 9 akun demo) ada di [2026-10-29_test-cases.md](2026-10-29_test-cases.md). UAT-01 sampai UAT-09 di bawah adalah subset pasca-deploy dan dipetakan ke TC-LIV, TC-REQ, TC-OFR, TC-ASG, TC-CMP, TC-BKP, TC-RPT, dan TC-SEC. Lingkungan, akun, dan batas kuota: [ENVIRONMENTS.md](../ENVIRONMENTS.md).
 
 ## Informasi Eksekusi
 
@@ -61,21 +63,21 @@ Status: _PENDING_ | Bukti: _TBD_ | Catatan: _TBD_
 
 ### UAT-03 Penawaran AI (FR-011)
 
-Langkah: pilih permintaan, hasilkan penawaran, amati streaming, uji tombol Batal pada satu percobaan, lalu simpan hasil yang valid.
+Langkah: pilih permintaan, hasilkan penawaran, amati streaming, uji tombol Hentikan pada satu percobaan, lalu simpan hasil yang valid.
 
-Hasil diharapkan: teks tampil bertahap; Batal menghentikan dan menampilkan "Dibatalkan"; hasil tervalidasi (harga/scope/terms) dan tersimpan berstatus `draft`. Catat model yang dipakai dan lama respons.
+Hasil diharapkan: teks tampil bertahap; Hentikan menghentikan dan menampilkan "Dihentikan"; hasil tervalidasi (harga/scope/terms) dan tersimpan berstatus `approved`. Catat model yang dipakai dan lama respons.
 
 Status: _PENDING_ | Model: _TBD_ | Bukti: _TBD_ | Catatan: _TBD_
 
 ### UAT-04 Penugasan (FR-013)
 
-Prasyarat: ada penawaran berstatus `approved`. Karena belum ada layar persetujuan (R-009), ubah status lewat prosedur yang disepakati: _TBD_ (mis. `wrangler d1 execute --remote` atau panggilan `/api/db` dengan token akun A). Catat prosedur yang dipakai.
+Prasyarat: ada penawaran berstatus `approved` (penawaran yang disimpan di UAT-03 otomatis `approved`; penawaran `draft` dapat disetujui lewat tombol "Setujui" di daftar Penawaran).
 
 Langkah: pilih penawaran, isi nama pekerja dan jadwal, simpan.
 
 Hasil diharapkan: penugasan berstatus `assigned` muncul di daftar.
 
-Status: _PENDING_ | Prosedur persetujuan: _TBD_ | Bukti: _TBD_ | Catatan: _TBD_
+Status: _PENDING_ | Bukti: _TBD_ | Catatan: _TBD_
 
 ### UAT-05 Penyelesaian (FR-014)
 

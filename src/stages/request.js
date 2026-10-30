@@ -11,75 +11,129 @@ export async function render(container, ctx = {}) {
 
   /* ------------------------------------------------------------- Form */
   const name = C.field({ label: 'Nama pelanggan', name: 'customer_name', required: true, placeholder: 'PT Maju Jaya', hint: 'Perusahaan atau perorangan yang meminta layanan.', attrs: { autocomplete: 'organization', maxlength: '120' } })
-  const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
   const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
   const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
+  const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
   const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
-  const submit = C.button({ label: 'Simpan permintaan', icon: 'save', variant: 'primary', type: 'submit' })
-  const msg = C.message()
+  const reviewBox = el('div', { className: 'proposal' })
 
-  const form = el('form', { className: 'form', noValidate: '' },
-    name.wrap, service.wrap,
-    el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap),
-    desc.wrap,
-    el('div', { className: 'form-actions' }, submit),
-    msg,
-  )
-  form.noValidate = true
+  const PHONE_RE = /^[+()\d\s.-]{6,32}$/
+  const values = () => ({
+    customer_name: name.input.value.trim(),
+    service_type: service.input.value.trim(),
+    location: location.input.value.trim(),
+    phone: phone.input.value.trim(),
+    description: desc.input.value.trim(),
+  })
+  const customerErrors = () => {
+    const d = values()
+    const errs = []
+    if (!d.customer_name) errs.push({ text: 'Nama pelanggan wajib diisi.', input: name.input })
+    if (d.phone && !PHONE_RE.test(d.phone)) errs.push({ text: 'Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.', input: phone.input })
+    return errs
+  }
+  const needErrors = () => (values().service_type ? [] : [{ text: 'Jenis layanan wajib diisi.', input: service.input }])
+
+  const wiz = C.wizard({
+    label: 'Permintaan baru',
+    steps: [
+      {
+        key: 'customer',
+        title: 'Pelanggan',
+        description: 'Siapa yang meminta, dan di mana.',
+        content: [name.wrap, el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap)],
+        validate: customerErrors,
+      },
+      {
+        key: 'need',
+        title: 'Kebutuhan',
+        description: 'Layanan yang diminta dan rinciannya.',
+        content: [service.wrap, desc.wrap],
+        validate: needErrors,
+      },
+      {
+        key: 'review',
+        title: 'Tinjau',
+        description: 'Periksa sebelum disimpan.',
+        content: reviewBox,
+        primary: { label: 'Simpan permintaan', icon: 'save', iconRight: undefined },
+        validate: () => {
+          const errs = [...customerErrors(), ...needErrors()]
+          return errs.map((e) => e.text)
+        },
+        onPrimary: () => save(),
+        onEnter: () => drawReview(),
+      },
+    ],
+  })
+  const msg = wiz.msg
+
+  // Arriving with a prefill (e.g. from Radar peluang): fill the form and open step 2.
+  const pre = ctx.params?.prefill
+  if (pre && typeof pre === 'object') {
+    const put = (f, v) => { if (v) f.input.value = String(v).slice(0, Number(f.input.maxLength) > 0 ? Number(f.input.maxLength) : 2000) }
+    put(name, pre.customer_name); put(location, pre.location); put(phone, pre.phone); put(service, pre.service_type); put(desc, pre.description)
+    if (pre.customer_name) queueMicrotask(() => wiz.go('need', { focus: false, animate: false }))
+  }
 
   const listBody = el('div', {}, C.skeletonRows(5))
   const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari permintaan' })
   const searchBox = el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search)
   const listPanel = C.panel({ title: 'Daftar permintaan', meta: 'memuat…', actions: searchBox, className: 'list-panel' }, listBody)
+  const pg = C.pager({ key: 'requests', label: 'daftar permintaan', onChange: () => drawList(), scrollTarget: listPanel })
 
   container.replaceChildren(
-    C.pageHeader({ num: '01', label: 'Permintaan', title: 'Permintaan masuk', em: 'masuk', description: 'Catat kebutuhan pelanggan. Status setiap permintaan mengikuti seberapa jauh ia sudah bergerak di alur.' }),
-    el('div', { className: 'stage-grid' },
-      C.panel({ title: 'Permintaan baru', meta: 'Isi data pelanggan', raised: true, className: 'form-panel' }, form),
-      listPanel,
-    ),
+    C.pageHeader({ title: 'Permintaan masuk' }),
+    el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
   )
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault()
-    msg.hide()
-    const data = {
-      customer_name: name.input.value.trim(),
-      service_type: service.input.value.trim(),
-      location: location.input.value.trim(),
-      phone: phone.input.value.trim(),
-      description: desc.input.value.trim(),
-    }
-    const missing = []
-    if (!data.customer_name) missing.push('Nama pelanggan wajib diisi.')
-    if (!data.service_type) missing.push('Jenis layanan wajib diisi.')
-    if (data.phone && !/^[+()\d\s.-]{6,32}$/.test(data.phone)) missing.push('Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.')
-    if (missing.length) {
-      msg.show('danger', 'Periksa kembali isian berikut.', missing)
-      ;(!data.customer_name ? name.input : !data.service_type ? service.input : phone.input).focus()
-      return
-    }
-    const restore = C.setBusy(submit, 'Menyimpan…')
+  function drawReview() {
+    const d = values()
+    reviewBox.replaceChildren(...[
+      C.miniPreview({
+        title: d.customer_name || '—',
+        chips: [
+          { icon: 'layers', text: d.service_type || '—', title: `Layanan: ${d.service_type || '—'}` },
+          d.location ? { icon: 'mapPin', text: d.location, title: `Lokasi: ${d.location}` } : null,
+          d.phone ? { icon: 'phone', text: d.phone, title: `Telepon: ${d.phone}` } : null,
+        ],
+        note: d.description || 'Tanpa deskripsi kebutuhan.',
+        noteLines: 4,
+      }),
+      d.description ? null : el('p', { className: 'wiz-pane-desc' }, 'Tip: deskripsi yang rinci membuat penawaran AI lebih akurat.'),
+    ].filter(Boolean))
+  }
+
+  async function save() {
+    const data = values()
+    const restore = wiz.busy('Menyimpan…')
     try {
       const { data: created, error } = await getCloud().database.from('requests').insert(data)
       if (error) throw new Error(error.message)
       const row = Array.isArray(created) ? created[0] : created
-      form.reset()
-      msg.show('ok', `Permintaan ${data.customer_name} tersimpan. Lanjutkan dengan membuat penawaran.`)
+      restore()
+      const actions = []
       if (row?.id != null) {
         const next = C.button({ label: 'Buat penawaran', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
         next.addEventListener('click', () => navigate('offer', { requestId: row.id }))
-        msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
+        actions.push(next)
       }
+      const again = C.button({ label: 'Catat permintaan lain', icon: 'plus', size: 'sm', variant: 'soft' })
+      again.addEventListener('click', () => {
+        for (const f of [name, location, phone, service, desc]) f.input.value = ''
+        reviewBox.replaceChildren()
+        wiz.reset()
+      })
+      actions.push(again)
+      wiz.complete({ text: `Permintaan ${data.customer_name} tersimpan. Lanjutkan dengan membuat penawaran.`, actions })
       showToast('Permintaan baru tersimpan.', 'success')
       notifyDataChanged()
       await loadList()
     } catch (err) {
-      msg.show('danger', `Gagal menyimpan: ${err.message}`)
-    } finally {
       restore()
+      msg.show('danger', `Gagal menyimpan: ${err.message}`)
     }
-  })
+  }
 
   /* ------------------------------------------------------------- List */
   let model = null
@@ -108,7 +162,7 @@ export async function render(container, ctx = {}) {
     }
     listBody.replaceChildren(C.dataTable({
       caption: 'Daftar permintaan',
-      rows,
+      rows: pg.slice(rows, { resetKey: q }),
       columns: [
         {
           label: 'Pelanggan',
@@ -134,7 +188,7 @@ export async function render(container, ctx = {}) {
           },
         },
       ],
-    }))
+    }), pg.root)
   }
   search.addEventListener('input', () => model && drawList())
 

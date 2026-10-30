@@ -35,6 +35,13 @@ export async function submitEmailOtp(email, verificationCode) {
   return completed.data
 }
 
+/** Signs in to one of the seeded demo accounts (no OTP). */
+export async function loginWithDemo(email) {
+  const res = await getCloud().auth.demoLogin({ email })
+  if (res?.error) throw new Error(res.error.message)
+  return res.data
+}
+
 export async function getSession() {
   const cloud = getCloud()
   return cloud.auth.getSession()

@@ -68,6 +68,15 @@ const httpAuth = {
     return { data: { user }, error: null }
   },
 
+  async demoLogin({ email }) {
+    const res = await request('/api/auth/demo-login', { method: 'POST', body: { email } })
+    if (res.error) throw new Error(res.error.message)
+    const { user, access_token } = res.data
+    setToken(access_token)
+    notifyAuth('SIGNED_IN', { user, access_token })
+    return { data: { user }, error: null }
+  },
+
   async getSession() {
     const token = getToken()
     if (!token) return { data: null, error: { message: 'Belum masuk.' } }
@@ -151,7 +160,13 @@ const httpDatabase = {
 
       // Awaitable: satu panggilan POST /api/db
       then(resolve, reject) {
-        return request('/api/db', { method: 'POST', body: q }).then(resolve, reject)
+        const pending = request('/api/db', { method: 'POST', body: q })
+        if (q.action !== 'select') {
+          pending.then((res) => {
+            if (!res?.error) window.dispatchEvent(new CustomEvent('satualur:db-write', { detail: { table } }))
+          })
+        }
+        return pending.then(resolve, reject)
       },
     }
     return builder

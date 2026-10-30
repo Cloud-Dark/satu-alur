@@ -7,6 +7,8 @@
  * Response envelope: { data, error, count? }, error = { message }.
  */
 
+import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.js';
+
 // ---------------------------------------------------------------- constants
 
 const MAX_BODY_BYTES = 256 * 1024; // auth + db
@@ -20,7 +22,7 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_INSERT_ROWS = 100;
 const MAX_IN_VALUES = 100;
 const MAX_FILTERS = 20;
-const MAX_LIMIT = 1000;
+const MAX_LIMIT = 5000;
 
 const LLM_MODELS = [
   { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B Instruct (fast)', disabled: false },
@@ -60,6 +62,23 @@ const TABLES = {
   reports: {
     columns: ['id', 'owner_id', 'period_start', 'period_end', 'summary_json', 'explanation_html', 'status', 'created_at'],
     json: ['summary_json'],
+  },
+  social_contents: {
+    columns: ['id', 'owner_id', 'kind', 'platform', 'title', 'body', 'meta_json', 'status', 'created_at'],
+    json: ['meta_json'],
+  },
+  social_schedules: {
+    columns: ['id', 'owner_id', 'platform', 'post_type', 'content', 'scheduled_at', 'status', 'created_at'],
+  },
+  ai_messages: {
+    columns: ['id', 'owner_id', 'agent', 'role', 'content', 'model', 'latency_ms', 'error', 'created_at'],
+  },
+  opportunity_states: {
+    columns: ['id', 'owner_id', 'opp_key', 'status', 'until', 'note', 'created_at'],
+  },
+  leads: {
+    columns: ['id', 'owner_id', 'source', 'source_id', 'name', 'category', 'address', 'phone', 'website', 'lat', 'lon', 'distance_km', 'score', 'est_value', 'status', 'notes', 'meta_json', 'created_at'],
+    json: ['meta_json'],
   },
 };
 // Columns the client may never set directly.
@@ -263,6 +282,29 @@ async function handleVerifyOtp(request, env) {
   return ok({ user, access_token: accessToken });
 }
 
+// Demo accounts (seeded by scripts/seed-demo.mjs). Keep in sync with
+// src/auth/demo-accounts.js. Set DEMO_LOGIN = "false" to disable.
+const DEMO_EMAILS = new Set([
+  'demo-ac@satualur.id', 'demo-cleaning@satualur.id', 'demo-listrik@satualur.id',
+  'demo-pest@satualur.id', 'demo-laundry@satualur.id', 'demo-dinding@satualur.id',
+  'demo-mall@satualur.id', 'demo-fm@satualur.id', 'demo-rs@satualur.id',
+]);
+
+async function handleDemoLogin(request, env) {
+  if (env.DEMO_LOGIN === 'false') throw new HttpError(403, 'Mode demo tidak aktif.');
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  if (!email || !DEMO_EMAILS.has(email)) throw new HttpError(400, 'Akun demo tidak dikenal.');
+  const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
+  if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
+
+  const accessToken = randomHex(32);
+  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
+    .bind(await sha256Hex(accessToken), user.id, new Date(Date.now() + SESSION_TTL_MS).toISOString(), nowIso())
+    .run();
+  return ok({ user, access_token: accessToken });
+}
+
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
   return ok({ user });
@@ -404,6 +446,44 @@ async function assertFkOwnership(env, spec, rows, userId) {
   }
 }
 
+// Money and flow rules the generic endpoint enforces on top of the schema:
+// ledger amounts are positive, an assignment is completed once, and a
+// completion carries at most one revenue entry. Seeds write via SQL, not here.
+const LEDGER_CATEGORY_SET = new Set(['pendapatan', 'biaya_tenaga', 'biaya_bahan', 'biaya_transport', 'biaya_lain']);
+
+async function assertFlowRules(env, table, rows, userId) {
+  if (table === 'ledger_entries') {
+    const revenueFor = new Set();
+    for (const r of rows) {
+      if ('amount' in r) {
+        const amt = Number(r.amount);
+        if (!Number.isFinite(amt) || amt <= 0) throw bad('Jumlah jurnal harus lebih dari nol.');
+      }
+      if ('category' in r && !LEDGER_CATEGORY_SET.has(r.category)) throw bad('Kategori jurnal tidak dikenal.');
+      if (r.category === 'pendapatan' && r.completion_id != null) {
+        const key = String(r.completion_id);
+        const dup = revenueFor.has(key) || await env.DB.prepare(
+          "SELECT 1 AS x FROM ledger_entries WHERE owner_id = ? AND completion_id = ? AND category = 'pendapatan' LIMIT 1",
+        ).bind(userId, r.completion_id).first();
+        if (dup) throw new HttpError(409, 'Pendapatan untuk pekerjaan ini sudah diposting.');
+        revenueFor.add(key);
+      }
+    }
+  }
+  if (table === 'completions') {
+    const seen = new Set();
+    for (const r of rows) {
+      if (r.assignment_id == null) continue;
+      const key = String(r.assignment_id);
+      const dup = seen.has(key) || await env.DB.prepare(
+        'SELECT 1 AS x FROM completions WHERE owner_id = ? AND assignment_id = ? LIMIT 1',
+      ).bind(userId, r.assignment_id).first();
+      if (dup) throw new HttpError(409, 'Penugasan ini sudah ditandai selesai.');
+      seen.add(key);
+    }
+  }
+}
+
 function mapDbError(err) {
   const m = String(err && err.message);
   if (/constraint/i.test(m)) return new HttpError(400, 'Data tidak valid atau melanggar batasan.');
@@ -425,6 +505,7 @@ async function handleDb(request, env) {
     if (values.length === 0 || values.length > MAX_INSERT_ROWS) throw bad('Values tidak valid.');
     const rows = values.map((v) => serializeRow(spec, v, { forWrite: 'insert' }));
     await assertFkOwnership(env, spec, rows, uid);
+    await assertFlowRules(env, table, rows, uid);
     const stmts = rows.map((r) => {
       const cols = ['owner_id', ...Object.keys(r)];
       return env.DB.prepare(
@@ -451,6 +532,10 @@ async function handleDb(request, env) {
       const keys = Object.keys(ch);
       if (keys.length === 0) throw bad('Changes kosong.');
       await assertFkOwnership(env, spec, [ch], uid);
+      if (table === 'ledger_entries' && ('amount' in ch || 'category' in ch)) {
+        if ('amount' in ch && !(Number(ch.amount) > 0)) throw bad('Jumlah jurnal harus lebih dari nol.');
+        if ('category' in ch && !LEDGER_CATEGORY_SET.has(ch.category)) throw bad('Kategori jurnal tidak dikenal.');
+      }
       stmt = env.DB.prepare(
         `UPDATE ${table} SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE owner_id = ?${whereSql} RETURNING *`,
       ).bind(...Object.values(ch), uid, ...params);
@@ -661,35 +746,58 @@ async function handleChat(request, env) {
 // cannot satisfy JSON mode.
 async function structuredChat(env, model, params, schema) {
   const { stream: _stream, ...rest } = params;
-  let text = '';
-  try {
-    const out = await env.AI.run(model, { ...rest, response_format: { type: 'json_schema', json_schema: schema } });
-    const r = out?.response;
-    text = typeof r === 'string' ? r : r && typeof r === 'object' ? JSON.stringify(r, null, 2) : '';
-  } catch (e) {
-    console.warn('JSON mode failed, falling back to hinted stream', e);
-  }
-  if (!text) {
-    let aiStream;
-    try {
-      aiStream = await env.AI.run(model, { ...params, messages: [{ role: 'system', content: JSON_HINT }, ...params.messages] });
-    } catch (e) {
-      console.error('AI.run failed', e);
-      return fail(502, 'Layanan AI tidak tersedia.');
-    }
-    if (aiStream instanceof ReadableStream) return sseResponse(translateStream(aiStream));
-    text = typeof aiStream?.response === 'string' ? aiStream.response : '';
-  }
+  const keepAlive = new TextEncoder().encode(': keepalive\n\n');
+  // Open the SSE response right away and send comment keep-alives while the
+  // non-streaming JSON-mode call runs, so proxies and clients don't drop a
+  // long generation (e.g. ranking dozens of leads).
   const out = new ReadableStream({
     async start(c) {
+      const timer = setInterval(() => { try { c.enqueue(keepAlive) } catch { /* closed */ } }, 5000);
+      const finish = () => {
+        clearInterval(timer);
+        c.enqueue(sse({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
+        c.enqueue(sse('[DONE]'));
+        c.close();
+      };
+      c.enqueue(keepAlive);
+      let text = '';
+      try {
+        const res = await env.AI.run(model, { ...rest, response_format: { type: 'json_schema', json_schema: schema } });
+        const r = res?.response;
+        text = typeof r === 'string' ? r : r && typeof r === 'object' ? JSON.stringify(r, null, 2) : '';
+      } catch (e) {
+        console.warn('JSON mode failed, falling back to hinted stream', e);
+      }
+      if (!text) {
+        try {
+          const aiStream = await env.AI.run(model, { ...params, messages: [{ role: 'system', content: JSON_HINT }, ...params.messages] });
+          if (aiStream instanceof ReadableStream) {
+            clearInterval(timer);
+            const reader = translateStream(aiStream).getReader();
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              c.enqueue(value);
+            }
+            c.close();
+            return;
+          }
+          text = typeof aiStream?.response === 'string' ? aiStream.response : '';
+        } catch (e) {
+          console.error('AI.run failed', e);
+          clearInterval(timer);
+          c.enqueue(sse({ error: { message: 'Layanan AI tidak tersedia.' } }));
+          c.enqueue(sse('[DONE]'));
+          c.close();
+          return;
+        }
+      }
       const STEP = 24;
       for (let i = 0; i < text.length; i += STEP) {
         c.enqueue(sse({ choices: [{ delta: { content: text.slice(i, i + STEP) }, finish_reason: null }] }));
         await new Promise((r) => setTimeout(r, 12));
       }
-      c.enqueue(sse({ choices: [{ delta: {}, finish_reason: 'stop' }] }));
-      c.enqueue(sse('[DONE]'));
-      c.close();
+      finish();
     },
   });
   return sseResponse(out);
@@ -707,14 +815,21 @@ function sseResponse(stream) {
 
 // ------------------------------------------------------------------- router
 
+// Helpers handed to the lead-finder routes in ./leads.js (avoids a circular import).
+const LEAD_DEPS = { authenticate, readJson, ok, HttpError };
+
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
   'POST /api/auth/verify-otp': handleVerifyOtp,
+  'POST /api/auth/demo-login': handleDemoLogin,
   'GET /api/auth/session': handleSession,
   'POST /api/auth/signout': handleSignout,
   'POST /api/db': handleDb,
   'GET /api/llm/models': handleModels,
   'POST /api/llm/chat': handleChat,
+  'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, LEAD_DEPS),
+  'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, LEAD_DEPS),
+  'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, LEAD_DEPS),
 };
 
 async function handleApi(request, env, path) {
@@ -735,6 +850,9 @@ export default {
       } catch (err) {
         if (err instanceof HttpError) return fail(err.status, err.message);
         console.error('Unhandled error', err); // logs only; never returned to client
+        if (/exceeded D1's .*limit/i.test(String(err?.message))) {
+          return fail(503, 'Batas penulisan harian database tercapai. Data bisa dibaca, tetapi penyimpanan baru tertunda sampai kuota pulih (00.00 UTC / 07.00 WIB).');
+        }
         return fail(500, 'Terjadi kesalahan pada server.');
       }
     }

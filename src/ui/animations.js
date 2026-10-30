@@ -92,28 +92,3 @@ export function showToast(message, type = 'info', duration = 3200) {
     setTimeout(() => toast.remove(), 600)
   }, duration)
 }
-
-/** Types text into an element. Returns a cancel function. */
-export function typewriterEffect(element, text, speed = 30) {
-  if (!element || !text) return () => {}
-  if (reducedMotion()) {
-    element.textContent = text
-    return () => {}
-  }
-  element.textContent = ''
-  let i = 0
-  const timer = setInterval(() => {
-    element.textContent += text.charAt(i)
-    i++
-    if (i >= text.length) clearInterval(timer)
-  }, speed)
-  return () => clearInterval(timer)
-}
-
-/**
- * Kept for backwards compatibility. The app has no particle backdrop, so
- * this is a no-op that returns a cleanup function.
- */
-export function createParticleBackground() {
-  return () => {}
-}

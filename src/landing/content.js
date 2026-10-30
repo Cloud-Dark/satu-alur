@@ -16,7 +16,7 @@ export const NAV = [
 export const HERO_POINTS = [
   'Masuk cukup dengan email (OTP)',
   'Penawaran AI selalu divalidasi',
-  'Data di Cloudflare D1',
+  'Data aman di cloud',
 ]
 
 export const STAGES = [
@@ -61,10 +61,10 @@ export const TICKER = [
   { icon: 'checkCircle', label: 'Catatan penyelesaian' },
   { icon: 'ledger', label: 'Jurnal & laba/rugi' },
   { icon: 'chart', label: 'Laporan dijelaskan AI' },
-  { icon: 'zap', label: 'Streaming Workers AI' },
+  { icon: 'zap', label: 'Jawaban AI langsung mengalir' },
   { icon: 'bot', label: 'Agent Skill Editor' },
   { icon: 'mail', label: 'Login email OTP' },
-  { icon: 'layers', label: 'Data di Cloudflare D1' },
+  { icon: 'layers', label: 'Data aman di cloud' },
 ]
 
 export const FEATURES = [
@@ -115,7 +115,7 @@ export const ROADMAP = [
 export const FAQS = [
   {
     q: 'Di mana data bisnis saya disimpan?',
-    a: 'Data disimpan di Cloudflare D1 (basis data SQLite terkelola) dan dilayani oleh satu Cloudflare Worker. Setiap data terikat ke akun Anda, sehingga terpisah dari pengguna lain.',
+    a: 'Data disimpan di cloud yang aman. Setiap data terikat ke akun Anda, sehingga terpisah dari pengguna lain.',
   },
   {
     q: 'Bagaimana cara masuk ke Satu Alur?',
@@ -123,7 +123,7 @@ export const FAQS = [
   },
   {
     q: 'AI apa yang dipakai, dan apakah hasilnya bisa dipercaya?',
-    a: 'Penawaran dan penjelasan laporan dibuat dengan Cloudflare Workers AI dan ditampilkan secara streaming, sehingga bisa Anda batalkan kapan saja. Hasil penawaran selalu melewati validasi aturan domain sebelum disimpan, dan keputusan akhir tetap di tangan Anda.',
+    a: 'Penawaran dan penjelasan laporan dibuat AI dan tampil langsung saat ditulis, sehingga bisa Anda batalkan kapan saja. Hasil penawaran selalu melewati validasi aturan domain sebelum disimpan, dan keputusan akhir tetap di tangan Anda.',
   },
   {
     q: 'Bisakah saya mengubah cara AI menulis penawaran?',

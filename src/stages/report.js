@@ -3,7 +3,7 @@ import * as C from '../ui/components.js'
 import { explainReport } from '../ai/agent.js'
 import { showToast } from '../ui/animations.js'
 import { resolveModel, abortable } from './offer.js'
-import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from './data.js'
+import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel, customerKey, localDate } from './data.js'
 
 const { el } = C
 const DAY = 86400000
@@ -53,7 +53,7 @@ export async function render(container, ctx = {}) {
   const custPanel = C.panel({ title: 'Pelanggan teratas', meta: 'berdasarkan pendapatan', className: 'span-5' }, custBody)
 
   const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'primary' })
-  const modelNote = el('span', { className: 'model-note' }, 'Model: memuat…')
+  const modelNote = el('span', { className: 'model-note', hidden: true })
   const msg = C.message()
   const aiOut = el('div', { className: 'report-ai-out' })
   const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'Bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
@@ -64,7 +64,7 @@ export async function render(container, ctx = {}) {
   )
 
   container.replaceChildren(
-    C.pageHeader({ num: '06', label: 'Laporan', title: 'Laporan keuangan', em: 'keuangan', description: 'Angka dihitung langsung dari buku besar. Pilih periode, lalu minta AI menjelaskannya.', actions: seg }),
+    C.pageHeader({ title: 'Laporan keuangan', actions: seg }),
     periodLine,
     kpis,
     el('div', { className: 'dash-grid is-stretch' }, catPanel, custPanel),
@@ -72,9 +72,9 @@ export async function render(container, ctx = {}) {
   )
 
   let model = null
-  resolveModel()
-    .then((m) => { model = m; modelNote.textContent = m ? `Model: ${m.id}` : 'Model: tidak tersedia' })
-    .catch((err) => { modelNote.textContent = `Model: ${err.message}` })
+  const modelReady = resolveModel()
+    .then((m) => { model = m; if (!m) { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false } })
+    .catch((err) => { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false })
 
   let flow
   try {
@@ -106,7 +106,7 @@ export async function render(container, ctx = {}) {
     const cCost = cmp(t.cost, prevT?.cost, true)
     const cProfit = cmp(t.profit, prevT?.profit)
     kpis.replaceChildren(
-      C.kpi({ label: 'Laba bersih', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
+      C.kpi({ label: 'Laba sebelum pajak', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
       C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue), countTo: t.revenue, format: C.rupiah, sub: cRev.sub, tone: cRev.tone }),
       C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost), countTo: t.cost, format: C.rupiah, sub: cCost.sub, tone: cCost.tone }),
       C.kpi({ label: 'Margin', iconName: 'activity', value: margin == null ? '—' : `${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, sub: margin == null ? 'Belum ada pendapatan' : `Biaya ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan` }),
@@ -140,8 +140,10 @@ export async function render(container, ctx = {}) {
     const byCust = new Map()
     for (const l of entries.filter(isRevenue)) {
       const req = flow.requestOfLedger(l)
-      const k = req ? String(req.id) : 'x'
-      const cur = byCust.get(k) || { name: customerLabel(req), service: req?.service_type, amount: 0 }
+      const k = customerKey(req)
+      const cur = byCust.get(k) || { name: customerLabel(req), services: new Set(), amount: 0 }
+      if (req?.service_type) cur.services.add(req.service_type)
+      cur.service = [...cur.services].slice(0, 2).join(', ') + (cur.services.size > 2 ? ` +${cur.services.size - 2}` : '')
       cur.amount += Number(l.amount) || 0
       byCust.set(k, cur)
     }
@@ -156,8 +158,8 @@ export async function render(container, ctx = {}) {
 
     report = {
       period: r.label,
-      period_start: r.from.toISOString().slice(0, 10),
-      period_end: new Date(r.to.getTime() - 1).toISOString().slice(0, 10),
+      period_start: localDate(r.from),
+      period_end: localDate(r.to.getTime() - 1),
       total_revenue: t.revenue,
       total_cost: t.cost,
       net_profit: t.profit,
@@ -188,13 +190,14 @@ export async function render(container, ctx = {}) {
 
   explainBtn.addEventListener('click', async () => {
     msg.hide()
+    if (!model) { try { await modelReady } catch { /* reported below */ } }
     if (!model) { msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.'); return }
     if (!report) return
     current?.abort()
     const ac = new AbortController()
     current = ac
     const restore = C.setBusy(explainBtn, 'Menganalisis…')
-    const ui = C.aiConsole({ model: model.id })
+    const ui = C.aiConsole({ model: 'Analis laporan' })
     ui.onStop(() => ac.abort())
     ui.setStatus('Menulis…', true)
     ui.write('')

@@ -150,7 +150,6 @@ Lihat [docs/API.md](docs/API.md) untuk dokumentasi API. Indeks seluruh dokumenta
 | `npm run dev` | Start development server |
 | `npm run build` | Build for production |
 | `npm run preview` | Preview production build |
-| `npm run setup` | Skrip setup lama (WorkBuddy) |
 | `npm run cf:dev` | Build lalu jalankan Worker lokal (`wrangler dev`) |
 | `npm run deploy` | Build lalu deploy ke Cloudflare |
 | `npm run db:migrate:local` | Terapkan migrasi D1 ke database lokal |
