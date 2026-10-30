@@ -4,6 +4,7 @@
 // test to exercise the real code paths (approach adapted from zul-pr6:tests/ai-integration.test.mjs).
 import { test, before, after, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
+import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import './helpers/setup.mjs'
 
@@ -16,7 +17,7 @@ let realDatabase
 before(async () => {
   server = await createServer({
     configFile: false,
-    root: new URL('..', import.meta.url).pathname,
+    root: fileURLToPath(new URL('..', import.meta.url)), // .pathname keeps %20 for paths with spaces
     logLevel: 'silent',
     server: { middlewareMode: true, hmr: false, ws: false },
     appType: 'custom',
