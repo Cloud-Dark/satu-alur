@@ -1536,6 +1536,8 @@ body.scroll-lock { overflow: hidden; }
 .of-row { display: flex; gap: var(--s-3); align-items: flex-end; }
 .of-row > .field { flex: 1 1 auto; min-width: 0; }
 .of-list { display: grid; gap: var(--s-4); margin-bottom: var(--s-4); }
+.of-quota-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: var(--s-3) var(--s-4); margin-bottom: var(--s-4); }
+.of-voucher-code { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-weight: 600; letter-spacing: 0.02em; }
 .of-faq { display: grid; gap: var(--s-3); padding-bottom: var(--s-4); border-bottom: 1px solid var(--line); }
 .of-row-actions, .of-actions { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
 .of-preview { padding: var(--s-4); border: 1px dashed var(--line); border-radius: var(--r-md); overflow-wrap: anywhere; }
@@ -1619,3 +1621,8 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .sm-inf-photo { width: 4rem; height: 4rem; border-radius: 50%; object-fit: cover; }
 .sm-inf-photo[hidden] { display: none; }
 .sm-inf-initials { display: grid; place-items: center; background: var(--line); color: var(--brand); font-weight: 600; }
+
+/* Kantor › Pelanggan: AI usage and credit inside the customer dialog. */
+.of-cu-quota-wrap { margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--line); display: grid; gap: var(--s-3); }
+.of-cu-usage, .of-cu-entries { list-style: none; margin: var(--s-2) 0 0; padding: 0; display: grid; gap: 4px; }
+.of-cu-usage { grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); }

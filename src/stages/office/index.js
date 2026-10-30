@@ -10,6 +10,7 @@ import * as Users from './users.js'
 import * as Contact from './contact.js'
 import * as Support from './support.js'
 import * as Campaigns from './campaigns.js'
+import * as Vouchers from './vouchers.js'
 import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
 const { el } = C
@@ -22,7 +23,8 @@ export const GROUPS = [
     { key: 'legal', label: 'Legal', icon: 'file', draw: Doc.drawLegal }] },
   { title: 'Bisnis', items: [
     { key: 'plans', label: 'Paket langganan', icon: 'ledger', draw: Plans.draw },
-    { key: 'gateway', label: 'Payment gateway', icon: 'wallet', draw: Payment.draw }] },
+    { key: 'gateway', label: 'Payment gateway', icon: 'wallet', draw: Payment.draw },
+    { key: 'vouchers', label: 'Voucher', icon: 'receipt', draw: Vouchers.draw }] },
   { title: 'Pelanggan', items: [
     { key: 'customers', label: 'Pelanggan & mitra', icon: 'users', draw: Customers.draw },
     { key: 'users', label: 'Pengguna', icon: 'shield', draw: Users.draw },

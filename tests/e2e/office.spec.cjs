@@ -3,7 +3,7 @@
 // username + password sign-in at /super-admin-login; the normal #/masuk login never grants it.
 const { loginLive, goStage } = require('./lib.cjs')
 
-const KEYS = { 'Landing page': 'landing', 'Tentang kami': 'about', Legal: 'legal', 'Paket langganan': 'plans', 'Payment gateway': 'gateway', 'Pelanggan & mitra': 'customers', Pengguna: 'users', 'Contact Us': 'contact', 'Pengaduan CS': 'tickets', Influencer: 'influencers', Permintaan: 'requests', Kampanye: 'campaigns' }
+const KEYS = { 'Landing page': 'landing', 'Tentang kami': 'about', Legal: 'legal', 'Paket langganan': 'plans', 'Payment gateway': 'gateway', Voucher: 'vouchers', 'Pelanggan & mitra': 'customers', Pengguna: 'users', 'Contact Us': 'contact', 'Pengaduan CS': 'tickets', Influencer: 'influencers', Permintaan: 'requests', Kampanye: 'campaigns' }
 
 async function staffLogin(page, base, username, password) {
   await page.goto(`${base}/super-admin-login`, { waitUntil: 'load' })
@@ -89,7 +89,7 @@ module.exports = async function office(t) {
   const labels = (await p.locator('.side-label').allTextContents()).map((x) => x.trim())
   t.check(labels.join() === 'Konten Situs,Bisnis,Pelanggan,Agensi Influencer', 'staff sidebar: exactly the four groups, in order', labels.join())
   const names = await p.locator('.side .flow-name').allTextContents()
-  t.check(names.join() === 'Landing page,Tentang kami,Legal,Paket langganan,Payment gateway,Pelanggan & mitra,Pengguna,Contact Us,Pengaduan CS,Influencer,Permintaan,Kampanye', 'staff sidebar: the twelve office sections', names.join())
+  t.check(names.join() === 'Landing page,Tentang kami,Legal,Paket langganan,Payment gateway,Voucher,Pelanggan & mitra,Pengguna,Contact Us,Pengaduan CS,Influencer,Permintaan,Kampanye', 'staff sidebar: the thirteen office sections', names.join())
   t.check(await p.locator('.side').getByText(/Ringkasan|Media Sosial|Bantuan|Pengaturan|Kantor Satu Alur|Mode demo/).count() === 0, 'staff sidebar: no Ringkasan, Media Sosial, Bantuan, Pengaturan or demo badge')
   t.check(await p.locator('.side-user').count() === 1 && await p.getByRole('button', { name: 'Keluar' }).count() === 1 && await p.locator('.topbar-cta').count() === 0, 'staff: user card and sign-out kept, no topbar action button')
   t.check(await p.locator('.view > h1').count() === 1 && (await p.locator('.view > h1').textContent()) === 'Landing page', 'staff page has one h1 with the section label')
@@ -343,6 +343,39 @@ module.exports = async function office(t) {
   await tes.click()
   await p.locator('.note-ok', { hasText: 'Terhubung ke Midtrans (sandbox).' }).waitFor({ timeout: 8000 })
   t.check(true, 'Tes koneksi: connected (ok note)')
+
+  // vouchers: create one per type rule, the list shows value and usage, toggling active works
+  await sec('Voucher')
+  await p.getByRole('button', { name: 'Buat voucher' }).first().click()
+  await p.waitForSelector('dialog[open]')
+  await p.locator('dialog[open] select[id^="of-vc-type"]').selectOption('credit')
+  t.check(await p.locator('dialog[open] input[id^="of-vc-days"]').isHidden() && await p.locator('dialog[open] input[id^="of-vc-credit"]').isVisible(), 'voucher dialog: "Saldo AI" hides the plan fields')
+  await p.locator('dialog[open] input[id^="of-vc-credit"]').fill('900000')
+  await p.locator('dialog[open] button[type=submit]').click()
+  t.check(/Saldo AI Rp1\.000 sampai Rp500\.000/.test(await p.locator('dialog[open] .field-error').textContent()), 'voucher above the cap is refused in the dialog')
+  await p.locator('dialog[open] input[id^="of-vc-credit"]').fill('30000')
+  await p.locator('dialog[open] input[id^="of-vc-code"]').fill('satu-e2e-ai')
+  await p.locator('dialog[open] button[type=submit]').click()
+  await p.locator('tr[data-code="SATU-E2E-AI"]').waitFor({ timeout: 8000 })
+  const vrow = await p.locator('tr[data-code="SATU-E2E-AI"]').textContent()
+  t.check(/Saldo AI/.test(vrow) && /Rp30\.000/.test(vrow) && /0 \/ 20/.test(vrow) && /Aktif/.test(vrow), 'new voucher row: code upper-cased, value, 0 / 20, Aktif', vrow)
+  await p.getByRole('button', { name: 'Nonaktifkan SATU-E2E-AI' }).click()
+  await p.getByRole('button', { name: 'Aktifkan SATU-E2E-AI' }).waitFor({ timeout: 8000 })
+  t.check(/Nonaktif/.test(await p.locator('tr[data-code="SATU-E2E-AI"]').textContent()), 'Nonaktifkan marks the voucher inactive')
+  await p.getByRole('button', { name: 'Buat voucher' }).first().click()
+  await p.waitForSelector('dialog[open]')
+  await p.locator('dialog[open] input[id^="of-vc-code"]').fill('SATU-E2E-AI')
+  await p.locator('dialog[open] select[id^="of-vc-type"]').selectOption('credit')
+  await p.locator('dialog[open] input[id^="of-vc-credit"]').fill('5000')
+  await p.locator('dialog[open] button[type=submit]').click()
+  await p.locator('dialog[open] .field-error', { hasText: 'Kode voucher sudah dipakai.' }).waitFor({ timeout: 8000 })
+  t.check(true, 'a duplicate code is refused')
+  p.once('dialog', (d) => d.accept()) // "leave without saving?" confirm
+  await p.locator('dialog[open]').getByRole('button', { name: 'Batal' }).click()
+  await p.waitForTimeout(300)
+  t.check(await p.locator('dialog[open]').count() === 0, 'Batal closes the voucher dialog')
+  await sec('Payment gateway')
+  await serverKey.waitFor({ timeout: 8000 })
   await serverKey.fill('salah-123')
   await p.getByRole('button', { name: 'Simpan', exact: true }).click()
   await p.waitForFunction(() => /…-123/.test(document.querySelector('input[type=password]')?.placeholder || ''), null, { timeout: 8000 })
@@ -510,7 +543,7 @@ module.exports = async function office(t) {
   await p.waitForTimeout(500)
   await p.click('.topbar-menu')
   await p.waitForTimeout(400)
-  t.check(await p.locator('.side .flow-item:visible').count() === 12 && await p.locator('.flow-item[data-stage="campaigns"]').isVisible() && await p.locator('.side-label:visible').count() === 4, '360px: the drawer shows the twelve staff items under four groups')
+  t.check(await p.locator('.side .flow-item:visible').count() === 13 && await p.locator('.flow-item[data-stage="campaigns"]').isVisible() && await p.locator('.side-label:visible').count() === 4, '360px: the drawer shows the thirteen staff items under four groups')
   await p.locator('.flow-item[data-stage="requests"]').click()
   await p.waitForTimeout(500)
   t.check(await p.locator('.scrim:not(.scrim-drawer)').isHidden() && await crumb() === 'Agensi Influencer › Permintaan', '360px: choosing an item closes the drawer and updates the breadcrumb')

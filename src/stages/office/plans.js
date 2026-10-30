@@ -7,6 +7,7 @@ import { renderPlanCard } from '../../business/plan-card.js'
 import { PRICING_TIERS } from '../../landing/pricing.js'
 import { stampLine } from './site-landing.js'
 import { LEAVE_MSG } from './site-doc.js'
+import { FEATURES, limitFor } from '../../quota/rules.js'
 
 const { el } = C
 const PERIOD_OPTIONS = [{ value: 'month', label: 'Per bulan' }, { value: 'year', label: 'Per tahun' }, { value: 'once', label: 'Sekali bayar' }, { value: 'custom', label: 'Kustom (tanpa akhiran)' }]
@@ -30,7 +31,7 @@ const fromTier = (t, i) => {
 
 function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   const id = ++seq
-  const v = plan || { slug: '', name: '', tagline: '', price_idr: 0, period: 'month', period_label: '', recommended: 0, badge: '', limits: [], features: [], cta_label: 'Pilih paket', cta_kind: 'signup', active: 1 }
+  const v = plan || { slug: '', name: '', tagline: '', price_idr: 0, period: 'month', period_label: '', recommended: 0, badge: '', limits: [], features: [], quota: {}, cta_label: 'Pilih paket', cta_kind: 'signup', active: 1 }
   const f = (label, key, extra = {}) => C.field({ label, id: `of-pl-${key}-${id}`, value: v[key] ?? '', ...extra })
   const name = f('Nama paket', 'name', { required: true, attrs: { maxlength: '60' } })
   const slug = f('Slug', 'slug', { required: true, hint: 'Huruf kecil, angka, tanda hubung (2-40 karakter).', attrs: { maxlength: '40' } })
@@ -44,6 +45,12 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   const ctaKind = C.select({ label: 'Tujuan tombol', id: `of-pl-cta-${id}`, options: CTA_OPTIONS, value: v.cta_kind })
   const act = C.choiceGroup({ legend: 'Status', name: `of-pl-act-${id}`, options: [{ value: 'on', label: 'Aktif (tampil di landing page)', checked: v.active !== 0 }] })
 
+  // Monthly AI quota per feature: what the app enforces (the "Batas" rows below are only card text).
+  const quotaInputs = FEATURES.map((ft) => {
+    const cur = limitFor(v.quota || {}, ft.key)
+    return { key: ft.key, f: C.field({ label: `${ft.label} (${ft.unit}/bulan)`, id: `of-pl-q-${ft.key}-${id}`, type: 'number', value: cur === null ? '' : String(cur), hint: 'Kosong = tanpa batas.', attrs: { min: '0', step: '1', 'data-quota': ft.key } }) }
+  })
+  const quotaGrid = el('div', { className: 'of-quota-grid' }, ...quotaInputs.map((q) => q.f.wrap))
   const limitRows = el('div', { className: 'of-list' })
   const featureRows = el('div', { className: 'of-list' })
   const preview = el('div', { className: 'lp of-preview', 'aria-live': 'polite' })
@@ -56,6 +63,7 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
     recommended: rec.inputs.on.checked ? 1 : 0, badge: badge.input.value,
     limits: [...limitRows.children].map((r) => ({ label: r.querySelector('[data-k=label]').value, value: r.querySelector('[data-k=value]').value })),
     features: [...featureRows.children].map((r) => r.querySelector('input').value),
+    quota: Object.fromEntries(quotaInputs.map((q) => [q.key, q.f.input.value.trim() === '' ? null : Number(q.f.input.value)])),
     cta_label: ctaLabel.input.value, cta_kind: ctaKind.input.value, active: act.inputs.on.checked ? 1 : 0,
   })
   let base = null // snapshot of the untouched form; null while it is still being filled
@@ -107,6 +115,9 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
       el('div', { className: 'form-row' }, rec.wrap, badge.wrap), el('div', { className: 'form-row' }, ctaLabel.wrap, ctaKind.wrap),
       el('h3', { className: 'field-label' }, 'Batas'), limitRows, addLimit,
       el('h3', { className: 'field-label' }, 'Fitur'), featureRows, addFeature,
+      el('h3', { className: 'field-label' }, 'Kuota AI per bulan'),
+      el('p', { className: 'muted small' }, 'Batas pemakaian AI yang benar-benar berlaku. Setelah kuota habis, pelanggan memakai saldo AI. Paket tidak termasuk saldo AI.'),
+      quotaGrid,
       act.wrap, el('h3', { className: 'field-label' }, 'Pratinjau kartu'), preview, err],
   })
   redraw()
