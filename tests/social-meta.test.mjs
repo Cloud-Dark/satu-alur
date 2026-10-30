@@ -161,3 +161,120 @@ test('postInstagram: still IN_PROGRESS after 5 polls is transient, not ambiguous
     (e) => e.kind === 'transient' && !e.ambiguous)
   assert.equal(f.calls.filter((c) => c.method === 'POST').length, 1)
 })
+
+// ------------------------------------------------------------------ Threads
+const M = await import('../src/social/meta.js')
+const TH = 'https://graph.threads.net'
+
+test('threadsOauthUrl uses threads.net with the Threads scopes', () => {
+  const u = new URL(M.threadsOauthUrl({ appId: 'TA', redirectUri: 'https://a.b/api/social/threads/callback', state: 'S' }))
+  assert.equal(`${u.origin}${u.pathname}`, 'https://threads.net/oauth/authorize')
+  assert.equal(u.searchParams.get('client_id'), 'TA')
+  assert.equal(u.searchParams.get('redirect_uri'), 'https://a.b/api/social/threads/callback')
+  assert.equal(u.searchParams.get('scope'), 'threads_basic,threads_content_publish')
+  assert.equal(u.searchParams.get('response_type'), 'code')
+  assert.equal(u.searchParams.get('state'), 'S')
+})
+
+test('exchangeThreadsCode posts the code, then swaps for a long-lived token', async () => {
+  const f = stub([{ json: { access_token: 'short', user_id: 42 } }, { json: { access_token: 'long', expires_in: 5184000 } }])
+  assert.deepEqual(await M.exchangeThreadsCode({ appId: 'TA', appSecret: 'TS', redirectUri: 'R', code: 'C' }, f), { token: 'long', expiresIn: 5184000 })
+  assert.equal(f.calls[0].url, `${TH}/oauth/access_token`)
+  assert.equal(f.calls[0].method, 'POST')
+  assert.deepEqual(Object.fromEntries(f.calls[0].body), { client_id: 'TA', client_secret: 'TS', grant_type: 'authorization_code', redirect_uri: 'R', code: 'C' })
+  const u = new URL(f.calls[1].url)
+  assert.equal(`${u.origin}${u.pathname}`, `${TH}/access_token`)
+  assert.equal(f.calls[1].method, 'GET')
+  assert.equal(u.searchParams.get('grant_type'), 'th_exchange_token')
+  assert.equal(u.searchParams.get('client_secret'), 'TS')
+  assert.equal(u.searchParams.get('access_token'), 'short')
+})
+
+test('threadsProfile reads id and username', async () => {
+  const f = stub([{ json: { id: 'TU', username: 'kedai' } }])
+  assert.deepEqual(await M.threadsProfile('LT', f), { id: 'TU', username: 'kedai' })
+  const u = new URL(f.calls[0].url)
+  assert.equal(`${u.origin}${u.pathname}`, `${TH}/v1.0/me`)
+  assert.equal(u.searchParams.get('fields'), 'id,username')
+  assert.equal(u.searchParams.get('access_token'), 'LT')
+})
+
+test('refreshThreadsToken uses th_refresh_token', async () => {
+  const f = stub([{ json: { access_token: 'new', expires_in: 5184000 } }])
+  assert.deepEqual(await M.refreshThreadsToken('old', f), { token: 'new', expiresIn: 5184000 })
+  const u = new URL(f.calls[0].url)
+  assert.equal(`${u.origin}${u.pathname}`, `${TH}/refresh_access_token`)
+  assert.equal(u.searchParams.get('grant_type'), 'th_refresh_token')
+  assert.equal(u.searchParams.get('access_token'), 'old')
+})
+
+test('refreshThreadsToken: code 190 is a token error', async () => {
+  const f = stub([{ status: 400, json: { error: { message: 'expired', code: 190 } } }])
+  await assert.rejects(M.refreshThreadsToken('old', f), (e) => e instanceof MetaError && e.kind === 'token')
+})
+
+test('postThreads text-only: container, status, publish, permalink', async () => {
+  const f = stub([{ json: { id: 'C1' } }, { json: { status: 'FINISHED' } }, { json: { id: 'T1' } }, { json: { permalink: 'https://www.threads.net/@k/post/1' } }])
+  const r = await M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'halo', wait: async () => {} }, f)
+  assert.deepEqual(r, { id: 'T1', permalink: 'https://www.threads.net/@k/post/1' })
+  assert.equal(f.calls[0].url, `${TH}/v1.0/TU/threads`)
+  assert.equal(f.calls[0].method, 'POST')
+  assert.equal(f.calls[0].body.get('media_type'), 'TEXT')
+  assert.equal(f.calls[0].body.get('text'), 'halo')
+  assert.equal(f.calls[0].body.get('image_url'), null)
+  assert.equal(f.calls[0].body.get('access_token'), 'TT')
+  assert.match(f.calls[1].url, /^https:\/\/graph\.threads\.net\/v1\.0\/C1\?.*fields=status/)
+  assert.equal(f.calls[2].url, `${TH}/v1.0/TU/threads_publish`)
+  assert.equal(f.calls[2].body.get('creation_id'), 'C1')
+  assert.match(f.calls[3].url, /^https:\/\/graph\.threads\.net\/v1\.0\/T1\?.*fields=permalink/)
+})
+
+test('postThreads with an image uses IMAGE and image_url', async () => {
+  const f = stub([{ json: { id: 'C1' } }, { json: { status: 'FINISHED' } }, { json: { id: 'T1' } }, { json: { permalink: 'p' } }])
+  await M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'halo', imageUrl: 'https://x/i.jpg', wait: async () => {} }, f)
+  assert.equal(f.calls[0].body.get('media_type'), 'IMAGE')
+  assert.equal(f.calls[0].body.get('image_url'), 'https://x/i.jpg')
+})
+
+test('postThreads polls until FINISHED', async () => {
+  const waits = []
+  const f = stub([{ json: { id: 'C1' } }, { json: { status: 'IN_PROGRESS' } }, { json: { status: 'FINISHED' } }, { json: { id: 'T1' } }, { json: { permalink: 'p' } }])
+  await M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'x', wait: async (ms) => { waits.push(ms) } }, f)
+  assert.deepEqual(waits, [1500])
+  assert.equal(f.calls[3].url, `${TH}/v1.0/TU/threads_publish`)
+})
+
+test('postThreads: container ERROR or EXPIRED is fatal and never publishes', async () => {
+  for (const status of ['ERROR', 'EXPIRED']) {
+    const f = stub([{ json: { id: 'C1' } }, { json: { status } }])
+    await assert.rejects(M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'x', wait: async () => {} }, f),
+      (e) => e instanceof MetaError && e.kind === 'fatal' && e.message === 'Threads menolak konten ini.')
+    assert.equal(f.calls.length, 2)
+  }
+})
+
+test('postThreads: still in progress after 5 polls is transient, not ambiguous', async () => {
+  const f = stub([{ json: { id: 'C1' } }, ...Array.from({ length: 5 }, () => ({ json: { status: 'IN_PROGRESS' } }))])
+  await assert.rejects(M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'x', wait: async () => {} }, f),
+    (e) => e.kind === 'transient' && !e.ambiguous)
+  assert.equal(f.calls.filter((c) => c.method === 'POST').length, 1)
+})
+
+test('postThreads: 5xx or network failure on threads_publish is ambiguous', async () => {
+  for (const fail of [{ status: 500, json: { error: { message: 'boom', code: 2 } } }, new Error('reset')]) {
+    const f = stub([{ json: { id: 'C1' } }, { json: { status: 'FINISHED' } }, fail])
+    await assert.rejects(M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'x', wait: async () => {} }, f),
+      (e) => e.kind === 'transient' && e.ambiguous === true)
+  }
+})
+
+test('postThreads: 5xx creating the container is not ambiguous', async () => {
+  const f = stub([{ status: 500, json: { error: { message: 'boom', code: 2 } } }])
+  await assert.rejects(M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'x', wait: async () => {} }, f),
+    (e) => e.kind === 'transient' && !e.ambiguous)
+})
+
+test('postThreads: permalink failure still resolves with null permalink', async () => {
+  const f = stub([{ json: { id: 'C1' } }, { json: { status: 'FINISHED' } }, { json: { id: 'T1' } }, new Error('boom')])
+  assert.deepEqual(await M.postThreads({ threadsUserId: 'TU', token: 'TT', text: 'x', wait: async () => {} }, f), { id: 'T1', permalink: null })
+})

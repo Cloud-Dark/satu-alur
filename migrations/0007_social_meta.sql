@@ -1,15 +1,22 @@
--- Meta publishing (Facebook Page + linked Instagram) and Satu Alur office requests.
+-- Meta publishing (Facebook Page + linked Instagram, Threads) and Satu Alur office requests.
 
--- One connected Page per business. Never exposed through /api/db (not in TABLES).
--- page_token_enc = AES-GCM output of encryptToken (TOKEN_KEY secret).
+-- One row per business: a connected Facebook Page (page_*, ig_*) and/or a Threads account (threads_*).
+-- Either half may be NULL; the row is deleted once both are disconnected. Never exposed through /api/db (not in TABLES).
+-- page_token_enc / threads_token_enc = AES-GCM output of encryptToken (TOKEN_KEY secret).
+-- threads_expires_at: ISO expiry of the long-lived Threads token; the cron refreshes it 10 days ahead.
 CREATE TABLE IF NOT EXISTS social_accounts (
   owner_id TEXT PRIMARY KEY,
-  page_id TEXT NOT NULL,
+  page_id TEXT,
   page_name TEXT,
-  page_token_enc TEXT NOT NULL,
+  page_token_enc TEXT,
   ig_user_id TEXT,
   ig_username TEXT,
   needs_reconnect INTEGER NOT NULL DEFAULT 0,
+  threads_user_id TEXT,
+  threads_username TEXT,
+  threads_token_enc TEXT,
+  threads_expires_at TEXT,
+  threads_needs_reconnect INTEGER NOT NULL DEFAULT 0,
   connected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
@@ -43,6 +50,7 @@ CREATE TABLE IF NOT EXISTS staff_accounts (
 -- One row per platform per publish/schedule. Kept apart from social_schedules,
 -- which the "Media sosial" stage uses as free-form notes (the cron must never see those).
 -- Status: scheduled | publishing | posted | failed | cancelled
+-- page_id = target account id: the Facebook Page for facebook/instagram, threads_user_id for threads.
 CREATE TABLE IF NOT EXISTS social_posts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   owner_id TEXT NOT NULL,

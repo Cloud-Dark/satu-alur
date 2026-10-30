@@ -43,3 +43,13 @@ test('verifyState: nonce round trip, and a swapped nonce breaks the signature', 
   const bare = await signState({ ownerId: 'u1', exp: now + 600000 }, 'app-secret')
   assert.deepEqual(await verifyState(bare, 'app-secret', now), { ownerId: 'u1', nonce: null })
 })
+
+test('verifyState: a state signed for one purpose never verifies for the other', async () => {
+  const now = Date.now()
+  const th = await signState({ ownerId: 'u1', exp: now + 600000, nonce: 'n', purpose: 'threads' }, 'same-secret')
+  const fb = await signState({ ownerId: 'u1', exp: now + 600000, nonce: 'n' }, 'same-secret')
+  assert.equal(await verifyState(th, 'same-secret', now), null)
+  assert.equal(await verifyState(fb, 'same-secret', now, 'threads'), null)
+  assert.deepEqual(await verifyState(th, 'same-secret', now, 'threads'), { ownerId: 'u1', nonce: 'n' })
+  assert.deepEqual(await verifyState(fb, 'same-secret', now, 'facebook'), { ownerId: 'u1', nonce: 'n' })
+})

@@ -120,7 +120,7 @@ Rute Worker ada di `worker/social.js`; enkripsi token dan `state` OAuth di `src/
 | `VITE_STAFF_USERS` | env build (mode mock/dev) | `staff:rahasia-demo-123` | Akun staf untuk mode mock/e2e (`username:password`, dipisah koma). Kosong secara bawaan. Tidak berpengaruh pada Worker asli. |
 | `PUBLIC_BASE_URL` | var | `https://app.satualur.id` | Origin publik tanpa garis miring di akhir. Dipakai untuk redirect OAuth dan URL gambar yang diambil Meta. |
 | `META_APP_SECRET` | secret | - | App Secret Meta. Juga menandatangani `state` OAuth (berlaku 10 menit). |
-| `TOKEN_KEY` | secret | keluaran `openssl rand -base64 32` | Kunci AES-GCM 32 byte (base64) untuk mengenkripsi token Page di tabel `social_accounts`. Mengganti kunci memutus semua koneksi (pengguna harus menghubungkan ulang). |
+| `TOKEN_KEY` | secret | keluaran `openssl rand -base64 32` | Kunci AES-GCM 32 byte (base64) untuk mengenkripsi token Page dan token Threads di tabel `social_accounts`. Mengganti kunci memutus semua koneksi (pengguna harus menghubungkan ulang). |
 | `MEDIA` | binding R2 | bucket `satu-alur-media` | Gambar posting (JPEG, maks. 8 MB), disajikan publik di `/api/media/<kunci acak 32 hex>`. |
 | `[triggers] crons` | cron | `*/5 * * * *` | Menerbitkan posting terjadwal yang jatuh tempo (maks. 25 baris per putaran). |
 
@@ -143,6 +143,27 @@ Token Meta tidak pernah dikirim ke klien atau ditulis ke log. Tabel `social_acco
 5. Instagram harus akun Business/Creator yang ditautkan ke Halaman Facebook. Bila Halaman tidak punya IG tertaut, koneksi tetap berhasil (hanya Facebook).
 
 Selama aplikasi dalam mode pengembangan, hanya pengguna yang terdaftar sebagai admin/developer/tester aplikasi yang bisa menghubungkan Halaman. **App Review Meta (izin di atas, akses lanjutan) wajib** sebelum bisnis lain (bukan tester) bisa terhubung.
+
+### Threads
+
+Threads adalah koneksi terpisah dari Page Facebook (Threads API, `graph.threads.net` v1.0). Bisnis boleh menghubungkan Threads saja, Facebook saja, atau keduanya; memutuskan satu tidak menyentuh yang lain. Threads dianggap **terkonfigurasi** hanya bila `DEMO_OTP` bukan `"true"` dan `THREADS_APP_ID`, `THREADS_APP_SECRET`, `TOKEN_KEY`, dan `PUBLIC_BASE_URL` semuanya terisi (terlepas dari `META_*`); selain itu `GET /api/social/account` mengembalikan `threads_configured: false` dan kartu Threads di tab Akun menampilkan "belum dikonfigurasi".
+
+| Nama | Jenis | Contoh | Fungsi |
+|------|-------|--------|--------|
+| `THREADS_APP_ID` | var | `1234567890` | Threads App ID (bukan App ID Meta utama). |
+| `THREADS_APP_SECRET` | secret | - | Threads App Secret. Juga menandatangani `state` OAuth Threads (tujuan `threads`, berlaku 10 menit), jadi `state` Threads tidak bisa dipakai di callback Facebook dan sebaliknya. |
+
+```bash
+npx wrangler secret put THREADS_APP_SECRET
+```
+
+1. Di aplikasi Meta yang sama (atau aplikasi baru), tambahkan use case **Access the Threads API**.
+2. Di pengaturan use case Threads, isi **Redirect Callback URLs** dengan `${PUBLIC_BASE_URL}/api/social/threads/callback` (mis. `https://app.satualur.id/api/social/threads/callback`). Uninstall dan delete callback boleh diarahkan ke URL yang sama untuk saat ini.
+3. Izin (scope) yang diminta: `threads_basic`, `threads_content_publish`.
+4. Salin **Threads App ID** ke `THREADS_APP_ID` (di `wrangler.toml`) dan **Threads App Secret** ke secret `THREADS_APP_SECRET`, lalu deploy ulang.
+5. Token Threads berumur panjang (sekitar 60 hari) dan disimpan terenkripsi (`TOKEN_KEY`). Cron memperbaruinya otomatis bila akan kedaluwarsa dalam 10 hari (maks. 20 akun per putaran). Bila pembaruan ditolak karena token tidak valid, kartu Threads meminta **Hubungkan ulang Threads**.
+
+Aturan konten Threads: teks 1–500 karakter, paling banyak 1 tag topik, gambar opsional. Selama aplikasi dalam mode pengembangan, hanya akun Threads yang terdaftar sebagai tester aplikasi yang bisa terhubung; **App Review** untuk `threads_content_publish` wajib sebelum bisnis lain bisa terhubung.
 
 ## Akun staf Kantor Satu Alur
 

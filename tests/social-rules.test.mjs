@@ -5,8 +5,16 @@ import {
   PLATFORMS, validateScheduleAt, toUtcIso, igEligibility, SCHEDULE_STATUS_LABEL, REQUEST_STATUS_LABEL,
 } from '../src/social/rules.js'
 
-test('platforms are Facebook and Instagram only', () => {
-  assert.deepEqual(PLATFORMS, ['facebook', 'instagram'])
+test('platforms are Facebook, Instagram and Threads', () => {
+  assert.deepEqual(PLATFORMS, ['facebook', 'instagram', 'threads'])
+})
+test('threads eligibility', async () => {
+  const { threadsEligibility } = await import('../src/social/rules.js')
+  assert.deepEqual(threadsEligibility({ caption: 'Halo #servis', hasImage: false }), { ok: true })
+  assert.deepEqual(threadsEligibility({ caption: 'a'.repeat(500), hasImage: true }), { ok: true })
+  assert.equal(threadsEligibility({ caption: 'a'.repeat(501), hasImage: false }).reason, 'Threads maksimal 500 karakter.')
+  assert.equal(threadsEligibility({ caption: '#satu #dua', hasImage: false }).reason, 'Threads maksimal 1 tag topik.')
+  assert.equal(threadsEligibility({ caption: '   ', hasImage: true }).reason, 'Isi konten tidak boleh kosong.')
 })
 test('schedule window', () => {
   const now = Date.parse('2026-11-01T00:00:00Z')

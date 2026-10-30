@@ -6,7 +6,7 @@
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
-import { PLATFORMS, validateScheduleAt, igEligibility } from './rules.js'
+import { PLATFORMS, validateScheduleAt, igEligibility, threadsEligibility } from './rules.js'
 import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer, publicInfluencer } from '../office/rules.js'
 import { AGENCY_KEY } from '../agency/api.js'
 
@@ -83,7 +83,8 @@ function settle(s) {
       r.error = 'Meta menolak posting (simulasi).'
     } else {
       r.status = 'posted'
-      r.permalink = r.platform === 'instagram' ? `https://instagram.com/p/demo${r.id}` : `https://facebook.com/demo/${r.id}`
+      r.permalink = r.platform === 'instagram' ? `https://instagram.com/p/demo${r.id}`
+        : r.platform === 'threads' ? `https://www.threads.net/@demo.threads/post/demo${r.id}` : `https://facebook.com/demo/${r.id}`
       r.published_at = new Date(t).toISOString()
     }
     delete r.resolve_at
@@ -92,11 +93,17 @@ function settle(s) {
 
 async function demoCreatePosts(contentId, platforms, scheduledAt, publishing) {
   const list = [...new Set(Array.isArray(platforms) ? platforms : [])]
-  if (!list.length || !list.every((p) => PLATFORMS.includes(p))) throw new Error('Pilih platform Facebook dan/atau Instagram.')
+  if (!list.length || !list.every((p) => PLATFORMS.includes(p))) throw new Error('Pilih platform Facebook, Instagram, dan/atau Threads.')
   const { data } = await db().from('social_contents').select('*').eq('id', Number(contentId)).maybeSingle()
   if (!data) throw new Error('Konten tidak ditemukan.')
   return demo((s) => {
-    if (!s.account) throw new Error('Hubungkan akun Facebook terlebih dahulu.')
+    const a = demoAccount(s) || {}
+    if (list.some((p) => p !== 'threads') && !a.fb_connected) throw new Error('Hubungkan akun Facebook terlebih dahulu.')
+    if (list.includes('threads')) {
+      if (!a.threads_connected) throw new Error('Akun Threads belum terhubung.')
+      const th = threadsEligibility({ caption: data.body || '', hasImage: Boolean(data.image_key) })
+      if (!th.ok) throw new Error(th.reason)
+    }
     if (list.includes('instagram')) {
       if (!data.image_key) throw new Error('Instagram wajib memakai gambar.')
       const ig = igEligibility({ hasImage: true, width: 1, height: 1, caption: data.body || '' })
@@ -122,19 +129,46 @@ const unwrap = ({ data, error }, what) => {
 }
 
 /* ------------------------------------------------------------------ account */
+const FB_OFF = { fb_connected: false, page_name: null, ig_username: null, ig_connected: false, needs_reconnect: false }
+const TH_OFF = { threads_connected: false, threads_username: null, threads_needs_reconnect: false }
+// Same shape as the Worker: null once neither Facebook nor Threads is connected. Older demo stores had Facebook only.
+function demoAccount(s) {
+  if (!s.account) return null
+  const a = { ...FB_OFF, ...TH_OFF, fb_connected: Boolean(s.account.page_name), ...s.account }
+  return a.fb_connected || a.threads_connected ? a : null
+}
+function demoConnect(patch) {
+  demo((s) => { s.account = { ...(demoAccount(s) || { ...FB_OFF, ...TH_OFF }), ...patch } })
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('satualur:db-write'))
+}
+
 export async function getAccount() {
-  if (isUsingMockCloud()) return { configured: true, account: demo((s) => s.account) }
+  if (isUsingMockCloud()) return { configured: true, threads_configured: true, account: demo((s) => demoAccount(s)) }
   return call('/api/social/account')
 }
 
 export async function startConnect() {
   if (isUsingMockCloud()) {
-    demo((s) => { s.account = { page_name: 'Demo Page', ig_username: 'demo', ig_connected: true, needs_reconnect: false } })
-    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('satualur:db-write'))
+    demoConnect({ fb_connected: true, page_name: 'Demo Page', ig_username: 'demo', ig_connected: true, needs_reconnect: false })
     return
   }
   const { url } = await call('/api/social/oauth/start', { method: 'POST' })
   location.href = url
+}
+
+export async function startThreadsConnect() {
+  if (isUsingMockCloud()) {
+    demoConnect({ threads_connected: true, threads_username: 'demo.threads', threads_needs_reconnect: false })
+    return
+  }
+  const { url } = await call('/api/social/threads/start', { method: 'POST' })
+  location.href = url
+}
+
+// Demo: disconnecting Facebook while Threads stays connected gives a Threads-only business (e2e seam).
+export async function disconnectThreads() {
+  if (isUsingMockCloud()) { demo((s) => { s.account = demoAccount(s) && { ...demoAccount(s), ...TH_OFF } }); return }
+  await call('/api/social/threads', { method: 'DELETE' })
 }
 
 export async function listPagesToPick(pick) {
@@ -148,7 +182,7 @@ export async function pickPage(pick, pageId) {
 }
 
 export async function disconnect() {
-  if (isUsingMockCloud()) { demo((s) => { s.account = null }); return }
+  if (isUsingMockCloud()) { demo((s) => { s.account = demoAccount(s) && { ...demoAccount(s), ...FB_OFF } }); return }
   await call('/api/social/account', { method: 'DELETE' })
 }
 

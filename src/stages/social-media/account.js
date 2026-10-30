@@ -24,22 +24,44 @@ function legacyRows() {
   return rows.length ? rows : null
 }
 
-function connectPanel(ctx) {
-  const { account, configured, status } = ctx
+// Connect / disconnect helpers shared by the Facebook & Instagram card and the Threads card.
+function cardKit(ctx, startConnect, disconnect) {
   const button = (label, extra = {}) => C.button({ label, icon: 'plug', variant: 'primary', ...extra })
   const run = async (btn, busy, fn) => {
     const restore = C.setBusy(btn, busy)
-    status.hide()
-    try { await fn() } catch (err) { status.show('danger', err.message) } finally { restore() }
+    ctx.status.hide()
+    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore() }
   }
   const connect = (label) => {
     const btn = button(label)
     btn.addEventListener('click', () => run(btn, 'Menghubungkan…', async () => {
-      await Social.startConnect()
+      await startConnect()
       await ctx.refresh() // demo mode connects in place; the real flow navigates away
     }))
     return btn
   }
+  const off = (name) => {
+    const btn = C.button({ label: 'Putuskan', icon: 'x', variant: 'ghost' })
+    btn.addEventListener('click', () => {
+      if (!confirm(`Putuskan ${name}? Jadwal yang belum tayang tidak akan terkirim.`)) return
+      run(btn, 'Memutuskan…', async () => {
+        await disconnect()
+        await ctx.refresh()
+        showToast('Akun diputuskan.', 'success')
+      })
+    })
+    return btn
+  }
+  return { button, connect, off }
+}
+
+const reconnectNote = (name) => el('div', { className: 'note note-warn', role: 'status' }, C.icon('alert'),
+  el('div', { className: 'note-body' }, el('p', {}, `Koneksi ke ${name} perlu diperbarui sebelum Anda bisa membagikan konten.`)))
+
+function connectPanel(ctx) {
+  const { configured } = ctx
+  const account = ctx.account?.fb_connected ? ctx.account : null
+  const { button, connect, off: offButton } = cardKit(ctx, Social.startConnect, Social.disconnect)
   if (!configured) {
     return C.panel({ title: 'Akun Meta', raised: true },
       el('p', {}, 'Integrasi Meta belum dikonfigurasi oleh admin.'),
@@ -50,23 +72,34 @@ function connectPanel(ctx) {
       el('p', {}, 'Hubungkan Page Facebook Anda (dan akun Instagram Bisnis yang tertaut) untuk membagikan konten langsung dari sini.'),
       el('div', { className: 'form-actions' }, connect('Hubungkan Facebook & Instagram')))
   }
-  const off = C.button({ label: 'Putuskan', icon: 'x', variant: 'ghost' })
-  off.addEventListener('click', () => {
-    if (!confirm(`Putuskan ${account.page_name}? Jadwal yang belum tayang tidak akan terkirim.`)) return
-    run(off, 'Memutuskan…', async () => {
-      await Social.disconnect()
-      await ctx.refresh()
-      showToast('Akun diputuskan.', 'success')
-    })
-  })
+  const off = offButton(account.page_name || 'Page Facebook')
   return C.panel({ title: 'Akun Meta', meta: 'Terhubung', raised: true },
     C.defList([
       ['Page Facebook', account.page_name],
       ['Instagram', account.ig_username ? `@${account.ig_username}` : 'Hubungkan akun Instagram Bisnis ke Page ini'],
     ]),
-    account.needs_reconnect ? el('div', { className: 'note note-warn', role: 'status' }, C.icon('alert'),
-      el('div', { className: 'note-body' }, el('p', {}, 'Koneksi ke Meta perlu diperbarui sebelum Anda bisa membagikan konten.'))) : null,
+    account.needs_reconnect ? reconnectNote('Meta') : null,
     el('div', { className: 'form-actions' }, account.needs_reconnect ? connect('Hubungkan ulang') : null, off))
+}
+
+function threadsPanel(ctx) {
+  const account = ctx.account?.threads_connected ? ctx.account : null
+  const { button, connect, off } = cardKit(ctx, Social.startThreadsConnect, Social.disconnectThreads)
+  if (!ctx.threadsConfigured) {
+    return C.panel({ title: 'Akun Threads', raised: true },
+      el('p', {}, 'Integrasi Threads belum dikonfigurasi oleh admin.'),
+      el('div', { className: 'form-actions' }, button('Hubungkan Threads', { disabled: true })))
+  }
+  if (!account) {
+    return C.panel({ title: 'Akun Threads', meta: 'Belum terhubung', raised: true },
+      el('p', {}, 'Hubungkan akun Threads Anda untuk membagikan dan menjadwalkan posting Threads dari sini. Tidak perlu Page Facebook.'),
+      el('div', { className: 'form-actions' }, connect('Hubungkan Threads')))
+  }
+  const name = `@${account.threads_username || 'threads'}`
+  return C.panel({ title: 'Akun Threads', meta: 'Terhubung', raised: true },
+    C.defList([['Threads', name]]),
+    account.threads_needs_reconnect ? reconnectNote('Threads') : null,
+    el('div', { className: 'form-actions' }, account.threads_needs_reconnect ? connect('Hubungkan ulang Threads') : null, off(name)))
 }
 
 function pickPanel(ctx) {
@@ -122,5 +155,6 @@ export function render(host, ctx) {
   host.replaceChildren(el('div', { className: 'workspace-stack' },
     ctx.pick ? pickPanel(ctx) : null,
     connectPanel(ctx),
+    threadsPanel(ctx),
     legacy ? importPanel(ctx, legacy) : null))
 }

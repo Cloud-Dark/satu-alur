@@ -25,7 +25,7 @@ test('social client demo mode', async () => {
     const session = await cloud.auth.getSession()
     assert.equal(session.data.is_admin, false, 'a demo login is never Satu Alur staff (only /super-admin-login is)')
 
-    assert.deepEqual(await api.getAccount(), { configured: true, account: null })
+    assert.deepEqual(await api.getAccount(), { configured: true, threads_configured: true, account: null })
     await api.startConnect()
     assert.equal((await api.getAccount()).account.page_name, 'Demo Page')
 
@@ -73,9 +73,32 @@ test('social client demo mode', async () => {
     await api.deleteContent(withImg.id)
     assert.equal((await api.listContents()).some((c) => c.id === withImg.id), false)
 
+    // Threads: text-only posts, #gagal fails, independent of the Facebook connection
+    await assert.rejects(api.publishNow(ok.id, ['threads']), /Akun Threads belum terhubung/)
+    await api.startThreadsConnect()
+    assert.equal((await api.getAccount()).account.threads_username, 'demo.threads')
+    const [th] = await api.publishNow(ok.id, ['threads'])
+    assert.equal(th.status, 'posted')
+    assert.equal(th.permalink, `https://www.threads.net/@demo.threads/post/demo${th.id}`)
+    assert.equal((await api.publishNow(bad.id, ['threads']))[0].status, 'failed')
+    await api.saveContent({ kind: 'content', body: '#satu #dua' })
+    const tags = (await api.listContents()).find((c) => c.body === '#satu #dua')
+    await assert.rejects(api.publishNow(tags.id, ['threads']), /Threads maksimal 1 tag topik/)
+
+    await api.disconnect()
+    let acct = (await api.getAccount()).account
+    assert.equal(acct.fb_connected, false)
+    assert.equal(acct.threads_connected, true, 'disconnecting Facebook keeps Threads')
+    await assert.rejects(api.publishNow(ok.id, ['facebook']), /Hubungkan akun Facebook/)
+    assert.equal((await api.publishNow(ok.id, ['threads']))[0].status, 'posted', 'Threads-only business can publish')
+
+    await api.startConnect()
+    await api.disconnectThreads()
+    acct = (await api.getAccount()).account
+    assert.equal(acct.fb_connected, true, 'disconnecting Threads keeps Facebook')
+    assert.equal(acct.threads_connected, false)
     await api.disconnect()
     assert.equal((await api.getAccount()).account, null)
-    await assert.rejects(api.publishNow(ok.id, ['facebook']), /Hubungkan akun Facebook/)
 
     assert.equal((await api.listInfluencers()).length, 6)
     await api.adminSaveInfluencer({ name: 'Rani Baru', niche: 'Kuliner', city: 'Medan' })
@@ -110,8 +133,8 @@ test('live publishNow: lost response, network error or 5xx is reported as uncert
     await assert.rejects(api.publishNow(1, ['facebook']), { message: UNCERTAIN })
     globalThis.fetch = reply(200, '')
     await assert.rejects(api.publishNow(1, ['facebook']), { message: UNCERTAIN })
-    globalThis.fetch = reply(400, JSON.stringify({ error: { message: 'Pilih platform Facebook dan/atau Instagram.' } }))
-    await assert.rejects(api.publishNow(1, ['facebook']), { message: 'Pilih platform Facebook dan/atau Instagram.' })
+    globalThis.fetch = reply(400, JSON.stringify({ error: { message: 'Pilih platform Facebook, Instagram, dan/atau Threads.' } }))
+    await assert.rejects(api.publishNow(1, ['facebook']), { message: 'Pilih platform Facebook, Instagram, dan/atau Threads.' })
     globalThis.fetch = reply(200, JSON.stringify({ data: [{ id: 1, status: 'posted' }] }))
     assert.deepEqual(await api.publishNow(1, ['facebook']), [{ id: 1, status: 'posted' }])
   } finally {

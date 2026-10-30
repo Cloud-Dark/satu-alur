@@ -1,13 +1,13 @@
 /**
- * Publishes social_posts rows to Meta. Pure: the store, account lookup and
+ * Publishes social_posts rows to Meta (Facebook, Instagram, Threads). Pure: the store, account lookup and
  * fetch are injected (D1 adapter in worker/social.js). Tokens are never logged.
  * Unit test: tests/social-runner.test.mjs
  */
-import { postFacebook, postInstagram, MetaError } from './meta.js'
+import { postFacebook, postInstagram, postThreads, MetaError } from './meta.js'
 
 const MAX_ATTEMPTS = 3
 const STUCK_MS = 15 * 60 * 1000
-const MISMATCH = 'Akun Facebook berubah atau terputus, jadwalkan ulang'
+const mismatch = (name) => `Akun ${name} berubah atau terputus, jadwalkan ulang`
 const STUCK = 'Status tidak pasti, periksa halaman Anda'
 const GENERIC = 'Gagal memposting ke Meta.'
 
@@ -23,15 +23,18 @@ export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, no
   try {
     const account = await getAccount(row.owner_id)
     const ig = row.platform === 'instagram'
-    if (!account || account.page_id !== row.page_id || (ig && !account.ig_user_id)) {
-      await store.markFailed(row.id, MISMATCH)
+    const th = row.platform === 'threads'
+    // row.page_id holds the target account id: the Threads user for threads, the Facebook Page otherwise.
+    const target = th ? account?.threads_user_id : account?.page_id
+    if (!target || target !== row.page_id || (ig && !account.ig_user_id)) {
+      await store.markFailed(row.id, mismatch(th ? 'Threads' : 'Facebook'))
       return 'failed'
     }
     const imageUrl = row.image_key ? mediaUrl(row.image_key) : undefined
     const text = row.content || ''
-    result = ig
-      ? await postInstagram({ igUserId: account.ig_user_id, pageToken: account.pageToken, caption: text, imageUrl, wait }, fetchFn)
-      : await postFacebook({ pageId: account.page_id, pageToken: account.pageToken, message: text, imageUrl }, fetchFn)
+    if (th) result = await postThreads({ threadsUserId: target, token: account.threadsToken, text, imageUrl, wait }, fetchFn)
+    else if (ig) result = await postInstagram({ igUserId: account.ig_user_id, pageToken: account.pageToken, caption: text, imageUrl, wait }, fetchFn)
+    else result = await postFacebook({ pageId: target, pageToken: account.pageToken, message: text, imageUrl }, fetchFn)
   } catch (err) {
     if (!(err instanceof MetaError)) {
       console.error('Social publish failed', err?.name) // name only: the message could carry request data
@@ -46,7 +49,7 @@ export async function publishRow(row, { store, getAccount, mediaUrl, fetchFn, no
       await store.requeue(row.id, err.message)
       return 'requeued'
     }
-    if (err.kind === 'token') await store.flagReconnect(row.owner_id)
+    if (err.kind === 'token') await store.flagReconnect(row.owner_id, row.platform)
     await store.markFailed(row.id, err.message)
     return 'failed'
   }

@@ -156,7 +156,7 @@ Sidebar → **Media Sosial**. Tab: Akun, Konten, Jadwal, Brainstorm, Iklan, Kola
 Mode demo: tidak memanggil Meta; akun dan hasil terbit disimulasikan. Konten yang memuat `#gagal` sengaja gagal.
 
 1. **Media Sosial → Akun**: **Hubungkan Facebook & Instagram**, pilih Halaman bila ada beberapa. Tampil nama Halaman dan akun Instagram tertaut.
-2. Tab **Konten**: simpan konten, tambahkan gambar JPEG, lalu **Bagikan sekarang** ke Facebook dan/atau Instagram. Instagram wajib bergambar.
+2. Tab **Konten**: simpan konten, tambahkan gambar JPEG, lalu **Bagikan sekarang** ke Facebook, Instagram, dan/atau Threads. Instagram wajib bergambar; Threads boleh teks saja (hubungkan dulu di kartu **Akun Threads**).
 3. Buat konten berisi `#gagal`, bagikan: baris gagal dengan pesan galat, tunjukkan bahwa yang lain tetap jalan.
 4. Tab **Jadwal → Daftar konten**: jadwalkan (**Jadwalkan tayang**, waktu WIB, minimal 1 menit ke depan), lalu **Batalkan** satu jadwal. **Laporan tayang** menampilkan hasilnya. Di produksi cron memproses tiap 5 menit.
 5. Tab **Kolaborasi**: pilih influencer dari katalog, **Ajukan kolaborasi**. Tab **Iklan**: **Lihat rekomendasi**, lalu **Ajukan iklan** ke tim Satu Alur.

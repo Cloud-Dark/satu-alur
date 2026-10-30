@@ -25,20 +25,21 @@ export async function decryptToken(blob, keyB64) {
   return dec.decode(pt)
 }
 
-export async function signState({ ownerId, exp, nonce }, secret) {
-  const payload = b64url(enc.encode(JSON.stringify({ ownerId, exp, nonce })))
+// `purpose` ('facebook' | 'threads') keeps one flow's state from completing the other's callback.
+export async function signState({ ownerId, exp, nonce, purpose = 'facebook' }, secret) {
+  const payload = b64url(enc.encode(JSON.stringify({ ownerId, exp, nonce, purpose })))
   const sig = await crypto.subtle.sign('HMAC', await hmacKey(secret), enc.encode(payload))
   return `${payload}.${b64url(sig)}`
 }
 
-export async function verifyState(state, secret, now = Date.now()) {
+export async function verifyState(state, secret, now = Date.now(), purpose = 'facebook') {
   try {
     const [payload, sig, extra] = String(state).split('.')
     if (!payload || !sig || extra !== undefined) return null
     // crypto.subtle.verify compares in constant time.
     if (!(await crypto.subtle.verify('HMAC', await hmacKey(secret), unb64url(sig), enc.encode(payload)))) return null
-    const { ownerId, exp, nonce } = JSON.parse(dec.decode(unb64url(payload)))
-    if (typeof ownerId !== 'string' || !ownerId || !(Number(exp) >= now)) return null
+    const { ownerId, exp, nonce, purpose: p } = JSON.parse(dec.decode(unb64url(payload)))
+    if (typeof ownerId !== 'string' || !ownerId || !(Number(exp) >= now) || p !== purpose) return null
     return { ownerId, nonce: typeof nonce === 'string' ? nonce : null }
   } catch {
     return null

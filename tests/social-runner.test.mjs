@@ -31,7 +31,7 @@ function memStore(rows) {
     async markPosted(id, v) { fromPublishing(id, () => ({ status: 'posted', error: null, ...v })) },
     async requeue(id, error) { fromPublishing(id, (r) => ({ status: 'scheduled', attempts: r.attempts + 1, error })) },
     async markFailed(id, error) { fromPublishing(id, () => ({ status: 'failed', error })) },
-    async flagReconnect(ownerId) { flagged.push(ownerId) },
+    async flagReconnect(ownerId, platform) { flagged.push(`${ownerId}:${platform}`) },
     async listStuck(beforeIso) {
       return rows.filter((r) => r.status === 'publishing' && r.claimed_at < beforeIso).map((r) => ({ ...r }))
     },
@@ -146,7 +146,7 @@ test('token error (190) fails and flags reconnect', async () => {
   const f = stubFetch([{ status: 400, json: { error: { message: 'Token kedaluwarsa', code: 190 } } }])
   assert.equal(await publishRow(store.rows[0], deps(store, f)), 'failed')
   assert.equal(store.rows[0].error, 'Token kedaluwarsa')
-  assert.deepEqual(store.flagged, ['u1'])
+  assert.deepEqual(store.flagged, ['u1:facebook'])
 })
 
 test('unexpected exception fails with a generic message', async () => {
@@ -206,4 +206,53 @@ test('a 2xx without an id is still marked posted', async () => {
   assert.equal(store.rows[0].status, 'posted')
   assert.equal(store.rows[0].platform_post_id, null)
   assert.equal(store.rows[0].permalink, null)
+})
+
+// ------------------------------------------------------------------ Threads
+const TH_MISMATCH = 'Akun Threads berubah atau terputus, jadwalkan ulang'
+const TH_ACCOUNT = { page_id: null, pageToken: null, ig_user_id: null, threads_user_id: 'TU', threadsToken: 'TT' }
+const thRow = (over = {}) => row({ platform: 'threads', page_id: 'TU', ...over })
+
+test('Threads post goes to the Threads account and is marked posted', async () => {
+  const store = memStore([thRow()])
+  const f = stubFetch([{ json: { id: 'C' } }, { json: { status: 'FINISHED' } }, { json: { id: 'T1' } }, { json: { permalink: 'https://www.threads.net/@k/post/1' } }])
+  assert.equal(await publishRow(store.rows[0], { ...deps(store, f, TH_ACCOUNT), wait: async () => {} }), 'posted')
+  assert.equal(f.calls[0].url, 'https://graph.threads.net/v1.0/TU/threads')
+  assert.equal(store.rows[0].platform_post_id, 'T1')
+  assert.equal(store.rows[0].permalink, 'https://www.threads.net/@k/post/1')
+})
+
+test('Threads: mismatched threads_user_id fails with the Threads message without calling Meta', async () => {
+  for (const account of [{ ...TH_ACCOUNT, threads_user_id: 'OTHER' }, { ...ACCOUNT, threads_user_id: null }, null]) {
+    const store = memStore([thRow()])
+    const f = stubFetch([])
+    assert.equal(await publishRow(store.rows[0], deps(store, f, account)), 'failed')
+    assert.equal(store.rows[0].error, TH_MISMATCH)
+    assert.equal(f.calls.length, 0)
+  }
+})
+
+test('Facebook row on a Threads-only account fails with the Facebook message', async () => {
+  for (const r of [row(), row({ page_id: null })]) {
+    const store = memStore([r])
+    const f = stubFetch([])
+    assert.equal(await publishRow(store.rows[0], deps(store, f, TH_ACCOUNT)), 'failed')
+    assert.equal(store.rows[0].error, MISMATCH)
+    assert.equal(f.calls.length, 0)
+  }
+})
+
+test('Threads: ambiguous final publish fails as uncertain and is never requeued', async () => {
+  const store = memStore([thRow()])
+  const f = stubFetch([{ json: { id: 'C' } }, { json: { status: 'FINISHED' } }, { status: 503, json: { error: { message: 'timeout', code: 2 } } }])
+  assert.equal(await publishRow(store.rows[0], { ...deps(store, f, TH_ACCOUNT), wait: async () => {} }), 'failed')
+  assert.equal(store.rows[0].error, 'Status tidak pasti, periksa halaman Anda')
+  assert.equal(store.rows[0].attempts, 0)
+})
+
+test('Threads: token error flags the Threads connection, not Facebook', async () => {
+  const store = memStore([thRow()])
+  const f = stubFetch([{ status: 400, json: { error: { message: 'Token kedaluwarsa', code: 190 } } }])
+  assert.equal(await publishRow(store.rows[0], deps(store, f, TH_ACCOUNT)), 'failed')
+  assert.deepEqual(store.flagged, ['u1:threads'])
 })

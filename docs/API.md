@@ -222,19 +222,22 @@ Kesalahan sebelum stream dimulai berupa JSON biasa (400/401/502). Pembatalan: tu
 
 Semua rute wajib masuk, kecuali `oauth/callback` (dipanggil Meta; dicek lewat `state` + cookie) dan `GET /api/media/:key` (publik, agar Meta bisa mengambil gambar). Kode: `worker/social.js`; konfigurasi: [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md). `social_posts` hanya bisa dibaca lewat `/api/db` (tulis lewat rute di bawah); `social_accounts` tidak bisa diakses lewat `/api/db`.
 
-Akun demo bersama (`DEMO_EMAILS`, dipakai `demo-login`) mendapat 403 "Tidak tersedia di akun demo." pada `oauth/start`, `oauth/pick`, `publish`, `schedule` dan `media`, dan `GET /api/social/account` untuk mereka selalu `configured: false`. Selama `DEMO_OTP` = `"true"` integrasi dianggap belum dikonfigurasi dan tidak ada admin (lihat [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md)).
+Akun demo bersama (`DEMO_EMAILS`, dipakai `demo-login`) mendapat 403 "Tidak tersedia di akun demo." pada `oauth/start`, `threads/start`, `oauth/pick`, `publish`, `schedule` dan `media`, dan `GET /api/social/account` untuk mereka selalu `configured: false`. Selama `DEMO_OTP` = `"true"` integrasi dianggap belum dikonfigurasi dan tidak ada admin (lihat [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md)).
 
 | Rute | Fungsi | Kesalahan |
 |------|--------|-----------|
-| `GET /api/social/account` | `{ configured, account: { page_name, ig_username, ig_connected, needs_reconnect } }`; `account` null bila belum terhubung | - |
-| `DELETE /api/social/account` | Putuskan akun | - |
+| `GET /api/social/account` | `{ configured, threads_configured, account: { fb_connected, page_name, ig_username, ig_connected, needs_reconnect, threads_connected, threads_username, threads_needs_reconnect } }`; `account` null bila Facebook maupun Threads belum terhubung. Tidak pernah berisi token | - |
+| `DELETE /api/social/account` | Putuskan Facebook (dan Instagram); Threads tetap terhubung | - |
+| `POST /api/social/threads/start` | `{ url }` ke `threads.net/oauth/authorize` (scope `threads_basic,threads_content_publish`), memasang cookie `__Host-social_nonce` yang sama. `state` bertujuan `threads`, jadi tidak berlaku di callback Facebook dan sebaliknya | 503 bila Threads belum dikonfigurasi |
+| `GET /api/social/threads/callback` | Mengalihkan (302) ke aplikasi: `?social=threads_connected` atau `?social_error=` | - |
+| `DELETE /api/social/threads` | Putuskan Threads; Facebook tetap terhubung | - |
 | `POST /api/social/oauth/start` | `{ url }` ke dialog Meta. Sekaligus memasang cookie sekali pakai `__Host-social_nonce` (HttpOnly, 10 menit) yang dicocokkan callback | 400 bila belum dikonfigurasi |
 | `GET /api/social/oauth/callback` | Mengalihkan (302) ke aplikasi: `?social=connected`, `?social_pick=<id>` bila ada lebih dari satu Halaman, atau pesan galat. Menolak `state` kedaluwarsa atau cookie tidak cocok | - |
 | `GET /api/social/oauth/pages?pick=<id>` | Daftar Halaman `[{ id, name, ig_username }]` (pilihan disimpan terenkripsi di D1 `social_oauth_picks`, sekali pakai) | 404 bila pilihan kedaluwarsa (10 menit) |
 | `POST /api/social/oauth/pick` | Body `{ pick, page_id }`; menyimpan Halaman terpilih | 400 Halaman tak dikenal, 404 |
-| `POST /api/social/media` | Unggah JPEG mentah (`content-type: image/jpeg`, maks. 8 MB); `{ key }`. Hanya bila integrasi terkonfigurasi dan pemanggil punya akun Facebook terhubung atau admin | 403 "Hubungkan akun Facebook terlebih dahulu.", 400 bukan JPEG, 413, 415, 503 bila R2 belum ada |
+| `POST /api/social/media` | Unggah JPEG mentah (`content-type: image/jpeg`, maks. 8 MB); `{ key }`. Hanya bila integrasi Meta atau Threads terkonfigurasi dan pemanggil punya akun terhubung atau admin | 403 "Hubungkan akun media sosial terlebih dahulu.", 400 bukan JPEG, 413, 415, 503 bila R2 belum ada |
 | `GET /api/media/:key` | Gambar publik (kunci 32 hex) | 404 |
-| `POST /api/social/publish` | Body `{ content_id, platforms: ["facebook","instagram"] }`; terbit sekarang, mengembalikan baris `social_posts` hasilnya. Tidak pernah dicoba ulang: galat sementara langsung `failed` | 400, 404 konten tak ditemukan |
+| `POST /api/social/publish` | Body `{ content_id, platforms: ["facebook","instagram","threads"] }` (hanya platform yang terhubung; Threads: teks 1–500 karakter, maks. 1 tag topik); terbit sekarang, mengembalikan baris `social_posts` hasilnya. Tidak pernah dicoba ulang: galat sementara langsung `failed` | 400, 404 konten tak ditemukan |
 | `POST /api/social/schedule` | Body sama + `scheduled_at` (ISO; 1 menit sampai 75 hari ke depan); mengembalikan baris berstatus `scheduled` | 400 |
 | `DELETE /api/social/schedule/:id` | Batalkan baris yang masih `scheduled` | 409 bila sudah diproses |
 

@@ -2,12 +2,18 @@ import * as AI from '../../ai/superpowers.js'
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
-import { igEligibility } from '../../social/rules.js'
+import { igEligibility, threadsEligibility } from '../../social/rules.js'
 import { toJpeg } from '../../social/image.js'
-import { PLATFORM_LABEL, connectedPlatforms, platformReason } from './platforms.js'
+import { PLATFORMS as AI_PLATFORMS } from '../../ai/social-agent.js'
+import { PLATFORM_LABEL, connectedPlatforms, platformReason, canShare } from './platforms.js'
 
 const { el } = C
-const PLATFORMS = [{ value: 'instagram', label: 'Instagram' }, { value: 'facebook', label: 'Facebook' }]
+const PLATFORMS = [{ value: 'instagram', label: 'Instagram' }, { value: 'facebook', label: 'Facebook' }, { value: 'threads', label: 'Threads' }]
+const THREADS_STYLE = AI_PLATFORMS.find((p) => p.value === 'threads')
+// Threads gets the fork's style rule; Instagram and Facebook keep the plain prompt.
+const styleOf = (platform) => (platform === 'threads'
+  ? ` Gaya platform: ${THREADS_STYLE.style}. Batas teks ${THREADS_STYLE.limit} karakter.`
+  : ' Sertakan hashtag relevan.')
 let seq = 0
 
 // Editable content with image, platform checkboxes, Simpan and Bagikan sekarang.
@@ -25,15 +31,19 @@ function composer(ctx, item, initialBody, onCreated) {
   const now = C.button({ label: 'Bagikan sekarang', icon: 'send', variant: 'primary' })
   const checks = {}
 
-  function igCheck() {
-    return igEligibility({ hasImage: Boolean(state.imageKey), width: state.w, height: state.h, caption: body.input.value })
+  function eligibility() {
+    const caption = body.input.value
+    const hasImage = Boolean(state.imageKey)
+    return { instagram: igEligibility({ hasImage, width: state.w, height: state.h, caption }), threads: threadsEligibility({ hasImage, caption }) }
   }
-  function syncIg() {
-    if (!checks.instagram) return
-    const reason = platformReason(ctx.account, 'instagram', igCheck())
-    checks.instagram.input.disabled = Boolean(reason)
-    if (reason) checks.instagram.input.checked = false
-    checks.instagram.hint.textContent = reason
+  function syncElig() {
+    const elig = eligibility()
+    for (const [p, c] of Object.entries(checks)) {
+      const reason = platformReason(ctx.account, p, elig)
+      c.input.disabled = Boolean(reason)
+      if (reason) c.input.checked = false
+      c.hint.textContent = reason
+    }
   }
   function drawImage() {
     const url = state.imageKey ? Social.mediaUrl(state.imageKey) : ''
@@ -41,28 +51,27 @@ function composer(ctx, item, initialBody, onCreated) {
       url ? el('img', { src: url, alt: 'Pratinjau gambar konten', className: 'sm-image-preview', style: 'max-width:160px;max-height:160px;border-radius:8px' })
         : el('p', { className: 'muted small' }, 'Gambar terlampir.'),
       removeImg] : []))
-    syncIg()
+    syncElig()
   }
   function drawShare() {
-    if (!ctx.account) {
+    const platforms = connectedPlatforms(ctx.account)
+    if (!platforms.length) {
       const go = C.button({ label: 'Hubungkan akun di tab Akun untuk membagikan.', variant: 'ghost', size: 'sm' })
       go.addEventListener('click', () => ctx.goto('account'))
       share.replaceChildren(go)
       now.disabled = true
       return
     }
-    const platforms = connectedPlatforms(ctx.account)
     share.replaceChildren(el('fieldset', { className: 'sm-platforms' }, el('legend', { className: 'field-label' }, 'Bagikan ke'),
       ...platforms.map((p) => {
         const input = el('input', { type: 'checkbox', id: `sm-${p}-${id}`, value: p })
         const hint = el('span', { className: 'field-hint', id: `sm-${p}-${id}-hint` })
         input.setAttribute('aria-describedby', hint.id)
-        if (ctx.account.needs_reconnect) { input.disabled = true; if (p === 'facebook') hint.textContent = platformReason(ctx.account, p) }
         checks[p] = { input, hint }
         return el('div', {}, el('label', { className: 'check-row', htmlFor: input.id }, input, PLATFORM_LABEL[p]), ' ', hint)
       })))
-    syncIg()
-    if (ctx.account.needs_reconnect) now.disabled = true
+    syncElig()
+    if (!canShare(ctx.account)) now.disabled = true
   }
 
   // Returns the content id, saving first when needed.
@@ -78,10 +87,10 @@ function composer(ctx, item, initialBody, onCreated) {
   async function guarded(button, busy, fn) {
     const restore = C.setBusy(button, busy)
     ctx.status.hide()
-    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore(); if (!ctx.account || ctx.account.needs_reconnect) now.disabled = true }
+    try { await fn() } catch (err) { ctx.status.show('danger', err.message) } finally { restore(); if (!canShare(ctx.account)) now.disabled = true }
   }
 
-  body.input.addEventListener('input', syncIg)
+  body.input.addEventListener('input', syncElig)
   file.addEventListener('change', () => {
     const f = file.files[0]
     if (!f) return
@@ -211,7 +220,7 @@ export async function render(host, ctx, brainstorm = false) {
     if (!topic.input.value.trim()) { topic.input.focus(); return }
     await generate(brainstorm
       ? `Lakukan brainstorm ${type.input.value} ide konten tentang ${topic.input.value.trim()} untuk ${platform.input.value}. Sertakan judul, hook, format, konsep dan estimasi engagement. Gunakan bahasa Indonesia.`
-      : `Buat ${type.input.value} untuk ${platform.input.value} tentang ${topic.input.value.trim()}. Gaya: ${tone.input.value}. Ajakan bertindak: ${cta.input.value.trim()}. Gunakan bahasa Indonesia dan sertakan hashtag relevan.`)
+      : `Buat ${type.input.value} untuk ${platform.input.value} tentang ${topic.input.value.trim()}. Gaya: ${tone.input.value}. Ajakan bertindak: ${cta.input.value.trim()}. Gunakan bahasa Indonesia.${styleOf(platform.input.value)}`)
   })
   host.replaceChildren(el('div', { className: 'workspace-stack' },
     el('div', { className: 'stage-grid workspace-grid' },

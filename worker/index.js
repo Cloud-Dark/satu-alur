@@ -13,6 +13,7 @@ import {
   handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
   handleSocialOauthPages, handleSocialOauthPick, handleSocialMediaUpload, handleMediaGet,
   handleSocialPublish, handleSocialSchedule, handleSocialScheduleCancel, runCron, isAdminUser,
+  handleThreadsStart, handleThreadsCallback, handleThreadsDisconnect,
 } from './social.js';
 import {
   handleInfluencers, handleRequestCreate, handleRequestList, handleAdminInfluencers, handleAdminInfluencerCreate,
@@ -120,7 +121,7 @@ const TABLES = {
     json: ['meta_json'],
   },
 };
-// social_accounts is deliberately absent from TABLES (it holds Page tokens).
+// social_accounts is deliberately absent from TABLES (it holds Page and Threads tokens).
 // Tables /api/db may only select from; writes go through /api/social/*.
 const READ_ONLY_TABLES = new Set(['social_posts']);
 // Columns the client may never set directly.
@@ -892,6 +893,9 @@ const ROUTES = {
   'DELETE /api/social/account': (req, env) => handleSocialDisconnect(req, env, ROUTE_DEPS),
   'POST /api/social/oauth/start': (req, env) => handleSocialOauthStart(req, env, ROUTE_DEPS),
   'GET /api/social/oauth/callback': handleSocialOauthCallback,
+  'POST /api/social/threads/start': (req, env) => handleThreadsStart(req, env, ROUTE_DEPS),
+  'GET /api/social/threads/callback': handleThreadsCallback,
+  'DELETE /api/social/threads': (req, env) => handleThreadsDisconnect(req, env, ROUTE_DEPS),
   'GET /api/social/oauth/pages': (req, env) => handleSocialOauthPages(req, env, ROUTE_DEPS),
   'POST /api/social/oauth/pick': (req, env) => handleSocialOauthPick(req, env, ROUTE_DEPS),
   'POST /api/social/media': (req, env) => handleSocialMediaUpload(req, env, ROUTE_DEPS),

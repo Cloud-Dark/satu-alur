@@ -1,7 +1,7 @@
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
-import { igEligibility, toUtcIso, validateScheduleAt, SCHEDULE_STATUS_LABEL } from '../../social/rules.js'
+import { igEligibility, threadsEligibility, toUtcIso, validateScheduleAt, SCHEDULE_STATUS_LABEL } from '../../social/rules.js'
 import { PLATFORM_LABEL, RECONNECT, connectedPlatforms, platformReason } from './platforms.js'
 
 const { el } = C
@@ -23,12 +23,17 @@ function openDialog(ctx, item, opener) {
   const platErr = el('p', { className: 'field-error', role: 'alert' })
   const save = C.button({ label: 'Simpan jadwal', icon: 'calendar', variant: 'primary', type: 'submit' })
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
-  const reconnect = Boolean(ctx.account?.needs_reconnect)
-  const platforms = reconnect ? [] : connectedPlatforms(ctx.account)
-  if (reconnect) platErr.textContent = RECONNECT
-  const ig = igEligibility({ hasImage: Boolean(item.image_key), width: item.meta_json?.width ?? 1, height: item.meta_json?.height ?? 1, caption: item.body })
+  const connected = connectedPlatforms(ctx.account)
+  // A platform waiting for a reconnect is not offered at all; say so when that leaves nothing.
+  const platforms = connected.filter((p) => platformReason(ctx.account, p) !== RECONNECT)
+  if (connected.length && !platforms.length) platErr.textContent = RECONNECT
+  const hasImage = Boolean(item.image_key)
+  const elig = {
+    instagram: igEligibility({ hasImage, width: item.meta_json?.width ?? 1, height: item.meta_json?.height ?? 1, caption: item.body }),
+    threads: threadsEligibility({ hasImage, caption: item.body }),
+  }
   const group = C.choiceGroup({ legend: 'Platform', name: `sm-dlg-plat-${id}`, required: true, options: platforms.map((p) => {
-    const reason = platformReason(ctx.account, p, ig)
+    const reason = platformReason(ctx.account, p, elig)
     return { value: p, label: PLATFORM_LABEL[p], disabled: Boolean(reason), hint: reason || undefined }
   }) })
   const checks = group.inputs
@@ -38,7 +43,7 @@ function openDialog(ctx, item, opener) {
     children: [
       el('p', { className: 'workspace-preview' }, item.body.slice(0, 120)),
       date.wrap, dateErr,
-      platforms.length ? group.wrap : (ctx.account ? null : goAkun),
+      platforms.length ? group.wrap : (connected.length ? null : goAkun),
       platErr,
     ],
     actions: [cancel, platforms.length ? save : null], opener,
