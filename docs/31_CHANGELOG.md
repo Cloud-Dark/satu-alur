@@ -31,6 +31,18 @@ Landing sebelumnya hanya bercerita tentang enam tahap alur. Dua grup menu terbar
 - Kasus UAT TC-LND-11 dan TC-LND-12 ditambahkan; TC-LND-01 diperbarui.
 - Total 368 tes Node dan 122 pemeriksaan browser landing/site lulus. Chromium menguji 1440, 1024, 960, 959, 390, dan 320 px pada tema terang/gelap, termasuk reduced motion, overflow, dan benturan navigasi. Build produksi berhasil dengan peringatan ukuran bundel.
 
+### 2026-10-31 - Halaman kontak didesain ulang
+
+Halaman publik `#/kontak` sebelumnya memakai komponen formulir yang bergantung pada `.app-shell` — padahal halaman publik tidak memuat shell aplikasi. Akibatnya seluruh input, label, dan tombol tampil dengan gaya browser bawaan: tanpa border, tanpa fokus ring, dan tanpa layout card.
+
+#### Diperbaiki
+- Desain ulang layout menjadi **dua kolom pada desktop** (intro di kiri, kartu formulir di kanan) dan **tumpuk pada seluler**.
+- Tambah stylesheet `.contact-page` penuh di `landing.css`: field label dengan badge "WAJIB", input dengan border, hover, dan fokus ring; textarea memenuhi lebar; tombol primer penuh lebar; pesan sukses dengan ikon cek hijau dan latar hijau muda.
+- Semua style tidak bergantung `.app-shell`, menggunakan token desain yang sama dengan halaman publik lainnya, dan mendukung tema gelap lewat `prefers-color-scheme`.
+
+#### Ditambahkan
+- Dua kolom grid pada lebar ≥840 px; form 2-kolom pada ≥560 px dengan `Pesan` dan tombol melebar penuh lewat `.field-full`.
+
 ### 2026-10-31 - Persistensi dan validasi produksi Pendapatan
 
 Dua menu Pendapatan (**Layanan Tambahan** dan **Tanpa Limbah**) sebelumnya hanya UI di atas mock tanpa tabel D1, tanpa validasi server, dan tanpa pencarian. Perubahan ini menambahkan penyimpanan D1 dan validasi server untuk keduanya.
