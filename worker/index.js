@@ -46,6 +46,8 @@ import {
   handleMigrationList, handleMigrationCreate, handleMigrationGet, handleMigrationRun,
   handleMigrationRollback, handleWebhook,
 } from './mcp.js';
+import { canUse, planLockMessage, planForScale, normalizePlan } from '../src/business/plan-access.js';
+import { demoAccount } from '../src/auth/demo-accounts.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -260,7 +262,8 @@ async function authenticate(request, env) {
   if (!m) throw new HttpError(401, 'Belum masuk.');
   const tokenHash = await sha256Hex(m[1]);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended
+    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended,
+            COALESCE(f.plan, 'sole') AS plan
        FROM sessions s JOIN users u ON u.id = s.user_id
        LEFT JOIN user_flags f ON f.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
@@ -270,6 +273,7 @@ async function authenticate(request, env) {
   if (!row) throw new HttpError(401, 'Sesi tidak valid atau sudah berakhir.');
   const { suspended, ...user } = row;
   if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+  user.plan = normalizePlan(user.plan);
   return { user, tokenHash };
 }
 
@@ -376,6 +380,16 @@ async function handleDemoLogin(request, env) {
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
   await refuseSuspended(env, user.id);
+
+  // Each demo account stands for a business scale, and the scale is the tier:
+  // the enterprise demos keep access to ERP integration, the smaller ones do
+  // not. Re-aligning on every login keeps a stale row from granting access.
+  const account = demoAccount(email);
+  user.plan = planForScale(account?.scale);
+  await env.DB.prepare(
+    `INSERT INTO user_flags (user_id, updated_at, plan) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, updated_at = excluded.updated_at`,
+  ).bind(user.id, nowIso(), user.plan).run();
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -964,7 +978,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex, canUse, planLockMessage };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,

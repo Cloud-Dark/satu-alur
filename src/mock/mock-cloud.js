@@ -7,9 +7,27 @@ import { isBlocked, isStaffEmail, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../
 import {
   validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS,
 } from '../pendapatan/rules.js'
+import { demoAccount } from '../auth/demo-accounts.js'
+import { normalizePlan } from '../business/plan-access.js'
 
 const STORAGE_KEY = 'satualur_mock_v1'
 const OTP_STORE = 'satualur_mock_otp'
+const MOCK_PLAN_KEY = 'satualur_plan'
+
+/**
+ * Tier for a mock session. Demo accounts follow their seeded scale, any other
+ * dev/e2e account is Enterprise so the whole product is reviewable without a
+ * backend, and `localStorage.satualur_plan` overrides both — that is how the
+ * e2e suite exercises the locked state.
+ */
+function mockPlanFor(user) {
+  try {
+    const forced = localStorage.getItem(MOCK_PLAN_KEY)
+    if (forced) return normalizePlan(forced)
+  } catch { /* storage unavailable */ }
+  const account = demoAccount(user?.email)
+  return account ? normalizePlan(account.scale) : 'enterprise'
+}
 
 function loadState() {
   try {
@@ -128,7 +146,7 @@ const mockAuth = {
     }
     refuseSuspended(user)
     startSession(user)
-    return { data: { user }, error: null }
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
   async demoLogin({ email }) {
@@ -141,7 +159,7 @@ const mockAuth = {
     }
     refuseSuspended(user)
     startSession(user)
-    return { data: { user }, error: null }
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
   /**
@@ -161,7 +179,7 @@ const mockAuth = {
       persist()
     }
     startSession(user, { is_staff: true })
-    return { data: { user }, error: null }
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
   async getSession() {
@@ -180,7 +198,8 @@ const mockAuth = {
     // Same rule as the Worker: only a staff-login session is an admin.
     if (_session) {
       const { is_staff, ...pub } = _session
-      return { data: { ...pub, is_admin: is_staff === true }, error: null }
+      const user = { ...pub.user, plan: mockPlanFor(pub.user) }
+      return { data: { ...pub, user, is_admin: is_staff === true }, error: null }
     }
     return { data: null, error: { message: 'Belum masuk.' } }
   },

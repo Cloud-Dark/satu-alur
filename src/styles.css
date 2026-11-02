@@ -1809,3 +1809,55 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .mcp-mapping-table .field { margin: 0; }
 .mcp-mapping-table .field-label { display: none; }
 .mcp-mapping-table .input { min-width: 8rem; padding: 4px 8px; font-size: 0.82rem; }
+
+/* ------------------------------------------- Enterprise-only MCP panels */
+
+/* Small lock pill next to a panel title, so the tier is visible before the
+   user invests time in a form they cannot save. */
+.mcp-plan-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: var(--s-2); padding: 2px 8px 2px 6px;
+  border-radius: 999px; vertical-align: middle;
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.02em;
+  color: var(--accent); background: var(--accent-50);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.mcp-plan-tag svg { flex-shrink: 0; }
+
+.mcp-locked { display: grid; gap: var(--s-3); justify-items: start; }
+.mcp-locked-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px 3px 8px; border-radius: 999px;
+  font-size: 0.7rem; font-weight: 600;
+  color: var(--accent); background: var(--accent-50);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.mcp-locked .set-title { margin: 0; }
+.mcp-locked .set-desc { margin: 0; }
+.mcp-locked-lede {
+  margin: 0; max-width: 62ch;
+  color: var(--text-2); line-height: 1.6;
+}
+.mcp-locked-list {
+  margin: 0; padding: 0; list-style: none;
+  display: grid; gap: 8px; width: 100%; max-width: 62ch;
+}
+.mcp-locked-list li {
+  position: relative; padding-left: 22px;
+  color: var(--text-2); font-size: 0.88rem; line-height: 1.5;
+}
+.mcp-locked-list li::before {
+  content: ''; position: absolute; left: 4px; top: 0.52em;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent); opacity: 0.55;
+}
+.mcp-locked-plan {
+  margin: 0; font-size: 0.8rem; color: var(--text-muted);
+  padding: 6px 10px; border-radius: var(--r-sm);
+  background: var(--surface-sunken); border: 1px solid var(--line);
+}
+.mcp-locked-actions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.mcp-locked-note {
+  margin: 0; max-width: 62ch;
+  font-size: 0.8rem; line-height: 1.55; color: var(--text-muted);
+}

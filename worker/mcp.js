@@ -101,8 +101,18 @@ function asBadRequest(err, HttpError) {
   return err;
 }
 
+/**
+ * Every MCP route starts here, which is also why the tier gate lives here
+ * rather than in each handler: ERP integration is an Enterprise feature, and
+ * hiding the tab in the UI is not a control. The public webhook receiver does
+ * not call this — its signature is the credential, and the connector it
+ * delivers to was created by an Enterprise account.
+ */
 async function requireOwner(request, env, deps) {
   const { user } = await deps.authenticate(request, env);
+  if (!deps.canUse(user.plan, 'erpIntegration')) {
+    throw new deps.HttpError(403, deps.planLockMessage('erpIntegration'));
+  }
   return user;
 }
 

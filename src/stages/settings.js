@@ -19,6 +19,8 @@ import {
   listMigrations, createMigration, getMigration, runMigrationPhase,
   rollbackMigration, generateValidationReport, MIGRATION_PHASES,
 } from '../mcp/migration.js'
+import { getSession } from '../auth/auth.js'
+import { canUse, normalizePlan, planLabel } from '../business/plan-access.js'
 
 const { el, icon } = C
 
@@ -125,12 +127,68 @@ export function render(container) {
   function draw() {
     content.replaceChildren()
     if (currentTab === 'agent') renderAgentTab(content, draw)
-    else if (currentTab === 'erp') renderErpTab(content, draw)
-    else if (currentTab === 'migration') renderMigrationTab(content, draw)
-    else if (currentTab === 'logs') renderLogsTab(content)
+    else if (currentTab === 'erp') withEnterpriseGate(content, () => renderErpTab(content, draw))
+    else if (currentTab === 'migration') withEnterpriseGate(content, () => renderMigrationTab(content, draw))
+    else if (currentTab === 'logs') withEnterpriseGate(content, () => renderLogsTab(content))
     else renderMcpTab(content)
   }
   draw()
+}
+
+/* ------------------------------------------------------- Enterprise gate */
+
+/**
+ * ERP integration, migration and sync logs are Enterprise features. The Worker
+ * enforces the same rule on /api/mcp/* (403); this gate only keeps a locked
+ * user from meeting a wall of failed requests.
+ */
+async function withEnterpriseGate(container, render) {
+  container.replaceChildren(loadingBox('Memeriksa paket…'))
+  let plan = 'sole'
+  try {
+    const res = await getSession()
+    plan = normalizePlan(res?.data?.user?.plan)
+  } catch { /* not signed in or offline: treat as locked */ }
+  if (!canUse(plan, 'erpIntegration')) {
+    container.replaceChildren(planLockedPanel(plan))
+    return
+  }
+  render()
+}
+
+/** Marks a panel that only Enterprise accounts can use. */
+function enterpriseTag() {
+  return el('span', { className: 'mcp-plan-tag', title: 'Tersedia pada paket Enterprise' },
+    icon('lock', { size: 11 }), 'Enterprise')
+}
+
+function planLockedPanel(plan) {
+  const bullets = [
+    'Konektor REST API, database, impor file, dan webhook masuk',
+    'Pemetaan bidang dengan pratinjau dan validasi sebelum menulis',
+    'Migrasi tiga fase dengan rollback dan log per baris',
+  ]
+  return el('section', { className: 'set-section mcp-locked' },
+    el('div', { className: 'mcp-locked-tag' }, icon('lock', { size: 12 }), 'Fitur Enterprise'),
+    el('h3', { className: 'set-title' }, 'Integrasi ERP & migrasi data'),
+    el('p', { className: 'mcp-locked-lede' },
+      'Kalau perusahaan Anda sudah memakai ERP, aplikasi kasir, atau spreadsheet, Satu Alur tidak meminta Anda pindah sistem. Data yang sudah ada dihubungkan, dipetakan, lalu dipindahkan bertahap sambil dua sistem tetap berjalan.'),
+    el('ul', { className: 'mcp-locked-list' }, ...bullets.map((b) => el('li', {}, b))),
+    el('p', { className: 'mcp-locked-plan' },
+      `Paket Anda sekarang: ${planLabel(plan)}. `,
+      el('strong', {}, 'Fitur ini tersedia pada paket Enterprise.')),
+    el('div', { className: 'mcp-locked-actions' },
+      C.button({
+        label: 'Diskusikan paket Enterprise',
+        icon: 'arrowRight',
+        size: 'sm',
+        variant: 'primary',
+        onClick: () => { location.hash = '#/kontak' },
+      }),
+    ),
+    el('p', { className: 'mcp-locked-note' },
+      'Ingin melihat contohnya? Masuk dengan akun demo Enterprise (PT Arunika, PT Prima Fasilitas, atau PT Sehat Bersih Medika).'),
+  )
 }
 
 /* ------------------------------------------------------------- Helpers */
@@ -284,7 +342,7 @@ function renderErpTab(container) {
 
     const header = el('div', { className: 'set-head-flex' },
       el('div', {},
-        el('h3', { className: 'set-title' }, 'Konektor Sistem Eksternal'),
+        el('h3', { className: 'set-title' }, 'Konektor Sistem Eksternal', enterpriseTag()),
         el('p', { className: 'set-desc' }, 'Hubungkan Satu Alur dengan ERP, database, atau sistem lain yang sudah Anda pakai.'),
       ),
       C.button({ label: 'Tambah Konektor', icon: 'plus', size: 'sm', onClick: () => showForm() }),
@@ -842,7 +900,7 @@ function renderMigrationTab(container) {
 
     const header = el('div', { className: 'set-head-flex' },
       el('div', {},
-        el('h3', { className: 'set-title' }, 'Migrasi database'),
+        el('h3', { className: 'set-title' }, 'Migrasi database', enterpriseTag()),
         el('p', { className: 'set-desc' }, 'Pindahkan data dari sistem lama secara bertahap. Tanpa big bang.'),
       ),
       C.button({ label: 'Migrasi baru', icon: 'plus', size: 'sm', onClick: showWizard }),
@@ -1193,7 +1251,7 @@ function renderLogsTab(container) {
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
         el('div', {},
-          el('h3', { className: 'set-title' }, 'Log sinkronisasi'),
+          el('h3', { className: 'set-title' }, 'Log sinkronisasi', enterpriseTag()),
           el('p', { className: 'set-desc' }, 'Riwayat sinkronisasi dan baris yang gagal ditulis.'),
         ),
         C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost', onClick: show }),

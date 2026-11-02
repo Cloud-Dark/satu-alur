@@ -19,7 +19,7 @@ import { getSite } from '../site/api.js'
 import { getPlans } from '../business/api.js'
 import { renderPlanCard } from '../business/plan-card.js'
 import { renderHero } from '../site/hero.js'
-import { NAV, HERO, HERO_POINTS, STAGES, TICKER, FEATURES, INCOME, GROWTH, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
+import { NAV, HERO, HERO_POINTS, STAGES, TICKER, FEATURES, INCOME, GROWTH, INTEGRATION, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
@@ -402,6 +402,37 @@ function growthHTML() {
   </section>`
 }
 
+function integrationHTML() {
+  const cards = INTEGRATION.cards.map((c, i) => `
+    <article class="lp-int-card reveal" style="--d: ${i * 70}ms">
+      <span class="lp-int-icon">${iconHTML(c.icon, { size: 20, stroke: 1.9 })}</span>
+      <h3 class="lp-int-title">${esc(c.title)}</h3>
+      <p class="lp-int-desc">${esc(c.desc)}</p>
+    </article>`).join('')
+  const steps = INTEGRATION.steps.map((s, i) => `
+    <li class="lp-int-step reveal" style="--d: ${i * 80}ms">
+      <span class="lp-int-step-no" aria-hidden="true">${esc(s.no)}</span>
+      <div class="lp-int-step-body">
+        <h4 class="lp-int-step-title">${esc(s.title)}</h4>
+        <p class="lp-int-step-desc">${esc(s.desc)}</p>
+      </div>
+    </li>`).join('')
+  return `
+  <section class="lp-section lp-int-sec" id="integrasi" aria-labelledby="lp-int-title">
+    <div class="lp-container">
+      <header class="lp-head lp-head-center">
+        <p class="eyebrow reveal">${esc(INTEGRATION.eyebrow)}</p>
+        <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-int-title">${emHTML(INTEGRATION.title)}</h2>
+        <p class="lp-lede reveal" style="--d: 120ms">${esc(INTEGRATION.lede)}</p>
+        <p class="lp-int-badge reveal" style="--d: 160ms">${iconHTML('lock', { size: 12, stroke: 2 })}${esc(INTEGRATION.badge)}</p>
+      </header>
+      <div class="lp-int-grid">${cards}</div>
+      <ol class="lp-int-steps">${steps}</ol>
+      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}${esc(INTEGRATION.note)}</p>
+    </div>
+  </section>`
+}
+
 function visionHTML() {
   const cards = ROADMAP.map((r, i) => `
     <li class="lp-road reveal" style="--d: ${i * 90}ms">
@@ -558,6 +589,7 @@ function footerHTML() {
             ['Alur kerja', 'href="#alur" data-scroll="alur"'],
             ['Pendapatan', 'href="#pendapatan" data-scroll="pendapatan"'],
             ['Pertumbuhan', 'href="#pertumbuhan" data-scroll="pertumbuhan"'],
+            ['Integrasi ERP', 'href="#integrasi" data-scroll="integrasi"'],
             ['Fitur AI', 'href="#fitur-ai" data-scroll="fitur-ai"'],
             ['Harga', 'href="#harga" data-scroll="harga"'],
             ['FAQ', 'href="#faq" data-scroll="faq"'],
@@ -709,6 +741,7 @@ export function renderLanding(root, ctx = {}) {
       ${flowHTML()}
       ${incomeHTML()}
       ${growthHTML()}
+      ${integrationHTML()}
       ${featuresHTML()}
       ${visionHTML()}
       ${pricingHTML()}

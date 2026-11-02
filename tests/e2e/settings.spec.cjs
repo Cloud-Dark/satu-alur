@@ -72,6 +72,29 @@ module.exports = async function settings(t) {
   await p.click('.side-collapse')
   await t.noErrors(p)
 
+  // Enterprise gate: the same account on a lower tier sees a locked panel
+  // instead of a form whose requests would all come back 403. The plan is read
+  // on every tab draw, so switching tabs re-evaluates it without a reload
+  // (a reload would drop the in-memory mock session).
+  await p.evaluate(() => localStorage.setItem('satualur_plan', 'sole'))
+  await p.click('.side-row')
+  await p.waitForSelector('.drawer.is-open', { timeout: 5000 })
+  await p.click('.drawer .seg-btn[data-value="erp"]')
+  await p.waitForSelector('.mcp-locked', { timeout: 8000 })
+  t.check(await p.locator('.mcp-locked').count() === 1, 'ERP tab: locked panel shown for a non-enterprise plan')
+  t.check(await p.locator('.mcp-connector-grid').count() === 0, 'ERP tab: connector grid hidden when locked')
+  t.check(/Enterprise/.test(await p.locator('.mcp-locked').innerText()), 'locked panel names the Enterprise tier')
+  await p.click('.drawer .seg-btn[data-value="migration"]')
+  await p.waitForSelector('.mcp-locked', { timeout: 8000 })
+  t.check(await p.locator('.mcp-migration-list').count() === 0, 'Migrasi tab: gated on the same rule')
+  await p.evaluate(() => localStorage.removeItem('satualur_plan'))
+  await p.click('.drawer .seg-btn[data-value="erp"]')
+  await p.waitForSelector('.mcp-connector-grid', { timeout: 8000 })
+  t.check(await p.locator('.mcp-locked').count() === 0, 'Enterprise plan: the gate opens again')
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(400)
+  await t.noErrors(p)
+
   // mobile: sidebar is a drawer opened by the menu button
   const m = await t.page({ width: 390, height: 844 })
   await loginLive(m, t.base)
