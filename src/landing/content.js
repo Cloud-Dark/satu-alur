@@ -261,7 +261,7 @@ export const INTEGRATION = {
     {
       icon: 'fileText',
       title: 'Impor file',
-      desc: 'Ekspor CSV atau Excel dari sistem lama, petakan kolomnya, lalu periksa pratinjau sebelum satu baris pun ditulis.',
+      desc: 'Ekspor CSV atau JSON dari sistem lama (Excel dapat diekspor sebagai CSV), petakan kolomnya, lalu periksa pratinjau sebelum satu baris pun ditulis.',
     },
     {
       icon: 'rotateCcw',
@@ -272,7 +272,7 @@ export const INTEGRATION = {
   steps: [
     { no: '1', title: 'Hubungkan', desc: 'Uji koneksi lebih dulu. Tidak ada data yang berpindah sebelum Anda setuju.' },
     { no: '2', title: 'Petakan', desc: 'Cocokkan kolom sumber dengan kolom Satu Alur, termasuk format Rupiah dan tanggal Indonesia.' },
-    { no: '3', title: 'Pindahkan bertahap', desc: 'Data master, lalu transaksi aktif, lalu riwayat. Bisa dihentikan dan dibatalkan kapan saja.' },
+    { no: '3', title: 'Pindahkan bertahap', desc: 'Tenaga kerja dan katalog, lalu permintaan. Rollback mempertahankan baris yang sudah diedit atau dipakai.' },
   ],
   note: 'Integrasi ERP dan migrasi data tersedia pada paket Enterprise. Pendekatan parallel running membuat dua sistem bisa dipakai bersamaan selama masa peralihan.',
 }

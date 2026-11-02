@@ -164,9 +164,9 @@ function enterpriseTag() {
 
 function planLockedPanel(plan) {
   const bullets = [
-    'Konektor REST API, database, impor file, dan webhook masuk',
+    'Konektor REST API, impor CSV/JSON, dan webhook masuk',
     'Pemetaan bidang dengan pratinjau dan validasi sebelum menulis',
-    'Migrasi tiga fase dengan rollback dan log per baris',
+    'Migrasi bertahap dengan rollback dan laporan per fase',
   ]
   return el('section', { className: 'set-section mcp-locked' },
     el('div', { className: 'mcp-locked-tag' }, icon('lock', { size: 12 }), 'Fitur Enterprise'),
@@ -423,7 +423,7 @@ function renderErpTab(container) {
         templateCard('SAP B1', 'rest', 'Service Layer'),
         templateCard('MySQL', 'database', 'Database langsung'),
         templateCard('PostgreSQL', 'database', 'Database langsung'),
-        templateCard('CSV / Excel', 'file', 'Impor dari file'),
+        templateCard('CSV / JSON', 'file', 'Ekspor Excel sebagai CSV'),
         templateCard('Webhook', 'webhook', 'Event real-time'),
       ),
     )
@@ -449,7 +449,7 @@ function renderErpTab(container) {
       options: [
         { value: 'rest', label: 'REST API (Odoo, SAP, NetSuite)' },
         { value: 'database', label: 'Database langsung (MySQL, PostgreSQL)' },
-        { value: 'file', label: 'Impor file (CSV, Excel)' },
+        { value: 'file', label: 'Impor file (CSV, JSON)' },
         { value: 'webhook', label: 'Webhook (real-time)' },
       ],
       value: type,
@@ -457,7 +457,6 @@ function renderErpTab(container) {
         type = v
         const fresh = structuredClone(CONNECTOR_TEMPLATES[v])
         Object.assign(form, fresh)
-        form.name = typeSelect.input.value === v ? form.name : form.name
         renderFields()
       },
     })
@@ -482,9 +481,9 @@ function renderErpTab(container) {
                 { value: 'oauth2', label: 'OAuth 2.0 (bearer token)' },
               ],
               value: form.auth?.type || 'apikey',
-              onChange: (v) => { form.auth.type = v },
+              onChange: (v) => { form.auth.type = v; renderFields() },
             }).wrap,
-            textField('API key / token', 'mcp-key', form.auth?.apiKey || '', 'password', (v) => { form.auth.apiKey = v }, 'Disimpan terenkripsi di server.'),
+            textField('API key / password / bearer token', 'mcp-key', form.auth?.[{ apikey: 'apiKey', basic: 'password', oauth2: 'token' }[form.auth?.type || 'apikey']] || '', 'password', (v) => { form.auth[{ apikey: 'apiKey', basic: 'password', oauth2: 'token' }[form.auth.type]] = v }, 'Disimpan terenkripsi di server.'),
           ),
           textField('Username (Basic Auth)', 'mcp-user', form.auth?.username || '', 'text', (v) => { form.auth.username = v }, 'Kosongkan jika memakai API key.'),
         )
@@ -518,7 +517,6 @@ function renderErpTab(container) {
             label: 'Format', id: 'mcp-format',
             options: [
               { value: 'csv', label: 'CSV' },
-              { value: 'xlsx', label: 'Excel (.xlsx)' },
               { value: 'json', label: 'JSON' },
             ],
             value: form.format || 'csv',
@@ -541,7 +539,6 @@ function renderErpTab(container) {
           label: 'Strategi sinkronisasi', id: 'mcp-strategy',
           options: [
             { value: 'manual', label: 'Manual' },
-            { value: 'scheduled', label: 'Terjadwal' },
             { value: 'realtime', label: 'Real-time (webhook)' },
           ],
           value: form.sync?.strategy || 'manual',
@@ -770,7 +767,7 @@ function renderErpTab(container) {
     }
 
     const fileInput = el('input', {
-      type: 'file', accept: '.csv,text/csv,.json,.xlsx',
+      type: 'file', accept: '.csv,text/csv,.json',
       className: 'mcp-file-input',
       onchange: async (e) => {
         const file = e.target.files?.[0]
@@ -779,6 +776,7 @@ function renderErpTab(container) {
           const text = await file.text()
           const delimiter = connector.config?.delimiter || ','
           sampleRows = /\.json$/i.test(file.name) ? JSON.parse(text) : csvToRows(text, delimiter)
+          if (!Array.isArray(sampleRows)) throw new Error('Isi file bukan daftar baris.')
           sampleColumns = columnsFromRows(sampleRows)
           if (!sampleRows.length) {
             showToast('File tidak berisi baris data.', 'error')
@@ -937,14 +935,14 @@ function renderMigrationTab(container) {
             el('span', { className: 'text-muted tnum' }, `${done}/${phases.length} fase`),
             C.button({ label: 'Jalankan', icon: 'play', size: 'xs', onClick: () => showRun(mig.id) }),
             C.button({ label: 'Laporan', icon: 'fileText', size: 'xs', variant: 'ghost', onClick: () => showReport(mig) }),
-            (mig.status === 'completed' || mig.status === 'completed_with_errors')
+            mig.status !== 'rolled_back'
               ? C.button({
                 label: 'Rollback', icon: 'rotateCcw', size: 'xs', variant: 'ghost',
                 onClick: async () => {
-                  if (!confirm('Rollback menghapus baris yang dibuat migrasi ini. Data lama tidak disentuh. Lanjutkan?')) return
+                  if (!confirm('Hapus baris baru dari migrasi ini? Baris yang sudah diedit atau dipakai akan dipertahankan. Perubahan pada data lama tidak dibatalkan.')) return
                   try {
                     const res = await rollbackMigration(mig.id)
-                    showToast(`Rollback selesai. ${res.removedRows || 0} baris dihapus.`, 'success')
+                    showToast(`${res.removedRows || 0} baris dihapus.${res.retainedRows ? ` ${res.retainedRows} baris dipertahankan karena sudah berubah atau dipakai.` : ' Rollback selesai.'}`, res.retainedRows ? 'info' : 'success', 7000)
                     showList()
                   } catch (err) { showToast(String(err.message || err), 'error') }
                 },
@@ -960,7 +958,7 @@ function renderMigrationTab(container) {
       list,
       el('div', { className: 'mcp-info-box' },
         el('h4', {}, icon('info', { size: 16 }), ' Strategi parallel running'),
-        el('p', {}, 'Satu Alur menyarankan migrasi bertahap: data master dulu, lalu transaksi aktif, terakhir data historis. Dua sistem berjalan bersamaan selama transisi.'),
+        el('p', {}, 'Pindahkan tenaga kerja dan katalog, lalu permintaan. Impor penawaran, penyelesaian, dan jurnal belum tersedia karena memerlukan pemetaan referensi internal.'),
         el('a', { href: '#/dokumentasi/migrasi', className: 'link' }, 'Baca panduan lengkap →'),
       ),
     )
@@ -968,7 +966,8 @@ function renderMigrationTab(container) {
 
   async function showWizard() {
     let connectors = []
-    try { connectors = await listConnectors() } catch { /* offline: still allow file-less migration */ }
+    try { connectors = (await listConnectors()).filter((c) => c.enabled && ['rest', 'file'].includes(c.type)) } catch (err) { container.replaceChildren(errorBox(err, showWizard)); return }
+    if (!connectors.length) { showToast('Buat dan aktifkan konektor REST atau file terlebih dahulu.', 'error'); return }
 
     let step = 1
     const form = { name: '', connectorId: connectors[0]?.id || '', strategy: 'parallel' }
@@ -983,7 +982,6 @@ function renderMigrationTab(container) {
           C.select({
             label: 'Sumber data', id: 'mig-source',
             options: [
-              { value: '', label: 'Tanpa konektor (unggah file nanti)' },
               ...connectors.map((c) => ({ value: c.id, label: `${c.name} · ${CONNECTOR_TYPE_LABELS[c.type] || c.type}` })),
             ],
             value: form.connectorId,
@@ -1002,7 +1000,7 @@ function renderMigrationTab(container) {
         )
       } else if (step === 2) {
         slot.append(
-          el('p', { className: 'set-desc' }, 'Fase dijalankan berurutan. Data master wajib; transaksi aktif disarankan; historis opsional.'),
+          el('p', { className: 'set-desc' }, 'Fase dijalankan berurutan: tenaga kerja dan katalog, lalu permintaan. Simpan pemetaan setiap entitas sebelum menjalankan migrasi.'),
           ...MIGRATION_PHASES.map((p, i) => el('div', { className: 'mcp-phase-checkbox' },
             el('div', {},
               el('strong', {}, `${i + 1}. ${p.name}`),
@@ -1021,39 +1019,43 @@ function renderMigrationTab(container) {
       }
     }
 
-    drawStep()
-
-    container.replaceChildren(
-      el('div', { className: 'set-head-flex' },
-        C.button({ label: 'Batal', icon: 'x', size: 'sm', variant: 'ghost', onClick: showList }),
-        el('h3', { className: 'set-title' }, 'Wizard migrasi'),
-      ),
-      el('div', { className: 'mcp-stepper' },
-        ...[1, 2, 3].map((n) => el('div', { className: `mcp-step ${step >= n ? 'active' : ''}` }, `${n}. ${['Info', 'Fase', 'Konfirmasi'][n - 1]}`)),
-      ),
-      slot,
-      el('div', { className: 'form-actions' },
-        step > 1 ? C.button({ label: 'Sebelumnya', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: () => { step--; drawStep() } }) : el('span', {}),
-        step < 3
-          ? C.button({ label: 'Selanjutnya', icon: 'arrowRight', size: 'sm', onClick: () => { step++; drawStep() } })
-          : C.button({
-            label: 'Buat migrasi', icon: 'save', size: 'sm',
-            onClick: async () => {
-              if (form.name.trim().length < 3) { showToast('Nama migrasi minimal 3 karakter.', 'error'); return }
-              try {
-                const created = await createMigration({
-                  name: form.name,
-                  connectorId: form.connectorId || null,
-                  strategy: form.strategy,
-                  phases: MIGRATION_PHASES.map((p) => p.key),
-                })
-                showToast('Migrasi dibuat.', 'success')
-                showRun(created.id)
-              } catch (err) { showToast(String(err.message || err), 'error', 6000) }
-            },
-          }),
-      ),
-    )
+    const frame = el('div', {})
+    function drawWizard() {
+      drawStep()
+      frame.replaceChildren(
+        el('div', { className: 'set-head-flex' },
+          C.button({ label: 'Batal', icon: 'x', size: 'sm', variant: 'ghost', onClick: showList }),
+          el('h3', { className: 'set-title' }, 'Wizard migrasi'),
+        ),
+        el('div', { className: 'mcp-stepper' },
+          ...[1, 2, 3].map((n) => el('div', { className: `mcp-step ${step >= n ? 'active' : ''}` }, `${n}. ${['Info', 'Fase', 'Konfirmasi'][n - 1]}`)),
+        ),
+        slot,
+        el('div', { className: 'form-actions' },
+          step > 1 ? C.button({ label: 'Sebelumnya', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: () => { step--; drawWizard() } }) : el('span', {}),
+          step < 3
+            ? C.button({ label: 'Selanjutnya', icon: 'arrowRight', size: 'sm', onClick: () => { step++; drawWizard() } })
+            : C.button({
+              label: 'Buat migrasi', icon: 'save', size: 'sm',
+              onClick: async () => {
+                if (form.name.trim().length < 3) { showToast('Nama migrasi minimal 3 karakter.', 'error'); return }
+                try {
+                  const created = await createMigration({
+                    name: form.name,
+                    connectorId: form.connectorId || null,
+                    strategy: form.strategy,
+                    phases: MIGRATION_PHASES.map((p) => p.key),
+                  })
+                  showToast('Migrasi dibuat.', 'success')
+                  showRun(created.id)
+                } catch (err) { showToast(String(err.message || err), 'error', 6000) }
+              },
+            }),
+        ),
+      )
+    }
+    drawWizard()
+    container.replaceChildren(frame)
   }
 
   async function showRun(id) {
@@ -1070,8 +1072,11 @@ function renderMigrationTab(container) {
       return
     }
 
+    let connector = null
+    try { connector = (await listConnectors()).find((c) => c.id === migration.connectorId) } catch (err) { container.replaceChildren(errorBox(err, () => showRun(id))); return }
     const phases = migration.phases || []
-    const nextIndex = phases.findIndex((p) => p.status === 'pending')
+    const rowsByEntity = {}
+    const nextIndex = migration.status === 'rolled_back' ? -1 : phases.findIndex((p) => p.status === 'pending')
     const progress = el('div', { className: 'mcp-run-progress' })
 
     for (const phase of phases) {
@@ -1100,19 +1105,48 @@ function renderMigrationTab(container) {
       ))
     }
 
+    const uploads = el('div', {})
+    const dryRunReport = el('p', { role: 'status', className: 'set-desc' })
+    if (nextIndex >= 0 && connector?.type === 'file') {
+      for (const entity of phases[nextIndex].entities) {
+        uploads.append(el('label', { className: 'field' },
+          el('span', {}, `${SATU_ALUR_SCHEMA[entity]?.label || entity} · CSV / JSON`),
+          el('input', { type: 'file', accept: '.csv,text/csv,.json', 'aria-label': `File ${entity}`, onchange: async (event) => {
+            delete rowsByEntity[entity]
+            try {
+              const file = event.target.files?.[0]
+              if (!file) return
+              const text = await file.text()
+              const rows = /\.json$/i.test(file.name) ? JSON.parse(text) : csvToRows(text, connector.config?.delimiter || ',')
+              if (!Array.isArray(rows)) throw new Error('Isi file bukan daftar baris.')
+              rowsByEntity[entity] = rows
+              showToast(`${rows.length} baris ${entity} siap diperiksa.`, 'info')
+            } catch (err) { showToast(String(err.message || err), 'error') }
+          } }),
+        ))
+      }
+    }
+    const options = () => ({ phaseIndex: nextIndex, ...(connector?.type === 'file' ? { rowsByEntity } : {}) })
     const actions = el('div', { className: 'form-actions' })
-    if (nextIndex >= 0) {
+    if (nextIndex >= 0 && migration.status !== 'rolled_back') {
       actions.append(
         C.button({
           label: `Jalankan fase ${nextIndex + 1}`, icon: 'play', size: 'sm',
           onClick: async () => {
             try {
-              await runMigrationPhase(id, { phaseIndex: nextIndex })
+              await runMigrationPhase(id, options())
               showRun(id)
             } catch (err) { showToast(String(err.message || err), 'error', 7000) }
           },
         }),
-        C.button({
+        C.button({ label: 'Periksa tanpa menyimpan', icon: 'eye', size: 'sm', variant: 'ghost', onClick: async () => {
+          try {
+            const preview = await runMigrationPhase(id, { ...options(), dryRun: true })
+            const phase = preview.phases[nextIndex]
+            dryRunReport.textContent = `Pratinjau: ${phase.recordsProcessed || 0} diproses, ${phase.recordsFailed || 0} gagal. Tidak ada data atau progres yang disimpan.`
+          } catch (err) { showToast(String(err.message || err), 'error', 7000) }
+        } }),
+        connector?.type === 'rest' ? C.button({
           label: 'Jalankan semua', icon: 'playCircle', size: 'sm', variant: 'secondary',
           onClick: async () => {
             try {
@@ -1126,7 +1160,7 @@ function renderMigrationTab(container) {
               showRun(id)
             } catch (err) { showToast(String(err.message || err), 'error', 7000) }
           },
-        }),
+        }) : el('span', {}),
       )
     }
     actions.append(C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }))
@@ -1138,6 +1172,8 @@ function renderMigrationTab(container) {
       ),
       el('p', { className: 'set-desc' }, `Status: ${migration.status}. ${migration.connectorId ? 'Baris diambil dari konektor.' : 'Migrasi ini belum terhubung ke konektor — baris tidak akan terbaca.'}`),
       progress,
+      uploads,
+      dryRunReport,
       actions,
     )
   }

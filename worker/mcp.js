@@ -1,5 +1,5 @@
 /**
- * MCP (Model Context Protocol) — Worker endpoints.
+ * MCP (ERP connector module) — Worker endpoints.
  *
  * Connectors, field mappings, sync runs, dead-letter queue and phased
  * migrations. Reached only through /api/mcp/*, never through the generic
@@ -7,7 +7,7 @@
  *
  * Design notes
  * ------------
- * - Secrets are encrypted with AES-GCM when `MCP_ENCRYPTION_KEY` is set, and
+ * - Secrets require AES-GCM encryption with `MCP_ENCRYPTION_KEY` and
  *   are never returned by any endpoint (`redactConnector`).
  * - Sync is idempotent through `mcp_external_refs`: the same external record
  *   updates the same local row instead of duplicating it.
@@ -22,11 +22,16 @@ import {
   SECRET_FIELDS, applyTransforms, columnType, externalIdFor, redactConnector,
   validateConnector, validateMapping, validateMigration,
 } from '../src/mcp/rules.js';
+import { validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS as INCOME_LIMITS } from '../src/pendapatan/rules.js';
 
 /* ------------------------------------------------------------- Encryption */
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
+
+function unavailable(message) {
+  return Object.assign(new Error(message), { mcpStatus: 503 });
+}
 
 async function deriveKey(env) {
   const raw = env.MCP_ENCRYPTION_KEY;
@@ -48,11 +53,12 @@ function fromB64(str) {
   return out;
 }
 
-/** `v1:<iv>:<ciphertext>` when a key is configured, `plain:<base64>` otherwise. */
+/** Credentials are never persisted without encryption. File connectors need no key. */
 export async function sealSecrets(env, secrets) {
-  const json = JSON.stringify(secrets || {});
+  if (!Object.keys(secrets || {}).length) return { value: null, encrypted: true };
+  const json = JSON.stringify(secrets);
   const key = await deriveKey(env);
-  if (!key) return { value: `plain:${btoa(json)}`, encrypted: false };
+  if (!key) throw unavailable('Integrasi belum dikonfigurasi: MCP_ENCRYPTION_KEY wajib diisi (minimal 16 karakter).');
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(json));
   return { value: `v1:${toB64(iv)}:${toB64(ct)}`, encrypted: true };
@@ -60,19 +66,16 @@ export async function sealSecrets(env, secrets) {
 
 export async function openSecrets(env, stored) {
   if (!stored) return {};
-  if (stored.startsWith('plain:')) {
-    try { return JSON.parse(atob(stored.slice(6))) } catch { return {}; }
-  }
-  if (!stored.startsWith('v1:')) return {};
+  if (!stored.startsWith('v1:')) throw unavailable('Simpan ulang kredensial konektor dengan enkripsi.');
   const key = await deriveKey(env);
-  if (!key) return {};
+  if (!key) throw unavailable('MCP_ENCRYPTION_KEY belum dikonfigurasi.');
   const [, ivB64, ctB64] = stored.split(':');
   try {
     const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(ivB64) }, key, fromB64(ctB64));
     return JSON.parse(dec.decode(pt));
   } catch {
     // Key rotated or corrupted: fail closed, the admin re-enters credentials.
-    return {};
+    throw unavailable('Kredensial tidak dapat dibuka. Periksa kunci atau simpan ulang kredensial.');
   }
 }
 
@@ -98,6 +101,7 @@ function parseJson(value, fallback) {
 /** Turn a validation error into a 400 and let real bugs bubble up as 500. */
 function asBadRequest(err, HttpError) {
   if (err?.validation) return new HttpError(400, err.message);
+  if (err?.mcpStatus) return new HttpError(err.mcpStatus, err.message);
   return err;
 }
 
@@ -166,7 +170,8 @@ export async function handleConnectorCreate(request, env, deps) {
   } catch (err) { throw asBadRequest(err, deps.HttpError) }
 
   const id = uid('conn');
-  const sealed = await sealSecrets(env, clean.secrets);
+  let sealed;
+  try { sealed = await sealSecrets(env, clean.secrets) } catch (err) { throw asBadRequest(err, deps.HttpError) }
   const ts = nowIso();
 
   await env.DB.prepare(
@@ -198,6 +203,7 @@ export async function handleConnectorUpdate(request, env, deps, params) {
   if (!existing) throw new deps.HttpError(404, 'Konektor tidak ditemukan.');
 
   const body = await deps.readJson(request);
+  if (body.type && body.type !== existing.type) throw new deps.HttpError(400, 'Tipe konektor tidak dapat diubah. Buat konektor baru.');
   const merged = {
     type: body.type || existing.type,
     name: body.name ?? existing.name,
@@ -208,13 +214,17 @@ export async function handleConnectorUpdate(request, env, deps, params) {
 
   let clean;
   try {
-    clean = validateConnector(merged, { existing: { hasSecrets: Boolean(existing.secrets_json) } });
+    const original = parseJson(existing.config_json, {});
+    const sameAuth = existing.type !== 'rest' || (merged.auth?.type || 'apikey') === (original.auth?.type || 'apikey');
+    clean = validateConnector(merged, { existing: { hasSecrets: Boolean(existing.secrets_json) && sameAuth } });
   } catch (err) { throw asBadRequest(err, deps.HttpError) }
 
   // Keep the old secrets unless the request supplies new ones.
   let secretsValue = existing.secrets_json;
   if (Object.keys(clean.secrets).length) {
-    secretsValue = (await sealSecrets(env, clean.secrets)).value;
+    let old = {};
+    try { old = await openSecrets(env, existing.secrets_json) } catch { /* replacement credentials recover an unreadable secret */ }
+    try { secretsValue = (await sealSecrets(env, { ...old, ...clean.secrets })).value } catch (err) { throw asBadRequest(err, deps.HttpError) }
   }
 
   const enabled = typeof body.enabled === 'undefined'
@@ -238,7 +248,7 @@ export async function handleConnectorDelete(request, env, deps, params) {
   const existing = await loadConnector(env, user.id, params.id);
   if (!existing) throw new deps.HttpError(404, 'Konektor tidak ditemukan.');
 
-  // Child rows cascade by FK, but D1 does not enforce FK by default; be explicit.
+  // Explicit cleanup also covers audit tables without connector foreign keys.
   await env.DB.batch([
     env.DB.prepare('DELETE FROM mcp_mappings WHERE connector_id = ? AND owner_id = ?').bind(params.id, user.id),
     env.DB.prepare('DELETE FROM mcp_sync_errors WHERE connector_id = ? AND owner_id = ?').bind(params.id, user.id),
@@ -263,7 +273,8 @@ export async function handleConnectorTest(request, env, deps, params) {
   if (!row) throw new deps.HttpError(404, 'Konektor tidak ditemukan.');
 
   const config = parseJson(row.config_json, {});
-  const secrets = await openSecrets(env, row.secrets_json);
+  let secrets;
+  try { secrets = await openSecrets(env, row.secrets_json) } catch (err) { throw asBadRequest(err, deps.HttpError) }
   const started = Date.now();
 
   const finish = async (result) => {
@@ -286,15 +297,16 @@ export async function handleConnectorTest(request, env, deps, params) {
   if (row.type === 'rest') {
     const baseUrl = config.endpoint?.baseUrl;
     if (!baseUrl) return finish({ ok: false, code: 'CONFIG', message: 'URL endpoint belum diisi.' });
-    const headers = buildAuthHeaders(config, secrets);
+    let headers;
+    try { headers = buildAuthHeaders(config, secrets) } catch (err) { throw asBadRequest(err, deps.HttpError) }
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), Math.min(config.endpoint?.timeout || 15000, 20000));
       let res;
       try {
-        res = await fetch(baseUrl, { method: 'HEAD', headers, signal: controller.signal, redirect: 'follow' });
+        res = await fetch(baseUrl, { method: 'HEAD', headers, signal: controller.signal, redirect: 'error' });
         if (res.status === 405 || res.status === 501) {
-          res = await fetch(baseUrl, { method: 'GET', headers, signal: controller.signal, redirect: 'follow' });
+          res = await fetch(baseUrl, { method: 'GET', headers, signal: controller.signal, redirect: 'error' });
         }
       } finally {
         clearTimeout(timer);
@@ -329,9 +341,11 @@ export async function handleConnectorTest(request, env, deps, params) {
 function buildAuthHeaders(config, secrets) {
   const headers = { accept: 'application/json' };
   const auth = config.auth || {};
+  const credential = { basic: 'password', oauth2: 'token', apikey: 'apiKey' }[auth.type || 'apikey'];
+  if (!secrets[credential]) throw unavailable('Kredensial belum lengkap. Simpan ulang kredensial konektor.');
   if (auth.type === 'basic') {
     const raw = `${auth.username || ''}:${secrets.password || ''}`;
-    headers.authorization = `Basic ${btoa(raw)}`;
+    headers.authorization = `Basic ${toB64(enc.encode(raw))}`;
   } else if (auth.type === 'oauth2') {
     if (secrets.token) headers.authorization = `Bearer ${secrets.token}`;
   } else if (secrets.apiKey) {
@@ -376,14 +390,11 @@ export async function handleMappingPut(request, env, deps, params) {
   const { count } = await env.DB.prepare(
     'SELECT COUNT(*) AS count FROM mcp_mappings WHERE owner_id = ?',
   ).bind(user.id).first() || { count: 0 };
-  if (count >= LIMITS.mappings) {
-    throw new deps.HttpError(400, `Batas ${LIMITS.mappings} pemetaan tercapai.`);
-  }
-
   const existing = await env.DB.prepare(
     'SELECT id FROM mcp_mappings WHERE connector_id = ? AND entity = ?',
   ).bind(params.id, clean.entity).first();
 
+  if (!existing && count >= LIMITS.mappings) throw new deps.HttpError(400, `Batas ${LIMITS.mappings} pemetaan tercapai.`);
   const id = existing?.id || uid('map');
   const ts = nowIso();
 
@@ -454,7 +465,7 @@ function coerce(entity, field, value) {
   }
 
   if (type === 'number') {
-    const n = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]/g, ''));
+    const n = typeof value === 'number' ? value : Number(String(value).trim());
     if (!Number.isFinite(n)) return { error: `${field.target}: harus berupa angka` };
     return { value: Math.round(n) };
   }
@@ -483,6 +494,8 @@ export function transformRow(entity, sourceRow, mapping) {
   const values = {};
   const errors = [];
   const spec = ENTITIES[entity];
+  if (!IMPORTABLE_ENTITIES.includes(entity)) return { values, errors: ['Entitas ini belum mendukung impor.'] };
+  if (!sourceRow || typeof sourceRow !== 'object' || Array.isArray(sourceRow)) return { values, errors: ['Baris harus berupa objek.'] };
   for (const field of mapping.fields || []) {
     let raw;
     if (field.constant !== null && field.constant !== undefined) raw = field.constant;
@@ -504,11 +517,27 @@ export function transformRow(entity, sourceRow, mapping) {
     if (out.error) errors.push(out.error);
     else if (!out.skip) values[field.target] = out.value;
   }
+  try {
+    if (entity === 'vas_items') Object.assign(values, validateVasItem(values, { partial: true }));
+    if (entity === 'waste_entries') Object.assign(values, validateWasteEntry(values, { partial: true }));
+  } catch (err) {
+    if (!err.validation) throw err;
+    errors.push(err.message);
+  }
   return { values, errors };
 }
 
-/** Write one mapped row: insert, or update when an external ref already exists. */
-async function writeRow(env, ownerId, connectorId, entity, mapping, values, externalId) {
+/** The full stored row is compared before rollback, preserving subsequent edits. */
+function snapshotSql(entity) {
+  const columns = [...ENTITIES[entity].columns, 'id', 'owner_id', 'created_at'];
+  if (entity === 'workers') columns.push('lat', 'lng');
+  if (entity === 'vas_items' || entity === 'waste_entries') columns.push('updated_at');
+  return `json_object(${columns.map((c) => `'${c}', ${c}`).join(', ')})`;
+}
+
+/** Write the row, rollback journal and external reference in one transaction. */
+async function writeRow(env, ownerId, connectorId, entity, mapping, values, externalId, migrationId = null) {
+  if (!IMPORTABLE_ENTITIES.includes(entity)) throw Object.assign(new Error('Entitas ini belum mendukung impor.'), { validation: true });
   const spec = ENTITIES[entity];
   const cols = Object.keys(values).filter((c) => spec.columns.includes(c));
   if (!cols.length) throw Object.assign(new Error('Tidak ada kolom yang dapat ditulis.'), { validation: true });
@@ -516,8 +545,20 @@ async function writeRow(env, ownerId, connectorId, entity, mapping, values, exte
   let ref = null;
   if (mapping.mode === 'upsert' && externalId) {
     ref = await env.DB.prepare(
-      'SELECT local_id FROM mcp_external_refs WHERE connector_id = ? AND entity = ? AND external_id = ?',
-    ).bind(connectorId, entity, externalId).first();
+      'SELECT local_id FROM mcp_external_refs WHERE connector_id = ? AND entity = ? AND external_id = ? AND owner_id = ?',
+    ).bind(connectorId, entity, externalId, ownerId).first();
+  }
+
+  if (entity === 'waste_entries') {
+    const current = ref ? await env.DB.prepare('SELECT * FROM waste_entries WHERE id = ? AND owner_id = ?').bind(ref.local_id, ownerId).first() : null;
+    const merged = withWasteCompletion({ saved: 0, status: 'open', ...current, ...values });
+    assertWasteInvariants(merged);
+    values.saved = merged.saved;
+    if (!cols.includes('saved')) cols.push('saved');
+  }
+  if (entity === 'vas_items' || entity === 'waste_entries') {
+    values.updated_at = nowIso();
+    cols.push('updated_at');
   }
 
   if (ref) {
@@ -529,20 +570,29 @@ async function writeRow(env, ownerId, connectorId, entity, mapping, values, exte
     return { action: 'updated' };
   }
 
-  const placeholders = cols.map(() => '?').join(', ');
-  const row = await env.DB.prepare(
-    `INSERT INTO ${entity} (owner_id, ${cols.join(', ')}) VALUES (?, ${placeholders}) RETURNING id`,
-  ).bind(ownerId, ...cols.map((c) => values[c])).first();
-
-  if (mapping.mode === 'upsert' && externalId && row?.id) {
-    await env.DB.prepare(
-      `INSERT INTO mcp_external_refs (owner_id, connector_id, entity, external_id, local_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(connector_id, entity, external_id)
-       DO UPDATE SET local_id = excluded.local_id, updated_at = excluded.updated_at`,
-    ).bind(ownerId, connectorId, entity, externalId, row.id, nowIso(), nowIso()).run();
+  const cap = entity === 'vas_items' ? INCOME_LIMITS.items : entity === 'waste_entries' ? INCOME_LIMITS.findings : null;
+  if (cap) {
+    const { n } = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${entity} WHERE owner_id = ?`).bind(ownerId).first();
+    if (n >= cap) throw Object.assign(new Error(`Batas ${cap} baris tercapai.`), { validation: true });
   }
-
+  const placeholders = cols.map(() => '?').join(', ');
+  const statements = [env.DB.prepare(
+    `INSERT INTO ${entity} (owner_id, ${cols.join(', ')}) VALUES (?, ${placeholders}) RETURNING id`,
+  ).bind(ownerId, ...cols.map((c) => values[c]))];
+  if (migrationId) {
+    statements.push(env.DB.prepare(
+      `INSERT INTO mcp_migration_rows (migration_id, owner_id, entity, local_id, snapshot_json)
+       SELECT ?, ?, ?, id, ${snapshotSql(entity)} FROM ${entity} WHERE id = last_insert_rowid() AND owner_id = ?`,
+    ).bind(migrationId, ownerId, entity, ownerId));
+  }
+  if (mapping.mode === 'upsert' && externalId) {
+    // A concurrent duplicate fails the batch, including the domain INSERT.
+    statements.push(env.DB.prepare(
+      `INSERT INTO mcp_external_refs (owner_id, connector_id, entity, external_id, local_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, last_insert_rowid(), ?, ?)`,
+    ).bind(ownerId, connectorId, entity, externalId, nowIso(), nowIso()));
+  }
+  await env.DB.batch(statements);
   return { action: 'inserted' };
 }
 
@@ -564,6 +614,7 @@ async function pullFromRest(config, secrets, entity, mapping) {
     const res = await fetch(url.toString(), {
       headers: buildAuthHeaders(config, secrets),
       signal: controller.signal,
+      redirect: 'error',
     });
     if (!res.ok) return { rows: [], error: `Endpoint menjawab HTTP ${res.status}.` };
     const payload = await res.json();
@@ -595,7 +646,7 @@ export async function handleSyncRun(request, env, deps, params) {
   if (!connector) throw new deps.HttpError(404, 'Konektor tidak ditemukan.');
   if (connector.enabled !== 1) throw new deps.HttpError(400, 'Konektor belum diaktifkan.');
 
-  const body = await deps.readJson(request).catch(() => ({}));
+  const body = await deps.readJson(request);
   const dryRun = body?.dryRun === true;
   const trigger = ['manual', 'scheduled', 'webhook', 'migration'].includes(body?.trigger) ? body.trigger : 'manual';
   const onlyEntity = typeof body?.entity === 'string' ? body.entity : null;
@@ -606,13 +657,14 @@ export async function handleSyncRun(request, env, deps, params) {
   }
 
   const config = parseJson(connector.config_json, {});
-  const secrets = await openSecrets(env, connector.secrets_json);
+  let secrets;
+  try { secrets = await openSecrets(env, connector.secrets_json) } catch (err) { throw asBadRequest(err, deps.HttpError) }
 
   const { results: mappings } = await env.DB.prepare(
     'SELECT * FROM mcp_mappings WHERE connector_id = ? AND owner_id = ?',
   ).bind(params.id, user.id).all();
   const active = (mappings || [])
-    .map((m) => ({ ...m, fields: parseJson(m.fields_json, []), filters: parseJson(m.filters_json, null) }))
+    .map((m) => ({ ...m, externalIdField: m.external_id_field, fields: parseJson(m.fields_json, []), filters: parseJson(m.filters_json, null) }))
     .filter((m) => m.direction !== 'outbound')
     .filter((m) => !onlyEntity || m.entity === onlyEntity);
 
@@ -621,6 +673,9 @@ export async function handleSyncRun(request, env, deps, params) {
   }
 
   const providedRows = Array.isArray(body?.rows) ? body.rows : null;
+  if (connector.type !== 'rest' && !providedRows?.length) throw new deps.HttpError(400, 'Unggah baris sumber terlebih dahulu.');
+  if (providedRows && active.length > 1 && !onlyEntity) throw new deps.HttpError(400, 'Pilih entitas tujuan untuk impor baris.');
+  if (body.rows !== undefined && !providedRows) throw new deps.HttpError(400, 'rows harus berupa array.');
   if (providedRows && providedRows.length > LIMITS.importRows) {
     throw new deps.HttpError(400, `Maksimal ${LIMITS.importRows} baris per permintaan.`);
   }
@@ -644,7 +699,7 @@ export async function handleSyncRun(request, env, deps, params) {
 
   for (const mapping of active) {
     const entity = mapping.entity;
-    if (!ENTITY_KEYS.includes(entity)) continue;
+    if (!IMPORTABLE_ENTITIES.includes(entity)) throw new deps.HttpError(400, 'Entitas ini belum mendukung impor.');
 
     let rows;
     if (providedRows) {
@@ -656,6 +711,10 @@ export async function handleSyncRun(request, env, deps, params) {
         continue;
       }
       rows = pulled.rows;
+      if (rows.length > LIMITS.importRows) {
+        await recordError(entity, null, `Maksimal ${LIMITS.importRows} baris per permintaan.`, 'VALIDATION_ERROR');
+        continue;
+      }
     } else {
       rows = [];
     }
@@ -686,7 +745,7 @@ export async function handleSyncRun(request, env, deps, params) {
     }
   }
 
-  const status = stats.failed === 0 ? 'completed' : stats.processed === stats.failed ? 'failed' : 'completed_with_errors';
+  const status = stats.failed === 0 ? 'completed' : (stats.inserted + stats.updated + stats.skipped === 0 ? 'failed' : 'completed_with_errors');
   const endedAt = nowIso();
 
   if (!dryRun) {
@@ -882,180 +941,146 @@ export async function handleMigrationGet(request, env, deps, params) {
  * entity at a time, with progress recorded per phase. Rows come from
  * `rowsByEntity` (file upload) or from the connector itself (REST pull).
  */
+async function lockMigration(env, id, ownerId, HttpError) {
+  const result = await env.DB.prepare('UPDATE mcp_migrations SET locked = 1 WHERE id = ? AND owner_id = ? AND locked = 0')
+    .bind(id, ownerId).run();
+  if (result.meta.changes !== 1) throw new HttpError(409, 'Migrasi sedang diproses. Tunggu hingga selesai.');
+}
+
 export async function handleMigrationRun(request, env, deps, params) {
   const user = await requireOwner(request, env, deps);
-  const row = await env.DB.prepare('SELECT * FROM mcp_migrations WHERE id = ? AND owner_id = ?')
-    .bind(params.id, user.id).first();
+  const body = await deps.readJson(request);
+  const dryRun = body.dryRun === true;
+  let row = await env.DB.prepare('SELECT * FROM mcp_migrations WHERE id = ? AND owner_id = ?').bind(params.id, user.id).first();
   if (!row) throw new deps.HttpError(404, 'Migrasi tidak ditemukan.');
-  if (row.status === 'rolled_back') throw new deps.HttpError(400, 'Migrasi sudah di-rollback. Buat migrasi baru.');
-
-  const body = await deps.readJson(request).catch(() => ({}));
-  const phases = parseJson(row.phases_json, []);
-  const dryRun = body?.dryRun === true;
-  const rowsByEntity = body?.rowsByEntity && typeof body.rowsByEntity === 'object' ? body.rowsByEntity : null;
-
-  let index = Number.isInteger(body?.phaseIndex) ? body.phaseIndex : phases.findIndex((p) => p.status === 'pending');
-  if (index < 0 || index >= phases.length) {
-    // Nothing pending: report the final state instead of erroring.
-    return deps.ok(migrationView(row));
-  }
-
-  const phase = phases[index];
-  // Defensive: a phase row could predate a schema change.
-  if (!Array.isArray(phase.errors)) phase.errors = [];
-  for (const key of ['recordsProcessed', 'recordsInserted', 'recordsUpdated', 'recordsFailed']) {
-    if (typeof phase[key] !== 'number') phase[key] = 0;
-  }
-  if (!Array.isArray(phase.entities)) phase.entities = [];
-  phase.status = 'running';
-  phase.startedAt = nowIso();
-  await env.DB.prepare('UPDATE mcp_migrations SET status = ?, phases_json = ?, started_at = COALESCE(started_at, ?) WHERE id = ? AND owner_id = ?')
-    .bind('running', JSON.stringify(phases), phase.startedAt, params.id, user.id).run();
-
-  const aggregate = emptyStats();
-  const connectorId = row.connector_id;
-
-  for (const entity of phase.entities) {
-    if (!connectorId) {
-      phase.errors.push({ entity, message: 'Migrasi belum terhubung ke konektor.' });
-      phase.recordsFailed += 1;
-      continue;
-    }
-    const mappingRow = await env.DB.prepare(
-      'SELECT * FROM mcp_mappings WHERE connector_id = ? AND entity = ? AND owner_id = ?',
-    ).bind(connectorId, entity, user.id).first();
-
-    if (!mappingRow) {
-      // Optional phase entities may simply not be configured.
-      continue;
-    }
-
-    const mapping = { ...mappingRow, fields: parseJson(mappingRow.fields_json, []), filters: parseJson(mappingRow.filters_json, null) };
-    const connector = await loadConnector(env, user.id, connectorId);
-    if (!connector) continue;
-
-    let rows = rowsByEntity?.[entity] || null;
-    if (!rows && connector.type === 'rest') {
-      const config = parseJson(connector.config_json, {});
-      const secrets = await openSecrets(env, connector.secrets_json);
-      const pulled = await pullFromRest(config, secrets, entity, mapping);
-      if (pulled.error) {
-        phase.errors.push({ entity, message: pulled.error });
-        phase.recordsFailed += 1;
-        continue;
+  if (!dryRun) await lockMigration(env, params.id, user.id, deps.HttpError);
+  try {
+    // Re-read after acquiring the lock; another phase may have just completed.
+    row = await env.DB.prepare('SELECT * FROM mcp_migrations WHERE id = ? AND owner_id = ?').bind(params.id, user.id).first();
+    if (row.status === 'rolled_back') throw new deps.HttpError(400, 'Migrasi sudah di-rollback. Buat migrasi baru.');
+    const phases = parseJson(row.phases_json, []);
+    const index = body.phaseIndex ?? phases.findIndex((p) => p.status === 'pending');
+    if (index === -1 && body.phaseIndex === undefined) return deps.ok({ ...migrationView(row), dryRun });
+    if (!Number.isInteger(index) || index < 0 || index >= phases.length) throw new deps.HttpError(400, 'Fase tidak valid.');
+    const phase = phases[index];
+    if (phase.status !== 'pending') throw new deps.HttpError(409, 'Fase sudah dijalankan. Buat migrasi baru untuk mengulang.');
+    if (phases.slice(0, index).some((p) => p.status === 'pending')) throw new deps.HttpError(409, 'Jalankan fase sebelumnya terlebih dahulu.');
+    const connector = await loadConnector(env, user.id, row.connector_id);
+    if (!connector || connector.enabled !== 1) throw new deps.HttpError(400, 'Pilih konektor yang aktif.');
+    if (connector.type === 'database') throw new deps.HttpError(400, 'Koneksi database langsung memerlukan agen jembatan.');
+    const supplied = body.rowsByEntity;
+    if (supplied !== undefined && (!supplied || typeof supplied !== 'object' || Array.isArray(supplied))) throw new deps.HttpError(400, 'rowsByEntity harus berupa objek.');
+    if (supplied) {
+      let total = 0;
+      for (const [entity, rows] of Object.entries(supplied)) {
+        if (!phase.entities.includes(entity) || !IMPORTABLE_ENTITIES.includes(entity) || !Array.isArray(rows)) throw new deps.HttpError(400, 'Entitas atau daftar baris tidak valid untuk fase ini.');
+        total += rows.length;
       }
-      rows = pulled.rows;
+      if (total > LIMITS.importRows) throw new deps.HttpError(400, `Maksimal ${LIMITS.importRows} baris per permintaan.`);
     }
-    if (!rows || !rows.length) continue;
-
-    for (const sourceRow of rows) {
-      phase.recordsProcessed += 1;
-      aggregate.processed += 1;
-      const { values, errors } = transformRow(entity, sourceRow, mapping);
-      if (errors.length) {
-        phase.recordsFailed += 1;
-        aggregate.failed += 1;
-        if (phase.errors.length < 100) phase.errors.push({ entity, message: errors.join('; ') });
-        continue;
+    const { results: stored } = await env.DB.prepare('SELECT * FROM mcp_mappings WHERE connector_id = ? AND owner_id = ?')
+      .bind(connector.id, user.id).all();
+    const mappings = stored.filter((m) => phase.entities.includes(m.entity) && m.direction === 'inbound' && IMPORTABLE_ENTITIES.includes(m.entity));
+    if (!mappings.length) throw new deps.HttpError(400, 'Belum ada pemetaan masuk untuk fase ini.');
+    if (connector.type !== 'rest' && !mappings.some((m) => supplied?.[m.entity]?.length)) throw new deps.HttpError(400, 'Unggah baris sumber untuk fase ini.');
+    const aggregate = emptyStats();
+    phase.startedAt = nowIso();
+    let rowCount = 0;
+    const sources = [];
+    for (const mappingRow of mappings) {
+      const entity = mappingRow.entity;
+      const mapping = { ...mappingRow, externalIdField: mappingRow.external_id_field, fields: parseJson(mappingRow.fields_json, []), filters: parseJson(mappingRow.filters_json, null) };
+      let rows = supplied?.[entity];
+      if (!rows && connector.type === 'rest') {
+        let secrets;
+        try { secrets = await openSecrets(env, connector.secrets_json) } catch (err) { throw asBadRequest(err, deps.HttpError) }
+        const pulled = await pullFromRest(parseJson(connector.config_json, {}), secrets, entity, mapping);
+        if (pulled.error) {
+          phase.errors.push({ entity, message: pulled.error });
+          aggregate.failed += 1;
+          continue;
+        }
+        rows = pulled.rows;
       }
-      if (dryRun) {
-        phase.recordsInserted += 1;
-        aggregate.inserted += 1;
-        continue;
-      }
-      try {
-        const externalId = externalIdFor(entity, sourceRow, mapping);
-        const { action } = await writeRow(env, user.id, connectorId, entity, mapping, values, externalId);
-        if (action === 'updated') { phase.recordsUpdated += 1; aggregate.updated += 1; }
-        else if (action === 'skipped') { aggregate.skipped += 1; }
-        else { phase.recordsInserted += 1; aggregate.inserted += 1; }
-      } catch (err) {
-        phase.recordsFailed += 1;
-        aggregate.failed += 1;
-        if (phase.errors.length < 100) {
-          phase.errors.push({ entity, message: err?.validation ? err.message : 'Gagal menulis baris.' });
+      rows = rows || [];
+      rowCount += rows.length;
+      if (rowCount > LIMITS.importRows) throw new deps.HttpError(400, `Maksimal ${LIMITS.importRows} baris per permintaan.`);
+      sources.push({ entity, mapping, rows });
+    }
+    for (const { entity, mapping, rows } of sources) {
+      for (const sourceRow of rows) {
+        aggregate.processed += 1;
+        const { values, errors } = transformRow(entity, sourceRow, mapping);
+        if (errors.length) {
+          aggregate.failed += 1;
+          if (phase.errors.length < 100) phase.errors.push({ entity, message: errors.join('; ') });
+          continue;
+        }
+        if (dryRun) { aggregate.inserted += 1; continue; }
+        try {
+          const { action } = await writeRow(env, user.id, connector.id, entity, mapping, values, externalIdFor(entity, sourceRow, mapping), params.id);
+          aggregate[action] += 1;
+        } catch (err) {
+          aggregate.failed += 1;
+          if (phase.errors.length < 100) phase.errors.push({ entity, message: err?.validation ? err.message : 'Gagal menulis baris.' });
         }
       }
     }
+    phase.recordsProcessed = aggregate.processed;
+    phase.recordsInserted = aggregate.inserted;
+    phase.recordsUpdated = aggregate.updated;
+    phase.recordsFailed = aggregate.failed;
+    phase.status = aggregate.failed ? 'completed_with_errors' : 'completed';
+    phase.endedAt = nowIso();
+    const remaining = phases.some((p) => p.status === 'pending');
+    const status = remaining ? 'running' : phases.some((p) => p.status === 'completed_with_errors') ? 'completed_with_errors' : 'completed';
+    const stats = parseJson(row.stats_json, emptyStats());
+    for (const key of ['processed', 'inserted', 'updated', 'skipped', 'failed']) stats[key] += aggregate[key];
+    const result = { ...migrationView(row), phases, stats, status, startedAt: row.started_at || phase.startedAt, endedAt: remaining ? null : phase.endedAt, dryRun };
+    if (!dryRun) {
+      await env.DB.prepare('UPDATE mcp_migrations SET status = ?, phases_json = ?, stats_json = ?, started_at = ?, ended_at = ? WHERE id = ? AND owner_id = ?')
+        .bind(status, JSON.stringify(phases), JSON.stringify(stats), result.startedAt, result.endedAt, params.id, user.id).run();
+    }
+    return deps.ok(result);
+  } finally {
+    if (!dryRun) await env.DB.prepare('UPDATE mcp_migrations SET locked = 0 WHERE id = ? AND owner_id = ?').bind(params.id, user.id).run();
   }
-
-  phase.status = phase.recordsFailed === 0 ? 'completed' : 'completed_with_errors';
-  phase.endedAt = nowIso();
-
-  const remaining = phases.some((p) => p.status === 'pending');
-  const anyFailed = phases.some((p) => p.status === 'completed_with_errors' || p.status === 'failed');
-  const finalStatus = remaining ? 'running' : (anyFailed ? 'completed_with_errors' : 'completed');
-
-  const previous = parseJson(row.stats_json, emptyStats());
-  const stats = {
-    processed: previous.processed + aggregate.processed,
-    inserted: previous.inserted + aggregate.inserted,
-    updated: previous.updated + aggregate.updated,
-    skipped: previous.skipped + aggregate.skipped,
-    failed: previous.failed + aggregate.failed,
-    entities: { ...(previous.entities || {}) },
-  };
-
-  await env.DB.prepare(
-    'UPDATE mcp_migrations SET status = ?, phases_json = ?, stats_json = ?, ended_at = ? WHERE id = ? AND owner_id = ?',
-  ).bind(finalStatus, JSON.stringify(phases), JSON.stringify(stats), remaining ? null : nowIso(), params.id, user.id).run();
-
-  const updated = await env.DB.prepare('SELECT * FROM mcp_migrations WHERE id = ? AND owner_id = ?')
-    .bind(params.id, user.id).first();
-  return deps.ok({ ...migrationView(updated), dryRun });
 }
 
-/**
- * Roll back a migration.
- *
- * Only rows this migration created are removed — the external refs table tells
- * us exactly which local rows are ours, so pre-existing data is never touched.
- */
+/** Remove only unchanged, unreferenced rows inserted by this migration. */
 export async function handleMigrationRollback(request, env, deps, params) {
   const user = await requireOwner(request, env, deps);
-  const row = await env.DB.prepare('SELECT * FROM mcp_migrations WHERE id = ? AND owner_id = ?')
-    .bind(params.id, user.id).first();
+  const row = await env.DB.prepare('SELECT * FROM mcp_migrations WHERE id = ? AND owner_id = ?').bind(params.id, user.id).first();
   if (!row) throw new deps.HttpError(404, 'Migrasi tidak ditemukan.');
-
-  const phases = parseJson(row.phases_json, []);
-  const entities = [...new Set(phases.flatMap((p) => p.entities || []))];
-  let removed = 0;
-
-  if (row.connector_id) {
-    for (const entity of entities) {
-      if (!ENTITY_KEYS.includes(entity)) continue;
-      const { results: refs } = await env.DB.prepare(
-        'SELECT id, local_id FROM mcp_external_refs WHERE connector_id = ? AND entity = ? AND owner_id = ?',
-      ).bind(row.connector_id, entity, user.id).all();
-
-      for (const ref of refs || []) {
-        await env.DB.prepare(`DELETE FROM ${entity} WHERE id = ? AND owner_id = ?`)
-          .bind(ref.local_id, user.id).run();
-        await env.DB.prepare('DELETE FROM mcp_external_refs WHERE id = ? AND owner_id = ?')
-          .bind(ref.id, user.id).run();
-        removed += 1;
-      }
+  await lockMigration(env, params.id, user.id, deps.HttpError);
+  try {
+    const { results: journal } = await env.DB.prepare('SELECT * FROM mcp_migration_rows WHERE migration_id = ? AND owner_id = ?')
+      .bind(params.id, user.id).all();
+    const statements = [];
+    for (const item of journal) {
+      const entity = item.entity;
+      if (!IMPORTABLE_ENTITIES.includes(entity)) throw new deps.HttpError(409, 'Jurnal migrasi tidak valid.');
+      const dependent = { requests: ['offers', 'request_id'], workers: ['assignment_workers', 'worker_id'], vas_items: ['ledger_entries', 'vas_item_id'] }[entity];
+      const unused = dependent ? `AND NOT EXISTS (SELECT 1 FROM ${dependent[0]} WHERE ${dependent[1]} = ${entity}.id)` : '';
+      statements.push(env.DB.prepare(`DELETE FROM ${entity} WHERE id = ? AND owner_id = ? AND ${snapshotSql(entity)} = ? ${unused} RETURNING id`)
+        .bind(item.local_id, user.id, item.snapshot_json));
+      statements.push(env.DB.prepare(`DELETE FROM mcp_external_refs WHERE entity = ? AND local_id = ? AND owner_id = ? AND NOT EXISTS (SELECT 1 FROM ${entity} WHERE id = ?)`)
+        .bind(entity, item.local_id, user.id, item.local_id));
+      statements.push(env.DB.prepare(`DELETE FROM mcp_migration_rows WHERE migration_id = ? AND entity = ? AND local_id = ? AND owner_id = ? AND NOT EXISTS (SELECT 1 FROM ${entity} WHERE id = ?)`)
+        .bind(params.id, entity, item.local_id, user.id, item.local_id));
     }
+    const results = statements.length ? await env.DB.batch(statements) : [];
+    const removedRows = results.filter((_, i) => i % 3 === 0).reduce((sum, r) => sum + r.results.length, 0);
+    const { n: retainedRows } = await env.DB.prepare('SELECT COUNT(*) AS n FROM mcp_migration_rows WHERE migration_id = ? AND owner_id = ?').bind(params.id, user.id).first();
+    if (!retainedRows) {
+      // Keep the original counters and phases as an audit trail.
+      await env.DB.prepare("UPDATE mcp_migrations SET status = 'rolled_back', rolled_back_at = ? WHERE id = ? AND owner_id = ?")
+        .bind(nowIso(), params.id, user.id).run();
+    }
+    return deps.ok({ rolledBack: retainedRows === 0, removedRows, retainedRows });
+  } finally {
+    await env.DB.prepare('UPDATE mcp_migrations SET locked = 0 WHERE id = ? AND owner_id = ?').bind(params.id, user.id).run();
   }
-
-  for (const phase of phases) {
-    phase.status = 'pending';
-    phase.startedAt = null;
-    phase.endedAt = null;
-    phase.recordsProcessed = 0;
-    phase.recordsInserted = 0;
-    phase.recordsUpdated = 0;
-    phase.recordsFailed = 0;
-    phase.errors = [];
-  }
-
-  await env.DB.prepare(
-    `UPDATE mcp_migrations
-        SET status = 'rolled_back', phases_json = ?, stats_json = ?, rolled_back_at = ?, ended_at = ?
-      WHERE id = ? AND owner_id = ?`,
-  ).bind(JSON.stringify(phases), JSON.stringify(emptyStats()), nowIso(), nowIso(), params.id, user.id).run();
-
-  return deps.ok({ rolledBack: true, removedRows: removed });
 }
 
 /* ---------------------------------------------------------------- Webhook */
@@ -1070,11 +1095,15 @@ export async function handleWebhook(request, env, deps, params) {
   const row = await env.DB.prepare('SELECT * FROM mcp_connectors WHERE id = ?').bind(params.id).first();
   if (!row || row.type !== 'webhook') throw new deps.HttpError(404, 'Endpoint tidak ditemukan.');
   if (row.enabled !== 1) throw new deps.HttpError(403, 'Konektor tidak aktif.');
+  const flags = await env.DB.prepare('SELECT plan, suspended FROM user_flags WHERE user_id = ?').bind(row.owner_id).first();
+  if (flags?.suspended || !deps.canUse(flags?.plan, 'erpIntegration')) throw new deps.HttpError(403, 'Pemilik konektor tidak memiliki akses integrasi.');
 
-  const secrets = await openSecrets(env, row.secrets_json);
+  let secrets;
+  try { secrets = await openSecrets(env, row.secrets_json) } catch (err) { throw asBadRequest(err, deps.HttpError) }
   const secret = secrets.secret;
   if (!secret) throw new deps.HttpError(403, 'Konektor belum dikonfigurasi.');
 
+  const payload = await deps.readJson(request.clone());
   const raw = await request.text();
   const signature = request.headers.get('x-mcp-signature') || request.headers.get('x-hub-signature-256') || '';
   const expected = await hmacHex(secret, raw);
@@ -1082,21 +1111,21 @@ export async function handleWebhook(request, env, deps, params) {
     throw new deps.HttpError(401, 'Tanda tangan tidak valid.');
   }
 
-  let payload;
-  try { payload = JSON.parse(raw) } catch { throw new deps.HttpError(400, 'Body bukan JSON.') }
-
   const mappingRow = await env.DB.prepare(
     'SELECT * FROM mcp_mappings WHERE connector_id = ? AND entity = ?',
   ).bind(params.id, payload?.entity || '').first();
 
   if (!mappingRow) throw new deps.HttpError(400, 'Event tidak memiliki pemetaan untuk entitas tersebut.');
 
-  const mapping = { ...mappingRow, fields: parseJson(mappingRow.fields_json, []), filters: parseJson(mappingRow.filters_json, null) };
-  const records = Array.isArray(payload?.data) ? payload.data : payload?.data ? [payload.data] : [];
+  if (!IMPORTABLE_ENTITIES.includes(mappingRow.entity) || mappingRow.direction !== 'inbound') throw new deps.HttpError(400, 'Pemetaan masuk tidak didukung.');
+  const mapping = { ...mappingRow, externalIdField: mappingRow.external_id_field, fields: parseJson(mappingRow.fields_json, []), filters: parseJson(mappingRow.filters_json, null) };
+  const data = payload.rows ?? payload.data;
+  const records = Array.isArray(data) ? data : data ? [data] : [];
+  if (records.length > LIMITS.importRows) throw new deps.HttpError(400, `Maksimal ${LIMITS.importRows} baris per permintaan.`);
   if (!records.length) throw new deps.HttpError(400, 'Event tidak berisi data.');
 
   const results = [];
-  for (const sourceRow of records.slice(0, LIMITS.importRows)) {
+  for (const sourceRow of records) {
     const { values, errors } = transformRow(mapping.entity, sourceRow, mapping);
     if (errors.length) {
       results.push({ ok: false, errors });

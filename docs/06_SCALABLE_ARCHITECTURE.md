@@ -356,13 +356,13 @@ Tiga tingkat, dari yang paling murah:
 
 | Area | Hari ini | Yang ditambahkan |
 |------|----------|------------------|
-| Kredensial konektor | AES-GCM dengan `MCP_ENCRYPTION_KEY`; jatuh ke `plain:` base64 bila kunci tidak diset | **Wajibkan kunci di produksi** — tolak simpan kredensial bila tidak ada; `key_version` per baris untuk rotasi |
+| Kredensial konektor | AES-GCM dengan `MCP_ENCRYPTION_KEY`; simpan kredensial ditolak tanpa kunci | `key_version` per baris untuk rotasi |
 | Token sesi | Hash SHA-256, 30 hari | Rotasi token saat perubahan peran; daftar sesi aktif |
 | Rate limit | Hanya OTP per email | Per token: `/api/llm/*` (paling mahal), `/api/mcp/*/sync`, `/api/auth/*` |
 | Audit | Tidak ada | Tabel `audit_log` untuk: login staf, ubah konektor, jalankan migrasi, rollback, ekspor data |
 | CSP | Belum | `default-src 'self'`; longgarkan hanya untuk yang benar-benar perlu |
 
-**Catatan penting untuk rilis berikutnya:** `MCP_ENCRYPTION_KEY` belum tentu ada di lingkungan produksi. Tanpa kunci, kredensial ERP tersimpan sebagai base64 — bisa dibaca siapa pun yang memegang akses baca D1. Ini harus ditutup sebelum konektor pertama dipakai dengan kredensial asli.
+**Persiapan deploy:** setel `MCP_ENCRYPTION_KEY` sebelum membuat konektor berisi rahasia. Tanpa kunci, Worker menolak penyimpanan dengan `503`; impor file tetap dapat dipakai.
 
 ### 6.3 Pemulihan bencana
 

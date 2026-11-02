@@ -301,123 +301,82 @@ Kode: `worker/office.js`. Rute `admin/*` hanya untuk sesi dari `POST /api/auth/s
 
 ## MCP: Konektor ERP dan Migrasi
 
-Kode: `worker/mcp.js` (22 rute). Aturan bersama ada di `src/mcp/rules.js` — modul yang sama dipakai Worker, peramban, dan mock, sehingga formulir dan database tidak bisa berbeda pendapat. Skema tabel di [20_DATABASE.md](20_DATABASE.md) §MCP; spesifikasi protokol di [mcp/MCP_SPEC.md](mcp/MCP_SPEC.md).
+MCP adalah nama modul konektor internal, bukan implementasi standar Model Context Protocol. Implementasi: `worker/mcp.js`; aturan bersama: `src/mcp/rules.js`. [Panduan implementasi](mcp/MCP_SPEC.md) dan [skema D1](20_DATABASE.md).
 
-Semua rute wajib masuk (**Bearer**) kecuali `POST /api/mcp/webhook/:id` — di sana **tanda tangan HMAC adalah kredensialnya**. Tabel `mcp_*` **tidak** ada di whitelist `/api/db`: kredensial konektor tidak boleh bisa dibaca lewat endpoint generik.
+Authenticated routes memerlukan sesi Bearer, kepemilikan, dan paket Enterprise. Plan `sole`, `ukm`, atau tidak ada mendapat `403`. Webhook memakai HMAC serta memeriksa plan/suspensi pemilik saat event diterima. Tabel `mcp_*` tidak tersedia lewat `/api/db`.
 
-**Semua rute MCP butuh paket Enterprise.** Selain `webhook`, setiap handler memeriksa tier sebelum menyentuh database (`requireOwner` di `worker/mcp.js`). Pengguna `sole` atau `ukm` mendapat `403` dengan pesan `"Integrasi ERP & migrasi data tersedia pada paket Enterprise."` — bukan `404` dan bukan daftar kosong, agar batasnya jelas. Menyembunyikan tab di UI bukan kontrol; pemeriksaan ini yang sebenarnya. Webhook tetap publik karena tanda tangannya adalah kredensial, dan konektornya hanya bisa dibuat oleh akun Enterprise.
+Respons memakai `{ data, error }`; create konektor/migrasi mengembalikan `201`, operasi lain `200`. Galat memakai `{ data: null, error: { message } }`.
 
-### Batas
+### Batas dan cakupan
 
-| Batas | Nilai | Berlaku di |
-|-------|-------|-----------|
-| Nama konektor | 80 karakter | create/update |
-| URL konektor | 500 karakter | create/update |
-| Konektor per pemilik | 20 | create |
-| Pemetaan per konektor | 60 | put mapping |
-| Bidang per pemetaan | 120 | put mapping |
-| Baris per impor/sinkronisasi | 500 | `sync` |
-| Batch tulis | 100 | `migration run` |
-| Baris dead letter disimpan | 5000 (per pemilik) | sync |
-| Log sinkronisasi disimpan | 500 (per pemilik) | sync |
-| Baris mentah per entri dead letter | 20.000 karakter | sync |
+| Batas | Nilai |
+|-------|-------|
+| Body request | 256 KiB; `413` jika terlampaui |
+| Nama konektor | 2–80 karakter |
+| URL REST | Maks. 500 karakter, HTTPS hostname publik, tanpa userinfo atau fragmen; redirect ditolak |
+| Konektor per pemilik | 20 |
+| Pemetaan per pemilik | 60; pemetaan yang sudah ada tetap dapat diperbarui pada batas ini |
+| Bidang per pemetaan | 120 |
+| Baris per request | 500; input atau respons REST berlebih ditolak seluruhnya |
+| Dead letter per sync | Maks. 200 baris gagal disimpan, maks. 20.000 karakter per baris mentah |
 
-Melampaui batas → `400` dengan pesan Indonesia, bukan `500`.
+Entitas yang dapat ditulis adalah `requests`, `workers`, `vas_items`, dan `waste_entries`. Penawaran/jurnal dan entitas dengan referensi internal belum dapat diimpor. Hanya arah `inbound` didukung. Mode `upsert` memakai `externalIdField` atau natural key; `insert` selalu membuat baris baru. Tidak ada penjadwal ERP, pagination vendor, atau retensi log otomatis.
 
-### Konektor
+### Konektor dan pemetaan
 
-| Rute | Fungsi | Kesalahan |
-|------|--------|-----------|
-| `GET /api/mcp/schema` | Skema Satu Alur untuk pemetaan: `{ entities: [{ key, label, columns: [{ name, type, required, enum? }] }], importable, transforms }`. `importable` = `requests`, `workers`, `vas_items`, `waste_entries` | - |
-| `GET /api/mcp/connectors` | Daftar konektor milik pemanggil, sudah diredaksi (tanpa rahasia). `{ data: [...], count }` | - |
-| `POST /api/mcp/connectors` | Body `{ type, name, config, secrets? }` → konektor baru. `type`: `rest` \| `database` \| `file` \| `webhook`. `secrets` dipisahkan dari `config` sebelum disimpan | 400 validasi (nama < 2 karakter, URL tidak valid, port di luar 1–65535, kredensial tidak lengkap, rahasia webhook < 16 karakter, `cron` wajib untuk tipe `rest`) |
-| `GET /api/mcp/connectors/:id` | Satu konektor (diredaksi) | 404 |
-| `PATCH /api/mcp/connectors/:id` | Ubah sebagian. `secrets` yang tidak dikirim **tidak** menghapus rahasia lama | 400, 404 |
-| `DELETE /api/mcp/connectors/:id` | Hapus konektor beserta pemetaan dan log-nya | 404 |
-| `POST /api/mcp/connectors/:id/test` | Uji konfigurasi. Untuk `rest`: panggilan nyata dengan batas waktu 8 detik → `{ ok, latencyMs, message }`. Untuk `database`: `{ ok: false, bridgeRequired: true, message }` karena Worker tidak bisa membuka TCP | 400, 404 |
-| `POST /api/mcp/connectors/:id/sync` | Jalankan sinkronisasi masuk. Body `{ dryRun?, trigger?, entity?, rows? }`. `rows` = array baris sumber (impor file); tanpa `rows` dan tipe `rest`, data ditarik dari `config.baseUrl + mapping.endpoint`. `dryRun` tidak menulis apa pun dan tidak membuat log | 400 "Konektor belum diaktifkan.", 400 "Belum ada pemetaan masuk…", 400 >500 baris, 400 tipe `database` |
-| `GET /api/mcp/connectors/:id/sync` | 100 log sinkronisasi terakhir untuk konektor ini | 404 |
+| Rute | Kontrak |
+|------|---------|
+| `GET /api/mcp/schema` | `{ entities: [{ key, label, importable, columns: [{ name, type, required, values }] }], phases }` |
+| `GET /api/mcp/connectors` | Array konektor milik pemanggil, tanpa rahasia |
+| `POST /api/mcp/connectors` | `{ type, name, enabled?, config?, apiKey?, password?, token?, secret? }`; tipe `rest`, `database`, `file`, `webhook` → `201`. Bidang konfigurasi juga boleh flat; rahasia nested dalam `auth`/`connection` dipisahkan sebelum disimpan |
+| `GET /api/mcp/connectors/:id` | Satu konektor; `404` bila tidak dimiliki pemanggil |
+| `PATCH /api/mcp/connectors/:id` | Perubahan sebagian. `enabled`/rahasia yang tidak dikirim dipertahankan. Tipe tidak dapat diganti; buat konektor baru |
+| `DELETE /api/mcp/connectors/:id` | Hapus konektor, pemetaan, log, dead letter, dan referensi eksternal. Catatan migrasi dan jurnal tetap disimpan |
+| `POST /api/mcp/connectors/:id/test` | `{ ok, code, message, status, latencyMs }`. REST: HEAD, fallback GET untuk 405/501, timeout maks. 20 detik. Database: `code: "BRIDGE_REQUIRED"`. File/webhook: validasi konfigurasi |
+| `GET /api/mcp/connectors/:id/mappings` | Array pemetaan masuk |
+| `PUT /api/mcp/connectors/:id/mappings` | `{ entity, direction?, fields, externalIdField?, mode?, filters? }`. `fields`: `[{ source?, target, transform?, mapping?, constant? }]`. Kolom wajib harus dipetakan. Hanya `inbound` dan entitas importable diterima |
+| `DELETE /api/mcp/connectors/:id/mappings/:entity` | Hapus pemetaan milik pemanggil |
 
-Respons `sync`:
+REST memakai `config.endpoint.baseUrl`, `config.auth.type` (`apikey`, `basic`, `oauth2`), dan `config.auth.headerName` untuk API key. Basic membutuhkan `username` dan `password`; OAuth membutuhkan bearer `token` yang sudah diperoleh. Tidak ada token refresh otomatis. File hanya mendukung CSV/JSON; ekspor Excel sebagai CSV.
 
-```json
-{
-  "data": {
-    "syncId": "sync_9f2c…",
-    "dryRun": false,
-    "status": "completed_with_errors",
-    "stats": {
-      "processed": 120, "inserted": 98, "updated": 15, "skipped": 5, "failed": 2,
-      "entities": { "requests": { "processed": 120, "inserted": 98, "updated": 15, "skipped": 5, "failed": 2 } }
-    },
-    "errors": [{ "entity": "requests", "message": "layanan wajib diisi.", "code": "VALIDATION_ERROR" }],
-    "errorCount": 2
-  },
-  "error": null
-}
-```
+### Sinkronisasi
 
-`status`: `completed` (tanpa kegagalan), `completed_with_errors` (sebagian), `failed` (semua baris gagal). Baris yang gagal disimpan mentah di `mcp_sync_errors` untuk diperbaiki dan dijalankan ulang.
+| Rute | Kontrak |
+|------|---------|
+| `POST /api/mcp/connectors/:id/sync` | `{ dryRun?, trigger?, entity?, rows? }`. Konektor harus aktif dan mempunyai pemetaan. `rows` untuk file; tanpa rows, REST menarik array JSON dari sumber. `dryRun` tidak menulis data atau log |
+| `GET /api/mcp/connectors/:id/sync` | 100 log terakhir milik konektor |
+| `GET /api/mcp/sync/:id` | Satu log sync milik pemanggil |
+| `GET /api/mcp/sync` | 100 log terakhir milik pemanggil |
+| `GET /api/mcp/errors?status=open` | Dead letter milik pemanggil; status `open`, `resolved`, `ignored` |
+| `PATCH /api/mcp/errors/:id` | `{ status }`; mengubah penandaan, bukan menjalankan replay otomatis |
 
-### Pemetaan
+REST menerima array langsung, `{ data: [] }`, `{ records: [] }`, atau `{ rows: [] }`. Path tambahan dari `filters.path` atau `config.endpoint.entityPath`; query dari `filters.query`.
 
-| Rute | Fungsi | Kesalahan |
-|------|--------|-----------|
-| `GET /api/mcp/connectors/:id/mappings` | Semua pemetaan konektor | 404 |
-| `PUT /api/mcp/connectors/:id/mappings` | Body `{ entity, direction?, mode?, idField?, fields: [{ source, target, transform? }], filters? }`. Unik per `(connector_id, entity)` — `PUT` yang sama menimpa | 400 entitas tak dikenal, target tak dikenal, target ganda, transform tak dikenal, kolom wajib tidak dipetakan |
-| `DELETE /api/mcp/connectors/:id/mappings/:entity` | Hapus satu pemetaan | 404 |
-
-`mode`: `insert` (selalu menambah) atau `upsert` (memakai `idField` sebagai kunci alami; bawaannya `upsert`). `transform` adalah rantai, mis. `"trim|uppercase"` atau `"money"`. Daftar lengkap ada di `GET /api/mcp/schema` → `transforms`.
-
-### Log dan dead letter
-
-| Rute | Fungsi |
-|------|--------|
-| `GET /api/mcp/sync` | Log sinkronisasi semua konektor (maks. 100, terbaru dulu) |
-| `GET /api/mcp/sync/:syncId` | Satu log beserta statistiknya |
-| `GET /api/mcp/errors[?status=open\|resolved\|ignored]` | Dead letter. Bawaannya `open` |
-| `PATCH /api/mcp/errors/:id` | Body `{ status: "resolved" \| "ignored", note? }` |
-
-Entri dead letter menyimpan `source_data` (baris sumber mentah, maks. 20.000 karakter), `error_code`, dan `error_message`. `error_code`: `VALIDATION_ERROR`, `WRITE_ERROR`, `CONN_ERROR`, `SIGNATURE_ERROR`.
+Hasil sync: `{ syncId, dryRun, status, stats, errors, errorCount }`, dengan `stats: { processed, inserted, updated, skipped, failed, entities }`. Error per baris tidak membatalkan baris lain; INSERT domain dan referensi/jurnalnya tetap atomik. `errors` membatasi contoh 50 item.
 
 ### Migrasi
 
-| Rute | Fungsi | Kesalahan |
-|------|--------|-----------|
-| `GET /api/mcp/migrations` | Daftar migrasi milik pemanggil | - |
-| `POST /api/mcp/migrations` | Body `{ connectorId?, name, strategy, phases? }` → migrasi `draft`. `strategy`: `parallel` (disarankan) \| `phased` \| `bigbang`. Tanpa `phases`, dipakai tiga fase bawaan: master → transaksi aktif → historis | 400 |
-| `GET /api/mcp/migrations/:id` | Satu migrasi beserta status per fase | 404 |
-| `POST /api/mcp/migrations/:id/run` | Jalankan **satu** fase berikutnya. Body `{ dryRun? }`. Mengembalikan migrasi terbaru; `status` menjadi `running` selama masih ada fase `pending` | 400, 404 |
-| `POST /api/mcp/migrations/:id/rollback` | Hapus baris yang **dibuat migrasi ini** (diketahui dari `mcp_external_refs`) dan setel ulang fase. Data yang sudah ada sebelum migrasi tidak disentuh → `{ rolledBack: true, removedRows: N }` | 404 |
+| Rute | Kontrak |
+|------|---------|
+| `GET /api/mcp/migrations` | 50 migrasi terakhir milik pemanggil |
+| `POST /api/mcp/migrations` | `{ connectorId?, name, strategy?, phases? }` → `201`. Fase tersedia `master` (`workers`, `vas_items`) dan `open_transactions` (`requests`). Strategi `parallel`, `phased`, `bigbang` adalah label operator; tidak menjalankan cutover otomatis |
+| `GET /api/mcp/migrations/:id` | Satu migrasi dan fase |
+| `POST /api/mcp/migrations/:id/run` | `{ phaseIndex?, dryRun?, rowsByEntity?: { entity: rows[] } }`. Memerlukan konektor aktif dan pemetaan masuk. File memerlukan baris sumber. Fase dijalankan sekali dan berurutan; duplikat/permintaan serentak `409`. Dry run mengembalikan pratinjau tanpa mengubah progres/data/log/lock tersimpan |
+| `POST /api/mcp/migrations/:id/rollback` | Hapus hanya baris baru milik run ini yang belum berubah dan belum dipakai. `{ rolledBack, removedRows, retainedRows }`. Update pada baris lama tidak dipulihkan; fase/statistik dipertahankan sebagai audit |
 
-`run` mengembalikan `phases: [{ key, label, entities, status, recordsProcessed, recordsInserted, recordsUpdated, recordsFailed, errors }]`. Status fase: `pending`, `running`, `completed`, `completed_with_errors`, `failed`. Status migrasi: `draft`, `running`, `completed`, `completed_with_errors`, `rolled_back`.
+Galat: `400` payload/sumber tidak valid atau konektor nonaktif, `404` tidak dimiliki, `409` migrasi sedang diproses atau fase sudah dijalankan. `mcp_migration_rows` dari migrasi `0011` adalah sumber jurnal rollback; baris run lama tanpa jurnal tidak dihapus.
 
-### Webhook masuk (publik)
+### Webhook masuk
 
-`POST /api/mcp/webhook/:id` — tanpa sesi. Tanda tangan dihitung atas **body mentah**:
+`POST /api/mcp/webhook/:id` menerima `{ entity, rows: [...] }`; `data` juga diterima untuk kompatibilitas. Header `X-MCP-Signature: sha256=<hex>` atau `X-Hub-Signature-256` berisi HMAC-SHA256 atas body mentah dengan `secret` konektor.
 
-```
-X-MCP-Signature: sha256=<hex>          (atau X-Hub-Signature-256)
-```
+Respons `{ received, written, failed }`. Gunakan upsert dengan ID stabil untuk kiriman berulang. Galat: `401` tanda tangan salah, `403` konektor nonaktif atau pemilik tidak lagi berhak/disuspensi, `404` bukan konektor webhook, `400` payload/pemetaan tidak didukung atau >500 baris, `413` body >256 KiB. Payload berlebih ditolak tanpa menulis sebagian.
 
-Diverifikasi dengan HMAC-SHA256 memakai `secrets.webhookSecret` konektor; perbandingan waktu-konstan. Body `{ entity, rows: [...] }`; maks. 500 baris. Galat: `401` tanda tangan tidak cocok, `404` konektor tidak ada atau tidak aktif, `400` entitas tak dikenal.
+### Keamanan dan rollout
 
-```bash
-BODY='{"entity":"requests","rows":[{"nama":"Budi","tebu":"tebu"}]}'
-SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
-curl -X POST "https://satu-alur.apipedia.workers.dev/api/mcp/webhook/$CONNECTOR_ID" \
-  -H "content-type: application/json" -H "X-MCP-Signature: sha256=$SIG" -d "$BODY"
-```
+Terapkan seluruh migrasi, termasuk `0009`, `0010`, dan `0011`, sebelum deploy kode. Setel `MCP_ENCRYPTION_KEY` sebagai Worker secret (minimal 16 karakter; gunakan nilai acak kuat). Tanpa kunci, simpan kredensial ditolak `503`; file tetap dapat dipakai. Rahasia disimpan AES-GCM dan tidak dikembalikan API. Kredensial lama berformat plaintext harus disimpan ulang. Kunci salah/berubah menghasilkan `503` hingga kredensial dipulihkan.
 
-### Keamanan kredensial
-
-`config.secrets` dienkripsi AES-GCM dengan `MCP_ENCRYPTION_KEY` sebelum masuk `mcp_connectors.secrets_json`. **Tanpa kunci itu, rahasia disimpan sebagai `plain:<base64>`** — bisa dibaca siapa pun yang memegang akses baca D1. Setel kunci sebelum konektor pertama dipakai dengan kredensial asli:
-
-```bash
-openssl rand -base64 32 | wrangler secret put MCP_ENCRYPTION_KEY
-```
-
-Rahasia tidak pernah dikembalikan oleh rute mana pun (`redactConnector`), termasuk `GET /api/mcp/connectors/:id`.
+Lock per migrasi dilepas pada penyelesaian atau error yang tertangkap. Setelah penghentian paksa, operator harus memastikan tidak ada request aktif sebelum mereset `mcp_migrations.locked = 0`. Baris yang telah ditulis tetap tercatat di jurnal untuk pemeriksaan/rollback.
 
 ## Pemakaian dari Klien
 

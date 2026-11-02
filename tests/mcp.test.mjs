@@ -107,7 +107,7 @@ test('redactConnector never returns secrets', () => {
     id: 'conn_1',
     name: 'Odoo',
     type: 'rest',
-    config: { endpoint: { baseUrl: 'https://a.id' } },
+    config: { endpoint: { baseUrl: 'https://a.id' }, auth: { type: 'apikey', apiKey: 'raw-secret' } },
     has_secrets: true,
     enabled: 1,
     status: 'active',
@@ -310,11 +310,10 @@ test('transformRow keeps a valid text value that contains a colon', () => {
 
 /* ------------------------------------------------------------- Migration */
 
-test('validateMigration builds the three phases and keeps them ordered', () => {
+test('validateMigration builds the supported phases and keeps them ordered', () => {
   const out = R.validateMigration({ name: 'Migrasi Q4', strategy: 'parallel' })
-  assert.equal(out.phases.length, 3)
-  assert.deepEqual(out.phases.map((p) => p.key), ['master', 'open_transactions', 'historical'])
-  assert.equal(out.phases[2].optional, true)
+  assert.equal(out.phases.length, 2)
+  assert.deepEqual(out.phases.map((p) => p.key), ['master', 'open_transactions'])
   assert.ok(out.phases.every((p) => p.status === 'pending'))
 })
 
@@ -337,4 +336,12 @@ test('schemaFor exposes required flags and enum values', () => {
 
 test('importable entities exclude FK-dependent tables', () => {
   assert.deepEqual(R.IMPORTABLE_ENTITIES, ['requests', 'workers', 'vas_items', 'waste_entries'])
+})
+
+test('connector config never exposes nested or irrelevant credentials', () => {
+  const out = R.validateConnector({ type: 'file', name: 'CSV', config: { auth: { apiKey: 'never-store', password: 'never-store' }, connection: { password: 'never-store' } } })
+  assert.ok(!JSON.stringify(out.config).includes('never-store'))
+  for (const baseUrl of ['http://erp.example.com', 'https://user:password@erp.example.com', 'https://127.0.0.1', 'https://[::1]', 'https://localhost', 'https://erp.local']) {
+    throwsValidation(() => R.validateConnector({ type: 'rest', name: 'ERP', endpoint: { baseUrl }, apiKey: 'key' }), /URL endpoint harus valid/)
+  }
 })

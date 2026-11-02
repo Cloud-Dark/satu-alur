@@ -8,7 +8,7 @@
  */
 
 import {
-  ENTITIES, ENTITY_KEYS, TRANSFORMS, applyTransforms, columnType,
+  ENTITIES, IMPORTABLE_ENTITIES, TRANSFORMS, applyTransforms, columnType,
   schemaFor, validateMapping as validateMappingRules,
 } from './rules.js'
 
@@ -16,7 +16,7 @@ import {
 
 /** Shape the mapping screen renders: { requests: { label, columns: [...] } }. */
 export const SATU_ALUR_SCHEMA = Object.fromEntries(
-  ENTITY_KEYS.map((key) => [key, schemaFor(key)]),
+  IMPORTABLE_ENTITIES.map((key) => [key, schemaFor(key)]),
 )
 
 export { TRANSFORMS, applyTransforms }

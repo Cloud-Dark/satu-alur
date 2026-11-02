@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS mcp_connectors (
   type TEXT NOT NULL CHECK (type IN ('rest', 'database', 'file', 'webhook')),
   -- Non-secret configuration (endpoint, auth type, driver, host, format...).
   config_json TEXT NOT NULL DEFAULT '{}',
-  -- Secrets, encrypted with AES-GCM when MCP_ENCRYPTION_KEY is set.
+  -- Secrets require AES-GCM with MCP_ENCRYPTION_KEY; no plaintext fallback.
   -- NULL means "no credentials stored" (file connectors).
   secrets_json TEXT,
   enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),

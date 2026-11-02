@@ -1,5 +1,5 @@
 /**
- * MCP (Model Context Protocol) — one set of rules, three callers.
+ * MCP (ERP connector module) — one set of rules, three callers.
  *
  * `worker/mcp.js`, `src/mcp/connector.js` and the Pengaturan UI all import this
  * module, so a connector the form accepts can never be one the database
@@ -272,6 +272,8 @@ export const SECRET_FIELDS = {
 export function splitConnectorInput(type, input = {}) {
   const secrets = {}
   const config = {}
+  input = { ...(isPlainObject(input.config) ? input.config : {}), ...input }
+  const publicKeys = [...({ rest: ['baseUrl'], database: [], file: ['format', 'delimiter', 'encoding', 'hasHeader'], webhook: [] }[type] || []), 'sync']
 
   for (const [key, value] of Object.entries(input)) {
     if (typeof value === 'undefined') continue
@@ -279,11 +281,11 @@ export function splitConnectorInput(type, input = {}) {
       if (value !== '' && value !== null) secrets[key] = String(value)
       continue
     }
-    config[key] = value
+    if (publicKeys.includes(key)) config[key] = value
   }
 
   // Nested shapes from the UI templates.
-  if (isPlainObject(input.auth)) {
+  if (type === 'rest' && isPlainObject(input.auth)) {
     config.auth = { type: input.auth.type || 'apikey', headerName: input.auth.headerName || 'X-Api-Key' }
     for (const key of ['apiKey', 'password', 'clientSecret', 'token', 'username']) {
       if (typeof input.auth[key] !== 'undefined' && input.auth[key] !== '') {
@@ -292,14 +294,16 @@ export function splitConnectorInput(type, input = {}) {
       }
     }
   }
-  if (isPlainObject(input.connection)) {
-    const { password, ...rest } = input.connection
-    config.connection = rest
+  if (type === 'database' && isPlainObject(input.connection)) {
+    const { password, driver, host, port, database, username, ssl, readOnly } = input.connection
+    config.connection = { driver, host, port, database, username, ssl, readOnly }
     if (password) secrets.password = String(password)
   }
-  if (isPlainObject(input.endpoint)) config.endpoint = input.endpoint
+  if (type === 'rest' && isPlainObject(input.endpoint)) {
+    const { baseUrl, entityPath, timeout } = input.endpoint
+    config.endpoint = { baseUrl, ...(entityPath ? { entityPath } : {}), ...(timeout ? { timeout } : {}) }
+  }
   if (isPlainObject(input.sync)) config.sync = input.sync
-  if (isPlainObject(input.validation)) config.validation = input.validation
 
   return { config, secrets }
 }
@@ -319,13 +323,20 @@ export function validateConnector(input = {}, { existing = null } = {}) {
 
   if (type === 'rest') {
     const url = text(config.endpoint?.baseUrl || config.baseUrl, LIMITS.url)
-    if (!/^https?:\/\/[^\s]+$/i.test(url)) fail('URL endpoint harus valid (dimulai dengan http:// atau https://).')
+    try {
+      const parsed = new URL(url)
+      const host = parsed.hostname.toLowerCase()
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.hash
+        || !host.includes('.') || /^[\d.]+$/.test(host) || host.startsWith('[')
+        || ['.localhost', '.local', '.internal'].some((suffix) => host.endsWith(suffix))) throw new Error()
+    } catch { fail('URL endpoint harus valid: gunakan HTTPS dengan hostname publik, tanpa kredensial atau fragmen.') }
     config.endpoint = { ...(config.endpoint || {}), baseUrl: url }
+    delete config.baseUrl
     const authType = config.auth?.type || 'apikey'
     if (!['apikey', 'basic', 'oauth2'].includes(authType)) fail('Tipe autentikasi tidak dikenal.')
     config.auth = { ...(config.auth || {}), type: authType }
-    const hasSecret = Object.keys(secrets).length > 0 || Boolean(existing?.hasSecrets)
-    if (!hasSecret) fail('Kredensial konektor wajib diisi.')
+    const secretKey = { apikey: 'apiKey', basic: 'password', oauth2: 'token' }[authType]
+    if (!secrets[secretKey] && !existing?.hasSecrets) fail('Kredensial konektor wajib diisi.')
     if (authType === 'basic' && !config.auth.username) fail('Username wajib diisi untuk Basic Auth.')
   }
 
@@ -352,7 +363,7 @@ export function validateConnector(input = {}, { existing = null } = {}) {
 
   if (type === 'file') {
     const format = config.format || 'csv'
-    if (!['csv', 'xlsx', 'json', 'xml'].includes(format)) fail('Format file tidak dikenal.')
+    if (!['csv', 'json'].includes(format)) fail('Gunakan CSV atau JSON. Ekspor Excel sebagai CSV terlebih dahulu.')
     config.format = format
     config.delimiter = config.delimiter || ','
     config.encoding = config.encoding || 'utf-8'
@@ -361,8 +372,9 @@ export function validateConnector(input = {}, { existing = null } = {}) {
 
   if (type === 'webhook') {
     const secret = secrets.secret || existing?.secret
-    if (!secret || String(secret).length < 16) fail('Secret webhook minimal 16 karakter.')
-    secrets.secret = secret
+    if (secret && String(secret).length < 16) fail('Secret webhook minimal 16 karakter.')
+    if (!secret && !existing?.hasSecrets) fail('Secret webhook minimal 16 karakter.')
+    if (secret) secrets.secret = secret
   }
 
   const syncStrategy = config.sync?.strategy || 'manual'
@@ -388,7 +400,7 @@ export function validateConnector(input = {}, { existing = null } = {}) {
 /** Strip every secret before a connector leaves the server. */
 export function redactConnector(row) {
   if (!row) return null
-  const config = row.config || {}
+  const { config } = splitConnectorInput(row.type, row.config || {})
   const hasSecrets = Boolean(row.has_secrets)
   return {
     id: row.id,
@@ -414,6 +426,8 @@ export function validateMapping(input = {}) {
   const spec = ENTITIES[entity]
   const direction = input.direction || 'inbound'
   enumOrThrow(direction, SYNC_DIRECTIONS, 'Arah sinkronisasi')
+  if (!IMPORTABLE_ENTITIES.includes(entity)) fail('Entitas ini belum mendukung impor; referensi internal harus dipetakan terlebih dahulu.')
+  if (direction !== 'inbound') fail('Saat ini hanya pemetaan masuk (inbound) yang didukung.')
 
   const fields = Array.isArray(input.fields) ? input.fields : []
   if (fields.length === 0) fail('Pemetaan harus memiliki minimal satu bidang.')
@@ -435,7 +449,7 @@ export function validateMapping(input = {}) {
       ? (Array.isArray(raw.transform) ? raw.transform : [raw.transform]).filter((t) => TRANSFORM_KEYS.includes(t))
       : []
 
-    if (raw.transform && transform.length === 0) fail(`Transformasi tidak dikenal untuk ${target}.`)
+    if (raw.transform && (transform.length === 0 || transform.length !== (Array.isArray(raw.transform) ? raw.transform.length : 1))) fail(`Transformasi tidak dikenal untuk ${target}.`)
 
     let mapTable = null
     if (isPlainObject(raw.mapping)) {
@@ -443,7 +457,7 @@ export function validateMapping(input = {}) {
       for (const [k, v] of Object.entries(raw.mapping)) mapTable[text(k, 120)] = v
     }
 
-    if (!source && !raw.constant && spec.required.includes(target)) {
+    if (!source && (raw.constant === undefined || raw.constant === null || raw.constant === '') && spec.required.includes(target)) {
       fail(`Kolom wajib belum dipetakan: ${target}.`)
     }
 
@@ -514,16 +528,9 @@ export const MIGRATION_PHASES = [
   {
     key: 'open_transactions',
     name: 'Transaksi Aktif',
-    description: 'Permintaan dan penawaran yang masih berjalan',
-    entities: ['requests', 'offers'],
+    description: 'Permintaan yang masih berjalan',
+    entities: ['requests'],
     optional: false,
-  },
-  {
-    key: 'historical',
-    name: 'Data Historis',
-    description: 'Penyelesaian dan jurnal masa lalu',
-    entities: ['completions', 'ledger_entries'],
-    optional: true,
   },
 ]
 
@@ -537,6 +544,7 @@ export function validateMigration(input = {}) {
   const requested = Array.isArray(input.phases) && input.phases.length
     ? input.phases.filter((p) => MIGRATION_PHASES.some((x) => x.key === p))
     : MIGRATION_PHASES.map((p) => p.key)
+  if (!requested.length) fail('Pilih fase migrasi yang didukung.')
 
   const phases = MIGRATION_PHASES
     .filter((p) => requested.includes(p.key) || (!p.optional && !requested.length))

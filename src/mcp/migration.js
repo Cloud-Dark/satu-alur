@@ -1,8 +1,8 @@
 /**
  * MCP migration helpers.
  *
- * The engine itself lives in the Worker (`worker/mcp.js`) so a migration keeps
- * running when the browser closes. This module re-exports the client calls and
+ * Each phase runs in a Worker request (`worker/mcp.js`) and stores its result.
+ * This module re-exports the client calls and
  * adds the pieces the UI needs: the phase plan and a validation report.
  */
 

@@ -314,7 +314,7 @@ CHECK constraint di sini mencerminkan `src/mcp/rules.js`, sehingga formulir, Wor
 | `name` | TEXT NOT NULL | Unik per pemilik (`idx_mcp_connectors_owner_name`) |
 | `type` | TEXT NOT NULL | CHECK: `rest`, `database`, `file`, `webhook` |
 | `config_json` | TEXT NOT NULL DEFAULT `'{}'` | Konfigurasi non-rahasia: endpoint, auth type, driver, host, format |
-| `secrets_json` | TEXT | **Terenkripsi AES-GCM** bila `MCP_ENCRYPTION_KEY` diset; `plain:<base64>` bila tidak. `NULL` = tanpa kredensial |
+| `secrets_json` | TEXT | **Terenkripsi AES-GCM** dengan `MCP_ENCRYPTION_KEY`; penyimpanan ditolak tanpa kunci. `NULL` = tanpa kredensial |
 | `enabled` | INTEGER NOT NULL DEFAULT 0 | CHECK: 0/1 |
 | `status` | TEXT NOT NULL DEFAULT `'draft'` | CHECK: `draft`, `active`, `disabled`, `error` |
 | `last_sync_at` | TEXT | Diperbarui setiap sinkronisasi selesai |
@@ -375,11 +375,19 @@ Indeks `(owner_id, status, created_at)` — persis pola query tab Log.
 
 `strategy` CHECK: `parallel` (disarankan), `phased`, `bigbang`. `status` CHECK: `draft`, `running`, `completed`, `completed_with_errors`, `failed`, `rolled_back`. `phases_json` = array `{ key, name, entities, status, recordsProcessed, recordsInserted, recordsUpdated, recordsFailed, errors }`. `connector_id` **tanpa** FK: migrasi boleh dicatat sebelum konektor dibuat (mis. impor file sekali jalan), dan rollback memakai `connector_id` bila ada.
 
+### Keamanan migrasi (`0011_mcp_migration_safety.sql`)
+
+`mcp_migration_rows` mencatat `(migration_id, owner_id, entity, local_id, snapshot_json)` untuk setiap baris baru. Baris domain, jurnal, dan referensi eksternal ditulis dalam satu transaksi D1. Snapshot dipakai untuk mempertahankan baris yang telah diedit sesudah impor. Baris lama yang diperbarui tidak dicatat sebagai baris baru dan tidak dihapus saat rollback.
+
+`mcp_migrations.locked` menserialkan eksekusi fase dan rollback. Jika proses Worker dihentikan paksa, pastikan tidak ada permintaan aktif sebelum operator mereset `locked = 0` untuk migrasi tersebut. Rollback sebelum `0011` tidak memiliki jurnal; baris dari run lama dipertahankan.
+
 ## Migrasi
 
-- Berkas: `migrations/0001_init.sql` (memakai `CREATE TABLE IF NOT EXISTS`) sampai `migrations/0010_user_plan.sql`.
+- Berkas: `migrations/0001_init.sql` (memakai `CREATE TABLE IF NOT EXISTS`) sampai `migrations/0011_mcp_migration_safety.sql`.
 - Lokal: `npm run db:migrate:local`; remote: `npm run db:migrate:remote`.
 - `0009_mcp.sql` **wajib** dijalankan sebelum tab ERP & Integrasi dipakai di lingkungan mana pun; tanpa itu `/api/mcp/*` mengembalikan galat SQL.
 - `0010_user_plan.sql` wajib dijalankan sebelum `authenticate` dipanggil: kolom `user_flags.plan` dibaca pada setiap permintaan, sehingga tanpa migrasi ini semua rute berautentikasi gagal dengan galat SQL.
 - Perubahan skema: tambahkan berkas bernomor berikutnya, dan perbarui whitelist di `worker/index.js` bila kolom/tabel domain berubah ([21_BACKEND.md](21_BACKEND.md)).
 - Kebijakan retensi data, backup, dan ukuran batas D1: lihat [06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md) §6.3.
+
+`0011_mcp_migration_safety.sql` wajib diterapkan sebelum menjalankan atau membatalkan migrasi ERP.

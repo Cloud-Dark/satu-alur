@@ -9,7 +9,7 @@
 
 import { isUsingMockCloud } from '../cloud.js'
 import { call } from './api.js'
-import { LIMITS, TRANSFORM_KEYS, applyTransforms } from './rules.js'
+import { LIMITS, TRANSFORM_KEYS, applyTransforms, validateConnector, validateMigration, validateMapping } from './rules.js'
 
 const CONNECTOR_KEY = 'satualur_mcp_connectors'
 const MAPPING_KEY = 'satualur_mcp_mappings'
@@ -80,13 +80,6 @@ function mockId(prefix) {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
 }
 
-function hasSecretInput(type, input) {
-  if (type === 'rest') return Boolean(input?.apiKey || input?.auth?.apiKey || input?.password || input?.auth?.password)
-  if (type === 'database') return Boolean(input?.password || input?.connection?.password)
-  if (type === 'webhook') return Boolean(input?.secret)
-  return false
-}
-
 /* ------------------------------------------------------------- Connectors */
 
 export async function listConnectors() {
@@ -111,14 +104,15 @@ export async function createConnector(input) {
     if (list.length >= LIMITS.connectors) {
       throw new Error(`Batas ${LIMITS.connectors} konektor tercapai. Hapus konektor yang tidak dipakai.`)
     }
+    const clean = validateConnector(input)
     const connector = {
       id: mockId('conn'),
-      name: input.name || 'Konektor baru',
-      type: input.type || 'rest',
-      config: input.config || {},
+      name: clean.name,
+      type: clean.type,
+      config: clean.config,
       enabled: input.enabled === true,
       status: input.enabled ? 'active' : 'draft',
-      hasSecrets: hasSecretInput(input.type, input),
+      hasSecrets: Object.keys(clean.secrets).length > 0,
       lastSyncAt: null,
       lastError: null,
       createdAt: new Date().toISOString(),
@@ -136,13 +130,15 @@ export async function updateConnector(id, input) {
     const list = readStore(CONNECTOR_KEY, [])
     const idx = list.findIndex((c) => c.id === id)
     if (idx === -1) return null
+    const clean = validateConnector({ ...list[idx].config, ...list[idx], ...input }, { existing: { hasSecrets: list[idx].hasSecrets } })
     const enabled = typeof input.enabled === 'undefined' ? list[idx].enabled : input.enabled === true
     list[idx] = {
       ...list[idx],
-      ...input,
-      config: { ...list[idx].config, ...(input.config || {}) },
+      name: clean.name,
+      type: clean.type,
+      config: clean.config,
       enabled,
-      hasSecrets: list[idx].hasSecrets || hasSecretInput(list[idx].type, input),
+      hasSecrets: list[idx].hasSecrets || Object.keys(clean.secrets).length > 0,
       status: enabled ? 'active' : 'draft',
       updatedAt: new Date().toISOString(),
     }
@@ -206,6 +202,7 @@ export async function listMappings(connectorId) {
 
 export async function saveMapping(connectorId, mapping) {
   if (isUsingMockCloud()) {
+    mapping = validateMapping(mapping)
     const all = readStore(MAPPING_KEY, {})
     const list = all[connectorId] || []
     const idx = list.findIndex((m) => m.entity === mapping.entity)
@@ -393,6 +390,7 @@ export async function listMigrations() {
 
 export async function createMigration(input) {
   if (isUsingMockCloud()) {
+    const clean = validateMigration(input)
     const list = readStore(MIGRATION_KEY, [])
     const row = {
       id: mockId('mig'),
@@ -400,7 +398,7 @@ export async function createMigration(input) {
       connectorId: input.connectorId || null,
       strategy: input.strategy || 'parallel',
       status: 'draft',
-      phases: (input.phases || []).map((p) => ({ ...p, status: 'pending' })),
+      phases: clean.phases,
       stats: { processed: 0, inserted: 0, updated: 0, skipped: 0, failed: 0 },
       createdAt: new Date().toISOString(),
     }
@@ -441,6 +439,8 @@ export async function runMigrationPhase(id, options = {}) {
       : mig.phases.findIndex((p) => p.status === 'pending')
     if (idx < 0) return mig
 
+    if (mig.status === 'rolled_back') throw new Error('Migrasi sudah di-rollback. Buat migrasi baru.')
+    if (idx >= mig.phases.length || mig.phases[idx].status !== 'pending') throw new Error('Fase sudah dijalankan.')
     const phase = mig.phases[idx]
     phase.status = 'running'
     phase.startedAt = phase.startedAt || new Date().toISOString()
@@ -461,8 +461,8 @@ export async function runMigrationPhase(id, options = {}) {
     mig.stats.processed += processed
     mig.stats.inserted += processed
     mig.status = mig.phases.every((p) => p.status === 'completed' || p.status === 'skipped') ? 'completed' : 'running'
-    writeStore(MIGRATION_KEY, list)
-    return mig
+    if (!options.dryRun) writeStore(MIGRATION_KEY, list)
+    return { ...mig, dryRun: options.dryRun === true }
   }
 
   return call(`/api/mcp/migrations/${encodeURIComponent(id)}/run`, {
@@ -502,7 +502,7 @@ function toServer(input) {
   return {
     type: input.type,
     name: input.name,
-    enabled: input.enabled === true,
+    ...(typeof input.enabled !== 'undefined' ? { enabled: input.enabled === true } : {}),
     config: {
       ...(input.config || {}),
       ...(input.endpoint ? { endpoint: input.endpoint } : {}),
@@ -516,6 +516,7 @@ function toServer(input) {
     ...(input.apiKey ? { apiKey: input.apiKey } : {}),
     ...(input.auth?.apiKey ? { apiKey: input.auth.apiKey } : {}),
     ...(input.auth?.password ? { password: input.auth.password } : {}),
+    ...(input.auth?.token ? { token: input.auth.token } : {}),
     ...(input.password ? { password: input.password } : {}),
     ...(input.connection?.password ? { password: input.connection.password } : {}),
     ...(input.secret ? { secret: input.secret } : {}),

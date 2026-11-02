@@ -174,7 +174,7 @@ function json(body, status = 200) {
     },
   });
 }
-const ok = (data, extra) => json({ data, error: null, ...(extra || {}) });
+const ok = (data, extra) => json({ data, error: null, ...(typeof extra === 'object' ? extra : {}) }, typeof extra === 'number' ? extra : 200);
 const fail = (status, message) => json({ data: null, error: { message } }, status);
 
 async function readJson(request, maxBytes = MAX_BODY_BYTES) {
