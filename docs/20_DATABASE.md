@@ -58,6 +58,23 @@ Akun staf Kantor Satu Alur (migrasi 0007). Dikelola hanya lewat `npm run staff`;
 | `last_login_at` | TEXT | |
 | `created_at` | TEXT NOT NULL | |
 
+### user_flags
+
+Atribut per pengguna yang dibaca `authenticate` pada setiap permintaan. Baris dibuat saat pengguna pertama kali diberi flag; tidak adanya baris berarti nilai bawaan (`suspended = 0`, `plan = 'sole'`).
+
+| Kolom | Tipe | Catatan |
+|-------|------|---------|
+| `user_id` | TEXT PK | FK → `users(id)` ON DELETE CASCADE |
+| `suspended` | INTEGER NOT NULL DEFAULT 0 | CHECK 0/1 |
+| `reason` | TEXT NOT NULL DEFAULT `''` | alasan penangguhan, tampil ke pengguna |
+| `plan` | TEXT NOT NULL DEFAULT `'sole'` | **Tier langganan**: `sole`, `ukm`, `enterprise` (migrasi `0010_user_plan.sql`). Enum ditegakkan di `src/business/plan-access.js`, bukan CHECK constraint, mengikuti konvensi tabel domain |
+| `updated_at` | TEXT NOT NULL | |
+| `updated_by` | TEXT | staf yang mengubah, bila ada |
+
+**Mengapa tier ada di sini, bukan di `users`:** tabel ini sudah menjadi tempat atribut per pengguna yang dibaca jalur autentikasi, sehingga `authenticate` tidak perlu join tambahan. `plan` menentukan fitur mana yang terbuka — saat ini hanya `erpIntegration` yang butuh `enterprise`; fitur yang tidak terdaftar di `FEATURES` terbuka untuk semua tier, sehingga menutup fitur selalu keputusan sadar.
+
+Akun demo diselaraskan pada setiap `demo-login` (`plan = skala akun`), jadi tiga akun demo Enterprise selalu bisa membuka integrasi ERP.
+
 ### otp_codes
 
 | Kolom | Tipe | Catatan |
@@ -360,8 +377,9 @@ Indeks `(owner_id, status, created_at)` — persis pola query tab Log.
 
 ## Migrasi
 
-- Berkas: `migrations/0001_init.sql` (memakai `CREATE TABLE IF NOT EXISTS`) sampai `migrations/0009_mcp.sql`.
+- Berkas: `migrations/0001_init.sql` (memakai `CREATE TABLE IF NOT EXISTS`) sampai `migrations/0010_user_plan.sql`.
 - Lokal: `npm run db:migrate:local`; remote: `npm run db:migrate:remote`.
 - `0009_mcp.sql` **wajib** dijalankan sebelum tab ERP & Integrasi dipakai di lingkungan mana pun; tanpa itu `/api/mcp/*` mengembalikan galat SQL.
+- `0010_user_plan.sql` wajib dijalankan sebelum `authenticate` dipanggil: kolom `user_flags.plan` dibaca pada setiap permintaan, sehingga tanpa migrasi ini semua rute berautentikasi gagal dengan galat SQL.
 - Perubahan skema: tambahkan berkas bernomor berikutnya, dan perbarui whitelist di `worker/index.js` bila kolom/tabel domain berubah ([21_BACKEND.md](21_BACKEND.md)).
 - Kebijakan retensi data, backup, dan ukuran batas D1: lihat [06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md) §6.3.

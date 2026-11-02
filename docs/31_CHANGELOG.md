@@ -8,6 +8,32 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-02 - Integrasi ERP menjadi fitur Enterprise, landing menjelaskan posisinya
+
+Integrasi ERP sebelumnya terbuka untuk semua akun. Itu keliru: fitur ini menyentuh kredensial sistem lain dan pemindahan data perusahaan, jadi tidak masuk akal dijual setara dengan alur kerja dasar. Sekarang ada tier per pengguna, dan landing page menjelaskan bahwa Satu Alur melengkapi sistem yang sudah berjalan — bukan meminta perusahaan mulai dari nol.
+
+#### Ditambahkan
+- Migrasi `0010_user_plan.sql`: kolom `user_flags.plan` (`sole`, `ukm`, `enterprise`), bawaan `sole`. Akun demo diselaraskan dengan skala seed-nya pada setiap `demo-login`, sehingga tiga akun demo Enterprise tetap membuka integrasi.
+- `src/business/plan-access.js`: satu sumber aturan tier untuk Worker, peramban, dan mock — `canUse`, `requiredPlan`, `planLockMessage`, `normalizePlan`. Fitur yang tidak terdaftar terbuka untuk semua tier, jadi menutup fitur selalu keputusan sadar.
+- `GET /api/auth/session` mengembalikan `user.plan`.
+- Panel terkunci di Pengaturan → ERP & Integrasi, Migrasi, dan Log untuk akun non-Enterprise: menjelaskan isi fitur, menyebut paket yang dibutuhkan, dan menyediakan jalan ke halaman kontak. Tab tetap terlihat; isinya yang menjelaskan.
+- Penanda **Enterprise** pada judul panel Konektor, Migrasi, dan Log untuk akun yang berhak.
+- Bagian **Integrasi** di landing (`#integrasi`): tiga jenis konektor yang benar-benar ada (REST API, impor file, webhook masuk), tiga langkah perpindahan bertahap, dan catatan bahwa fitur ini paket Enterprise. Tautan "Integrasi ERP" ditambahkan ke kolom Produk di footer.
+
+#### Diubah
+- Semua rute `/api/mcp/*` (kecuali webhook publik) menolak tier di bawah Enterprise dengan `403 "Integrasi ERP & migrasi data tersedia pada paket Enterprise."` Pemeriksaan ada di `requireOwner`, satu tempat untuk 21 rute, karena menyembunyikan tab bukan kontrol.
+- Landing tidak menampilkan integrasi database langsung, karena konektor itu masih memerlukan bridge agent yang belum ada.
+
+#### Pengujian
+- `tests/plan-access.test.mjs`: 9 tes — normalisasi tier, urutan rank, gating `erpIntegration`, fitur tak dikenal tetap terbuka, pesan kunci, pemetaan skala demo, dan penolakan `403` pada dua rute MCP untuk `sole`/`ukm` serta plan yang hilang.
+- Total **405 tes Node lulus, 0 gagal**.
+- `tests/e2e/settings.spec.cjs`: **32 pemeriksaan lulus** (dari 26), termasuk panel terkunci untuk tier `sole`, grid konektor yang tidak dirender, dan gerbang yang terbuka kembali saat tier dikembalikan.
+- Diverifikasi pada Worker lokal: `demo-ac` (sole) → `403`; `demo-mall` (enterprise) → `200`.
+
+#### Catatan
+- `0010_user_plan.sql` wajib dijalankan sebelum deploy: `authenticate` membaca `user_flags.plan` pada setiap permintaan, jadi tanpa migrasi ini semua rute berautentikasi gagal.
+- Di mode mock, akun non-demo dianggap Enterprise agar seluruh produk bisa ditinjau tanpa backend; `localStorage.satualur_plan` menimpanya (dipakai suite e2e untuk menguji keadaan terkunci).
+
 ### 2026-11-02 - MCP: Konektor ERP dan Migrasi Database
 
 Satu Alur kini punya **Model Context Protocol (MCP)** untuk menghubungkan dengan sistem ERP, database, atau aplikasi yang sudah perusahaan pakai — dengan backend sungguhan, bukan simulasi. Tidak perlu migrasi big bang: data bisa dipindahkan bertahap sambil dua sistem berjalan paralel.

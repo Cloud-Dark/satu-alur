@@ -50,6 +50,7 @@ E2E hanya berjalan di mode mock. Jangan arahkan ke produksi karena alurnya menul
 | TC-LND-10 | Demo agen AI dan animasi 3D | desktop | Gulir ke Fitur AI. Ulangi dengan "kurangi gerakan" OS aktif | - | Demo agen "mengetik". Dengan reduced motion, animasi berhenti atau statis tanpa error. Tanpa WebGL tampil gambar pengganti | P3 | Manual | _PENDING_ | |
 | TC-LND-11 | Bagian Pendapatan | sama | Gulir ke bagian Pendapatan | - | Dua kartu mesin pendapatan (Layanan tambahan dengan katalog add-on dan batang serapan; Tanpa limbah dengan cincin persentase dan tiga kebocoran terbesar), lalu strip ruang optimasi dengan lima chip tim dan "Pimpinan optimasi". Semua angka contoh diberi label "Contoh" | P1 | [landing](../../tests/e2e/landing.spec.cjs) | _PENDING_ | Angka di pratinjau ilustratif, bukan data pelanggan |
 | TC-LND-12 | Bagian Pertumbuhan | sama | Gulir ke bagian Pertumbuhan | - | Empat kartu menu (Radar peluang, Rekomendasi & prediksi, Pencari prospek, Media Sosial) dan dua kartu pendamping (Penasihat AI, AI Superpowers), plus catatan bahwa Media Sosial memerlukan Halaman Facebook dan Instagram Bisnis | P1 | [landing](../../tests/e2e/landing.spec.cjs) | _PENDING_ | |
+| TC-LND-13 | Bagian Integrasi | buka landing | Gulir ke bagian "Bukan mulai dari nol" (`#integrasi`) | - | Tiga kartu konektor (REST API, Impor file, Webhook masuk) dan tiga langkah (Hubungkan, Petakan, Pindahkan bertahap). Penanda **Enterprise** tampil. Tidak ada klaim koneksi database langsung. Footer kolom Produk punya tautan "Integrasi ERP" | P1 | [landing](../../tests/e2e/landing.spec.cjs) | _PENDING_ | Bridge agent belum ada, jadi tidak diklaim |
 
 ## 3. Login mode Live (email + OTP)
 
@@ -249,6 +250,11 @@ Fitur ini masih dalam pengerjaan (`src/stages/leads.js`, `src/leads/`, `worker/l
 | TC-SET-20 | Webhook menolak tanda tangan salah | konektor `webhook` aktif | Kirim `POST /api/mcp/webhook/:id` dengan `X-MCP-Signature` yang salah, lalu dengan yang benar | body 1 baris | Salah: `401`. Benar: `200` dan baris masuk. Body yang diubah setelah ditandatangani juga `401` | P1 | Manual (curl) | _PENDING_ | HMAC atas body mentah, perbandingan waktu-konstan |
 | TC-SET-21 | Batas impor | konektor + pemetaan | Kirim `rows` berisi 501 baris | 501 baris | `400` "Maksimal 500 baris per permintaan." — bukan galat SQL | P3 | Manual | _PENDING_ | |
 | TC-SET-22 | Migrasi `0009_mcp.sql` belum dijalankan | ENV-PROD baru | Buka tab ERP & Integrasi sebelum migrasi dijalankan | - | Kotak galat dengan tombol "Coba lagi", bukan layar kosong. Pesan menyebut tabel tidak ditemukan | P2 | Manual | _PENDING_ | Jalankan `npm run db:migrate:remote` |
+| TC-SET-23 | Panel terkunci untuk tier rendah | masuk sebagai akun `sole` atau `ukm` | Buka Pengaturan → ERP & Integrasi | - | Panel "Fitur Enterprise" tampil: menjelaskan isi fitur, menyebut "Paket Anda sekarang: …", dan tombol "Diskusikan paket Enterprise". Grid konektor **tidak** dirender | P1 | [settings](../../tests/e2e/settings.spec.cjs) (mock) | _PENDING_ | Tab tetap terlihat; isinya yang menjelaskan |
+| TC-SET-24 | Gerbang di server, bukan hanya UI | akun `sole` | `GET /api/mcp/connectors` dengan Bearer token akun itu | token | `403` "Integrasi ERP & migrasi data tersedia pada paket Enterprise." — bukan `404`, bukan daftar kosong | P1 | Manual (curl) | _PENDING_ | Diperiksa di `requireOwner`, satu tempat untuk 21 rute |
+| TC-SET-25 | Akun Enterprise tetap bisa | masuk sebagai `demo-mall` / `demo-fm` / `demo-rs` | Buka tab ERP & Integrasi, lalu `GET /api/mcp/connectors` | - | Grid konektor tampil dengan penanda **Enterprise** di judul; API mengembalikan `200` dan daftar konektor | P1 | Manual | _PENDING_ | Plan diselaraskan saat `demo-login` |
+| TC-SET-26 | Migrasi `0010_user_plan.sql` belum dijalankan | ENV-PROD | Panggil `GET /api/auth/session` | token | Galat SQL, bukan `200` tanpa `plan`. Semua rute berautentikasi gagal sampai migrasi dijalankan | P2 | Manual | _PENDING_ | `authenticate` membaca `user_flags.plan` |
+| TC-SET-27 | Webhook tetap menerima tanpa tier | konektor `webhook` milik akun Enterprise | `POST /api/mcp/webhook/:id` dengan tanda tangan benar | body 1 baris | `200` dan baris masuk, tanpa sesi dan tanpa pemeriksaan tier — tanda tangan adalah kredensialnya | P2 | Manual (curl) | _PENDING_ | Konektor hanya bisa dibuat akun Enterprise |
 
 ## 17. Tema dan responsif
 
@@ -315,7 +321,7 @@ Angka kunci berasal dari `seeds/demo-lean-summary.json`. Untuk AC, Cleaning, Lis
 
 | Tanggal | Lingkungan | Unit | E2E | Catatan |
 |---------|------------|------|-----|---------|
-| 2026-11-02 | ENV-MOCK (lokal, Vite) | 396 test: 396 lulus, 0 gagal | 1 spec `settings`: 26 cek lulus, 0 gagal | MCP: 28 tes unit baru (`tests/mcp.test.mjs`). Rute `/api/mcp/*` ditutup tes unit/kontrak; suite browser berjalan di mode mock sehingga tidak memukul D1 asli |
+| 2026-11-02 | ENV-MOCK (lokal, Vite) | 405 test: 405 lulus, 0 gagal | 1 spec `settings`: 32 cek lulus, 0 gagal | Tier Enterprise: 9 tes baru (`tests/plan-access.test.mjs`), 6 cek browser baru (panel terkunci, grid disembunyikan, gerbang terbuka lagi). Diverifikasi juga pada Worker lokal: `demo-ac` → 403, `demo-mall` → 200 |
 | 2026-10-29 | ENV-MOCK (lokal, Vite port 5199) | 139 test: 138 lulus, 0 gagal, 1 TODO (BUG-02). Termasuk 36 test Radar/Prospek dari tim fitur | 11 spec, 221 cek lulus, 0 gagal, 1 KNOWN-BUG (BUG-01). Radar/Prospek baru smoke | Isi baris baru setiap kali suite dijalankan |
 
 ## 23. Temuan

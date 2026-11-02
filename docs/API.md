@@ -90,7 +90,9 @@ Kesalahan: 401 "Username atau password salah." (username tidak ada, password sal
 
 ### GET /api/auth/session
 
-Respons 200: `{ "data": { "user": { ... } }, "error": null }`. 401 bila tidak valid.
+Respons 200: `{ "data": { "user": { ... }, "is_admin": false }, "error": null }`. 401 bila tidak valid.
+
+`user.plan` berisi tier langganan: `sole`, `ukm`, atau `enterprise`. Nilainya dibaca dari `user_flags.plan` dan dipakai untuk menutup fitur ([06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md) §4). Akun baru mendapat `sole`; akun demo mengikuti skala seed-nya dan diselaraskan setiap `demo-login`.
 
 ### POST /api/auth/signout
 
@@ -302,6 +304,8 @@ Kode: `worker/office.js`. Rute `admin/*` hanya untuk sesi dari `POST /api/auth/s
 Kode: `worker/mcp.js` (22 rute). Aturan bersama ada di `src/mcp/rules.js` — modul yang sama dipakai Worker, peramban, dan mock, sehingga formulir dan database tidak bisa berbeda pendapat. Skema tabel di [20_DATABASE.md](20_DATABASE.md) §MCP; spesifikasi protokol di [mcp/MCP_SPEC.md](mcp/MCP_SPEC.md).
 
 Semua rute wajib masuk (**Bearer**) kecuali `POST /api/mcp/webhook/:id` — di sana **tanda tangan HMAC adalah kredensialnya**. Tabel `mcp_*` **tidak** ada di whitelist `/api/db`: kredensial konektor tidak boleh bisa dibaca lewat endpoint generik.
+
+**Semua rute MCP butuh paket Enterprise.** Selain `webhook`, setiap handler memeriksa tier sebelum menyentuh database (`requireOwner` di `worker/mcp.js`). Pengguna `sole` atau `ukm` mendapat `403` dengan pesan `"Integrasi ERP & migrasi data tersedia pada paket Enterprise."` — bukan `404` dan bukan daftar kosong, agar batasnya jelas. Menyembunyikan tab di UI bukan kontrol; pemeriksaan ini yang sebenarnya. Webhook tetap publik karena tanda tangannya adalah kredensial, dan konektornya hanya bisa dibuat oleh akun Enterprise.
 
 ### Batas
 
