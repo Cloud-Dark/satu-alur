@@ -1619,3 +1619,193 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .sm-inf-photo { width: 4rem; height: 4rem; border-radius: 50%; object-fit: cover; }
 .sm-inf-photo[hidden] { display: none; }
 .sm-inf-initials { display: grid; place-items: center; background: var(--line); color: var(--brand); font-weight: 600; }
+
+/* ── MCP / ERP Connector & Migration ─────────────────────────────── */
+
+/* Connector grid & cards */
+.mcp-connector-grid { display: grid; gap: var(--s-4); }
+.mcp-empty { display: grid; place-items: center; gap: var(--s-3); padding: var(--s-8) var(--s-4); text-align: center; color: var(--text-muted); }
+.mcp-empty p { margin: 0; }
+.mcp-empty p:first-of-type { font-weight: 500; color: var(--text); }
+
+.mcp-card { display: grid; gap: var(--s-3); padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.mcp-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.mcp-card-title { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.mcp-card-title strong { font-size: 1rem; }
+.mcp-type-badge { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 999px; background: var(--brand-100); color: var(--brand-600); }
+.mcp-card-actions { display: flex; gap: var(--s-1); flex-wrap: wrap; }
+.mcp-card-meta { font-size: 0.82rem; color: var(--text-muted); }
+.mcp-card-stats { display: flex; gap: var(--s-4); font-size: 0.82rem; color: var(--text-faint); }
+
+/* Status indicators */
+.mcp-status { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.mcp-status.active { background: var(--success); box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
+.mcp-status.inactive { background: var(--text-faint); }
+.mcp-status-badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.03em; }
+.mcp-status-badge.status-draft { background: var(--surface-sunken); color: var(--text-muted); }
+.mcp-status-badge.status-running { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.mcp-status-badge.status-completed { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
+.mcp-status-badge.status-completed_with_errors { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.mcp-status-badge.status-failed { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+.mcp-status-badge.status-rolled_back { background: var(--surface-sunken); color: var(--text-muted); }
+
+/* Templates */
+.mcp-templates { margin-top: var(--s-6); }
+.mcp-templates h4 { font-size: 0.9rem; margin-bottom: var(--s-3); }
+.mcp-template-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr)); gap: var(--s-3); }
+.mcp-template-card { display: grid; gap: var(--s-1); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s; }
+.mcp-template-card:hover { border-color: var(--brand-300); box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+.mcp-template-card strong { font-size: 0.9rem; }
+.mcp-template-card span { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Head flex layout */
+.set-head-flex { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-4); }
+.set-head-flex .set-title { margin: 0; }
+
+/* Mapping */
+.mcp-mapping-container { margin-top: var(--s-4); }
+.mcp-mapping-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.mcp-mapping-table th { text-align: left; padding: var(--s-2) var(--s-3); font-size: 0.75rem; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--line); }
+.mcp-mapping-table td { padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--line-subtle); vertical-align: middle; }
+.mcp-mapping-table tr.conf-high { background: rgba(34, 197, 94, 0.04); }
+.mcp-mapping-table tr.conf-med { background: rgba(245, 158, 11, 0.04); }
+.mcp-mapping-table tr.conf-low { background: rgba(239, 68, 68, 0.03); }
+.badge-required { font-size: 0.6rem; font-weight: 600; color: #dc2626; background: rgba(239, 68, 68, 0.08); padding: 1px 5px; border-radius: 4px; margin-left: var(--s-1); text-transform: uppercase; }
+.badge-optional { font-size: 0.6rem; font-weight: 600; color: var(--text-faint); background: var(--surface-sunken); padding: 1px 5px; border-radius: 4px; margin-left: var(--s-1); text-transform: uppercase; }
+
+.mcp-validation-errors { margin-top: var(--s-3); padding: var(--s-3); border-radius: var(--r-md); background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.15); font-size: 0.85rem; }
+.mcp-validation-errors strong { color: #dc2626; }
+.mcp-validation-ok { margin-top: var(--s-3); display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3); border-radius: var(--r-md); background: rgba(34, 197, 94, 0.06); border: 1px solid rgba(34, 197, 94, 0.15); font-size: 0.85rem; color: #16a34a; }
+
+/* Migration */
+.mcp-migration-list { display: grid; gap: var(--s-3); }
+.mcp-migration-card { display: grid; gap: var(--s-3); padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.mcp-mig-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.mcp-mig-head strong { font-size: 1rem; }
+.mcp-mig-phases { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.mcp-phase { display: inline-flex; align-items: center; gap: var(--s-1); padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; background: var(--surface-sunken); color: var(--text-muted); }
+.mcp-phase.completed { background: rgba(34, 197, 94, 0.1); color: #16a34a; }
+.mcp-phase.running { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+.mcp-phase.failed { background: rgba(239, 68, 68, 0.1); color: #dc2626; }
+.mcp-phase-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.6; }
+.mcp-mig-actions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+
+.mcp-info-box { margin-top: var(--s-6); padding: var(--s-4); border-radius: var(--r-lg); background: var(--surface-sunken); border: 1px solid var(--line); }
+.mcp-info-box h4 { display: flex; align-items: center; gap: var(--s-2); font-size: 0.95rem; margin: 0 0 var(--s-2); }
+.mcp-info-box p { margin: 0 0 var(--s-2); font-size: 0.88rem; color: var(--text-muted); }
+.mcp-info-box .link { font-size: 0.88rem; color: var(--brand); text-decoration: none; }
+
+/* Stepper */
+.mcp-stepper { display: flex; gap: var(--s-2); margin: var(--s-4) 0; }
+.mcp-step { flex: 1; text-align: center; padding: var(--s-2); border-radius: var(--r-md); font-size: 0.8rem; font-weight: 500; color: var(--text-faint); background: var(--surface-sunken); }
+.mcp-step.active { background: var(--brand-100); color: var(--brand-700); }
+
+/* Phase checkbox */
+.mcp-phase-checkbox { display: flex; align-items: flex-start; gap: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); margin-bottom: var(--s-2); cursor: pointer; }
+.mcp-phase-checkbox:hover { border-color: var(--brand-300); }
+.mcp-phase-checkbox input { margin-top: 2px; }
+.mcp-phase-checkbox div { display: grid; gap: var(--s-1); }
+.mcp-phase-checkbox strong { font-size: 0.9rem; }
+.mcp-phase-checkbox span { font-size: 0.82rem; color: var(--text-muted); }
+
+.mcp-confirm-box { display: grid; gap: var(--s-2); padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); margin: var(--s-3) 0; }
+.mcp-confirm-row { display: flex; justify-content: space-between; gap: var(--s-3); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-subtle); }
+.mcp-confirm-row:last-child { border-bottom: 0; }
+
+/* Run progress */
+.mcp-run-progress { display: grid; gap: var(--s-4); margin-top: var(--s-4); }
+.mcp-run-phase { display: grid; gap: var(--s-3); padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.mcp-run-phase.running { border-color: var(--brand-300); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.08); }
+.mcp-run-phase.done { border-color: rgba(34, 197, 94, 0.3); }
+.mcp-run-phase-head { display: flex; align-items: center; gap: var(--s-3); }
+.mcp-phase-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--surface-sunken); color: var(--text-muted); }
+.mcp-phase-icon.done { background: rgba(34, 197, 94, 0.12); color: #16a34a; }
+.mcp-phase-icon.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.mcp-run-stats { display: flex; gap: var(--s-4); font-size: 0.82rem; color: var(--text-muted); padding-left: 40px; }
+.mcp-run-errors { padding-left: 40px; font-size: 0.82rem; color: #dc2626; }
+
+/* Report */
+.mcp-report-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr)); gap: var(--s-3); margin: var(--s-4) 0; }
+.mcp-report-card { display: grid; place-items: center; gap: var(--s-1); padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); text-align: center; }
+.mcp-report-card .tnum { font-size: 1.6rem; font-weight: 700; color: var(--text); }
+.mcp-report-card span:last-child { font-size: 0.78rem; color: var(--text-muted); }
+.mcp-report-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: var(--s-3) 0; }
+.mcp-report-table th { text-align: left; padding: var(--s-2) var(--s-3); font-size: 0.75rem; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--line); }
+.mcp-report-table td { padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--line-subtle); }
+.mcp-report-errors { margin-top: var(--s-4); padding: var(--s-4); border-radius: var(--r-lg); background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.12); }
+.mcp-report-errors h4 { color: #dc2626; margin: 0 0 var(--s-2); }
+.mcp-report-errors li { font-size: 0.85rem; color: #dc2626; margin-bottom: var(--s-1); }
+
+/* Log table */
+.mcp-log-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.mcp-log-table th { text-align: left; padding: var(--s-2) var(--s-3); font-size: 0.72rem; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.mcp-log-table td { padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--line-subtle); vertical-align: middle; white-space: nowrap; }
+.mcp-log-table td:first-child { font-variant-numeric: tabular-nums; }
+.mcp-log-table .badge-completed { font-size: 0.65rem; font-weight: 600; color: #16a34a; background: rgba(34, 197, 94, 0.1); padding: 2px 6px; border-radius: 4px; }
+.mcp-log-table .badge-running { font-size: 0.65rem; font-weight: 600; color: #3b82f6; background: rgba(59, 130, 246, 0.1); padding: 2px 6px; border-radius: 4px; }
+.mcp-log-table .badge-failed { font-size: 0.65rem; font-weight: 600; color: #dc2626; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px; }
+
+/* Checkbox label */
+.checkbox-label { display: inline-flex; align-items: center; gap: var(--s-2); font-size: 0.88rem; cursor: pointer; margin-top: var(--s-2); }
+.checkbox-label input { flex-shrink: 0; }
+
+/* Utility */
+.text-error { color: #dc2626; }
+.text-success { color: #16a34a; }
+.text-center { text-align: center; }
+
+/* MCP: async states, file import, mapping preview */
+.mcp-loading { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-6) var(--s-2); color: var(--text-muted); font-size: 0.88rem; }
+.mcp-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--line); border-top-color: var(--brand-500);
+  animation: mcp-spin 0.7s linear infinite;
+}
+@keyframes mcp-spin { to { transform: rotate(360deg); } }
+
+.mcp-error-box {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  padding: var(--s-4); border-radius: var(--r-lg);
+  background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.18);
+  font-size: 0.88rem;
+}
+.mcp-error-ic { color: #dc2626; display: grid; place-items: center; }
+.mcp-error-body { flex: 1; min-width: 0; }
+.mcp-error-body strong { display: block; color: #dc2626; margin-bottom: 2px; }
+.mcp-error-body p { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
+
+.mcp-card-error { margin: 0; font-size: 0.8rem; color: #dc2626; overflow-wrap: anywhere; }
+
+.mcp-file-row { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; margin: var(--s-3) 0; }
+.mcp-file-label {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) var(--s-3); border: 1px dashed var(--line);
+  border-radius: var(--r-md); cursor: pointer; font-size: 0.85rem;
+  color: var(--text-muted); background: var(--surface-sunken);
+}
+.mcp-file-label:hover { border-color: var(--brand-300); color: var(--text); }
+.mcp-file-input { max-width: 15rem; font-size: 0.8rem; }
+
+.mcp-mapping-body { margin-top: var(--s-4); display: grid; gap: var(--s-3); }
+.mcp-enum-hint { font-size: 0.68rem; color: var(--text-faint); margin-top: 2px; overflow-wrap: anywhere; }
+
+.mcp-preview-slot:empty { display: none; }
+.mcp-preview-wrap {
+  margin-top: var(--s-3); overflow-x: auto;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: var(--s-2); background: var(--surface-sunken);
+}
+.mcp-preview-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.mcp-preview-table th {
+  text-align: left; padding: 6px 8px; white-space: nowrap;
+  font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-faint); border-bottom: 1px solid var(--line);
+}
+.mcp-preview-table td { padding: 5px 8px; border-bottom: 1px solid var(--line-subtle); white-space: nowrap; }
+.mcp-preview-table tr.row-invalid td { color: #dc2626; }
+
+/* The mapping table embeds a select per row: keep it compact. */
+.mcp-mapping-table .field { margin: 0; }
+.mcp-mapping-table .field-label { display: none; }
+.mcp-mapping-table .input { min-width: 8rem; padding: 4px 8px; font-size: 0.82rem; }

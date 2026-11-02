@@ -37,6 +37,15 @@ import { SUSPENDED_MESSAGE, isStaffEmail } from '../src/customers/rules.js';
 import {
   validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS,
 } from '../src/pendapatan/rules.js';
+import {
+  handleConnectorList, handleConnectorCreate, handleConnectorGet, handleConnectorUpdate,
+  handleConnectorDelete, handleConnectorTest,
+  handleMappingList, handleMappingPut, handleMappingDelete, handleSchemaGet,
+  handleSyncRun, handleSyncList, handleSyncGet, handleSyncLogAll,
+  handleSyncErrorList, handleSyncErrorUpdate,
+  handleMigrationList, handleMigrationCreate, handleMigrationGet, handleMigrationRun,
+  handleMigrationRollback, handleWebhook,
+} from './mcp.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -1033,6 +1042,32 @@ const ROUTES = {
   'POST /api/office/admin/support/:id/messages': (req, env, params) => handleAdminSupportReply(req, env, ROUTE_DEPS, params),
   'PATCH /api/office/admin/support/:id': (req, env, params) => handleAdminSupportUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
+
+  // ------------------------------------------------------------ MCP / ERP
+  // Dedicated routes, never the generic /api/db: connector rows hold secrets.
+  'GET /api/mcp/schema': (req, env) => handleSchemaGet(req, env, ROUTE_DEPS),
+  'GET /api/mcp/connectors': (req, env) => handleConnectorList(req, env, ROUTE_DEPS),
+  'POST /api/mcp/connectors': (req, env) => handleConnectorCreate(req, env, ROUTE_DEPS),
+  'GET /api/mcp/connectors/:id': (req, env, params) => handleConnectorGet(req, env, ROUTE_DEPS, params),
+  'PATCH /api/mcp/connectors/:id': (req, env, params) => handleConnectorUpdate(req, env, ROUTE_DEPS, params),
+  'DELETE /api/mcp/connectors/:id': (req, env, params) => handleConnectorDelete(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/connectors/:id/test': (req, env, params) => handleConnectorTest(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/connectors/:id/sync': (req, env, params) => handleSyncRun(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/connectors/:id/sync': (req, env, params) => handleSyncList(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/connectors/:id/mappings': (req, env, params) => handleMappingList(req, env, ROUTE_DEPS, params),
+  'PUT /api/mcp/connectors/:id/mappings': (req, env, params) => handleMappingPut(req, env, ROUTE_DEPS, params),
+  'DELETE /api/mcp/connectors/:id/mappings/:entity': (req, env, params) => handleMappingDelete(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/sync': (req, env) => handleSyncLogAll(req, env, ROUTE_DEPS),
+  'GET /api/mcp/sync/:syncId': (req, env, params) => handleSyncGet(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/errors': (req, env) => handleSyncErrorList(req, env, ROUTE_DEPS),
+  'PATCH /api/mcp/errors/:id': (req, env, params) => handleSyncErrorUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/migrations': (req, env) => handleMigrationList(req, env, ROUTE_DEPS),
+  'POST /api/mcp/migrations': (req, env) => handleMigrationCreate(req, env, ROUTE_DEPS),
+  'GET /api/mcp/migrations/:id': (req, env, params) => handleMigrationGet(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/migrations/:id/run': (req, env, params) => handleMigrationRun(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/migrations/:id/rollback': (req, env, params) => handleMigrationRollback(req, env, ROUTE_DEPS, params),
+  // Public: the HMAC signature is the credential.
+  'POST /api/mcp/webhook/:id': (req, env, params) => handleWebhook(req, env, ROUTE_DEPS, params),
 };
 
 // Matches '/api/media/:key' against a path; returns the params or null.

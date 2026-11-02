@@ -11,13 +11,30 @@ module.exports = async function settings(t) {
   t.check(await p.getAttribute('.drawer', 'role') === 'dialog' && await p.getAttribute('.drawer', 'aria-modal') === 'true', 'drawer is a modal dialog')
   t.check(await p.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Tutup pengaturan', 'focus moves to the close button')
   const tabs = await p.$$eval('.drawer .seg-btn', (b) => b.map((x) => x.textContent.trim()))
-  t.check(tabs.join('|') === 'Konektor|Agen AI', 'tabs Konektor, Agen AI (no technical Cloud tab)', tabs.join('|'))
+  t.check(tabs.join('|') === 'Konektor|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
 
   // Konektor: WhatsApp toggle persists
   await p.click('label[for="whatsapp-enabled"]')
   await p.waitForTimeout(150)
   const mcp = await p.evaluate(() => JSON.parse(localStorage.getItem('satualur_settings_mcp') || '{}'))
   t.check(mcp.whatsapp?.enabled === true, 'WhatsApp "Aktif" saved to localStorage')
+
+  // ERP & Integrasi tab: connector grid and template cards (loaded async)
+  await p.click('.drawer .seg-btn[data-value="erp"]')
+  await p.waitForSelector('.mcp-connector-grid', { timeout: 8000 })
+  t.check(await p.locator('.mcp-connector-grid').count() === 1, 'ERP tab: connector grid present')
+  t.check(await p.locator('.mcp-template-card').count() >= 4, 'ERP tab: template cards present')
+
+  // Migrasi tab: migration list and info box
+  await p.click('.drawer .seg-btn[data-value="migration"]')
+  await p.waitForSelector('.mcp-migration-list', { timeout: 8000 })
+  t.check(await p.locator('.mcp-migration-list').count() === 1, 'Migrasi tab: migration list present')
+  t.check(await p.locator('.mcp-info-box').count() === 1, 'Migrasi tab: info box present')
+
+  // Log tab: log table
+  await p.click('.drawer .seg-btn[data-value="logs"]')
+  await p.waitForSelector('.mcp-log-table', { timeout: 8000 })
+  t.check(await p.locator('.mcp-log-table').count() === 1, 'Log tab: log table present')
 
   // Agen AI: prompt edit + reset
   await p.click('.drawer .seg-btn[data-value="agent"]')
