@@ -1,12 +1,81 @@
 # Changelog
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-31
+> Terakhir diperbarui: 2026-11-02
 > Pemilik: _TBD_
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Versi mengikuti `package.json` (saat ini `0.1.0`); penetapan nomor versi rilis: _TBD_.
 
 ## [Unreleased]
+
+### 2026-11-02 - MCP: Konektor ERP dan Migrasi Database
+
+Satu Alur kini punya **Model Context Protocol (MCP)** untuk menghubungkan dengan sistem ERP, database, atau aplikasi yang sudah perusahaan pakai — dengan backend sungguhan, bukan simulasi. Tidak perlu migrasi big bang: data bisa dipindahkan bertahap sambil dua sistem berjalan paralel.
+
+#### Backend
+
+- Migrasi `0009_mcp.sql`: enam tabel — `mcp_connectors`, `mcp_mappings`, `mcp_sync_logs`, `mcp_sync_errors` (dead letter), `mcp_external_refs` (kunci idempotensi), `mcp_migrations`. CHECK constraint mencerminkan `src/mcp/rules.js`, jadi formulir, Worker, dan skema menolak nilai yang sama. Tidak satu pun masuk whitelist `/api/db`: baris konektor menyimpan kredensial.
+- `worker/mcp.js` (1.126 baris) dan 22 rute `/api/mcp/*` di Worker: konektor (CRUD, uji, sinkronisasi), pemetaan, log, dead letter, migrasi (buat, jalankan per fase, rollback), skema, dan webhook publik.
+- Kredensial konektor dienkripsi **AES-GCM** dengan `MCP_ENCRYPTION_KEY` sebelum disimpan; tidak pernah dikembalikan oleh rute mana pun. Tanpa kunci, rahasia jatuh ke `plain:<base64>` — lihat Catatan.
+- Sinkronisasi **idempoten**: `mcp_external_refs` memetakan `(connector_id, entity, external_id)` ke baris lokal, sehingga menjalankan ulang memakai `UPDATE`, bukan `INSERT` kedua — tanpa menambah kolom `external_id` ke tabel domain.
+- Baris gagal disimpan **mentah** di `mcp_sync_errors` agar pemetaan bisa diperbaiki lalu dijalankan ulang.
+- **Rollback** menghapus hanya baris yang dibuat migrasi itu (diketahui dari `mcp_external_refs`); data yang sudah ada sebelum migrasi tidak tersentuh.
+- Webhook masuk diverifikasi **HMAC-SHA256** atas body mentah (`X-MCP-Signature` / `X-Hub-Signature-256`), perbandingan waktu-konstan, tanpa sesi.
+- Konektor `database` melaporkan `bridgeRequired` secara jujur: Worker tidak bisa membuka TCP mentah. Jalur sementara: impor file atau REST API.
+
+#### Pengaturan → ERP & Integrasi
+- Tab **ERP & Integrasi** di Pengaturan: kelola konektor ke sistem eksternal.
+- Empat tipe konektor: **REST API** (Odoo, SAP, NetSuite), **Database Langsung** (MySQL, PostgreSQL, SQL Server), **File Import** (CSV, Excel, JSON, XML), dan **Webhook** (event real-time).
+- Template cepat: Odoo, SAP B1, MySQL, PostgreSQL, CSV/Excel, Webhook.
+- Kartu konektor dengan indikator status (aktif/nonaktif), jumlah pemetaan, dan strategi sinkronisasi.
+- Uji koneksi dengan validasi konfigurasi dan simulasi latensi.
+
+**Pemetaan Bidang**
+- Tab **Pemetaan** per konektor: petakan bidang sumber ke bidang Satu Alur secara visual.
+- Deteksi skema otomatis (simulasi): sistem membaca struktur tabel sumber dan menyarankan pemetaan.
+- Fuzzy matching untuk nama bidang yang mirip (contoh: `nama` → `name`, `telepon` → `phone`).
+- Transformasi bawaan: `trim`, `uppercase`, `date:ISO8601`, `number` (format Indonesia: `Rp 1.500.000` → `1500000`), `map`, `concat`, `json`, `phone_id`, `rupiah`.
+- Validasi pemetaan: peringatan kolom wajib yang belum dipetakan, duplikat target, tipe tidak cocok.
+- Pratinjau transformasi: lihat 10 baris pertama setelah transformasi sebelum sinkron.
+
+**Migrasi Bertahap**
+- Tab **Migrasi** di Pengaturan: wizard migrasi tiga fase.
+  - **Fase 1: Data Master** — pelanggan, layanan, tenaga kerja.
+  - **Fase 2: Transaksi Aktif** — permintaan, penawaran, penugasan yang sedang berjalan.
+  - **Fase 3: Data Historis** (opsional) — penyelesaian, jurnal, laporan masa lalu.
+- Strategi **Parallel Running** (direkomendasikan): dua sistem aktif bersamaan, cutover per modul.
+- Simulasi **Dry Run** sebelum migrasi live.
+- Laporan validasi pasca-migrasi: jumlah record, tingkat sukses, error per fase.
+- Rollback: hapus data hasil migrasi dan kembalikan ke keadaan semula.
+
+**Log Sinkronisasi**
+- Tab **Log** di Pengaturan: riwayat semua sinkronisasi dengan status, durasi, jumlah record diproses/dimasukkan/gagal.
+
+**Modul Kode**
+- `src/mcp/rules.js` — satu sumber aturan untuk Worker, peramban, dan mock: tipe konektor, batas, 8 entitas dengan kolom/wajib/dedupe, transformasi, validasi konektor dan pemetaan, redaksi rahasia, kunci idempoten, fase migrasi. Modul yang sama diimpor `worker/mcp.js`, jadi validasi formulir dan validasi database tidak bisa berbeda.
+- `worker/mcp.js` — mesin konektor di sisi server: enkripsi rahasia, CRUD, uji koneksi, tarik REST, pemetaan baris, tulis idempoten, log, dead letter, migrasi bertahap, rollback, webhook.
+- `src/mcp/api.js` — klien `fetch` tipis dengan Bearer token dan pembongkaran `{ data, error }`.
+- `src/mcp/connector.js` — setiap fungsi bercabang pada `isUsingMockCloud()`: mode asli memanggil `/api/mcp/*`, mode mock memakai localStorage dengan bentuk kembalian identik.
+- `src/mcp/mapper.js` — skema Satu Alur, alias kolom ERP Indonesia (`nama`, `tebu`, `telepon`, `jenis_layanan`), saran pemetaan, pratinjau transformasi.
+- `src/mcp/migration.js` — eksekusi per fase, dry run, laporan validasi, rollback.
+- `src/ui/icons.js` — 14 ikon yang sebelumnya tidak ada (`map`, `edit`, `upload`, `play`, `loader`, `database`, `eye`, …) sehingga tidak lagi jatuh ke ikon `info`.
+
+#### Dokumentasi
+- `docs/mcp/MCP_SPEC.md` — spesifikasi protokol: arsitektur, tipe konektor, strategi sinkronisasi, model pemetaan, keamanan, endpoint API, roadmap implementasi.
+- `docs/mcp/ERP_INTEGRATION_GUIDE.md` — panduan integrasi per sistem: Odoo, SAP Business One, Oracle NetSuite, Accurate Online, Mekari Jurnal, database langsung, webhook. Termasuk konfigurasi langkah-demi-langkah dan contoh payload.
+- `docs/mcp/MIGRATION_GUIDE.md` — panduan migrasi lengkap: strategi parallel running, checklist pra-migrasi, proses bertahap, pemetaan standar, validasi pasca-migrasi, rollback, troubleshooting, dan template dokumentasi.
+- `docs/06_SCALABLE_ARCHITECTURE.md` — tangga skala enam tahap dengan pemicu angka, jalur multi-tenancy, evolusi lapisan integrasi (termasuk bridge agent), observabilitas, dan rencana jangka panjang.
+- `docs/API.md` §MCP — 22 rute beserta batas, bentuk respons, dan kode galat; `docs/20_DATABASE.md` §Tabel MCP — enam tabel.
+
+#### Pengujian
+- `tests/mcp.test.mjs`: 28 tes baru — validasi konektor (rahasia dipisah, URL, port, webhook secret, cron wajib, redaksi), pemetaan (target wajib/duplikat/transform tak dikenal), transformasi (angka Indonesia `Rp 1.500.000`, `phone_id`, rantai transformasi), kunci idempoten (stabil terhadap huruf besar/kecil dan spasi), pemetaan baris (koersi, enum, pembulatan uang, teks bertitik dua tidak salah dianggap galat), validasi migrasi.
+- Total **396 tes Node lulus, 0 gagal**.
+- `tests/e2e/settings.spec.cjs`: **26 pemeriksaan lulus** untuk lima tab Pengaturan, termasuk verifikasi tab ERP & Integrasi, Migrasi, dan Log. Suite browser berjalan di mode mock (localStorage), jadi rute `/api/mcp/*` yang sebenarnya ditutup oleh tes unit dan kontrak, bukan oleh peramban.
+- `npx vite build` berhasil (hanya peringatan ukuran bundel yang sudah ada sebelumnya).
+
+#### Catatan
+- Jalankan `npm run db:migrate:local` / `db:migrate:remote` untuk `0009_mcp.sql`. Tanpa itu `/api/mcp/*` mengembalikan galat SQL.
+- Setel `MCP_ENCRYPTION_KEY` (`openssl rand -base64 32 | wrangler secret put MCP_ENCRYPTION_KEY`) **sebelum** konektor pertama diisi kredensial asli. Tanpa kunci, rahasia tersimpan sebagai `plain:<base64>` dan bisa dibaca siapa pun yang memegang akses baca D1.
 
 ### 2026-10-31 - Landing menampilkan Pendapatan dan Pertumbuhan
 

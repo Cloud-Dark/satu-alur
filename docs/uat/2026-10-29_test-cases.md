@@ -233,6 +233,22 @@ Fitur ini masih dalam pengerjaan (`src/stages/leads.js`, `src/leads/`, `worker/l
 | TC-SET-04 | Parameter model | tab Agen AI | Ubah temperature, maks token, preferensi model | 0.2, 1000 | Nilai tersimpan. Dropdown model berisi model dari `/api/llm/models` (produksi: 2 model Llama) | P3 | Manual | _PENDING_ | |
 | TC-SET-05 | Tab Cloud | tab Cloud | Lihat status | - | ENV-MOCK: "Mock lokal…". ENV-PROD: "Cloudflare Worker + D1" | P3 | [settings](../../tests/e2e/settings.spec.cjs) (mock) | _PENDING_ | |
 | TC-SET-06 | Sidebar ciut | desktop | Klik tombol ciutkan sidebar | - | Sidebar mengecil dengan ikon saja dan bisa dibuka lagi | P3 | [settings](../../tests/e2e/settings.spec.cjs) | _PENDING_ | |
+| TC-SET-07 | Tab ERP & Integrasi | masuk | Buka Pengaturan → ERP & Integrasi | - | Grid konektor dan template cepat tampil. Belum ada konektor = tampil empty state | P2 | [settings](../../tests/e2e/settings.spec.cjs) | _PENDING_ | |
+| TC-SET-08 | Tambah konektor REST | tab ERP & Integrasi | Klik "Tambah Konektor", pilih REST API, isi nama dan URL, simpan | data palsu | Konektor muncul di grid dengan tipe REST. ENV-PROD: baris tersimpan di `mcp_connectors` (`owner_id` terisi). ENV-MOCK: tersimpan di localStorage | P2 | Manual | _PENDING_ | |
+| TC-SET-09 | Uji koneksi | ada konektor | Klik "Uji" pada konektor | - | Konektor `rest`: panggilan nyata dengan batas waktu 8 detik → pesan latensi atau pesan galat. Konektor `database`: "memerlukan agen jembatan (bridge agent)" | P2 | Manual | _PENDING_ | Worker tidak bisa membuka TCP |
+| TC-SET-10 | Pemetaan bidang | ada konektor | Klik "Peta", pilih entitas, unggah CSV contoh | CSV 3 kolom | Tabel pemetaan muncul dengan saran otomatis dari alias kolom Indonesia. Kolom wajib ditandai; simpan menulis `mcp_mappings` (unik per konektor+entitas) | P2 | Manual | _PENDING_ | |
+| TC-SET-11 | Tab Migrasi | masuk | Buka Pengaturan → Migrasi | - | List migrasi kosong dan info box strategi parallel running tampil | P2 | [settings](../../tests/e2e/settings.spec.cjs) | _PENDING_ | |
+| TC-SET-12 | Wizard migrasi baru | tab Migrasi | Klik "Migrasi Baru", isi info, konfirmasi | - | Wizard 3 langkah selesai. Migrasi muncul di list dengan status `draft` dan tiga fase `pending` | P2 | Manual | _PENDING_ | |
+| TC-SET-13 | Tab Log | masuk | Buka Pengaturan → Log | - | Tabel log tampil (kosong jika belum ada sinkronisasi), plus daftar dead letter `open` | P2 | [settings](../../tests/e2e/settings.spec.cjs) | _PENDING_ | |
+| TC-SET-14 | Kredensial tidak bocor | ada konektor dengan rahasia | `GET /api/mcp/connectors/:id` dengan Bearer token pemilik | token API | Respons tidak memuat `secrets`/`apiKey`/`password` dalam bentuk apa pun. Kolom `secrets_json` di D1 berbentuk ciphertext, bukan teks biasa | P1 | Manual (curl) | _PENDING_ | `redactConnector`; butuh `MCP_ENCRYPTION_KEY` |
+| TC-SET-15 | Isolasi antar pemilik | dua akun | Akun A membuat konektor, akun B memanggil `GET /api/mcp/connectors/:id` dengan id tersebut | - | 404 "Konektor tidak ditemukan." — bukan 403, agar keberadaan baris tidak bocor | P1 | Manual (curl) | _PENDING_ | |
+| TC-SET-16 | Sinkronisasi idempoten | konektor + pemetaan `upsert` | Jalankan sinkronisasi dua kali dengan 10 baris yang sama | 10 baris | Jalankan pertama: `inserted: 10`. Kedua: `updated: 10`, `inserted: 0`. Jumlah baris di tabel domain tetap 10 | P1 | Manual | _PENDING_ | Kunci di `mcp_external_refs` |
+| TC-SET-17 | Dead letter dan replay | sinkronisasi dengan 1 baris tidak valid | Kirim baris tanpa kolom wajib | `layanan` kosong | Sinkronisasi `completed_with_errors`; baris mentah masuk `mcp_sync_errors` berstatus `open`. Setelah pemetaan diperbaiki dan dijalankan ulang, baris masuk dan entri ditandai `resolved` | P1 | Manual | _PENDING_ | |
+| TC-SET-18 | Migrasi per fase | migrasi `draft` + konektor | Klik "Jalankan fase 1", lalu "Jalankan semua" | 3 fase | Fase 1 `completed`, migrasi `running`; setelah semua fase `completed`. Statistik bertambah per fase, bukan diulang dari nol | P2 | Manual | _PENDING_ | |
+| TC-SET-19 | Rollback tidak menghapus data lama | migrasi selesai + 5 baris domain yang sudah ada sebelum migrasi | Klik "Rollback" | - | `removedRows` sama dengan jumlah baris hasil migrasi. Lima baris lama **tetap ada**. Status migrasi `rolled_back`, semua fase kembali `pending` | P1 | Manual | _PENDING_ | Rollback hanya menghapus baris di `mcp_external_refs` |
+| TC-SET-20 | Webhook menolak tanda tangan salah | konektor `webhook` aktif | Kirim `POST /api/mcp/webhook/:id` dengan `X-MCP-Signature` yang salah, lalu dengan yang benar | body 1 baris | Salah: `401`. Benar: `200` dan baris masuk. Body yang diubah setelah ditandatangani juga `401` | P1 | Manual (curl) | _PENDING_ | HMAC atas body mentah, perbandingan waktu-konstan |
+| TC-SET-21 | Batas impor | konektor + pemetaan | Kirim `rows` berisi 501 baris | 501 baris | `400` "Maksimal 500 baris per permintaan." — bukan galat SQL | P3 | Manual | _PENDING_ | |
+| TC-SET-22 | Migrasi `0009_mcp.sql` belum dijalankan | ENV-PROD baru | Buka tab ERP & Integrasi sebelum migrasi dijalankan | - | Kotak galat dengan tombol "Coba lagi", bukan layar kosong. Pesan menyebut tabel tidak ditemukan | P2 | Manual | _PENDING_ | Jalankan `npm run db:migrate:remote` |
 
 ## 17. Tema dan responsif
 
@@ -299,6 +315,7 @@ Angka kunci berasal dari `seeds/demo-lean-summary.json`. Untuk AC, Cleaning, Lis
 
 | Tanggal | Lingkungan | Unit | E2E | Catatan |
 |---------|------------|------|-----|---------|
+| 2026-11-02 | ENV-MOCK (lokal, Vite) | 396 test: 396 lulus, 0 gagal | 1 spec `settings`: 26 cek lulus, 0 gagal | MCP: 28 tes unit baru (`tests/mcp.test.mjs`). Rute `/api/mcp/*` ditutup tes unit/kontrak; suite browser berjalan di mode mock sehingga tidak memukul D1 asli |
 | 2026-10-29 | ENV-MOCK (lokal, Vite port 5199) | 139 test: 138 lulus, 0 gagal, 1 TODO (BUG-02). Termasuk 36 test Radar/Prospek dari tim fitur | 11 spec, 221 cek lulus, 0 gagal, 1 KNOWN-BUG (BUG-01). Radar/Prospek baru smoke | Isi baris baru setiap kali suite dijalankan |
 
 ## 23. Temuan
