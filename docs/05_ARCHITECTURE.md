@@ -130,3 +130,19 @@ Rincian dan risiko: [21_BACKEND.md](21_BACKEND.md), [10_RISK_REGISTER.md](10_RIS
 ## 7. Deployment
 
 `npm run deploy` membangun `dist/` dan mendeploy Worker beserta aset. Langkah lengkap di [18_INSTALLATION.md](18_INSTALLATION.md).
+
+## 8. Batas dan Jalur Skala
+
+Arsitektur di atas sengaja sesederhana mungkin: satu Worker, satu database, tanpa lapisan tambahan. Kesederhanaan itu punya batas yang bisa dihitung.
+
+| Batas | Angka | Yang terjadi lebih dulu |
+|-------|-------|-------------------------|
+| Ukuran D1 | ±10 GB (berbayar) | ±300–500 tenant aktif atau 5–6 GB |
+| Penulis D1 | Satu primary, tulis diserialkan | Sinkronisasi besar bertabrakan dengan tulis pengguna |
+| `/api/db` | `MAX_LIMIT = 5000` baris | Agregasi sisi klien mulai kosong |
+| CPU Worker | 30 dtk/request (berbayar) | Fase migrasi > ±2.000 baris |
+| Subrequest | 1.000/request (berbayar) | Paginasi ERP dengan banyak halaman |
+
+Urutan perbaikan — cache/ringkasan → antrean → sharding per bucket → Durable Object per konektor → analitik terpisah → regional — beserta pemicu angka, biaya, dan alasan urutannya ada di **[06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md)**.
+
+Yang perlu dilakukan sekarang, sebelum salah satu pemicu tercapai: `request_id` di setiap log, penghitung durasi per rute, dan penghitung baris baca/tulis per tenant. Tanpa pengukuran, tahap berikutnya dipicu oleh panik, bukan data.

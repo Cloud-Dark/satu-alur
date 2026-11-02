@@ -11,13 +11,30 @@ module.exports = async function settings(t) {
   t.check(await p.getAttribute('.drawer', 'role') === 'dialog' && await p.getAttribute('.drawer', 'aria-modal') === 'true', 'drawer is a modal dialog')
   t.check(await p.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Tutup pengaturan', 'focus moves to the close button')
   const tabs = await p.$$eval('.drawer .seg-btn', (b) => b.map((x) => x.textContent.trim()))
-  t.check(tabs.join('|') === 'Konektor|Agen AI', 'tabs Konektor, Agen AI (no technical Cloud tab)', tabs.join('|'))
+  t.check(tabs.join('|') === 'Konektor|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
 
   // Konektor: WhatsApp toggle persists
   await p.click('label[for="whatsapp-enabled"]')
   await p.waitForTimeout(150)
   const mcp = await p.evaluate(() => JSON.parse(localStorage.getItem('satualur_settings_mcp') || '{}'))
   t.check(mcp.whatsapp?.enabled === true, 'WhatsApp "Aktif" saved to localStorage')
+
+  // ERP & Integrasi tab: connector grid and template cards (loaded async)
+  await p.click('.drawer .seg-btn[data-value="erp"]')
+  await p.waitForSelector('.mcp-connector-grid', { timeout: 8000 })
+  t.check(await p.locator('.mcp-connector-grid').count() === 1, 'ERP tab: connector grid present')
+  t.check(await p.locator('.mcp-template-card').count() >= 4, 'ERP tab: template cards present')
+
+  // Migrasi tab: migration list and info box
+  await p.click('.drawer .seg-btn[data-value="migration"]')
+  await p.waitForSelector('.mcp-migration-list', { timeout: 8000 })
+  t.check(await p.locator('.mcp-migration-list').count() === 1, 'Migrasi tab: migration list present')
+  t.check(await p.locator('.mcp-info-box').count() === 1, 'Migrasi tab: info box present')
+
+  // Log tab: log table
+  await p.click('.drawer .seg-btn[data-value="logs"]')
+  await p.waitForSelector('.mcp-log-table', { timeout: 8000 })
+  t.check(await p.locator('.mcp-log-table').count() === 1, 'Log tab: log table present')
 
   // Agen AI: prompt edit + reset
   await p.click('.drawer .seg-btn[data-value="agent"]')
@@ -53,6 +70,29 @@ module.exports = async function settings(t) {
   await p.waitForTimeout(300)
   t.check(await p.evaluate(() => /collapsed/.test(document.querySelector('.app-shell').className) || document.querySelector('.side-collapse').getAttribute('aria-label') !== 'Ciutkan sidebar'), 'sidebar collapses')
   await p.click('.side-collapse')
+  await t.noErrors(p)
+
+  // Enterprise gate: the same account on a lower tier sees a locked panel
+  // instead of a form whose requests would all come back 403. The plan is read
+  // on every tab draw, so switching tabs re-evaluates it without a reload
+  // (a reload would drop the in-memory mock session).
+  await p.evaluate(() => localStorage.setItem('satualur_plan', 'sole'))
+  await p.click('.side-row')
+  await p.waitForSelector('.drawer.is-open', { timeout: 5000 })
+  await p.click('.drawer .seg-btn[data-value="erp"]')
+  await p.waitForSelector('.mcp-locked', { timeout: 8000 })
+  t.check(await p.locator('.mcp-locked').count() === 1, 'ERP tab: locked panel shown for a non-enterprise plan')
+  t.check(await p.locator('.mcp-connector-grid').count() === 0, 'ERP tab: connector grid hidden when locked')
+  t.check(/Enterprise/.test(await p.locator('.mcp-locked').innerText()), 'locked panel names the Enterprise tier')
+  await p.click('.drawer .seg-btn[data-value="migration"]')
+  await p.waitForSelector('.mcp-locked', { timeout: 8000 })
+  t.check(await p.locator('.mcp-migration-list').count() === 0, 'Migrasi tab: gated on the same rule')
+  await p.evaluate(() => localStorage.removeItem('satualur_plan'))
+  await p.click('.drawer .seg-btn[data-value="erp"]')
+  await p.waitForSelector('.mcp-connector-grid', { timeout: 8000 })
+  t.check(await p.locator('.mcp-locked').count() === 0, 'Enterprise plan: the gate opens again')
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(400)
   await t.noErrors(p)
 
   // mobile: sidebar is a drawer opened by the menu button

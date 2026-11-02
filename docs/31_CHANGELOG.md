@@ -1,12 +1,28 @@
 # Changelog
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-31
+> Terakhir diperbarui: 2026-11-02
 > Pemilik: _TBD_
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Versi mengikuti `package.json` (saat ini `0.1.0`); penetapan nomor versi rilis: _TBD_.
 
 ## [Unreleased]
+
+### 2026-11-02 - Integrasi ERP Enterprise
+
+- Konektor REST, CSV/JSON, dan webhook masuk; pemetaan, pratinjau, sinkronisasi upsert, log, dan dead letter.
+- Migrasi data master (`workers`, `vas_items`) dan permintaan (`requests`). Impor relasional/historis, database bridge, XLSX/XML, sinkronisasi keluar, dan cron ERP otomatis belum tersedia.
+- Pemeriksaan Enterprise di UI dan Worker; webhook memeriksa entitlement dan suspensi pemilik saat event diterima.
+- Kredensial wajib terenkripsi AES-GCM. Kunci hilang, kunci salah, atau format plaintext lama menghasilkan `503`; tidak ada fallback plaintext.
+- Payload konfigurasi klien dinormalisasi tanpa mengekspos rahasia. Basic/bearer token dan PATCH tanpa `enabled` bekerja sesuai kontrak.
+- ID eksternal dari pemetaan tersimpan digunakan saat upsert agar impor ulang tidak menduplikasi data.
+- Dry run tidak mengubah progres atau data. INSERT domain, referensi, dan jurnal migrasi ditulis dalam satu batch transaksional.
+- Rollback memakai jurnal per migrasi dan mempertahankan baris yang berubah/dipakai serta baris dari run lain. Update pada data lama tidak dibatalkan.
+- Wizard migrasi, callback select, unggah sumber, dan alur pratinjau diperbaiki; regresi browser mencakup alur ini.
+- Styling halaman kontak diperbaiki; landing menjelaskan integrasi Enterprise. Dokumen arsitektur, integrasi, UAT, dan video story pack ditambahkan.
+- CI menjalankan unit/API tests, regresi workerd/D1 lokal, build, dan pemeriksaan whitespace PR.
+
+**Rollout:** terapkan `0009_mcp.sql`, `0010_user_plan.sql`, dan `0011_mcp_migration_safety.sql` sebelum deploy, lalu setel `MCP_ENCRYPTION_KEY`. Kontrak dan batas implementasi ada di [API.md](API.md#mcp-konektor-erp-dan-migrasi).
 
 ### 2026-10-31 - Landing menampilkan Pendapatan dan Pertumbuhan
 
@@ -30,6 +46,18 @@ Landing sebelumnya hanya bercerita tentang enam tahap alur. Dua grup menu terbar
 - `tests/e2e/landing.spec.cjs`: 81 pemeriksaan (dari 38), termasuk keberadaan kedua bagian, jumlah kartu, lima chip tim, baris pratinjau, dan navigasi anchor ke `#pendapatan`.
 - Kasus UAT TC-LND-11 dan TC-LND-12 ditambahkan; TC-LND-01 diperbarui.
 - Total 368 tes Node dan 122 pemeriksaan browser landing/site lulus. Chromium menguji 1440, 1024, 960, 959, 390, dan 320 px pada tema terang/gelap, termasuk reduced motion, overflow, dan benturan navigasi. Build produksi berhasil dengan peringatan ukuran bundel.
+
+### 2026-10-31 - Halaman kontak didesain ulang
+
+Halaman publik `#/kontak` sebelumnya memakai komponen formulir yang bergantung pada `.app-shell` — padahal halaman publik tidak memuat shell aplikasi. Akibatnya seluruh input, label, dan tombol tampil dengan gaya browser bawaan: tanpa border, tanpa fokus ring, dan tanpa layout card.
+
+#### Diperbaiki
+- Desain ulang layout menjadi **dua kolom pada desktop** (intro di kiri, kartu formulir di kanan) dan **tumpuk pada seluler**.
+- Tambah stylesheet `.contact-page` penuh di `landing.css`: field label dengan badge "WAJIB", input dengan border, hover, dan fokus ring; textarea memenuhi lebar; tombol primer penuh lebar; pesan sukses dengan ikon cek hijau dan latar hijau muda.
+- Semua style tidak bergantung `.app-shell`, menggunakan token desain yang sama dengan halaman publik lainnya, dan mendukung tema gelap lewat `prefers-color-scheme`.
+
+#### Ditambahkan
+- Dua kolom grid pada lebar ≥840 px; form 2-kolom pada ≥560 px dengan `Pesan` dan tombol melebar penuh lewat `.field-full`.
 
 ### 2026-10-31 - Persistensi dan validasi produksi Pendapatan
 

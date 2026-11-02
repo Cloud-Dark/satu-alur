@@ -241,6 +241,42 @@ export const GROWTH = {
   note: 'Hubungkan platform yang ingin dipakai: Halaman Facebook, Instagram Bisnis yang tertaut ke Halaman Facebook, atau akun Threads.',
 }
 
+/**
+ * Integrasi — the platform sits next to the systems a company already runs.
+ * Only the connector kinds the Worker actually implements are listed: REST,
+ * file import and inbound webhook. Direct database access needs a bridge agent
+ * that does not exist yet, so it is deliberately absent here.
+ */
+export const INTEGRATION = {
+  eyebrow: 'Bukan mulai dari nol',
+  title: 'Satu Alur *melengkapi* sistem yang sudah berjalan.',
+  lede: 'Anda tidak perlu membuang ERP, aplikasi kasir, atau spreadsheet yang sudah dipakai bertahun-tahun. Hubungkan sumbernya, petakan kolomnya, lalu pindahkan data bertahap — sementara dua sistem tetap berjalan berdampingan.',
+  badge: 'Enterprise',
+  cards: [
+    {
+      icon: 'plug',
+      title: 'REST API',
+      desc: 'Hubungkan Odoo, SAP Business One, NetSuite, atau aplikasi internal lewat endpoint yang sudah ada. Kredensial disimpan terenkripsi.',
+    },
+    {
+      icon: 'fileText',
+      title: 'Impor file',
+      desc: 'Ekspor CSV atau JSON dari sistem lama (Excel dapat diekspor sebagai CSV), petakan kolomnya, lalu periksa pratinjau sebelum satu baris pun ditulis.',
+    },
+    {
+      icon: 'rotateCcw',
+      title: 'Webhook masuk',
+      desc: 'Sistem lama mengirim peristiwa saat ada perubahan. Setiap kiriman diverifikasi tanda tangannya sebelum diterima.',
+    },
+  ],
+  steps: [
+    { no: '1', title: 'Hubungkan', desc: 'Uji koneksi lebih dulu. Tidak ada data yang berpindah sebelum Anda setuju.' },
+    { no: '2', title: 'Petakan', desc: 'Cocokkan kolom sumber dengan kolom Satu Alur, termasuk format Rupiah dan tanggal Indonesia.' },
+    { no: '3', title: 'Pindahkan bertahap', desc: 'Tenaga kerja dan katalog, lalu permintaan. Rollback mempertahankan baris yang sudah diedit atau dipakai.' },
+  ],
+  note: 'Integrasi ERP dan migrasi data tersedia pada paket Enterprise. Pendekatan parallel running membuat dua sistem bisa dipakai bersamaan selama masa peralihan.',
+}
+
 export const ROADMAP = [
   {
     no: 'R1', icon: 'trendingUp',

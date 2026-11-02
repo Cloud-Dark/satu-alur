@@ -251,10 +251,11 @@ export function textarea({ label, name, id, required = false, hint, placeholder,
 }
 
 /** options: [{value, label, disabled?}] */
-export function select({ label, name, id, required = false, hint, options = [], value, attrs = {} }) {
+export function select({ label, name, id, required = false, hint, options = [], value, attrs = {}, onChange }) {
   const fid = id || nextId(name || 'sel')
   const input = el('select', { id: fid, name: name || fid, required, className: 'input', ...attrs })
   setOptions(input, options, value)
+  if (onChange) input.addEventListener('change', (event) => onChange(event.target.value))
   const wrap = fieldWrap({ id: fid, label, required, hint, control: input, className: 'field-select' })
   enhanceSelect(input)
   return { wrap, input }

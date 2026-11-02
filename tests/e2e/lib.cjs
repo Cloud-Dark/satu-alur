@@ -47,7 +47,7 @@ function makeContext({ browser, base, spec, results, shotDir }) {
       const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion, permissions, timezoneId })
       const page = await ctx.newPage()
       page.errors = []
-      page.on('pageerror', (e) => page.errors.push(String(e)))
+      page.on('pageerror', (e) => page.errors.push(e.stack || String(e)))
       page.on('console', (m) => { if (m.type() === 'error') page.errors.push(m.text()) })
       // Initial theme only; a theme the page stored itself (toggle) wins on reload.
       await page.addInitScript((th) => { try { if (!localStorage.getItem('theme')) localStorage.setItem('theme', th) } catch { /* */ } }, theme)

@@ -37,6 +37,17 @@ import { SUSPENDED_MESSAGE, isStaffEmail } from '../src/customers/rules.js';
 import {
   validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS,
 } from '../src/pendapatan/rules.js';
+import {
+  handleConnectorList, handleConnectorCreate, handleConnectorGet, handleConnectorUpdate,
+  handleConnectorDelete, handleConnectorTest,
+  handleMappingList, handleMappingPut, handleMappingDelete, handleSchemaGet,
+  handleSyncRun, handleSyncList, handleSyncGet, handleSyncLogAll,
+  handleSyncErrorList, handleSyncErrorUpdate,
+  handleMigrationList, handleMigrationCreate, handleMigrationGet, handleMigrationRun,
+  handleMigrationRollback, handleWebhook,
+} from './mcp.js';
+import { canUse, planLockMessage, planForScale, normalizePlan } from '../src/business/plan-access.js';
+import { demoAccount } from '../src/auth/demo-accounts.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -163,7 +174,7 @@ function json(body, status = 200) {
     },
   });
 }
-const ok = (data, extra) => json({ data, error: null, ...(extra || {}) });
+const ok = (data, extra) => json({ data, error: null, ...(typeof extra === 'object' ? extra : {}) }, typeof extra === 'number' ? extra : 200);
 const fail = (status, message) => json({ data: null, error: { message } }, status);
 
 async function readJson(request, maxBytes = MAX_BODY_BYTES) {
@@ -251,7 +262,8 @@ async function authenticate(request, env) {
   if (!m) throw new HttpError(401, 'Belum masuk.');
   const tokenHash = await sha256Hex(m[1]);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended
+    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended,
+            COALESCE(f.plan, 'sole') AS plan
        FROM sessions s JOIN users u ON u.id = s.user_id
        LEFT JOIN user_flags f ON f.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
@@ -261,6 +273,7 @@ async function authenticate(request, env) {
   if (!row) throw new HttpError(401, 'Sesi tidak valid atau sudah berakhir.');
   const { suspended, ...user } = row;
   if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+  user.plan = normalizePlan(user.plan);
   return { user, tokenHash };
 }
 
@@ -367,6 +380,16 @@ async function handleDemoLogin(request, env) {
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
   await refuseSuspended(env, user.id);
+
+  // Each demo account stands for a business scale, and the scale is the tier:
+  // the enterprise demos keep access to ERP integration, the smaller ones do
+  // not. Re-aligning on every login keeps a stale row from granting access.
+  const account = demoAccount(email);
+  user.plan = planForScale(account?.scale);
+  await env.DB.prepare(
+    `INSERT INTO user_flags (user_id, updated_at, plan) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, updated_at = excluded.updated_at`,
+  ).bind(user.id, nowIso(), user.plan).run();
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -955,7 +978,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex, canUse, planLockMessage };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
@@ -1033,6 +1056,32 @@ const ROUTES = {
   'POST /api/office/admin/support/:id/messages': (req, env, params) => handleAdminSupportReply(req, env, ROUTE_DEPS, params),
   'PATCH /api/office/admin/support/:id': (req, env, params) => handleAdminSupportUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
+
+  // ------------------------------------------------------------ MCP / ERP
+  // Dedicated routes, never the generic /api/db: connector rows hold secrets.
+  'GET /api/mcp/schema': (req, env) => handleSchemaGet(req, env, ROUTE_DEPS),
+  'GET /api/mcp/connectors': (req, env) => handleConnectorList(req, env, ROUTE_DEPS),
+  'POST /api/mcp/connectors': (req, env) => handleConnectorCreate(req, env, ROUTE_DEPS),
+  'GET /api/mcp/connectors/:id': (req, env, params) => handleConnectorGet(req, env, ROUTE_DEPS, params),
+  'PATCH /api/mcp/connectors/:id': (req, env, params) => handleConnectorUpdate(req, env, ROUTE_DEPS, params),
+  'DELETE /api/mcp/connectors/:id': (req, env, params) => handleConnectorDelete(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/connectors/:id/test': (req, env, params) => handleConnectorTest(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/connectors/:id/sync': (req, env, params) => handleSyncRun(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/connectors/:id/sync': (req, env, params) => handleSyncList(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/connectors/:id/mappings': (req, env, params) => handleMappingList(req, env, ROUTE_DEPS, params),
+  'PUT /api/mcp/connectors/:id/mappings': (req, env, params) => handleMappingPut(req, env, ROUTE_DEPS, params),
+  'DELETE /api/mcp/connectors/:id/mappings/:entity': (req, env, params) => handleMappingDelete(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/sync': (req, env) => handleSyncLogAll(req, env, ROUTE_DEPS),
+  'GET /api/mcp/sync/:syncId': (req, env, params) => handleSyncGet(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/errors': (req, env) => handleSyncErrorList(req, env, ROUTE_DEPS),
+  'PATCH /api/mcp/errors/:id': (req, env, params) => handleSyncErrorUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/migrations': (req, env) => handleMigrationList(req, env, ROUTE_DEPS),
+  'POST /api/mcp/migrations': (req, env) => handleMigrationCreate(req, env, ROUTE_DEPS),
+  'GET /api/mcp/migrations/:id': (req, env, params) => handleMigrationGet(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/migrations/:id/run': (req, env, params) => handleMigrationRun(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/migrations/:id/rollback': (req, env, params) => handleMigrationRollback(req, env, ROUTE_DEPS, params),
+  // Public: the HMAC signature is the credential.
+  'POST /api/mcp/webhook/:id': (req, env, params) => handleWebhook(req, env, ROUTE_DEPS, params),
 };
 
 // Matches '/api/media/:key' against a path; returns the params or null.
