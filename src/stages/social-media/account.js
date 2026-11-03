@@ -1,6 +1,7 @@
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
+import { accountsSection, credentialsPanel, pickPanel as replizPickPanel, replizReady } from './repliz.js'
 
 const { el } = C
 const OLD_CONTENT = 'satualur_saved_content'
@@ -152,9 +153,16 @@ export function render(host, ctx) {
     return
   }
   const legacy = legacyRows()
+  // Accounts connected through Repliz come first; the direct Meta/Threads connection stays as a secondary option.
+  const repliz = replizReady(ctx)
+  const replizOn = Boolean(ctx.repliz?.status?.enabled)
+  const direct = !repliz || ctx.configured || ctx.threadsConfigured
   host.replaceChildren(el('div', { className: 'workspace-stack' },
+    ctx.replizPick ? replizPickPanel(ctx) : null,
+    repliz ? accountsSection(ctx) : replizOn ? credentialsPanel(ctx) : null,
     ctx.pick ? pickPanel(ctx) : null,
-    connectPanel(ctx),
-    threadsPanel(ctx),
+    repliz && direct ? el('h3', { className: 'sm-subhead' }, 'Koneksi langsung Meta & Threads') : null,
+    direct ? connectPanel(ctx) : null,
+    direct ? threadsPanel(ctx) : null,
     legacy ? importPanel(ctx, legacy) : null))
 }

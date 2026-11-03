@@ -1,0 +1,39 @@
+/* Social accounts through Repliz (Media Sosial › Akun, post dialog, Laporan tayang) and the WhatsApp card. */
+.rz-grid { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.rz-card { display: grid; gap: var(--s-3); align-content: start; padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-md, 14px); background: var(--surface); min-width: 0; }
+.rz-card-head { display: flex; gap: var(--s-3); align-items: center; }
+.rz-card-head p { margin: 0; }
+.rz-badge {
+  display: inline-grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px;
+  font-weight: 700; font-size: 0.82rem; letter-spacing: -0.01em; background: var(--brand-50, #edf5f0); color: var(--brand-600, #1f4d3f);
+}
+.rz-instagram { background: #fde8ef; color: #b4235a; }
+.rz-facebook { background: #e7effd; color: #1d4fbf; }
+.rz-threads, .rz-twitter { background: #ececec; color: #111; }
+.rz-tiktok { background: #e6f7f7; color: #0f6d6d; }
+.rz-youtube { background: #fde9e7; color: #b42318; }
+.rz-linkedin { background: #e5f0f8; color: #0a5a91; }
+.rz-pinterest { background: #fdeaea; color: #b8151f; }
+.rz-accounts { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
+.rz-account { display: grid; grid-template-columns: auto 1fr auto; gap: var(--s-2) var(--s-3); align-items: center; padding: var(--s-2) 0; border-top: 1px solid var(--line); }
+.rz-account:first-child { border-top: 0; }
+.rz-account-text { display: grid; min-width: 0; }
+.rz-account-text strong, .rz-account-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rz-account-actions { grid-column: 1 / -1; display: flex; gap: var(--s-2); justify-content: flex-end; }
+.rz-account:not(:has(.rz-avatar)) { grid-template-columns: 1fr auto; }
+.rz-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+.rz-who { display: flex; gap: var(--s-3); align-items: center; min-width: 0; }
+.rz-who p { margin: 0; }
+.rz-powered { margin: var(--s-4) 0 0; }
+.wa-status { display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; }
+.wa-preview { white-space: pre-wrap; }
+@media (max-width: 640px) {
+  .rz-grid { grid-template-columns: 1fr; }
+}
+.sm-subhead { margin: var(--s-2) 0 calc(var(--s-2) * -1); font-size: 0.95rem; font-weight: 600; color: var(--text-muted); }
+.row-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; justify-content: flex-end; }
+.ig-grid { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.ig-card { display: grid; gap: var(--s-3); align-content: start; padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--r-md, 14px); background: var(--surface); min-width: 0; }
+.ig-card .form { display: grid; gap: var(--s-3); }
+.ig-head { display: flex; gap: var(--s-3); align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ig-card p { margin: 0; }

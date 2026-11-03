@@ -13,11 +13,19 @@ module.exports = async function settings(t) {
   const tabs = await p.$$eval('.drawer .seg-btn', (b) => b.map((x) => x.textContent.trim()))
   t.check(tabs.join('|') === 'Konektor|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
 
-  // Konektor: WhatsApp toggle persists
-  await p.click('label[for="whatsapp-enabled"]')
-  await p.waitForTimeout(150)
-  const mcp = await p.evaluate(() => JSON.parse(localStorage.getItem('satualur_settings_mcp') || '{}'))
-  t.check(mcp.whatsapp?.enabled === true, 'WhatsApp "Aktif" saved to localStorage')
+  // Konektor: the business's own WAPilot key, saved and shown only as the last 4 characters
+  await p.evaluate(() => localStorage.setItem('satualur_settings_mcp', JSON.stringify({ whatsapp: { apiKey: 'lama', wapilotEndpoint: 'x' } })))
+  await p.click('.drawer .seg-btn[data-value="agent"]')
+  await p.click('.drawer .seg-btn[data-value="mcp"]')
+  await p.waitForSelector('#ig-wapilot-token', { timeout: 8000 })
+  const legacy = await p.evaluate(() => JSON.parse(localStorage.getItem('satualur_settings_mcp') || '{}'))
+  t.check(!('whatsapp' in legacy), 'old browser-stored WhatsApp key removed')
+  t.check(await p.locator('.ig-card[data-provider="waconsole"] #ig-waconsole-app_key').count() === 1 && await p.locator('#ig-repliz-access_key').count() === 1, 'WAConsole and Repliz key forms shown')
+  await p.fill('#ig-wapilot-token', 'aica_0123456789abcdef')
+  await p.getByRole('button', { name: 'Hubungkan WAPilot' }).click()
+  await p.locator('.ig-card[data-provider="wapilot"] .status', { hasText: '…cdef' }).waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await p.locator('.ig-card[data-provider="wapilot"]', { hasText: 'Terhubung • …cdef' }).count() === 1, 'WAPilot connected, key shown only as …cdef')
+  t.check(!(await p.evaluate(() => JSON.stringify(localStorage))).includes('aica_0123456789abcdef'), 'the key itself is not kept in the browser')
 
   // ERP & Integrasi tab: connector grid and template cards (loaded async)
   await p.click('.drawer .seg-btn[data-value="erp"]')

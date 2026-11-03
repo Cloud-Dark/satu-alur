@@ -3,6 +3,7 @@ import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
 import { igEligibility, threadsEligibility, toUtcIso, validateScheduleAt, SCHEDULE_STATUS_LABEL } from '../../social/rules.js'
 import { PLATFORM_LABEL, RECONNECT, connectedPlatforms, platformReason } from './platforms.js'
+import { openPostDialog, postsSection, replizReady } from './repliz.js'
 
 const { el } = C
 const TONE = { scheduled: 'brand', publishing: 'warn', posted: 'ok', failed: 'danger', cancelled: 'neutral' }
@@ -84,8 +85,10 @@ export async function render(host, ctx) {
     body.replaceChildren(...items.map((s) => {
       const btn = C.button({ label: 'Jadwalkan tayang', icon: 'calendar', variant: 'soft', size: 'sm' })
       btn.addEventListener('click', () => openDialog(ctx, s, btn))
+      const rz = replizReady(ctx) ? C.button({ label: 'Unggah ke akun terhubung', icon: 'send', variant: 'soft', size: 'sm' }) : null
+      rz?.addEventListener('click', () => openPostDialog({ ...ctx, onPosted: () => { sub = 'report'; draw() } }, { body: s.body }, rz))
       return el('article', { className: 'workspace-entry sm-schedule-item' },
-        el('p', { className: 'workspace-preview' }, s.body.slice(0, 160)), el('div', { className: 'form-actions' }, btn))
+        el('p', { className: 'workspace-preview' }, s.body.slice(0, 160)), el('div', { className: 'form-actions' }, btn, rz))
     }))
   }
 
@@ -97,7 +100,7 @@ export async function render(host, ctx) {
     rows = [...rows].sort((a, b) => (b.scheduled_at < a.scheduled_at ? -1 : b.scheduled_at > a.scheduled_at ? 1 : b.id - a.id))
     const reload = C.button({ label: 'Muat ulang', icon: 'refresh', variant: 'ghost', size: 'sm' })
     reload.addEventListener('click', () => draw())
-    body.replaceChildren(el('div', { className: 'form-actions' }, reload), ...(rows.length ? rows.map((r) => {
+    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : null, ...(rows.length ? rows.map((r) => {
       let action = null
       if (r.status === 'posted' && String(r.permalink || '').startsWith('https://')) action = el('a', { href: r.permalink, target: '_blank', rel: 'noopener' }, 'Lihat posting ↗')
       else if (r.status === 'scheduled') {

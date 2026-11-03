@@ -6,6 +6,7 @@ import { igEligibility, threadsEligibility } from '../../social/rules.js'
 import { toJpeg } from '../../social/image.js'
 import { PLATFORMS as AI_PLATFORMS } from '../../ai/social-agent.js'
 import { PLATFORM_LABEL, connectedPlatforms, platformReason, canShare } from './platforms.js'
+import { openPostDialog, replizReady } from './repliz.js'
 
 const { el } = C
 const PLATFORMS = [{ value: 'instagram', label: 'Instagram' }, { value: 'facebook', label: 'Facebook' }, { value: 'threads', label: 'Threads' }]
@@ -125,11 +126,18 @@ function composer(ctx, item, initialBody, onCreated) {
     })
   })
 
+  // Posting through the connected accounts (Repliz) takes the text as it is now; media are added in the dialog.
+  const viaRepliz = replizReady(ctx) ? C.button({ label: 'Unggah ke akun terhubung', icon: 'send', variant: 'soft' }) : null
+  viaRepliz?.addEventListener('click', () => {
+    if (!body.input.value.trim()) { ctx.status.show('danger', 'Isi konten tidak boleh kosong.'); return }
+    openPostDialog(ctx, { body: body.input.value.trim() }, viaRepliz)
+  })
+
   drawImage()
   drawShare()
   return el('div', { className: 'sm-composer form' }, body.wrap,
     el('div', { className: 'field' }, el('label', { className: 'field-label', htmlFor: fileId }, 'Gambar (opsional)'), file, preview),
-    share, el('div', { className: 'form-actions' }, save, now))
+    share, el('div', { className: 'form-actions' }, save, now, viaRepliz))
 }
 
 export async function render(host, ctx, brainstorm = false) {

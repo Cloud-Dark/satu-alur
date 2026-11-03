@@ -35,6 +35,13 @@ THREADS_APP_ID = ""
 # Staff (Kantor Satu Alur) sign in at /super-admin-login with accounts made by `npm run staff`.
 # Public origin without a trailing slash (OAuth redirect + media URLs Meta fetches).
 PUBLIC_BASE_URL = ""
+# Per-business integrations (WhatsApp via WAPilot / WAConsole, social media via Repliz): every business stores its OWN
+# keys in the app (Pengaturan › Konektor), encrypted with the TOKEN_KEY secret. See docs/integrations/.
+# While DEMO_OTP is "true" anyone can sign in as any email, so integrations stay off unless this is "true".
+INTEGRATIONS_ALLOW_DEMO_OTP = "false"
+# Optional platform WhatsApp keys (secrets WAPILOT_TOKEN, WACONSOLE_APP_KEY, WACONSOLE_AUTH_KEY, var WACONSOLE_DEVICE_ID)
+# are used for businesses ONLY when this is "true" (admin decision; default off).
+WA_PLATFORM_FALLBACK = "false"
 
 # Images for Meta posts, served publicly at /api/media/<random key>.
 [[r2_buckets]]

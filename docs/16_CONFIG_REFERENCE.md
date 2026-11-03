@@ -29,6 +29,11 @@ Sumber: `wrangler.toml`, `package.json`, `vite.config.js`, `src/cloud.js`. Pemas
 | Nama | Jenis | Nilai | Dampak |
 |------|-------|-------|--------|
 | `DEMO_OTP` | var | `"true"` atau lainnya | Hanya string persis `"true"` yang membuat `send-otp` mengembalikan `demoCode`. Ubah ke `"false"` atau hapus untuk produksi. Tidak aman untuk publik ([10_RISK_REGISTER.md](10_RISK_REGISTER.md) R-001). Selama `"true"`, integrasi Meta dianggap belum dikonfigurasi (tidak ada OAuth, unggah, terbit, atau cron), karena siapa pun bisa masuk sebagai email apa pun. Login staf (`/super-admin-login`) tidak terpengaruh karena memakai password. |
+| `TOKEN_KEY` | secret | 32 byte, base64 | Kunci AES-GCM untuk token Meta/Threads dan kunci integrasi per usaha (WAPilot, WAConsole, Repliz). Tanpa ini kunci integrasi tidak bisa disimpan (503 "Penyimpanan kunci belum dikonfigurasi"). |
+| `INTEGRATIONS_ALLOW_DEMO_OTP` | var | `"false"` | Selama `DEMO_OTP="true"`, integrasi WhatsApp/Repliz mati karena siapa pun bisa masuk sebagai email usaha lain dan memakai kuncinya. Set `"true"` hanya bila risiko itu diterima. Lihat [integrations/](integrations/). |
+| `WA_PLATFORM_FALLBACK` | var | `"false"` | `"true"` = usaha yang belum mengisi kunci WhatsApp sendiri memakai kunci platform di bawah. Bawaan mati. |
+| `WAPILOT_TOKEN` | secret (opsional) | - | Token WAPilot milik platform; hanya dipakai bila `WA_PLATFORM_FALLBACK="true"`. `WAPILOT_BASE_URL` (var) mengganti alamatnya. |
+| `WACONSOLE_APP_KEY`, `WACONSOLE_AUTH_KEY` | secret (opsional) | - | Kunci WAConsole milik platform; hanya dipakai bila `WA_PLATFORM_FALLBACK="true"`. `WACONSOLE_DEVICE_ID`, `WACONSOLE_BASE_URL` (var) opsional. |
 | `EMAIL_API_KEY` | secret (rencana) | - | Belum dipakai; disebut dalam TODO provider email di Worker. Provider: _TBD_. |
 
 ## Binding yang Dibaca Worker

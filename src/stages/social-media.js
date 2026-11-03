@@ -1,6 +1,8 @@
 import { loadModels, pickDefaultModel } from '../ai/models.js'
 import * as C from '../ui/components.js'
 import { getAccount } from '../social/api.js'
+import * as Repliz from '../repliz/api.js'
+import { safeCallbackMessage } from '../repliz/rules.js'
 import * as Account from './social-media/account.js'
 import * as Content from './social-media/content.js'
 import * as Schedule from './social-media/schedule.js'
@@ -25,11 +27,17 @@ export async function render(container, ctx = {}) {
   let modelId = null
   let acct = { configured: true, threads_configured: true, account: null }
   let pick = null
+  let replizPick = null
+  let repliz = { status: null, accounts: [] }
   // Return from the Meta OAuth callback (see ui/app.js): open Akun, show the outcome, drop the query.
   const query = new URLSearchParams(location.hash.split('?')[1] || '')
   const back = { connected: Object.hasOwn(CALLBACK_OK, query.get('social') || '') ? CALLBACK_OK[query.get('social')] : null,
     error: query.get('social_error'), pick: query.get('social_pick') }
-  if (back.connected || back.error || back.pick) {
+  // Return from the Repliz connect page (worker/repliz.js): repliz=connected | repliz_error=… | repliz_pick=<id>.
+  if (query.get('repliz') === 'connected') back.connected = 'Akun berhasil terhubung.'
+  if (query.get('repliz_error')) back.replizError = safeCallbackMessage(query.get('repliz_error'))
+  if (/^[0-9a-f]{32}$/.test(query.get('repliz_pick') || '')) replizPick = query.get('repliz_pick')
+  if (back.connected || back.error || back.pick || back.replizError || replizPick) {
     currentTab = 'account'
     pick = back.pick
     history.replaceState(null, '', '#/app')
@@ -50,6 +58,7 @@ export async function render(container, ctx = {}) {
 
   function tabCtx() {
     return { status, signal: controller.signal, getModelId: () => modelId, account: acct.account, configured: acct.configured, threadsConfigured: acct.threads_configured, loadError: acct.error, pick,
+      repliz, replizPick, clearReplizPick: () => { replizPick = null },
       refresh, clearPick: () => { pick = null }, goto: (value) => tabs.querySelector(`[data-value="${value}"]`).click() }
   }
   function draw() {
@@ -62,7 +71,13 @@ export async function render(container, ctx = {}) {
     else Collab.render(host, tabCtx())
   }
   async function loadAccount() {
-    try { acct = await getAccount() } catch (err) { acct = { configured: true, threads_configured: true, account: null, error: err.message } }
+    const [a, r] = await Promise.allSettled([getAccount(), loadRepliz()])
+    acct = a.status === 'fulfilled' ? a.value : { configured: true, threads_configured: true, account: null, error: a.reason?.message }
+    repliz = r.status === 'fulfilled' ? r.value : { status: null, accounts: [], error: r.reason?.message }
+  }
+  async function loadRepliz() {
+    const status = await Repliz.status()
+    return { status, accounts: status?.configured ? await Repliz.listAccounts() : [] }
   }
   async function refresh() {
     await loadAccount()
@@ -76,6 +91,7 @@ export async function render(container, ctx = {}) {
   if (ctx.signal?.aborted) return
   draw()
   if (back.connected) status.show('ok', back.connected)
+  else if (back.replizError) status.show('danger', back.replizError)
   else if (back.error) {
     const known = CALLBACK_ERRORS.includes(back.error) || CALLBACK_ERROR_PREFIXES.some((p) => back.error.startsWith(p))
     status.show('danger', known ? back.error : 'Koneksi gagal, coba lagi.')

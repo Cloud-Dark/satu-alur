@@ -1,11 +1,14 @@
 /**
  * Settings (rendered inside the shell's right drawer):
- * connectors (WhatsApp WAPilot, Email SMTP), MCP / ERP integration, migration
+ * connectors (WhatsApp via the server, Email SMTP), MCP / ERP integration, migration
  * wizard, sync logs, and agent prompts + parameters.
  * Notification credentials live in this browser's localStorage; MCP connectors,
  * mappings and migrations live in D1 behind /api/mcp/*.
  */
 import * as C from '../ui/components.js'
+import * as WA from '../wa/api.js'
+import * as Integrations from '../integrations/api.js'
+import { integrationCard } from '../ui/integration-card.js'
 import { showToast } from '../ui/animations.js'
 import { loadModels } from '../ai/models.js'
 import {
@@ -81,10 +84,15 @@ function saveSettings(key, data) {
 }
 
 function getMcpSettings() {
-  return loadSettings(STORAGE_KEYS.mcp, {
-    whatsapp: { enabled: false, apiKey: '', wapilotEndpoint: 'https://api.wapilot.io/v1', phoneNumber: '', webhookUrl: '' },
+  const settings = loadSettings(STORAGE_KEYS.mcp, {
     email: { enabled: false, smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', fromName: '', fromEmail: '' },
   })
+  // WhatsApp keys now live on the server (worker/integrations.js): drop the old browser-stored key and endpoint.
+  if (settings.whatsapp) {
+    delete settings.whatsapp
+    saveSettings(STORAGE_KEYS.mcp, settings)
+  }
+  return settings
 }
 
 function getAgentSettings() {
@@ -237,10 +245,8 @@ function selectField({ label, id, options, value, hint, onChange }) {
 }
 
 function testConnectionLegacy(type, cfg) {
-  const name = type === 'whatsapp' ? 'WhatsApp' : 'Email'
-  const missing = type === 'whatsapp'
-    ? [!cfg.apiKey && 'API key', !cfg.phoneNumber && 'nomor WhatsApp'].filter(Boolean)
-    : [!cfg.smtpHost && 'SMTP host', !cfg.smtpUser && 'username', !cfg.fromEmail && 'email pengirim'].filter(Boolean)
+  const name = 'Email'
+  const missing = [!cfg.smtpHost && 'SMTP host', !cfg.smtpUser && 'username', !cfg.fromEmail && 'email pengirim'].filter(Boolean)
   if (missing.length) {
     showToast(`${name}: lengkapi ${missing.join(', ')} terlebih dahulu.`, 'error')
     return
@@ -248,29 +254,81 @@ function testConnectionLegacy(type, cfg) {
   showToast(`${name}: konfigurasi lengkap dan tersimpan di browser. Uji kirim membutuhkan konektor server yang belum tersedia.`, 'info', 5200)
 }
 
+/* ------------------------------------------------------------- WhatsApp & Repliz (own accounts) */
+// The business's own WAPilot / WAConsole keys, which one sends, the device status and a test message;
+// plus the Repliz keys used by Media Sosial.
+function waSection() {
+  const statusBox = el('div', { className: 'wa-status' }, C.tag('Memeriksa…', 'neutral'))
+  const cards = el('div', { className: 'ig-grid' })
+  const providerHost = el('div')
+  const facts = el('div')
+  const phone = C.field({ label: 'Kirim pesan uji ke nomor', id: 'wa-test-phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '20' } })
+  const test = C.button({ label: 'Kirim pesan uji', icon: 'send', size: 'sm', variant: 'soft' })
+  const out = el('p', { className: 'muted small', role: 'status' })
+  test.disabled = true
+
+  async function load() {
+    let list
+    let s
+    try { [list, s] = await Promise.all([Integrations.list(), WA.status()]) } catch (e) { statusBox.replaceChildren(C.tag(e.message, 'danger')); return }
+    cards.replaceChildren(...list.items.filter((i) => i.kind === 'whatsapp').map((i) => integrationCard(i, { demo: list.demo, enabled: list.enabled, onChange: load })))
+    const tone = !s.configured ? 'neutral' : s.connected ? 'ok' : 'warn'
+    statusBox.replaceChildren(C.tag(s.demo ? 'Akun demo (simulasi)' : !s.configured ? 'Belum terhubung' : s.connected ? 'Terhubung' : 'Perangkat offline', s.demo ? 'neutral' : tone))
+    const connected = (s.providers || []).filter((p) => p.connected)
+    if (connected.length > 1) {
+      const sel = C.select({ label: 'Kirim lewat', id: 'wa-provider', value: s.provider, options: connected.map((p) => ({ value: p.key, label: p.label })) })
+      sel.input.addEventListener('change', async () => {
+        try { await WA.setProvider(sel.input.value); showToast('Pengirim WhatsApp diperbarui.', 'success'); load() } catch (e) { showToast(e.message, 'error'); sel.input.value = s.provider }
+      })
+      providerHost.replaceChildren(sel.wrap)
+    } else providerHost.replaceChildren()
+    const rows = []
+    if (s.configured) rows.push(['Dikirim lewat', (s.providers || []).find((p) => p.key === s.provider)?.label || '—'])
+    if (s.device?.name) rows.push(['Perangkat', s.device.name])
+    if (s.device?.number_masked) rows.push(['Nomor pengirim', s.device.number_masked])
+    if (s.license?.days_left != null) rows.push(['Masa aktif layanan', `${s.license.days_left} hari lagi`])
+    rows.push(['Terkirim hari ini', `${s.used_today || 0} dari ${s.limits?.per_day ?? 200} pesan`])
+    facts.replaceChildren(...[C.defList(rows), s.note ? el('p', { className: 'muted small' }, s.note) : null, s.error ? el('p', { className: 'field-error' }, s.error) : null].filter(Boolean))
+    test.disabled = !s.configured
+  }
+  test.addEventListener('click', async () => {
+    const restore = C.setBusy(test, 'Mengirim…')
+    out.textContent = ''
+    try {
+      const r = await WA.send({ phone: phone.input.value, text: 'Pesan uji dari Satu Alur. Bila pesan ini sampai, WhatsApp usaha Anda siap dipakai.', kind: 'test' })
+      out.textContent = r.status === 'simulated' ? `Pesan uji disimulasikan ke ${r.to}.` : `Pesan uji terkirim ke ${r.to}.`
+    } catch (e) { out.textContent = e.message } finally { restore() }
+  })
+  load()
+  return setSection({ num: 'Konektor · 01', title: 'WhatsApp', desc: 'Hubungkan akun WAPilot atau WAConsole milik usaha Anda. Pesan ke pelanggan dikirim dari daftar Permintaan dan Penawaran, dan selalu ditampilkan dulu sebelum dikirim.', toggle: statusBox },
+    cards, providerHost, facts, phone.wrap, el('div', { className: 'form-actions' }, test), out)
+}
+
+// Repliz keys for Media Sosial (the accounts themselves are connected in Media Sosial › Akun).
+function replizSection() {
+  const host = el('div', { className: 'ig-grid' }, C.skeletonRows(1))
+  async function load() {
+    try {
+      const list = await Integrations.list()
+      host.replaceChildren(...list.items.filter((i) => i.provider === 'repliz').map((i) => integrationCard(i, { demo: list.demo, enabled: list.enabled, onChange: load })))
+    } catch (e) { host.replaceChildren(C.errorState(e.message)) }
+  }
+  load()
+  return setSection({ num: 'Konektor · 02', title: 'Media sosial (Repliz)', desc: 'Hubungkan akun Repliz Anda, lalu sambungkan Instagram, Facebook, TikTok, dan lainnya di Media Sosial › Akun.' }, host)
+}
+
 /* ------------------------------------------------------------- MCP tab (legacy: WhatsApp + Email) */
 function renderMcpTab(container) {
   const settings = getMcpSettings()
   const save = () => saveSettings(STORAGE_KEYS.mcp, settings)
-  const wa = settings.whatsapp
   const em = settings.email
 
   container.append(
-    el('p', { className: 'set-lead' }, 'Konektor dipakai untuk mengirim notifikasi ke pelanggan dan tenaga kerja. Kredensial tersimpan lokal di browser ini.'),
+    el('p', { className: 'set-lead' }, 'Konektor dipakai untuk mengirim pesan ke pelanggan dan tenaga kerja.'),
+    waSection(),
+    replizSection(),
     setSection({
-      num: 'Konektor · 01', title: 'WhatsApp (WAPilot)', desc: 'Notifikasi otomatis lewat WhatsApp Business.',
-      toggle: switchControl({ id: 'whatsapp-enabled', label: 'Aktif', checked: wa.enabled, onChange: (v) => { wa.enabled = v; save() } }),
-    },
-      textField('WAPilot API key', 'whatsapp-apikey', wa.apiKey, 'password', (v) => { wa.apiKey = v; save() }, 'Dari dasbor WAPilot.'),
-      textField('Endpoint API', 'whatsapp-endpoint', wa.wapilotEndpoint, 'url', (v) => { wa.wapilotEndpoint = v; save() }),
-      el('div', { className: 'form-row' },
-        textField('Nomor WhatsApp', 'whatsapp-phone', wa.phoneNumber, 'tel', (v) => { wa.phoneNumber = v; save() }, 'Format 628123456789.'),
-        textField('Webhook URL', 'whatsapp-webhook', wa.webhookUrl, 'url', (v) => { wa.webhookUrl = v; save() }, 'Untuk pesan masuk.'),
-      ),
-      el('div', { className: 'form-actions' }, C.button({ label: 'Periksa konfigurasi', icon: 'plug', size: 'sm', onClick: () => testConnectionLegacy('whatsapp', wa) })),
-    ),
-    setSection({
-      num: 'Konektor · 02', title: 'Email (SMTP)', desc: 'Kirim penawaran, invoice, dan laporan lewat email.',
+      num: 'Konektor · 03', title: 'Email (SMTP)', desc: 'Kirim penawaran, invoice, dan laporan lewat email.',
       toggle: switchControl({ id: 'email-enabled', label: 'Aktif', checked: em.enabled, onChange: (v) => { em.enabled = v; save() } }),
     },
       el('div', { className: 'form-row form-row-2-1' },

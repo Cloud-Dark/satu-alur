@@ -1,6 +1,8 @@
 /** 01 — Permintaan: capture a customer request; list with derived status. */
 import { getCloud } from '../cloud.js'
 import * as C from '../ui/components.js'
+import { openWaDialog } from '../ui/wa-dialog.js'
+import { followUpMessage } from '../wa/rules.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 
@@ -188,11 +190,20 @@ export async function render(container, ctx = {}) {
           label: 'Aksi',
           className: 'col-action',
           render: (r) => {
-            if (model.offersOf(r.id).length) return el('span', { className: 'muted nil' }, '—')
-            const b = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
-            b.setAttribute('aria-label', `Buat penawaran untuk ${customerLabel(r)}`)
-            b.addEventListener('click', () => navigate('offer', { requestId: r.id }))
-            return b
+            let main = el('span', { className: 'muted nil' }, '—')
+            if (!model.offersOf(r.id).length) {
+              main = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+              main.setAttribute('aria-label', `Buat penawaran untuk ${customerLabel(r)}`)
+              main.addEventListener('click', () => navigate('offer', { requestId: r.id }))
+            }
+            if (!r.phone) return main
+            const wa = C.button({ label: 'WhatsApp', icon: 'send', size: 'sm', variant: 'ghost' })
+            wa.setAttribute('aria-label', `Kirim pesan ke ${customerLabel(r)} via WhatsApp`)
+            wa.addEventListener('click', () => openWaDialog({
+              requestId: r.id, customer: customerLabel(r), phone: r.phone, kind: 'followup', opener: wa, openSettings: ctx.openSettings,
+              text: followUpMessage({ customer: r.customer_name, service: r.service_type, business: ctx.user?.name }),
+            }))
+            return el('div', { className: 'row-actions' }, main, wa)
           },
         },
       ],

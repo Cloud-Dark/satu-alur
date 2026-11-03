@@ -1,6 +1,8 @@
 /** 02 — Penawaran: AI drafts an offer, domain rules validate, human saves. */
 import { getCloud } from '../cloud.js'
 import * as C from '../ui/components.js'
+import { openWaDialog } from '../ui/wa-dialog.js'
+import { offerMessage } from '../wa/rules.js'
 import { generateOffer } from '../ai/agent.js'
 import { validateOffer, OfferRules } from '../domain/rules.js'
 import { loadModels } from '../ai/models.js'
@@ -415,12 +417,23 @@ export async function render(container, ctx = {}) {
               b.addEventListener('click', () => approve(o, b))
               return b
             }
-            if (!flow.assignmentsOf(o.id).length) {
+            const main = flow.assignmentsOf(o.id).length ? el('span', { className: 'muted small' }, 'Ditugaskan') : (() => {
               const b = C.button({ label: 'Tugaskan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
               b.addEventListener('click', () => navigate('assign', { offerId: o.id }))
               return b
-            }
-            return el('span', { className: 'muted small' }, 'Ditugaskan')
+            })()
+            const r = flow.requestOfOffer(o)
+            if (!r?.phone) return main
+            const wa = C.button({ label: 'WhatsApp', icon: 'send', size: 'sm', variant: 'ghost' })
+            wa.setAttribute('aria-label', `Kirim penawaran ke ${customerLabel(r)} via WhatsApp`)
+            wa.addEventListener('click', () => {
+              const proposal = typeof o.ai_proposal_json === 'object' && o.ai_proposal_json ? o.ai_proposal_json : {}
+              openWaDialog({
+                requestId: r.id, customer: customerLabel(r), phone: r.phone, kind: 'offer', opener: wa, openSettings: ctx.openSettings,
+                text: offerMessage({ customer: r.customer_name, service: r.service_type, scope: o.validated_scope, price: o.validated_price, terms: proposal.terms, business: ctx.user?.name }),
+              })
+            })
+            return el('div', { className: 'row-actions' }, main, wa)
           },
         },
       ],

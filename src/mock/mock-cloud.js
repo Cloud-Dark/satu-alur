@@ -1274,14 +1274,14 @@ export function seedDemoData() {
 
   // --- Requests ---
   state.requests = [
-    { id: 1001, customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', requested_at: daysAgo(14), location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
-    { id: 1002, customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', requested_at: daysAgo(12), location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
+    { id: 1001, phone: '0812-0000-1001', customer_name: 'PT Maju Jaya', service_type: 'Pembersihan AC', requested_at: daysAgo(14), location: 'Jakarta Selatan', description: 'Pembersihan 15 unit AC split untuk kantor 3 lantai. Termasuk servis ringan dan penggantian filter.', created_at: daysAgo(14) },
+    { id: 1002, phone: '0812-0000-1002', customer_name: 'Rumah Bapak Surya', service_type: 'Cuci Sofa & Karpet', requested_at: daysAgo(12), location: 'Bandung', description: 'Cuci sofa 3 set dan karpet 2 pcs untuk rumah tinggal.', created_at: daysAgo(12) },
     { id: 1003, customer_name: 'Kost exclusive 99', service_type: 'Pembersihan Kolam Renang', location: 'Depok', description: 'Perawatan rutin kolam renang bulanan, termasuk pengecekan pH dan backwash.', created_at: daysAgo(10) },
     { id: 1004, customer_name: 'PT Sinar Abadi', service_type: 'Pest Control', location: 'Tangerang', description: 'Pengendalian hama rayap dan kecoa untuk gudang 500m2.', created_at: daysAgo(8) },
     { id: 1005, customer_name: 'Apartemen GreenView', service_type: 'Pembersihan Kaca Gedung', location: 'Jakarta Pusat', description: 'Pembersihan kaca eksterior 12 lantai menggunakan gondola.', created_at: daysAgo(6) },
     { id: 1006, customer_name: 'Resto Nusantara', service_type: 'Ducting & Exhaust Cleaning', location: 'Surabaya', description: 'Pembersihan ducting dan exhaust fan dapur restoran.', created_at: daysAgo(4) },
-    { id: 1007, customer_name: 'Hotel Grand Lestari', service_type: 'Deep Cleaning Kamar', location: 'Yogyakarta', description: 'Deep cleaning 50 kamar hotel setelah musim liburan.', created_at: daysAgo(2) },
-    { id: 1008, customer_name: 'Villa Bukit Asri', service_type: 'Pembersihan Taman & Kolam', location: 'Bogor', description: 'Perawatan taman landscape dan kolam ikan koi.', created_at: daysAgo(1) },
+    { id: 1007, phone: '0812-0000-1007', customer_name: 'Hotel Grand Lestari', service_type: 'Deep Cleaning Kamar', location: 'Yogyakarta', description: 'Deep cleaning 50 kamar hotel setelah musim liburan.', created_at: daysAgo(2) },
+    { id: 1008, phone: '0812-0000-1008', customer_name: 'Villa Bukit Asri', service_type: 'Pembersihan Taman & Kolam', location: 'Bogor', description: 'Perawatan taman landscape dan kolam ikan koi.', created_at: daysAgo(1) },
   ]
 
   // --- Offers ---

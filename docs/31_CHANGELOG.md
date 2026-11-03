@@ -8,6 +8,27 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-03 - Integrasi milik usaha: WhatsApp (WAPilot/WAConsole) dan Repliz
+
+#### Ditambahkan
+- Kunci integrasi per usaha (`integration_credentials`, AES-GCM `TOKEN_KEY`), dengan rute `GET/PUT/DELETE /api/integrations/:provider`. Kunci diperiksa saat disimpan dan hanya ditampilkan sebagai "…abcd".
+- WhatsApp dari akun usaha sendiri lewat WAPilot atau WAConsole (`worker/wa/`, `worker/whatsapp.js`):
+  - pilihan penyedia per usaha;
+  - tombol **WhatsApp** di Permintaan dan Penawaran dengan dialog konfirmasi;
+  - pesan uji;
+  - batas 200 pesan per hari;
+  - log `wa_messages`;
+  - akun demo disimulasikan.
+- Media sosial lewat Repliz milik usaha (`worker/repliz.js`):
+  - hubungkan Instagram, Facebook, Threads, TikTok, YouTube, LinkedIn, X, dan Pinterest;
+  - unggah sekarang atau jadwalkan dari Konten/Jadwal;
+  - status di Laporan tayang (`repliz_posts`).
+- Migrasi `0013_integrations.sql`; dokumentasi di `docs/integrations/`.
+
+#### Diubah
+- Kartu WhatsApp di Pengaturan tidak lagi menyimpan API key di browser. Kunci lama di localStorage dihapus otomatis.
+- Kunci WhatsApp milik platform hanya dipakai bila `WA_PLATFORM_FALLBACK="true"` (bawaan mati).
+
 ### 2026-11-03 - Rilis gabungan dan materi lomba
 
 #### Ditambahkan

@@ -25,6 +25,13 @@ import {
   handleRequestCampaign,
 } from './agency.js';
 import { handleSiteGet, handleSitePut } from './site.js';
+import { handleWaStatus, handleWaProvider, handleWaSend } from './whatsapp.js';
+import { handleIntegrationList, handleIntegrationPut, handleIntegrationDelete } from './integrations.js';
+import {
+  handleReplizStatus, handleReplizAccounts, handleReplizAuthorize, handleReplizCallback, handleReplizComplete, handleReplizPick,
+  handleReplizConnect, handleReplizDisconnect, handleReplizBoards, handleReplizSchedule, handleReplizSchedules,
+  handleReplizScheduleCancel, handleReplizMedia,
+} from './repliz.js';
 import {
   featureFrom, meter, handleMyPlan, handleVoucherRedeem, handleAdminVouchers, handleAdminVoucherCreate, handleAdminVoucherUpdate,
   handleAdminRedemptions, handleAdminCustomerQuota, handleAdminCustomerCredit,
@@ -1014,6 +1021,26 @@ const ROUTES = {
   'POST /api/social/publish': (req, env) => handleSocialPublish(req, env, ROUTE_DEPS),
   'POST /api/social/schedule': (req, env) => handleSocialSchedule(req, env, ROUTE_DEPS),
   'DELETE /api/social/schedule/:id': (req, env, params) => handleSocialScheduleCancel(req, env, ROUTE_DEPS, params),
+  // Per-business integrations (own WAPilot / WAConsole / Repliz keys): worker/integrations.js, worker/whatsapp.js, worker/repliz.js.
+  'GET /api/integrations': (req, env) => handleIntegrationList(req, env, ROUTE_DEPS),
+  'PUT /api/integrations/:provider': (req, env, params) => handleIntegrationPut(req, env, ROUTE_DEPS, params),
+  'DELETE /api/integrations/:provider': (req, env, params) => handleIntegrationDelete(req, env, ROUTE_DEPS, params),
+  'GET /api/wa/status': (req, env) => handleWaStatus(req, env, ROUTE_DEPS),
+  'PUT /api/wa/provider': (req, env) => handleWaProvider(req, env, ROUTE_DEPS),
+  'POST /api/wa/send': (req, env) => handleWaSend(req, env, ROUTE_DEPS),
+  'GET /api/social/repliz/status': (req, env) => handleReplizStatus(req, env, ROUTE_DEPS),
+  'GET /api/social/repliz/accounts': (req, env) => handleReplizAccounts(req, env, ROUTE_DEPS),
+  'POST /api/social/repliz/authorize': (req, env) => handleReplizAuthorize(req, env, ROUTE_DEPS),
+  'GET /api/social/repliz/callback/:platform': handleReplizCallback,
+  'POST /api/social/repliz/complete/:platform': (req, env, params) => handleReplizComplete(req, env, ROUTE_DEPS, params),
+  'GET /api/social/repliz/picks/:id': (req, env, params) => handleReplizPick(req, env, ROUTE_DEPS, params),
+  'POST /api/social/repliz/connect': (req, env) => handleReplizConnect(req, env, ROUTE_DEPS),
+  'DELETE /api/social/repliz/accounts/:id': (req, env, params) => handleReplizDisconnect(req, env, ROUTE_DEPS, params),
+  'GET /api/social/repliz/accounts/:id/boards': (req, env, params) => handleReplizBoards(req, env, ROUTE_DEPS, params),
+  'POST /api/social/repliz/schedule': (req, env) => handleReplizSchedule(req, env, ROUTE_DEPS),
+  'GET /api/social/repliz/schedules': (req, env) => handleReplizSchedules(req, env, ROUTE_DEPS),
+  'DELETE /api/social/repliz/schedules/:id': (req, env, params) => handleReplizScheduleCancel(req, env, ROUTE_DEPS, params),
+  'POST /api/social/repliz/media': (req, env) => handleReplizMedia(req, env, ROUTE_DEPS),
   'GET /api/office/influencers': (req, env) => handleInfluencers(req, env, ROUTE_DEPS),
   'POST /api/office/requests': (req, env) => handleRequestCreate(req, env, ROUTE_DEPS),
   'GET /api/office/requests': (req, env) => handleRequestList(req, env, ROUTE_DEPS),
