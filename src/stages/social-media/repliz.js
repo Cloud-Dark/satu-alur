@@ -3,7 +3,7 @@
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import * as Repliz from '../../repliz/api.js'
-import * as Integrations from '../../integrations/api.js'
+import * as Integrations from '../../integrations/connectors.js'
 import { integrationCard } from '../../ui/integration-card.js'
 import { REPLIZ_PLATFORMS, POST_TYPES, SCHEDULE_STATUS, CAPTION_MAX } from '../../repliz/rules.js'
 import { toUtcIso } from '../../social/rules.js'

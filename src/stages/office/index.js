@@ -11,6 +11,7 @@ import * as Contact from './contact.js'
 import * as Support from './support.js'
 import * as Campaigns from './campaigns.js'
 import * as Vouchers from './vouchers.js'
+import * as System from './system.js'
 import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
 const { el } = C
@@ -34,6 +35,14 @@ export const GROUPS = [
     { key: 'influencers', label: 'Influencer', icon: 'sparkles', draw: Influencers.draw },
     { key: 'requests', label: 'Permintaan', icon: 'inbox', draw: Requests.draw },
     { key: 'campaigns', label: 'Kampanye', icon: 'megaphone', draw: Campaigns.draw }] },
+  { title: 'Sistem', items: [
+    { key: 'sys-overview', label: 'Dasbor sistem', icon: 'chart', draw: System.drawOverview },
+    { key: 'sys-email', label: 'Email', icon: 'mail', draw: System.drawEmail },
+    { key: 'sys-ai', label: 'Mesin AI', icon: 'sparkles', draw: System.drawAi },
+    { key: 'sys-login', label: 'Login', icon: 'lock', draw: System.drawLogin },
+    { key: 'sys-access', label: 'Akses admin', icon: 'shield', draw: System.drawAccess },
+    { key: 'sys-whatsapp', label: 'WhatsApp & sosial', icon: 'plug', draw: System.drawWhatsapp },
+    { key: 'sys-activity', label: 'Log aktivitas', icon: 'activity', draw: System.drawActivity }] },
 ]
 export const ITEMS = GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.title })))
 

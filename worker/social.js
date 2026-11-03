@@ -44,8 +44,9 @@ export const isConfigured = (env) => env.DEMO_OTP !== 'true'
   && Boolean(env.META_APP_ID && env.META_APP_SECRET && env.TOKEN_KEY && env.PUBLIC_BASE_URL);
 export const isThreadsConfigured = (env) => env.DEMO_OTP !== 'true'
   && Boolean(env.THREADS_APP_ID && env.THREADS_APP_SECRET && env.TOKEN_KEY && env.PUBLIC_BASE_URL);
-// Staff = a session created by POST /api/auth/staff-login (username + password); see worker/staff.js.
-export const isAdminUser = (user) => user?.is_staff === 1;
+// Admin = a staff session from POST /api/auth/staff-login (username + password; worker/staff.js)
+// ADMIN_EMAILS email logins get admin_email = 1 in authenticate (worker/index.js; never while DEMO_OTP is on).
+export const isAdminUser = (user) => user?.is_staff === 1 || user?.admin_email === 1;
 const isDemoUser = (user, deps) => deps.DEMO_EMAILS.has(String(user.email || '').toLowerCase());
 // Authenticates and rejects the shared demo accounts (one user per business, shared by every visitor).
 export async function realUser(request, env, deps) {

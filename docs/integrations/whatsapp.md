@@ -32,9 +32,9 @@ Tempat mendapatkan kunci:
 
 | Rute | Isi |
 |------|-----|
-| `GET /api/integrations` | Daftar integrasi usaha: terhubung atau tidak, 4 karakter terakhir kunci, pengaturan non-rahasia. |
-| `PUT /api/integrations/:provider` | Simpan kunci (`wapilot`, `waconsole`, `repliz`) setelah diperiksa. |
-| `DELETE /api/integrations/:provider` | Hapus kunci. |
+| `GET /api/connectors` | Daftar integrasi usaha: terhubung atau tidak, 4 karakter terakhir kunci, pengaturan non-rahasia. |
+| `PUT /api/connectors/:provider` | Simpan kunci (`wapilot`, `waconsole`, `repliz`) setelah diperiksa. |
+| `DELETE /api/connectors/:provider` | Hapus kunci. |
 | `GET /api/wa/status` | Penyedia aktif, status perangkat, masa aktif lisensi (WAPilot), terpakai hari ini. |
 | `PUT /api/wa/provider` | `{ provider }` memilih penyedia (harus sudah terhubung). |
 | `POST /api/wa/send` | `{ request_id?, phone?, text, kind? }` → `{ status: 'sent' \| 'simulated', to, provider }`. |

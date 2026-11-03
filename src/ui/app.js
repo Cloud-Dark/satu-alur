@@ -35,6 +35,7 @@ const ROUTES = {
 
 let currentUser = null
 let currentIsAdmin = false
+let currentAdminVia = null // 'staff' | 'email' | null
 let cleanup = null
 let rootEl = null
 
@@ -90,6 +91,7 @@ function render() {
   const ctx = {
     user: currentUser,
     isAdmin: currentIsAdmin,
+    adminVia: currentAdminVia,
     navigate,
     async onSignedIn(user) {
       currentUser = user
@@ -101,6 +103,7 @@ function render() {
       await signOut()
       currentUser = null
       currentIsAdmin = false
+      currentAdminVia = null
       navigate('/')
     },
   }
@@ -112,7 +115,11 @@ function render() {
 
 // UX only: the worker enforces admin rights on every /api/office/admin call.
 async function loadAdmin() {
-  try { currentIsAdmin = (await getSession()).data?.is_admin === true } catch { currentIsAdmin = false }
+  try {
+    const data = (await getSession()).data
+    currentIsAdmin = data?.is_admin === true
+    currentAdminVia = currentIsAdmin ? data?.admin_via || 'staff' : null
+  } catch { currentIsAdmin = false; currentAdminVia = null }
 }
 
 export async function mountApp(root) {
@@ -129,6 +136,7 @@ export async function mountApp(root) {
     const { data: session } = await getSession()
     currentUser = session?.user ?? null
     currentIsAdmin = session?.is_admin === true
+    currentAdminVia = currentIsAdmin ? session?.admin_via || 'staff' : null
   } catch {
     currentUser = null
   }
@@ -142,7 +150,7 @@ export async function mountApp(root) {
       const changed = (next?.id ?? null) !== (currentUser?.id ?? null)
       currentUser = next
       if (next) await loadAdmin()
-      else currentIsAdmin = false
+      else { currentIsAdmin = false; currentAdminVia = null }
       // The login page shows its own success state and navigates via ctx.onSignedIn.
       if (changed && !(next && (currentPath() === '/masuk' || currentPath() === STAFF_PATH))) render()
     })

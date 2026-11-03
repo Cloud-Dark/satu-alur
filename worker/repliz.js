@@ -1,5 +1,5 @@
 /**
- * Social accounts through the business's OWN Repliz workspace (keys stored per business, worker/integrations.js).
+ * Social accounts through the business's OWN Repliz workspace (keys stored per business, worker/connectors.js).
  *
  *   GET    /api/social/repliz/status                  { configured, enabled, demo, platforms, capacity: { used, limit } | null }
  *   GET    /api/social/repliz/accounts                accounts in the business's workspace
@@ -24,7 +24,7 @@ import { REPLIZ_PLATFORMS, PLATFORM_KEYS, validatePost, accountView, postLink } 
 import { signConnectState, verifyConnectState, derivedKeyB64, STATE_TTL_MS } from '../src/repliz/state.js';
 import { encryptToken, decryptToken } from '../src/social/crypto.js';
 import { createRepliz, ReplizError } from './repliz-client.js';
-import { loadCredentials, integrationsEnabled, isDemo } from './integrations.js';
+import { loadCredentials, integrationsEnabled, isDemo } from './connectors.js';
 
 export { createRepliz, ReplizError };
 

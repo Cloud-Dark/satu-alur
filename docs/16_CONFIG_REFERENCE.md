@@ -28,14 +28,20 @@ Sumber: `wrangler.toml`, `package.json`, `vite.config.js`, `src/cloud.js`. Pemas
 
 | Nama | Jenis | Nilai | Dampak |
 |------|-------|-------|--------|
-| `DEMO_OTP` | var | `"true"` atau lainnya | Hanya string persis `"true"` yang membuat `send-otp` mengembalikan `demoCode`. Ubah ke `"false"` atau hapus untuk produksi. Tidak aman untuk publik ([10_RISK_REGISTER.md](10_RISK_REGISTER.md) R-001). Selama `"true"`, integrasi Meta dianggap belum dikonfigurasi (tidak ada OAuth, unggah, terbit, atau cron), karena siapa pun bisa masuk sebagai email apa pun. Login staf (`/super-admin-login`) tidak terpengaruh karena memakai password. |
 | `TOKEN_KEY` | secret | 32 byte, base64 | Kunci AES-GCM untuk token Meta/Threads dan kunci integrasi per usaha (WAPilot, WAConsole, Repliz). Tanpa ini kunci integrasi tidak bisa disimpan (503 "Penyimpanan kunci belum dikonfigurasi"). |
 | `INTEGRATIONS_ALLOW_DEMO_OTP` | var | `"false"` | Selama `DEMO_OTP="true"`, integrasi WhatsApp/Repliz mati karena siapa pun bisa masuk sebagai email usaha lain dan memakai kuncinya. Set `"true"` hanya bila risiko itu diterima. Lihat [integrations/](integrations/). |
 | `WA_PLATFORM_FALLBACK` | var | `"false"` | `"true"` = usaha yang belum mengisi kunci WhatsApp sendiri memakai kunci platform di bawah. Bawaan mati. |
 | `WAPILOT_TOKEN` | secret (opsional) | - | Token WAPilot milik platform; hanya dipakai bila `WA_PLATFORM_FALLBACK="true"`. `WAPILOT_BASE_URL` (var) mengganti alamatnya. |
 | `WACONSOLE_APP_KEY`, `WACONSOLE_AUTH_KEY` | secret (opsional) | - | Kunci WAConsole milik platform; hanya dipakai bila `WA_PLATFORM_FALLBACK="true"`. `WACONSOLE_DEVICE_ID`, `WACONSOLE_BASE_URL` (var) opsional. |
-| `EMAIL_API_KEY` | secret (rencana) | - | Belum dipakai; disebut dalam TODO provider email di Worker. Provider: _TBD_. |
-
+| `DEMO_OTP` | var | `"false"` (produksi) / `"true"` | `"false"`: `send-otp` mengirim kode lewat email (Resend) dan tidak pernah mengembalikannya. `"true"` hanya untuk demo/lokal: kode tampil di layar dan tidak ada email; integrasi Meta/Threads dan cron dianggap belum dikonfigurasi, dan **admin lewat email (`ADMIN_EMAILS`) tidak berlaku** karena siapa pun bisa masuk sebagai email apa pun ([10_RISK_REGISTER.md](10_RISK_REGISTER.md) R-001). Untuk `wrangler dev` tanpa email, isi `DEMO_OTP=true` di `.dev.vars`. |
+| `DEMO_LOGIN` | var | `"true"` | Tab "Akun demo" (9 akun bersama) di halaman masuk. `"false"` mematikannya. |
+| `RESEND_API_KEY` | secret | kunci Resend | Penyedia email bawaan (OTP, uji, penawaran, laporan). Domain pengirim harus terverifikasi di Resend (saat ini `apipedia.id`). Tanpa kunci ini, login kode email gagal dengan pesan yang jelas. |
+| `EMAIL_FROM` | var | `"Satu Alur <noreply@apipedia.id>"` | Alamat pengirim email platform. Nama tampilan bisa diganti admin di Kantor › Sistem › Email. |
+| `ADMIN_EMAILS` | var | `"apipedia22@gmail.com"` | Email (dipisah koma) yang otomatis menjadi admin Kantor Satu Alur saat masuk dengan kode email atau Google. Hanya berlaku saat `DEMO_OTP` bukan `"true"`. Akun staf (`/super-admin-login`) tetap berlaku terpisah. |
+| `TOKEN_KEY` | secret | `openssl rand -base64 32` | Kunci AES-GCM 32 byte. Mengenkripsi token Meta/Threads, password SMTP pribadi bisnis, dan API key AI milik bisnis. Tanpa kunci ini opsi "SMTP sendiri" dan "penyedia AI sendiri" mati (semua memakai bawaan). Mengganti kunci membuat data terenkripsi lama tidak bisa dibuka (bisnis harus menyimpan ulang). |
+| `GOOGLE_CLIENT_ID` | var | ID klien OAuth | "Masuk dengan Google". Tombol hanya muncul bila ini dan `GOOGLE_CLIENT_SECRET` ada. |
+| `GOOGLE_CLIENT_SECRET` | secret | rahasia klien OAuth | Dipakai Worker saat menukar kode Google. Redirect URI: `<PUBLIC_BASE_URL atau origin>/api/auth/google/callback` (produksi: `https://satu-alur.apipedia.workers.dev/api/auth/google/callback`). |
+| `PUBLIC_BASE_URL` | var | origin tanpa `/` di akhir | Bila kosong, redirect Google memakai origin permintaan. |
 ## Binding yang Dibaca Worker
 
 | Binding | Dipakai untuk |

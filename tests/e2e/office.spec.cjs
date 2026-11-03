@@ -87,9 +87,9 @@ module.exports = async function office(t) {
 
   // staff sidebar: only the four office groups, no business menus
   const labels = (await p.locator('.side-label').allTextContents()).map((x) => x.trim())
-  t.check(labels.join() === 'Konten Situs,Bisnis,Pelanggan,Agensi Influencer', 'staff sidebar: exactly the four groups, in order', labels.join())
+  t.check(labels.join() === 'Konten Situs,Bisnis,Pelanggan,Agensi Influencer,Sistem', 'staff sidebar: exactly the five groups, in order', labels.join())
   const names = await p.locator('.side .flow-name').allTextContents()
-  t.check(names.join() === 'Landing page,Tentang kami,Legal,Paket langganan,Payment gateway,Voucher,Pelanggan & mitra,Pengguna,Contact Us,Pengaduan CS,Influencer,Permintaan,Kampanye', 'staff sidebar: the thirteen office sections', names.join())
+  t.check(names.join() === 'Landing page,Tentang kami,Legal,Paket langganan,Payment gateway,Voucher,Pelanggan & mitra,Pengguna,Contact Us,Pengaduan CS,Influencer,Permintaan,Kampanye,Dasbor sistem,Email,Mesin AI,Login,Akses admin,WhatsApp & sosial,Log aktivitas', 'staff sidebar: the twenty office sections', names.join())
   t.check(await p.locator('.side').getByText(/Ringkasan|Media Sosial|Bantuan|Pengaturan|Kantor Satu Alur|Mode demo/).count() === 0, 'staff sidebar: no Ringkasan, Media Sosial, Bantuan, Pengaturan or demo badge')
   t.check(await p.locator('.side-user').count() === 1 && await p.getByRole('button', { name: 'Keluar' }).count() === 1 && await p.locator('.topbar-cta').count() === 0, 'staff: user card and sign-out kept, no topbar action button')
   t.check(await p.locator('.view > h1').count() === 1 && (await p.locator('.view > h1').textContent()) === 'Landing page', 'staff page has one h1 with the section label')
@@ -543,7 +543,7 @@ module.exports = async function office(t) {
   await p.waitForTimeout(500)
   await p.click('.topbar-menu')
   await p.waitForTimeout(400)
-  t.check(await p.locator('.side .flow-item:visible').count() === 13 && await p.locator('.flow-item[data-stage="campaigns"]').isVisible() && await p.locator('.side-label:visible').count() === 4, '360px: the drawer shows the thirteen staff items under four groups')
+  t.check(await p.locator('.side .flow-item:visible').count() === 20 && await p.locator('.flow-item[data-stage="campaigns"]').isVisible() && await p.locator('.side-label:visible').count() === 5, '360px: the drawer shows the twenty staff items under five groups')
   await p.locator('.flow-item[data-stage="requests"]').click()
   await p.waitForTimeout(500)
   t.check(await p.locator('.scrim:not(.scrim-drawer)').isHidden() && await crumb() === 'Agensi Influencer › Permintaan', '360px: choosing an item closes the drawer and updates the breadcrumb')

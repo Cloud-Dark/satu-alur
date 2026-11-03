@@ -9,6 +9,7 @@ import { loadModels } from '../ai/models.js'
 import { getAgentParams } from './settings.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
+import { offerEmailButton } from '../email/offer-dialog.js'
 
 const { el, icon } = C
 
@@ -331,7 +332,8 @@ export async function render(container, ctx = {}) {
         reviewBox.replaceChildren()
         wiz.reset()
       })
-      wiz.complete({ text: `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`, actions: [next, again] })
+      const mail = offerEmailButton({ offer: { ...row, validated_price: o.price, validated_scope: o.scope, ai_proposal_json: offerJson }, request, businessName: ctx.user?.name })
+      wiz.complete({ text: `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`, actions: [next, mail, again] })
       showToast('Penawaran disimpan.', 'success')
       notifyDataChanged()
       await loadList()
@@ -423,7 +425,9 @@ export async function render(container, ctx = {}) {
               return b
             })()
             const r = flow.requestOfOffer(o)
-            if (!r?.phone) return main
+            // Send the offer by email (any address, confirmed in a dialog) or WhatsApp (needs the customer's phone).
+            const mail = offerEmailButton({ offer: o, request: r, businessName: ctx.user?.name })
+            if (!r?.phone) return el('span', { className: 'row-actions' }, mail, main)
             const wa = C.button({ label: 'WhatsApp', icon: 'send', size: 'sm', variant: 'ghost' })
             wa.setAttribute('aria-label', `Kirim penawaran ke ${customerLabel(r)} via WhatsApp`)
             wa.addEventListener('click', () => {
@@ -433,7 +437,7 @@ export async function render(container, ctx = {}) {
                 text: offerMessage({ customer: r.customer_name, service: r.service_type, scope: o.validated_scope, price: o.validated_price, terms: proposal.terms, business: ctx.user?.name }),
               })
             })
-            return el('div', { className: 'row-actions' }, main, wa)
+            return el('span', { className: 'row-actions' }, mail, wa, main)
           },
         },
       ],

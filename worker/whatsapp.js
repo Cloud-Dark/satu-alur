@@ -1,5 +1,5 @@
 /**
- * WhatsApp for businesses, sent from the business's OWN WAPilot or WAConsole account (keys in worker/integrations.js,
+ * WhatsApp for businesses, sent from the business's OWN WAPilot or WAConsole account (keys in worker/connectors.js,
  * providers in worker/wa/).
  *
  *   GET  /api/wa/status    { enabled, demo, provider, providers: [{ key, label, connected }], configured, connected,
@@ -15,7 +15,7 @@
  */
 import { WA_LIMITS, normalizePhone, maskPhone, dayWib, validateText, capProblem } from '../src/wa/rules.js'
 import { PROVIDERS, PROVIDER_LABEL, WaError, sendText, status as providerStatus, platformConfig } from './wa/index.js'
-import { loadCredentials, connectedProviders, integrationsEnabled, isDemo } from './integrations.js'
+import { loadCredentials, connectedProviders, integrationsEnabled, isDemo } from './connectors.js'
 
 const KINDS = new Set(['offer', 'followup', 'custom', 'test'])
 const NOT_CONNECTED = 'WhatsApp belum dihubungkan. Isi kunci akun WAPilot atau WAConsole Anda di Pengaturan › Konektor.'

@@ -22,9 +22,17 @@ database_id = "085c9a7a-64c5-4ced-b0f3-3158870d64f4"
 migrations_dir = "migrations"
 
 [vars]
-# Demo mode: send-otp returns the OTP code in the response (no email provider yet).
-# Set to "false" (or remove) in production once an email provider is wired in.
-DEMO_OTP = "true"
+# "true" = send-otp shows the code on screen and sends no email (local demo only). Production sends
+# the code by email (Resend, secret RESEND_API_KEY). Email admins (ADMIN_EMAILS) only count while this is "false".
+DEMO_OTP = "false"
+# Sender of platform email (OTP, tests, offers without own SMTP); the domain must be verified in Resend.
+EMAIL_FROM = "Satu Alur <noreply@apipedia.id>"
+# Email-login users with full Kantor Satu Alur (admin) rights, comma-separated.
+ADMIN_EMAILS = "apipedia22@gmail.com"
+# Google sign-in. Secret: GOOGLE_CLIENT_SECRET. Redirect URI: <PUBLIC_BASE_URL or origin>/api/auth/google/callback.
+GOOGLE_CLIENT_ID = "959606928858-tdplvh4l80rl1n72b5uhdcu0eki7l0v6.apps.googleusercontent.com"
+# Other secrets (wrangler secret put): RESEND_API_KEY, TOKEN_KEY (32-byte base64; encrypts own SMTP passwords
+# and own AI keys), GOOGLE_CLIENT_SECRET.
 # Demo accounts: one-click login to the seeded demo businesses (POST /api/auth/demo-login).
 DEMO_LOGIN = "true"
 # Meta publishing (Social Media). Secrets (wrangler secret put): META_APP_SECRET, TOKEN_KEY (32-byte base64).
@@ -47,5 +55,5 @@ WA_PLATFORM_FALLBACK = "false"
 
 # R2 binding omitted: R2 is not enabled on this account yet (uploads answer 503).
 
-# Cron trigger omitted: the account is at its cron limit on the Free plan, and scheduled
-# publishing never runs while DEMO_OTP = "true" anyway. Restore [triggers] from wrangler.toml when needed.
+# Cron trigger omitted: the account is at its cron limit on the Free plan, so due Meta/Threads posts
+# scheduled inside Satu Alur are not published automatically. Restore [triggers] from wrangler.toml when needed.

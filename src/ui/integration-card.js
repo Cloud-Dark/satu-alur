@@ -2,7 +2,7 @@
 // Keys are typed once and never shown again: a connected card only shows "Terhubung • …abcd".
 import * as C from './components.js'
 import { showToast } from './animations.js'
-import * as Integrations from '../integrations/api.js'
+import * as Integrations from '../integrations/connectors.js'
 import '../styles/repliz.css'
 
 const { el } = C

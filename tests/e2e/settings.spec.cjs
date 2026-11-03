@@ -11,7 +11,7 @@ module.exports = async function settings(t) {
   t.check(await p.getAttribute('.drawer', 'role') === 'dialog' && await p.getAttribute('.drawer', 'aria-modal') === 'true', 'drawer is a modal dialog')
   t.check(await p.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Tutup pengaturan', 'focus moves to the close button')
   const tabs = await p.$$eval('.drawer .seg-btn', (b) => b.map((x) => x.textContent.trim()))
-  t.check(tabs.join('|') === 'Konektor|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
+  t.check(tabs.join('|') === 'Konektor|Email & AI|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, Email & AI, ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
 
   // Konektor: the business's own WAPilot key, saved and shown only as the last 4 characters
   await p.evaluate(() => localStorage.setItem('satualur_settings_mcp', JSON.stringify({ whatsapp: { apiKey: 'lama', wapilotEndpoint: 'x' } })))

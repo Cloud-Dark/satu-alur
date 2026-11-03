@@ -1,109 +1,138 @@
 /**
- * Per-business integration credentials (WAPilot, WAConsole, Repliz). Each business stores its OWN keys.
+ * Business integrations (Pengaturan › Integrasi) and outgoing email.
  *
- *   GET    /api/integrations             [{ provider, label, kind, connected, hint, meta, verified_at, help, url }]
- *   PUT    /api/integrations/:provider   form fields -> verified with a read-only call, encrypted, stored -> { connected, hint, verified, note? }
- *   DELETE /api/integrations/:provider   forgets the keys
+ *   GET  /api/integrations                 email + AI settings (secrets never returned, only has_*)
+ *   PUT  /api/integrations/email           { email_mode: platform|smtp, smtp_* , smtp_pass? }
+ *   PUT  /api/integrations/ai              { ai_mode: builtin|openai|anthropic, ai_base_url, ai_model, ai_key? }
+ *   POST /api/integrations/email/test      sends a test email to the signed-in user's own address
+ *   POST /api/integrations/ai/test         one short completion through the chosen provider
+ *   POST /api/email/send                   { kind: offer|report, to, subject, body } (offer: daily cap; report: own address only)
  *
- * Secrets are AES-GCM encrypted with TOKEN_KEY (src/social/crypto.js) and never returned: the browser only sees the
- * last 4 characters. Shared DEMO_EMAILS accounts cannot store keys. While DEMO_OTP is "true" anyone can sign in as any
- * email (and so use another business's keys), so integrations stay off unless INTEGRATIONS_ALLOW_DEMO_OTP = "true".
+ * Shared demo accounts can read but never change integrations or send real email (sends are simulated).
  */
-import { encryptToken, decryptToken } from '../src/social/crypto.js'
-import { INTEGRATIONS, INTEGRATION_KEYS, validateCredentials } from '../src/integrations/rules.js'
-import { WaError, verify as verifyWa, forgetStatus } from './wa/index.js'
-import { createRepliz, ReplizError } from './repliz-client.js'
+import { encryptToken } from '../src/social/crypto.js';
+import { isDemoUser } from './demo.js';
+import { validateEmailIntegration, validateAiIntegration } from '../src/admin/rules.js';
+import { isEmail } from '../src/admin/constants.js';
+import { testEmail, businessEmail } from '../src/email/templates.js';
+import { sendEmail, loadSystemSettings, loadIntegration, resendConfigured, customSecretsEnabled, sentToday } from './email.js';
+import { resolveAi, testProvider } from './ai-provider.js';
 
-export const integrationsEnabled = (env) => env.DEMO_OTP !== 'true' || env.INTEGRATIONS_ALLOW_DEMO_OTP === 'true'
-export const isDemo = (user, deps) => deps.DEMO_EMAILS.has(String(user.email || '').toLowerCase())
-const OFF = 'Integrasi akun belum aktif di server ini.'
-const NO_KEY = 'Penyimpanan kunci belum dikonfigurasi di server. Hubungi admin Satu Alur.'
+const DEMO_DENIED = 'Akun demo memakai data dan AI contoh, jadi pengaturan ini tidak bisa diubah.';
+const isDemo = (user) => isDemoUser(user);
 
-// Decrypted credentials of one business for one provider ({ ...secrets, ...meta }), or null.
-export async function loadCredentials(env, ownerId, provider) {
-  if (!env.TOKEN_KEY || !integrationsEnabled(env)) return null
-  const row = await env.DB.prepare('SELECT secret_enc, meta_json FROM integration_credentials WHERE owner_id = ? AND provider = ?')
-    .bind(ownerId, provider).first()
-  if (!row) return null
-  try {
-    return { ...JSON.parse(row.meta_json || '{}'), ...JSON.parse(await decryptToken(row.secret_enc, env.TOKEN_KEY)) }
-  } catch {
-    return null // key rotated or row damaged: treat as not connected
+function validated(HttpError, fn) {
+  try { return fn(); } catch (err) {
+    if (err?.validation) throw new HttpError(400, err.message);
+    throw err;
   }
 }
 
-export async function connectedProviders(env, ownerId) {
-  if (!integrationsEnabled(env)) return []
-  const { results } = await env.DB.prepare('SELECT provider FROM integration_credentials WHERE owner_id = ?').bind(ownerId).all()
-  return results.map((r) => r.provider)
+function publicView(row, settings, env, demo = false) {
+  const r = row || {};
+  return {
+    email: {
+      mode: r.email_mode || 'platform', smtp_host: r.smtp_host || '', smtp_port: r.smtp_port || 465, smtp_secure: r.smtp_secure || 'tls',
+      smtp_user: r.smtp_user || '', smtp_from_email: r.smtp_from_email || '', smtp_from_name: r.smtp_from_name || '', has_password: Boolean(r.smtp_pass_enc),
+    },
+    ai: { mode: r.ai_mode || 'builtin', base_url: r.ai_base_url || '', model: r.ai_model || '', has_key: Boolean(r.ai_key_enc) },
+    options: {
+      custom_smtp_allowed: settings.email.allow_custom_smtp, custom_ai_allowed: settings.ai.allow_custom,
+      secrets_enabled: customSecretsEnabled(env), platform_email_ready: resendConfigured(env), demo,
+    },
+  };
 }
 
-async function check(provider, cfg, fetchImpl) {
-  if (provider === 'repliz') {
-    await createRepliz(cfg, fetchImpl).request('GET', '/me/addon')
-    return { verified: true }
-  }
-  return verifyWa(provider, cfg, fetchImpl)
-}
-
-// ----------------------------------------------------------------- routes
-
-export async function handleIntegrationList(request, env, deps) {
-  const { user } = await deps.authenticate(request, env)
-  const { results } = integrationsEnabled(env)
-    ? await env.DB.prepare('SELECT provider, hint, meta_json, verified_at FROM integration_credentials WHERE owner_id = ?').bind(user.id).all()
-    : { results: [] }
-  const byProvider = new Map(results.map((r) => [r.provider, r]))
-  return deps.ok({
-    enabled: integrationsEnabled(env) && Boolean(env.TOKEN_KEY),
-    demo: isDemo(user, deps),
-    items: INTEGRATION_KEYS.map((key) => {
-      const def = INTEGRATIONS[key]
-      const r = byProvider.get(key)
-      let meta = {}
-      try { meta = JSON.parse(r?.meta_json || '{}') } catch { /* ignore */ }
-      return {
-        provider: key, label: def.label, kind: def.kind, help: def.help, url: def.url,
-        fields: def.fields.map(({ key: k, label, secret, required, placeholder }) => ({ key: k, label, secret, required, placeholder: placeholder || '' })),
-        connected: Boolean(r), hint: r?.hint || '', meta, verified_at: r?.verified_at || null,
-      }
-    }),
-  })
-}
-
-export async function handleIntegrationPut(request, env, deps, params) {
-  const { readJson, ok, HttpError } = deps
-  const { user } = await deps.authenticate(request, env)
-  const provider = String(params.provider || '')
-  if (!INTEGRATIONS[provider]) throw new HttpError(404, 'Integrasi tidak dikenal.')
-  if (isDemo(user, deps)) throw new HttpError(403, 'Akun demo dipakai bersama, jadi tidak bisa menyimpan kunci akun.')
-  if (!integrationsEnabled(env)) throw new HttpError(503, OFF)
-  if (!env.TOKEN_KEY) throw new HttpError(503, NO_KEY)
-  const v = validateCredentials(provider, await readJson(request))
-  if (v.error) throw new HttpError(400, v.error)
-  let result
-  try {
-    result = await check(provider, { ...v.meta, ...v.secrets }, deps.fetchImpl)
-  } catch (e) {
-    if (e instanceof WaError || e instanceof ReplizError) throw new HttpError(400, `Kunci belum bisa dipakai: ${e.message}`)
-    throw e
-  }
-  const now = new Date().toISOString()
+async function upsert(env, ownerId, fields) {
+  const cols = Object.keys(fields);
   await env.DB.prepare(
-    `INSERT INTO integration_credentials (owner_id, provider, secret_enc, hint, meta_json, verified_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(owner_id, provider) DO UPDATE SET secret_enc = excluded.secret_enc, hint = excluded.hint, meta_json = excluded.meta_json,
-       verified_at = excluded.verified_at, updated_at = excluded.updated_at`,
-  ).bind(user.id, provider, await encryptToken(JSON.stringify(v.secrets), env.TOKEN_KEY), v.hint, JSON.stringify(v.meta),
-    result.verified ? now : null, now).run()
-  forgetStatus(provider, user.id)
-  return ok({ provider, connected: true, hint: v.hint, verified: result.verified, note: result.note || null })
+    `INSERT INTO business_integrations (owner_id, ${cols.join(', ')}, updated_at) VALUES (?, ${cols.map(() => '?').join(', ')}, ?)
+     ON CONFLICT(owner_id) DO UPDATE SET ${cols.map((c) => `${c} = excluded.${c}`).join(', ')}, updated_at = excluded.updated_at`,
+  ).bind(ownerId, ...cols.map((c) => fields[c]), new Date().toISOString()).run();
 }
 
-export async function handleIntegrationDelete(request, env, deps, params) {
-  const { user } = await deps.authenticate(request, env)
-  const provider = String(params.provider || '')
-  if (!INTEGRATIONS[provider]) throw new deps.HttpError(404, 'Integrasi tidak dikenal.')
-  await env.DB.prepare('DELETE FROM integration_credentials WHERE owner_id = ? AND provider = ?').bind(user.id, provider).run()
-  forgetStatus(provider, user.id)
-  return deps.ok(null)
+export async function handleIntegrationsGet(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  const [row, settings] = await Promise.all([loadIntegration(env, user.id), loadSystemSettings(env)]);
+  return deps.ok(publicView(row, settings, env, isDemo(user)));
+}
+
+async function emailPut(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  if (isDemo(user, deps)) throw new deps.HttpError(403, DEMO_DENIED);
+  const body = await deps.readJson(request);
+  const clean = validated(deps.HttpError, () => validateEmailIntegration(body));
+  const settings = await loadSystemSettings(env);
+  if (clean.email_mode === 'platform') {
+    await upsert(env, user.id, { email_mode: 'platform' });
+  } else {
+    if (!settings.email.allow_custom_smtp) throw new deps.HttpError(403, 'SMTP pribadi dimatikan oleh admin.');
+    if (!customSecretsEnabled(env)) throw new deps.HttpError(503, 'SMTP pribadi belum tersedia: kunci enkripsi server belum diatur.');
+    const existing = await loadIntegration(env, user.id);
+    const { smtp_pass, ...rest } = clean;
+    if (!smtp_pass && !existing?.smtp_pass_enc) throw new deps.HttpError(400, 'Password SMTP wajib diisi.');
+    const fields = { ...rest };
+    if (smtp_pass) fields.smtp_pass_enc = await encryptToken(smtp_pass, env.TOKEN_KEY);
+    await upsert(env, user.id, fields);
+  }
+  return deps.ok(publicView(await loadIntegration(env, user.id), settings, env));
+}
+
+async function aiPut(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  if (isDemo(user, deps)) throw new deps.HttpError(403, DEMO_DENIED);
+  const body = await deps.readJson(request);
+  const clean = validated(deps.HttpError, () => validateAiIntegration(body));
+  const settings = await loadSystemSettings(env);
+  if (clean.ai_mode === 'builtin') {
+    await upsert(env, user.id, { ai_mode: 'builtin' });
+  } else {
+    if (!settings.ai.allow_custom) throw new deps.HttpError(403, 'Penyedia AI sendiri dimatikan oleh admin.');
+    if (!customSecretsEnabled(env)) throw new deps.HttpError(503, 'Penyedia AI sendiri belum tersedia: kunci enkripsi server belum diatur.');
+    const existing = await loadIntegration(env, user.id);
+    const { ai_key, ...rest } = clean;
+    if (!ai_key && !existing?.ai_key_enc) throw new deps.HttpError(400, 'API key wajib diisi.');
+    const fields = { ...rest };
+    if (ai_key) fields.ai_key_enc = await encryptToken(ai_key, env.TOKEN_KEY);
+    await upsert(env, user.id, fields);
+  }
+  return deps.ok(publicView(await loadIntegration(env, user.id), settings, env));
+}
+
+export { emailPut as handleIntegrationsEmailSave, aiPut as handleIntegrationsAiSave };
+
+export async function handleIntegrationsEmailTest(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  if (isDemo(user, deps)) return deps.ok({ simulated: true, provider: 'demo', to: user.email });
+  const row = await loadIntegration(env, user.id);
+  const t = testEmail({ via: row?.email_mode === 'smtp' ? `SMTP pribadi (${row.smtp_host})` : 'layanan email Satu Alur' });
+  const { provider } = await sendEmail(env, deps, { ownerId: user.id, kind: 'test', to: user.email, subject: t.subject, html: t.html, text: t.text });
+  return deps.ok({ provider, to: user.email });
+}
+
+export async function handleIntegrationsAiTest(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  const provider = await resolveAi(env, user, deps);
+  if (provider.mode === 'builtin') return deps.ok({ mode: 'builtin', reply: 'Mesin AI bawaan siap dipakai.' });
+  const reply = await testProvider(provider, deps);
+  return deps.ok({ mode: provider.mode, model: provider.model, reply: reply || '(balasan kosong)' });
+}
+
+export async function handleEmailSend(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  const body = await deps.readJson(request);
+  const kind = body.kind === 'report' ? 'report' : 'offer';
+  const to = kind === 'report' ? user.email : String(body.to || '').trim().toLowerCase();
+  if (!isEmail(to)) throw new deps.HttpError(400, 'Alamat email penerima tidak valid.');
+  const subject = String(body.subject || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
+  const text = String(body.body || '').trim();
+  if (!subject) throw new deps.HttpError(400, 'Subjek wajib diisi.');
+  if (!text || text.length > 10000) throw new deps.HttpError(400, 'Isi email wajib diisi (maks. 10.000 karakter).');
+  if (isDemo(user, deps)) return deps.ok({ simulated: true, provider: 'demo', to });
+  const settings = await loadSystemSettings(env);
+  const cap = kind === 'offer' ? settings.email.offer_daily_cap : 10;
+  if ((await sentToday(env, user.id, kind)) >= cap) throw new deps.HttpError(429, `Batas ${cap} email ${kind === 'offer' ? 'penawaran' : 'laporan'} per hari tercapai.`);
+  const mail = businessEmail({ subject, body: text, businessName: user.name });
+  const { provider } = await sendEmail(env, deps, { ownerId: user.id, kind, to, subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email });
+  return deps.ok({ provider, to });
 }

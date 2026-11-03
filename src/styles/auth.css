@@ -835,3 +835,12 @@
 @media (prefers-reduced-motion: reduce) {
   .auth-mode-thumb { transition: none; }
 }
+
+/* ---- Masuk dengan Google ---- */
+.auth-google-box { display: grid; gap: var(--s-3, 12px); margin-top: var(--s-4, 16px); }
+.auth-google-box[hidden] { display: none; }
+.auth-or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--text-muted); font-size: 0.8rem; }
+.auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.auth-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; text-decoration: none; }
+.auth-google-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; }
+.auth-form-code:not([hidden]) ~ .auth-google-box { display: none; }

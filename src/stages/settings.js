@@ -5,9 +5,10 @@
  * Notification credentials live in this browser's localStorage; MCP connectors,
  * mappings and migrations live in D1 behind /api/mcp/*.
  */
+import { renderIntegrationsTab } from './settings-integrations.js'
 import * as C from '../ui/components.js'
 import * as WA from '../wa/api.js'
-import * as Integrations from '../integrations/api.js'
+import * as Integrations from '../integrations/connectors.js'
 import { integrationCard } from '../ui/integration-card.js'
 import { showToast } from '../ui/animations.js'
 import { loadModels } from '../ai/models.js'
@@ -87,7 +88,7 @@ function getMcpSettings() {
   const settings = loadSettings(STORAGE_KEYS.mcp, {
     email: { enabled: false, smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', fromName: '', fromEmail: '' },
   })
-  // WhatsApp keys now live on the server (worker/integrations.js): drop the old browser-stored key and endpoint.
+  // WhatsApp keys now live on the server (worker/connectors.js): drop the old browser-stored key and endpoint.
   if (settings.whatsapp) {
     delete settings.whatsapp
     saveSettings(STORAGE_KEYS.mcp, settings)
@@ -111,12 +112,13 @@ export function render(container) {
   if (!currentTab) {
     try { currentTab = localStorage.getItem(STORAGE_KEYS.tab) || 'mcp' } catch { currentTab = 'mcp' }
   }
-  if (!['mcp', 'erp', 'migration', 'logs', 'agent'].includes(currentTab)) currentTab = 'mcp'
+  if (!['mcp', 'integrations', 'erp', 'migration', 'logs', 'agent'].includes(currentTab)) currentTab = 'mcp'
   const tabs = C.segmented({
     label: 'Bagian pengaturan',
     value: currentTab,
     options: [
       { value: 'mcp', label: 'Konektor' },
+      { value: 'integrations', label: 'Email & AI' },
       { value: 'erp', label: 'ERP & Integrasi' },
       { value: 'migration', label: 'Migrasi' },
       { value: 'logs', label: 'Log' },
@@ -135,6 +137,7 @@ export function render(container) {
   function draw() {
     content.replaceChildren()
     if (currentTab === 'agent') renderAgentTab(content, draw)
+    else if (currentTab === 'integrations') renderIntegrationsTab(content)
     else if (currentTab === 'erp') withEnterpriseGate(content, () => renderErpTab(content, draw))
     else if (currentTab === 'migration') withEnterpriseGate(content, () => renderMigrationTab(content, draw))
     else if (currentTab === 'logs') withEnterpriseGate(content, () => renderLogsTab(content))

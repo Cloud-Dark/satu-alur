@@ -95,6 +95,7 @@ const STAFF_STAGES = Office.ITEMS.map((i) => ({
 
 const STAGE_KEY = 'satualur_stage'
 const STAFF_KEY = 'satualur_office_section'
+const ADMIN_VIEW_KEY = 'satualur_admin_view'
 const COLLAPSE_KEY = 'satualur_sidebar_collapsed'
 const DESKTOP = '(min-width: 1024px)'
 
@@ -112,7 +113,10 @@ function initials(user) {
 
 export function renderShell(root, ctx) {
   const user = ctx.user || {}
-  const staff = ctx.isAdmin === true
+  // Staff sessions only ever see the office. Email admins (ADMIN_EMAILS) also run a business, so
+  // they switch between their app and Kantor Satu Alur; the choice is kept for this tab.
+  const emailAdmin = ctx.isAdmin === true && ctx.adminVia === 'email'
+  const staff = ctx.isAdmin === true && (!emailAdmin || store.get(sessionStorage, ADMIN_VIEW_KEY) === 'office')
   const stages = staff ? STAFF_STAGES : STAGES
   const storeKey = staff ? STAFF_KEY : STAGE_KEY
   const prevTitle = document.title
@@ -169,6 +173,15 @@ export function renderShell(root, ctx) {
   const settingsBtn = el('button', { type: 'button', className: 'side-row', title: 'Pengaturan' },
     icon('settings'), el('span', { className: 'side-row-label' }, 'Pengaturan'))
 
+  const officeSwitch = emailAdmin
+    ? el('button', { type: 'button', className: 'side-row side-row-office', title: staff ? 'Kembali ke usaha saya' : 'Kantor Satu Alur' },
+      icon(staff ? 'home' : 'shield'), el('span', { className: 'side-row-label' }, staff ? 'Kembali ke usaha saya' : 'Kantor Satu Alur'))
+    : null
+  officeSwitch?.addEventListener('click', () => {
+    store.set(sessionStorage, ADMIN_VIEW_KEY, staff ? 'app' : 'office')
+    ctx.navigate('/app')
+  })
+
   const signOutBtn = el('button', { type: 'button', className: 'icon-btn', 'aria-label': 'Keluar', title: 'Keluar' }, icon('logout'))
   signOutBtn.addEventListener('click', async () => {
     signOutBtn.disabled = true
@@ -197,6 +210,7 @@ export function renderShell(root, ctx) {
     el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
     el('nav', { className: 'side-nav', 'aria-label': staff ? 'Bagian Kantor Satu Alur' : 'Tahap alur' }, ...navLists.flat()),
     el('div', { className: 'side-foot' },
+      officeSwitch,
       staff ? null : settingsBtn,
       el('div', { className: 'side-user' },
         el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials(user)),

@@ -1,11 +1,11 @@
 /**
  * WhatsApp client for /api/wa/* — sent from the business's own WAPilot or WAConsole account.
  * In demo mode (mock cloud) the device, the provider choice and every send are simulated in
- * localStorage `satualur_wa_demo_v1` (keys come from src/integrations/api.js); nothing leaves the browser.
+ * localStorage `satualur_wa_demo_v1` (keys come from src/integrations/connectors.js); nothing leaves the browser.
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
-import { demoConnected } from '../integrations/api.js'
+import { demoConnected } from '../integrations/connectors.js'
 import { WA_LIMITS, normalizePhone, maskPhone, dayWib, validateText } from './rules.js'
 
 const TOKEN_KEY = 'satualur_token'

@@ -12,7 +12,7 @@ import { createWapilot, wapilotView } from '../worker/wa/wapilot.js'
 import { createWaconsole, waconsoleView } from '../worker/wa/waconsole.js'
 import { WaError, providerReady, sendText, status as providerStatus, verify, platformConfig, __resetStatusCache } from '../worker/wa/index.js'
 import { handleWaSend, handleWaStatus, handleWaProvider } from '../worker/whatsapp.js'
-import { handleIntegrationList, handleIntegrationPut, handleIntegrationDelete, loadCredentials, integrationsEnabled } from '../worker/integrations.js'
+import { handleIntegrationList, handleIntegrationPut, handleIntegrationDelete, loadCredentials, integrationsEnabled } from '../worker/connectors.js'
 import { createRepliz, ReplizError, replizProblem } from '../worker/repliz-client.js'
 import {
   handleReplizStatus, handleReplizSchedule, handleReplizSchedules, handleReplizComplete, handleReplizPick, handleReplizConnect,

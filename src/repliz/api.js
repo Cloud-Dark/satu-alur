@@ -1,12 +1,12 @@
 /**
  * Client for /api/social/repliz/* (the business's own Repliz workspace). In demo mode (mock cloud),
- * once Repliz keys are "saved" (src/integrations/api.js), accounts and posts are simulated in
+ * once Repliz keys are "saved" (src/integrations/connectors.js), accounts and posts are simulated in
  * localStorage `satualur_repliz_demo_v1`: connecting creates a demo account
  * at once, and a post moves pending -> success a moment after its time (or to error
  * when the text contains "#gagal").
  */
 import { isUsingMockCloud } from '../cloud.js'
-import { demoConnected } from '../integrations/api.js'
+import { demoConnected } from '../integrations/connectors.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { REPLIZ_PLATFORMS, PLATFORM_KEYS, validatePost, postLink } from './rules.js'
 

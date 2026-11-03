@@ -42,6 +42,18 @@ export async function staffLogin(username, password) {
   return res.data
 }
 
+/** Which sign-in options the server offers: { google, otp_email, demo_login }. */
+export async function authProviders() {
+  try { return await getCloud().auth.providers() } catch { return { google: false, otp_email: true, demo_login: true } }
+}
+
+/** Completes Google sign-in with the one-time code the Worker callback put in #/masuk?google=… */
+export async function finishGoogleLogin(code) {
+  const res = await getCloud().auth.googleExchange({ code })
+  if (res?.error) throw new Error(res.error.message)
+  return res.data
+}
+
 /** Signs in to one of the seeded demo accounts (no OTP). */
 export async function loginWithDemo(email) {
   const res = await getCloud().auth.demoLogin({ email })

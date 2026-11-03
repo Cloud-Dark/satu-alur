@@ -1,6 +1,6 @@
 /**
  * Per-business integrations: each business connects its OWN WAPilot, WAConsole and Repliz accounts.
- * Field definitions shared by the Worker (worker/integrations.js) and the settings UI.
+ * Field definitions shared by the Worker (worker/connectors.js) and the settings UI.
  * `secret` fields are encrypted at rest and never sent back to the browser; `meta` fields are plain settings.
  */
 
