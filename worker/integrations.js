@@ -10,13 +10,13 @@
  *
  * Shared demo accounts can read but never change integrations or send real email (sends are simulated).
  */
-import { encryptToken } from '../src/social/crypto.js';
+import { encryptToken, decryptToken } from '../src/social/crypto.js';
 import { isDemoUser } from './demo.js';
 import { validateEmailIntegration, validateAiIntegration } from '../src/admin/rules.js';
 import { isEmail } from '../src/admin/constants.js';
 import { testEmail, businessEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings, loadIntegration, resendConfigured, customSecretsEnabled, sentToday } from './email.js';
-import { resolveAi, testProvider } from './ai-provider.js';
+import { resolveAi, testProvider, listProviderModels } from './ai-provider.js';
 
 const DEMO_DENIED = 'Akun demo memakai data dan AI contoh, jadi pengaturan ini tidak bisa diubah.';
 const isDemo = (user) => isDemoUser(user);
@@ -110,12 +110,40 @@ export async function handleIntegrationsEmailTest(request, env, deps) {
   return deps.ok({ provider, to: user.email });
 }
 
+/** Provider from unsaved form values (ai_mode, ai_base_url, ai_model, ai_key; key '' = the stored key). */
+async function formProvider(env, deps, user, body, { requireModel }) {
+  const mode = body?.ai_mode;
+  if (mode !== 'openai' && mode !== 'anthropic') return null;
+  const clean = validated(deps.HttpError, () => validateAiIntegration({ ...body, ai_model: requireModel ? body.ai_model : (body.ai_model || 'model') }));
+  if (!customSecretsEnabled(env)) throw new deps.HttpError(503, 'Penyedia AI sendiri belum tersedia: kunci enkripsi server belum diatur.');
+  let apiKey = clean.ai_key;
+  if (!apiKey) {
+    const row = await loadIntegration(env, user.id);
+    if (row?.ai_mode === clean.ai_mode && row.ai_key_enc) {
+      try { apiKey = await decryptToken(row.ai_key_enc, env.TOKEN_KEY); } catch { /* asked below */ }
+    }
+  }
+  if (!apiKey) throw new deps.HttpError(400, 'Isi API key penyedia AI.');
+  return { mode: clean.ai_mode, baseUrl: clean.ai_base_url, model: clean.ai_model, apiKey };
+}
+
+export async function handleIntegrationsAiModels(request, env, deps) {
+  const { user } = await deps.authenticate(request, env);
+  if (isDemo(user, deps)) throw new deps.HttpError(403, DEMO_DENIED);
+  const provider = await formProvider(env, deps, user, await deps.readJson(request), { requireModel: false });
+  if (!provider) throw new deps.HttpError(400, 'Pilih OpenAI-compatible atau Anthropic-compatible.');
+  return deps.ok(await listProviderModels(provider, deps));
+}
+
 export async function handleIntegrationsAiTest(request, env, deps) {
   const { user } = await deps.authenticate(request, env);
-  const provider = await resolveAi(env, user, deps);
-  if (provider.mode === 'builtin') return deps.ok({ mode: 'builtin', reply: 'Mesin AI bawaan siap dipakai.' });
+  const body = await deps.readJson(request).catch(() => ({}));
+  // Unsaved form values when given (Uji before Simpan); otherwise what is saved.
+  const provider = body?.ai_mode ? ((!isDemo(user, deps) && await formProvider(env, deps, user, body, { requireModel: true })) || { mode: 'builtin' }) : await resolveAi(env, user, deps);
+  if (provider.mode === 'builtin' || provider.platform) return deps.ok({ mode: 'builtin', reply: 'Mesin AI bawaan siap dipakai.' });
+  const started = Date.now();
   const reply = await testProvider(provider, deps);
-  return deps.ok({ mode: provider.mode, model: provider.model, reply: reply || '(balasan kosong)' });
+  return deps.ok({ mode: provider.mode, model: provider.model, reply: reply || '(balasan kosong)', ms: Date.now() - started });
 }
 
 export async function handleEmailSend(request, env, deps) {

@@ -7,6 +7,11 @@
  * credit; each call is still counted in usage_counters under `byo_<feature>` for analytics.
  * Keys are AES-GCM encrypted with TOKEN_KEY; without TOKEN_KEY, or when an admin disallows
  * custom providers (system_settings.ai.allow_custom), everyone uses the built-in engine.
+ *
+ * The built-in engine itself is chosen by admins (system_settings 'ai_provider'): Workers AI by
+ * default, or a platform OpenAI-/Anthropic-compatible provider. Platform calls are still metered
+ * like Workers AI; if the platform provider fails before streaming, the call falls back to
+ * Workers AI and the fallback is written to admin_audit (shown in Log aktivitas).
  */
 import { decryptToken } from '../src/social/crypto.js';
 import { isDemoUser } from './demo.js';
@@ -14,19 +19,92 @@ import {
   openAiRequest, anthropicRequest, openAiToAppStream, anthropicToAppStream, providerErrorMessage, JSON_HINT,
 } from '../src/ai-providers/providers.js';
 import { loadSystemSettings, loadIntegration } from './email.js';
+import { modelsRequest, parseOpenAiModels, parseAnthropicModels, listUnsupported, MAX_MODEL_PAGES } from '../src/ai-providers/models.js';
+
+export const PLATFORM_AI_KEY = 'ai_provider';
+
+/** Stored platform provider (raw, includes key_enc) or { mode: 'workers' }. */
+export async function loadPlatformAi(env) {
+  try {
+    const row = await env.DB.prepare('SELECT value_json FROM system_settings WHERE key = ?').bind(PLATFORM_AI_KEY).first();
+    const v = row ? JSON.parse(row.value_json) : null;
+    return v && (v.mode === 'openai' || v.mode === 'anthropic') ? v : { mode: 'workers' };
+  } catch (err) {
+    if (/no such table/i.test(String(err?.message)) || err instanceof SyntaxError) return { mode: 'workers' };
+    throw err;
+  }
+}
+
+async function platformProvider(env) {
+  const p = await loadPlatformAi(env);
+  if (p.mode === 'workers' || !p.key_enc || !p.base_url || !p.model) return null;
+  let apiKey;
+  try { apiKey = await decryptToken(p.key_enc, env.TOKEN_KEY); } catch { return null; }
+  return { mode: p.mode, baseUrl: p.base_url, model: p.model, apiKey, platform: true, defaults: { max_tokens: p.max_tokens, temperature: p.temperature } };
+}
 
 const PROVIDER_TIMEOUT_MS = 60000;
 
-/** { mode: 'builtin' } or { mode, baseUrl, model, apiKey }. */
+/**
+ * { mode: 'builtin' } (Workers AI), a business's own provider { mode, baseUrl, model, apiKey },
+ * or the platform provider { ..., platform: true, defaults }.
+ */
 export async function resolveAi(env, user, { HttpError }) {
   if (!env.TOKEN_KEY || isDemoUser(user)) return { mode: 'builtin' };
   const row = await loadIntegration(env, user.id);
-  if (!row || row.ai_mode === 'builtin' || !row.ai_key_enc || !row.ai_base_url || !row.ai_model) return { mode: 'builtin' };
-  const settings = await loadSystemSettings(env);
-  if (!settings.ai.allow_custom) return { mode: 'builtin' };
-  let apiKey;
-  try { apiKey = await decryptToken(row.ai_key_enc, env.TOKEN_KEY); } catch { throw new HttpError(500, 'API key AI tersimpan tidak bisa dibuka. Simpan ulang di Pengaturan › Integrasi.'); }
-  return { mode: row.ai_mode, baseUrl: row.ai_base_url, model: row.ai_model, apiKey };
+  if (row && row.ai_mode !== 'builtin' && row.ai_key_enc && row.ai_base_url && row.ai_model) {
+    const settings = await loadSystemSettings(env);
+    if (settings.ai.allow_custom) {
+      let apiKey;
+      try { apiKey = await decryptToken(row.ai_key_enc, env.TOKEN_KEY); } catch { throw new HttpError(500, 'API key AI tersimpan tidak bisa dibuka. Simpan ulang di Pengaturan › Integrasi.'); }
+      return { mode: row.ai_mode, baseUrl: row.ai_base_url, model: row.ai_model, apiKey };
+    }
+  }
+  return (await platformProvider(env)) || { mode: 'builtin' };
+}
+
+let lastFallbackLog = 0;
+/** Records that the platform provider failed and Workers AI answered instead (at most once a minute per isolate). */
+export async function logAiFallback(env, provider, reason) {
+  const now = Date.now();
+  if (now - lastFallbackLog < 60000) return;
+  lastFallbackLog = now;
+  try {
+    await env.DB.prepare('INSERT INTO admin_audit (actor, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind('sistem', 'ai.fallback', `${provider.mode}:${provider.model}`, String(reason || '').slice(0, 300), new Date().toISOString()).run();
+  } catch (err) {
+    console.error('ai fallback log failed', err);
+  }
+}
+
+/**
+ * Lists a provider's models server-side. Returns { supported, models }; supported=false when the
+ * server has no list endpoint (the UI then lets the admin type a model). Throws HttpError(502) otherwise.
+ */
+export async function listProviderModels(provider, { HttpError, fetchImpl = fetch }) {
+  const models = [];
+  let afterId = null;
+  for (let page = 0; page < (provider.mode === 'anthropic' ? MAX_MODEL_PAGES : 1); page++) {
+    const req = modelsRequest({ mode: provider.mode, baseUrl: provider.baseUrl, apiKey: provider.apiKey, afterId });
+    let res;
+    try {
+      res = await fetchImpl(req.url, { ...req.init, signal: AbortSignal.timeout(15000) });
+    } catch {
+      throw new HttpError(502, 'Penyedia AI tidak bisa dihubungi. Periksa alamat API.');
+    }
+    if (listUnsupported(res.status)) return { supported: false, models: [] };
+    let body = '';
+    try { body = await res.text(); } catch { /* ignore */ }
+    if (!res.ok) throw new HttpError(502, providerErrorMessage(res.status, body));
+    let json;
+    try { json = JSON.parse(body); } catch { return { supported: false, models: [] }; }
+    if (provider.mode !== 'anthropic') return { supported: true, models: parseOpenAiModels(json) };
+    const p = parseAnthropicModels(json);
+    models.push(...p.models);
+    if (!p.hasMore || !p.lastId) break;
+    afterId = p.lastId;
+  }
+  return { supported: true, models };
 }
 
 export async function countByo(env, userId, feature) {

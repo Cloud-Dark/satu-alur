@@ -6,7 +6,8 @@
 import { isUsingMockCloud } from '../cloud.js'
 import { pageOf } from '../office/paging.js'
 import { call } from '../integrations/api.js'
-import { withDefaults, normalizeSetting, AI_MODE_LABELS, validatePlatformTransport, publicTransport } from './rules.js'
+import { withDefaults, normalizeSetting, AI_MODE_LABELS, validatePlatformTransport, publicTransport, validatePlatformAi, publicPlatformAi, PLATFORM_AI_LABELS } from './rules.js'
+import { DEMO_MODELS } from '../ai-providers/demo-models.js'
 import { isEmail } from './constants.js'
 import { PLANS } from '../business/plan-access.js'
 
@@ -25,7 +26,7 @@ export async function getSystem() {
       status: {
         email: { resend: true, from: 'Satu Alur <noreply@apipedia.id>', businesses_with_smtp: 0, transport: publicTransport(d.transport) },
         encryption: true,
-        ai: { builtin_models: [{ id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B Instruct (fast)' }, { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Instruct (fast)' }], businesses_with_custom: 0, modes: AI_MODE_LABELS },
+        ai: { builtin_models: [{ id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B Instruct (fast)' }, { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Instruct (fast)' }], businesses_with_custom: 0, modes: AI_MODE_LABELS, provider: publicPlatformAi(d.aiProvider), provider_modes: PLATFORM_AI_LABELS },
         login: { otp_email: false, demo_otp: true, demo_login: true, google: false, google_redirect_uri: `${location.origin}/api/auth/google/callback`, admin_emails: 1 },
         whatsapp: { platform_fallback: false, wapilot: null, waconsole: null, repliz: null },
       },
@@ -76,6 +77,49 @@ export async function testSystemEmail(to, via) {
     return { provider, to: to || 'admin', simulated: true }
   }
   return call('/api/office/admin/system/email/test', { method: 'POST', body: { ...(to ? { to } : {}), ...(via ? { via } : {}) } })
+}
+
+/* Platform AI provider (what "Bawaan Satu Alur" runs on). Mock: simulated lists and replies. */
+function mockKey(v, d) {
+  if (v.mode === 'workers') return
+  if (!v.api_key && !(d.aiProvider?.mode === v.mode && d.aiProvider.key_enc)) throw new Error('Isi API key penyedia AI.')
+}
+
+export async function listPlatformModels(input) {
+  const v = validatePlatformAi(input, { requireModel: false })
+  if (isUsingMockCloud()) {
+    await delay(300)
+    mockKey(v, readDemo())
+    return { supported: true, models: v.mode === 'workers' ? [] : DEMO_MODELS[v.mode], simulated: true }
+  }
+  return call('/api/office/admin/system/ai-provider/models', { method: 'POST', body: v })
+}
+
+export async function testPlatformAi(input) {
+  const v = validatePlatformAi(input)
+  if (isUsingMockCloud()) {
+    await delay(400)
+    mockKey(v, readDemo())
+    return { model: v.model || 'workers', reply: 'OK (simulasi)', ms: 412, simulated: true }
+  }
+  return call('/api/office/admin/system/ai-provider/test', { method: 'POST', body: v })
+}
+
+export async function savePlatformAi(input) {
+  const v = validatePlatformAi(input)
+  if (isUsingMockCloud()) {
+    await delay()
+    const d = readDemo()
+    mockKey(v, d)
+    if (v.mode === 'workers') d.aiProvider = { mode: 'workers' }
+    else {
+      const { api_key: key, ...rest } = v
+      d.aiProvider = { ...rest, key_enc: key ? 'demo' : d.aiProvider.key_enc, key_last4: key ? key.slice(-4) : d.aiProvider.key_last4 }
+    }
+    writeDemo(d)
+    return { provider: publicPlatformAi(d.aiProvider) }
+  }
+  return call('/api/office/admin/system/ai-provider', { method: 'PUT', body: v })
 }
 
 export async function testSystemAi() {

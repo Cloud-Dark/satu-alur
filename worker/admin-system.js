@@ -6,6 +6,9 @@
  *   PUT  /api/office/admin/system/email-transport  { mode: resend | smtp, host, port, secure, user, pass?, from_email, from_name, reply_to }
  *   POST /api/office/admin/system/email/test       { to?, via?: 'resend' } test email via the platform transport
  *   POST /api/office/admin/system/ai/test          one short reply from the built-in model
+ *   PUT  /api/office/admin/system/ai-provider      { mode: workers | openai | anthropic, base_url, model, api_key?, max_tokens?, temperature? }
+ *   POST /api/office/admin/system/ai-provider/models  list the provider's models (unsaved form values; key '' = stored key)
+ *   POST /api/office/admin/system/ai-provider/test    one short reply from the provider with the unsaved form values
  *   GET  /api/office/admin/summary                 dashboard counts
  *   GET  /api/office/admin/activity?page=&kind=    emails (paged) + AI usage per feature (this month) + connector counts
  *   GET  /api/office/admin/users/:userId/detail    one user: tier, plan, usage, credit, integrations (no secrets), emails
@@ -16,8 +19,9 @@
  * Every change is written to admin_audit.
  */
 import { requireAdmin } from './office.js';
-import { normalizeSetting, SETTING_KEYS, adminEmailSet, AI_MODE_LABELS, validatePlatformTransport, publicTransport } from '../src/admin/rules.js';
-import { encryptToken } from '../src/social/crypto.js';
+import { normalizeSetting, SETTING_KEYS, adminEmailSet, AI_MODE_LABELS, validatePlatformTransport, publicTransport, validatePlatformAi, publicPlatformAi, PLATFORM_AI_LABELS } from '../src/admin/rules.js';
+import { loadPlatformAi, PLATFORM_AI_KEY, listProviderModels, testProvider } from './ai-provider.js';
+import { encryptToken, decryptToken } from '../src/social/crypto.js';
 import { parsePage } from '../src/office/paging.js';
 import { isEmail } from '../src/admin/constants.js';
 import { testEmail } from '../src/email/templates.js';
@@ -57,7 +61,7 @@ export async function handleSystemGet(request, env, deps) {
     status: {
       email: { resend: resendConfigured(env), from: env.EMAIL_FROM || DEFAULT_FROM, businesses_with_smtp: byoSmtp?.n || 0, transport: publicTransport(await loadPlatformTransport(env)) },
       encryption: customSecretsEnabled(env),
-      ai: { builtin_models: deps.LLM_MODELS.map((m) => ({ id: m.id, name: m.name })), businesses_with_custom: byoAi?.n || 0, modes: AI_MODE_LABELS },
+      ai: { builtin_models: deps.LLM_MODELS.map((m) => ({ id: m.id, name: m.name })), businesses_with_custom: byoAi?.n || 0, modes: AI_MODE_LABELS, provider: publicPlatformAi(await loadPlatformAi(env)), provider_modes: PLATFORM_AI_LABELS },
       login: {
         otp_email: env.DEMO_OTP !== 'true', demo_otp: env.DEMO_OTP === 'true', demo_login: env.DEMO_LOGIN !== 'false',
         google: isGoogleConfigured(env), google_redirect_uri: googleRedirectUri(env, request.url),
@@ -140,6 +144,60 @@ export async function handleSystemEmailTest(request, env, deps) {
   return deps.ok({ provider, to });
 }
 
+// ------------------------------------------------------- platform AI provider
+
+/** Validated provider from the admin form; an empty api_key reuses the stored key of the same mode. */
+async function providerFromBody(env, deps, body, { requireModel }) {
+  let v;
+  try { v = validatePlatformAi(body, { requireModel }); } catch (err) {
+    if (err?.validation) throw new deps.HttpError(400, err.message);
+    throw err;
+  }
+  if (v.mode === 'workers') return { v, provider: null };
+  if (!customSecretsEnabled(env)) throw new deps.HttpError(400, 'Kunci enkripsi server (TOKEN_KEY) belum diatur, jadi API key belum bisa disimpan.');
+  let apiKey = v.api_key;
+  const stored = await loadPlatformAi(env);
+  if (!apiKey && stored.mode === v.mode && stored.key_enc) {
+    try { apiKey = await decryptToken(stored.key_enc, env.TOKEN_KEY); } catch { /* fall through to the prompt below */ }
+  }
+  if (!apiKey) throw new deps.HttpError(400, 'Isi API key penyedia AI.');
+  return { v, stored, provider: { mode: v.mode, baseUrl: v.base_url, model: v.model, apiKey } };
+}
+
+export async function handleSystemAiProviderModels(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const { provider } = await providerFromBody(env, deps, await deps.readJson(request), { requireModel: false });
+  if (!provider) return deps.ok({ supported: true, models: deps.LLM_MODELS.map((m) => ({ id: m.id, name: m.name })) });
+  return deps.ok(await listProviderModels(provider, deps));
+}
+
+export async function handleSystemAiProviderTest(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const { provider } = await providerFromBody(env, deps, await deps.readJson(request), { requireModel: true });
+  if (!provider) return handleSystemAiTest(request, env, deps);
+  const started = Date.now();
+  const reply = await testProvider(provider, deps);
+  return deps.ok({ model: provider.model, reply, ms: Date.now() - started });
+}
+
+export async function handleSystemAiProviderPut(request, env, deps) {
+  const admin = await requireAdmin(request, env, deps);
+  const { v, stored, provider } = await providerFromBody(env, deps, await deps.readJson(request), { requireModel: true });
+  let value = { mode: 'workers' };
+  if (provider) {
+    const { api_key: key, ...rest } = v;
+    const keyEnc = key ? await encryptToken(key, env.TOKEN_KEY) : stored.key_enc;
+    value = { ...rest, key_enc: keyEnc, key_last4: key ? key.slice(-4) : stored.key_last4 };
+  }
+  await env.DB.prepare(
+    `INSERT INTO system_settings (key, value_json, updated_at, updated_by) VALUES (?, ?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+  ).bind(PLATFORM_AI_KEY, JSON.stringify(value), new Date().toISOString(), admin.email).run();
+  const shown = publicPlatformAi(value);
+  await audit(env, admin.email, 'setting.update', PLATFORM_AI_KEY, JSON.stringify({ mode: shown.mode, base_url: shown.base_url, model: shown.model }));
+  return deps.ok({ provider: shown });
+}
+
 export async function handleSystemAiTest(request, env, deps) {
   await requireAdmin(request, env, deps);
   const settings = await loadSystemSettings(env);
@@ -183,7 +241,7 @@ export async function handleAdminActivity(request, env, deps) {
   const { page, limit, offset } = parsePage(params);
   const where = /^[a-z_]{2,20}$/.test(kind) ? 'WHERE kind = ?' : '';
   const args = where ? [kind] : [];
-  const [emails, total, usage, whatsapp] = await Promise.all([
+  const [emails, total, usage, whatsapp, aiEvents] = await Promise.all([
     safeAll(env.DB.prepare(
       `SELECT e.id, e.kind, e.recipient, e.subject, e.provider, e.status, e.error, e.created_at, u.email AS owner_email
          FROM email_log e LEFT JOIN users u ON u.id = e.owner_id ${where} ORDER BY e.id DESC LIMIT ? OFFSET ?`,
@@ -191,8 +249,9 @@ export async function handleAdminActivity(request, env, deps) {
     safeFirst(env.DB.prepare(`SELECT COUNT(*) AS n FROM email_log ${where}`).bind(...args), { n: 0 }),
     safeAll(env.DB.prepare('SELECT feature, SUM(count) AS calls, COUNT(DISTINCT user_id) AS users FROM usage_counters WHERE period = ? GROUP BY feature ORDER BY calls DESC').bind(period())),
     whatsappStatus(env),
+    safeAll(env.DB.prepare("SELECT target, detail, created_at FROM admin_audit WHERE action = 'ai.fallback' ORDER BY id DESC LIMIT 20")),
   ]);
-  return deps.ok({ emails, emails_total: total?.n || 0, page, size: limit, usage, whatsapp, period: period() });
+  return deps.ok({ emails, emails_total: total?.n || 0, page, size: limit, usage, whatsapp, ai_events: aiEvents, period: period() });
 }
 
 async function targetUser(env, deps, params) {

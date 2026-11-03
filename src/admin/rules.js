@@ -122,6 +122,43 @@ export function cleanBaseUrl(raw) {
   return `${u.origin}${u.pathname.replace(/\/+$/, '')}`
 }
 
+/**
+ * Platform AI provider chosen by admins (system_settings 'ai_provider'): what "Bawaan Satu Alur"
+ * means for live businesses. 'workers' = Workers AI (default). API key '' keeps the stored one.
+ */
+export const PLATFORM_AI_MODES = ['workers', 'openai', 'anthropic']
+export const PLATFORM_AI_LABELS = { workers: 'Workers AI (bawaan)', openai: 'OpenAI-compatible', anthropic: 'Anthropic-compatible' }
+export const OPENAI_DEFAULT_BASE = 'https://api.openai.com/v1'
+
+export function validatePlatformAi(input, { requireModel = true } = {}) {
+  const mode = PLATFORM_AI_MODES.includes(input?.mode) ? input.mode : 'workers'
+  if (mode === 'workers') return { mode: 'workers' }
+  const base = cleanBaseUrl(input.base_url || (mode === 'anthropic' ? ANTHROPIC_DEFAULT_BASE : OPENAI_DEFAULT_BASE))
+  const model = String(input.model || '').trim()
+  if (requireModel && !/^[\w.:@/-]{1,120}$/.test(model)) fail('Pilih atau ketik nama model.')
+  const key = typeof input.api_key === 'string' ? input.api_key.trim() : ''
+  if (key.length > 500) fail('API key terlalu panjang.')
+  const out = { mode, base_url: base, model, api_key: key }
+  if (input.max_tokens !== undefined && input.max_tokens !== null && input.max_tokens !== '') {
+    const n = Number(input.max_tokens)
+    if (!Number.isInteger(n) || n < 16 || n > 8192) fail('Maks token harus 16–8192.')
+    out.max_tokens = n
+  }
+  if (input.temperature !== undefined && input.temperature !== null && input.temperature !== '') {
+    const t = Number(input.temperature)
+    if (!(t >= 0 && t <= 2)) fail('Temperature harus 0–2.')
+    out.temperature = t
+  }
+  return out
+}
+
+/** What the admin UI may see of the stored platform provider: everything but the key. */
+export function publicPlatformAi(stored) {
+  if (!stored || stored.mode === 'workers' || !PLATFORM_AI_MODES.includes(stored.mode)) return { mode: 'workers' }
+  const { key_enc: _k, ...rest } = stored
+  return { ...rest, key_saved: Boolean(stored.key_enc) }
+}
+
 export function validateAiIntegration(input) {
   const mode = AI_MODES.includes(input?.ai_mode) ? input.ai_mode : 'builtin'
   if (mode === 'builtin') return { ai_mode: 'builtin' }

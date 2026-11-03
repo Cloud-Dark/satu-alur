@@ -63,14 +63,14 @@ import { DEMO_EMAILS, isDemoUser } from './demo.js';
 import { simulateAnswer } from '../src/ai/simulate.js';
 import { otpEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings } from './email.js';
-import { resolveAi, customChatStream, countByo } from './ai-provider.js';
+import { resolveAi, customChatStream, countByo, logAiFallback } from './ai-provider.js';
 import {
   handleIntegrationsGet, handleIntegrationsEmailSave, handleIntegrationsAiSave, handleIntegrationsEmailTest,
-  handleIntegrationsAiTest, handleEmailSend,
+  handleIntegrationsAiTest, handleIntegrationsAiModels, handleEmailSend,
 } from './integrations.js';
 import { handleAuthProviders, handleGoogleStart, handleGoogleCallback, handleGoogleExchange } from './google.js';
 import {
-  handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemTransportPut, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
+  handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemTransportPut, handleSystemAiProviderPut, handleSystemAiProviderModels, handleSystemAiProviderTest, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
   handleAdminUserDetail, handleAdminUserTier, handleAdminsList, handleAdminsAdd, handleAdminsRemove,
 } from './admin-system.js';
 import { demoAccount } from '../src/auth/demo-accounts.js';
@@ -845,6 +845,7 @@ async function handleModels(request, env) {
   const { user } = await authenticate(request, env);
   // A business on its own provider sees that model only; the chat route uses it whatever id is sent.
   const ai = await resolveAi(env, user, ROUTE_DEPS);
+  if (ai.platform) return ok([{ id: ai.model, name: ai.model, disabled: false, provider: ai.mode }]);
   if (ai.mode !== 'builtin') return ok([{ id: ai.model, name: `${ai.model} (penyedia Anda)`, disabled: false, provider: ai.mode }]);
   const settings = await loadSystemSettings(env);
   const first = LLM_MODELS.find((m) => m.id === settings.ai.default_model);
@@ -915,7 +916,7 @@ async function handleChat(request, env) {
   const body = await readJson(request, MAX_CHAT_BODY_BYTES);
   const ai = await resolveAi(env, user, ROUTE_DEPS);
 
-  if (ai.mode === 'builtin' && (typeof body.model !== 'string' || !LLM_MODELS.some((m) => m.id === body.model && !m.disabled))) {
+  if (ai.mode === 'builtin' && !ai.platform && (typeof body.model !== 'string' || !LLM_MODELS.some((m) => m.id === body.model && !m.disabled))) {
     throw bad('Model tidak didukung.');
   }
   if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > MAX_CHAT_MESSAGES) {
@@ -948,7 +949,26 @@ async function handleChat(request, env) {
     // Demo is 100% demo: a simulated answer, never Workers AI or a provider, and no quota.
     return sseResponse(simulatedStream({ messages, response_format: rf || undefined }));
   }
-  if (ai.mode !== 'builtin') {
+  let fallbackModel = body.model;
+  if (ai.platform) {
+    // The admin's platform provider is "Bawaan Satu Alur": metered like Workers AI. If it fails
+    // before streaming, Workers AI answers instead and the fallback is logged for admins.
+    const usage = await meter(env, user, feature, ROUTE_DEPS);
+    try {
+      const stream = await customChatStream(ai, {
+        messages,
+        temperature: params.temperature ?? ai.defaults?.temperature,
+        max_tokens: params.max_tokens ?? ai.defaults?.max_tokens,
+        schema, json: Boolean(rf && rf.type === 'json_object'),
+      }, { HttpError });
+      return sseResponse(stream);
+    } catch (err) {
+      await logAiFallback(env, ai, err?.message);
+      await usage.refund().catch((e) => console.error('Quota refund failed', e));
+    }
+    const settings = await loadSystemSettings(env);
+    fallbackModel = LLM_MODELS.some((m) => m.id === settings.ai.default_model) ? settings.ai.default_model : LLM_MODELS[0].id;
+  } else if (ai.mode !== 'builtin') {
     // The business pays its own provider: no Satu Alur quota or credit, counted for analytics only.
     const stream = await customChatStream(ai, {
       messages, temperature: params.temperature, max_tokens: params.max_tokens,
@@ -960,7 +980,7 @@ async function handleChat(request, env) {
   // Counted only once the request is valid; a model that never starts gives the call back.
   const usage = await meter(env, user, feature, ROUTE_DEPS);
   const refund = () => usage.refund().catch((e) => console.error('Quota refund failed', e));
-  if (schema) return structuredChat(env, body.model, params, schema, refund);
+  if (schema) return structuredChat(env, fallbackModel, params, schema, refund);
   if (rf && rf.type === 'json_object') {
     // Workers AI JSON mode does not support streaming, so steer via a system hint.
     params.messages = [{ role: 'system', content: JSON_HINT }, ...messages];
@@ -968,7 +988,7 @@ async function handleChat(request, env) {
 
   let aiStream;
   try {
-    aiStream = await env.AI.run(body.model, params);
+    aiStream = await env.AI.run(fallbackModel, params);
   } catch (e) {
     console.error('AI.run failed', e);
     await refund();
@@ -1108,10 +1128,14 @@ const ROUTES = {
   'PUT /api/integrations/ai': (req, env) => handleIntegrationsAiSave(req, env, ROUTE_DEPS),
   'POST /api/integrations/email/test': (req, env) => handleIntegrationsEmailTest(req, env, ROUTE_DEPS),
   'POST /api/integrations/ai/test': (req, env) => handleIntegrationsAiTest(req, env, ROUTE_DEPS),
+  'POST /api/integrations/ai/models': (req, env) => handleIntegrationsAiModels(req, env, ROUTE_DEPS),
   'POST /api/email/send': (req, env) => handleEmailSend(req, env, ROUTE_DEPS),
   'GET /api/office/admin/system': (req, env) => handleSystemGet(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/email/test': (req, env) => handleSystemEmailTest(req, env, ROUTE_DEPS),
   'PUT /api/office/admin/system/email-transport': (req, env) => handleSystemTransportPut(req, env, ROUTE_DEPS),
+  'PUT /api/office/admin/system/ai-provider': (req, env) => handleSystemAiProviderPut(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/system/ai-provider/models': (req, env) => handleSystemAiProviderModels(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/system/ai-provider/test': (req, env) => handleSystemAiProviderTest(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/ai/test': (req, env) => handleSystemAiTest(req, env, ROUTE_DEPS),
   'GET /api/office/admin/system/admins': (req, env) => handleAdminsList(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/admins': (req, env) => handleAdminsAdd(req, env, ROUTE_DEPS),

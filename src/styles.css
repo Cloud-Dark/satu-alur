@@ -1909,8 +1909,9 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .side-row-office { margin-bottom: 2px; }
 .row-actions { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; justify-content: flex-end; }
 
-/* ---- Kantor › Sistem › Email: platform SMTP fields ---- */
-.app-shell .of-tr-smtp { display: flex; flex-direction: column; gap: var(--s-4); }
+/* ---- Kantor › Sistem › Email: platform SMTP fields; Mesin AI provider fields ---- */
+.app-shell .of-tr-smtp, .app-shell .of-ai-provider, .app-shell .model-picker { display: flex; flex-direction: column; gap: var(--s-4); }
+.app-shell .model-picker-actions { margin-top: calc(-1 * var(--s-2)); }
 
 /* ---- Permintaan: pick the customer from the open map ---- */
 .app-shell .req-source { display: flex; flex-wrap: wrap; gap: var(--s-2); }

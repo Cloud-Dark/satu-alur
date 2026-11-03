@@ -134,3 +134,163 @@ test('map picker: fields from a picked business', () => {
   assert.equal(pickLocation({ address: '' }, 'Bandung, Indonesia (contoh)'), 'Bandung')
   assert.equal(pickLocation({ address: 'Jl. Riau 5, Bandung' }, 'Bandung'), 'Jl. Riau 5, Bandung')
 })
+
+// ------------------------------------------------------------ platform AI provider
+
+const { parseOpenAiModels, parseAnthropicModels, modelsRequest, listUnsupported } = await import('../src/ai-providers/models.js')
+const { validatePlatformAi, publicPlatformAi } = await import('../src/admin/rules.js')
+const { readFile, readdir } = await import('node:fs/promises')
+const { createHash } = await import('node:crypto')
+
+test('model lists: OpenAI-compatible and Anthropic pages are parsed', () => {
+  assert.deepEqual(parseOpenAiModels({ data: [{ id: 'gpt-4o-mini' }, { id: 'gpt-4.1' }, { id: 'gpt-4o-mini' }, { id: 'bad id!' }] }).map((m) => m.id), ['gpt-4.1', 'gpt-4o-mini'])
+  assert.deepEqual(parseOpenAiModels({ models: ['llama3', 'qwen'] }).map((m) => m.id), ['llama3', 'qwen'])
+  const page = parseAnthropicModels({ data: [{ id: 'claude-sonnet-4-5', display_name: 'Claude Sonnet 4.5' }], has_more: true, last_id: 'claude-sonnet-4-5' })
+  assert.deepEqual(page, { models: [{ id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5 (claude-sonnet-4-5)' }], hasMore: true, lastId: 'claude-sonnet-4-5' })
+  const a = modelsRequest({ mode: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', apiKey: 'k', afterId: 'x' })
+  assert.equal(a.url, 'https://api.anthropic.com/v1/models?limit=100&after_id=x')
+  assert.equal(a.init.headers['anthropic-version'], '2023-06-01')
+  assert.equal(modelsRequest({ mode: 'openai', baseUrl: 'https://api.openai.com/v1', apiKey: 'k' }).init.headers.Authorization, 'Bearer k')
+  assert.ok(listUnsupported(404) && listUnsupported(405) && !listUnsupported(401))
+})
+
+test('platform AI settings: validation and public view', () => {
+  assert.deepEqual(validatePlatformAi({ mode: 'workers', base_url: 'x' }), { mode: 'workers' })
+  assert.equal(validatePlatformAi({ mode: 'anthropic', model: 'claude-x', api_key: 'k' }).base_url, 'https://api.anthropic.com')
+  assert.throws(() => validatePlatformAi({ mode: 'openai', api_key: 'k' }), /model/)
+  assert.ok(validatePlatformAi({ mode: 'openai', api_key: 'k' }, { requireModel: false }))
+  assert.throws(() => validatePlatformAi({ mode: 'openai', model: 'm', base_url: 'http://x.com' }), /https/)
+  assert.throws(() => validatePlatformAi({ mode: 'openai', model: 'm', max_tokens: 5 }), /16/)
+  const shown = publicPlatformAi({ mode: 'openai', model: 'm', key_enc: 'a.b', key_last4: 'wxyz' })
+  assert.equal(shown.key_enc, undefined)
+  assert.equal(shown.key_saved, true)
+})
+
+async function sqliteEnv(t, extra = {}) {
+  const { DatabaseSync } = await import('node:sqlite').catch(() => ({}))
+  if (!DatabaseSync) { t.skip('SQLite integration requires Node 22.13+'); return null }
+  const sqlite = new DatabaseSync(':memory:')
+  t.after(() => sqlite.close())
+  const dir = new URL('../migrations/', import.meta.url)
+  for (const name of (await readdir(dir)).filter((n) => n.endsWith('.sql')).sort()) sqlite.exec(await readFile(new URL(name, dir), 'utf8'))
+  const reads = (sql) => /^\s*(select|with)\b/i.test(sql) || /\breturning\b/i.test(sql)
+  const prepare = (sql) => ({
+    args: [],
+    bind(...args) { this.args = args; return this },
+    async first() { return sqlite.prepare(sql).get(...this.args) ?? null },
+    async all() { return { results: sqlite.prepare(sql).all(...this.args) } },
+    async run() {
+      if (reads(sql)) return { results: sqlite.prepare(sql).all(...this.args), meta: {} }
+      const r = sqlite.prepare(sql).run(...this.args)
+      return { results: [], meta: { changes: Number(r.changes) } }
+    },
+  })
+  let aiCalls = 0
+  const env = {
+    DB: { prepare, async batch(stmts) { const out = []; for (const s of stmts) out.push(await s.run()); return out } },
+    DEMO_OTP: 'false', RESEND_API_KEY: 're_test', ADMIN_EMAILS: 'alice@example.com', TOKEN_KEY: TEST_KEY,
+    AI: { run: async () => { aiCalls++; return { response: 'Dari Workers AI' } } },
+    ...extra,
+  }
+  for (const uid of ['alice', 'bob']) {
+    sqlite.prepare('INSERT INTO users(id, email, name, created_at) VALUES (?, ?, ?, ?)').run(uid, `${uid}@example.com`, uid, '2026-11-01T00:00:00Z')
+    sqlite.prepare('INSERT INTO sessions(token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(createHash('sha256').update(uid.repeat(8)).digest('hex'), uid, '2099-01-01T00:00:00Z')
+  }
+  return { env, sqlite, aiCalls: () => aiCalls }
+}
+
+function caller(worker, env) {
+  return async (uid, method, path, body, expected = 200) => {
+    const res = await worker.fetch(new Request(`https://satu-alur.apipedia.workers.dev${path}`, {
+      method, headers: { ...(uid ? { authorization: `Bearer ${uid.repeat(8)}` } : {}), 'content-type': 'application/json', 'X-Satualur-Feature': 'offer' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }), env)
+    const text = await res.text()
+    assert.equal(res.status, expected, text)
+    try { return JSON.parse(text).data } catch { return text }
+  }
+}
+
+function stubFetch(t, handler) {
+  const original = globalThis.fetch
+  const calls = []
+  globalThis.fetch = async (url, init) => { calls.push({ url: String(url), init }); return handler(String(url), init) }
+  t.after(() => { globalThis.fetch = original })
+  return calls
+}
+
+test('worker: admin sets the platform AI provider; key encrypted; model list paged; chat uses it', async (t) => {
+  const ctx = await sqliteEnv(t)
+  if (!ctx) return
+  const { default: worker } = await import('../worker/index.js')
+  const call = caller(worker, ctx.env)
+  const calls = stubFetch(t, async (url) => {
+    if (url.includes('/v1/models')) {
+      const after = new URL(url).searchParams.get('after_id')
+      return new Response(JSON.stringify(after
+        ? { data: [{ id: 'claude-haiku-4-5', display_name: 'Haiku' }], has_more: false, last_id: 'claude-haiku-4-5' }
+        : { data: [{ id: 'claude-sonnet-4-5', display_name: 'Sonnet' }], has_more: true, last_id: 'claude-sonnet-4-5' }), { status: 200 })
+    }
+    if (url.endsWith('/v1/messages')) {
+      return new Response('event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Halo platform"}}\n\nevent: message_stop\ndata: {"type":"message_stop"}\n\n', { status: 200 })
+    }
+    return new Response('{}', { status: 404 })
+  })
+  await call('bob', 'POST', '/api/office/admin/system/ai-provider/models', { mode: 'anthropic', api_key: 'sk-ant' }, 403)
+  const list = await call('alice', 'POST', '/api/office/admin/system/ai-provider/models', { mode: 'anthropic', api_key: 'sk-ant-secret' })
+  assert.deepEqual(list.models.map((m) => m.id), ['claude-sonnet-4-5', 'claude-haiku-4-5'])
+  assert.equal(calls[0].init.headers['x-api-key'], 'sk-ant-secret')
+  await call('alice', 'PUT', '/api/office/admin/system/ai-provider', { mode: 'anthropic', model: 'claude-sonnet-4-5', api_key: 'sk-ant-secret', max_tokens: 512 })
+  const row = ctx.sqlite.prepare("SELECT value_json FROM system_settings WHERE key = 'ai_provider'").get()
+  assert.ok(!row.value_json.includes('sk-ant-secret'))
+  const sys = await call('alice', 'GET', '/api/office/admin/system')
+  assert.equal(sys.status.ai.provider.model, 'claude-sonnet-4-5')
+  assert.equal(sys.status.ai.provider.key_last4, 'cret')
+  assert.equal(JSON.stringify(sys).includes('key_enc'), false)
+  // Saved key is reused when the form leaves it empty.
+  const again = await call('alice', 'POST', '/api/office/admin/system/ai-provider/models', { mode: 'anthropic', api_key: '' })
+  assert.equal(again.models.length, 2)
+  // Live business on "Bawaan": the platform provider answers, the call is metered like Workers AI.
+  assert.equal((await call('bob', 'GET', '/api/llm/models'))[0].id, 'claude-sonnet-4-5')
+  const out = await call('bob', 'POST', '/api/llm/chat', { model: 'claude-sonnet-4-5', messages: [{ role: 'user', content: 'hai' }] })
+  assert.match(out, /Halo platform/)
+  assert.equal(ctx.aiCalls(), 0)
+  assert.deepEqual(ctx.sqlite.prepare("SELECT feature, count FROM usage_counters WHERE user_id = 'bob'").all().map((u) => [u.feature, u.count]), [['offer', 1]])
+  const audit = ctx.sqlite.prepare("SELECT action, target FROM admin_audit WHERE target = 'ai_provider'").all()
+  assert.equal(audit.length, 1)
+})
+
+test('worker: platform AI failure falls back to Workers AI and is logged', async (t) => {
+  const ctx = await sqliteEnv(t)
+  if (!ctx) return
+  const { default: worker } = await import('../worker/index.js')
+  const call = caller(worker, ctx.env)
+  const value = { mode: 'openai', base_url: 'https://api.down.example/v1', model: 'gpt-x', key_enc: await encryptToken('sk-1', TEST_KEY), key_last4: 'sk-1' }
+  ctx.sqlite.prepare("INSERT INTO system_settings (key, value_json, updated_at, updated_by) VALUES ('ai_provider', ?, '2026-11-03', 'alice')").run(JSON.stringify(value))
+  stubFetch(t, async () => new Response('{"error":{"message":"overloaded"}}', { status: 529 }))
+  const out = await call('bob', 'POST', '/api/llm/chat', { model: 'gpt-x', messages: [{ role: 'user', content: 'hai' }] })
+  assert.match(out, /Dari Workers AI/)
+  assert.equal(ctx.aiCalls(), 1)
+  const ev = ctx.sqlite.prepare("SELECT actor, target FROM admin_audit WHERE action = 'ai.fallback'").all()
+  assert.deepEqual(ev.map((e) => [e.actor, e.target]), [['sistem', 'openai:gpt-x']])
+  assert.equal(ctx.sqlite.prepare("SELECT count FROM usage_counters WHERE user_id = 'bob' AND feature = 'offer'").get().count, 1)
+  const act = await call('alice', 'GET', '/api/office/admin/activity?page=1')
+  assert.equal(act.ai_events.length, 1)
+})
+
+test('worker: business lists its own provider models and tests unsaved values', async (t) => {
+  const ctx = await sqliteEnv(t)
+  if (!ctx) return
+  const { default: worker } = await import('../worker/index.js')
+  const call = caller(worker, ctx.env)
+  const calls = stubFetch(t, async (url) => {
+    if (url.endsWith('/models')) return new Response('not here', { status: 404 })
+    return new Response('data: {"choices":[{"delta":{"content":"OK"}}]}\n\ndata: [DONE]\n\n', { status: 200 })
+  })
+  const list = await call('bob', 'POST', '/api/integrations/ai/models', { ai_mode: 'openai', ai_base_url: 'https://api.local-llm.id/v1', ai_key: 'k1' })
+  assert.deepEqual(list, { supported: false, models: [] })
+  const r = await call('bob', 'POST', '/api/integrations/ai/test', { ai_mode: 'openai', ai_base_url: 'https://api.local-llm.id/v1', ai_model: 'qwen', ai_key: 'k1' })
+  assert.equal(r.reply, 'OK')
+  assert.equal(calls.at(-1).url, 'https://api.local-llm.id/v1/chat/completions')
+  await call('bob', 'POST', '/api/integrations/ai/models', { ai_mode: 'openai', ai_base_url: 'https://api.local-llm.id/v1', ai_key: '' }, 400)
+})
