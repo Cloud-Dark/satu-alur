@@ -250,6 +250,20 @@ module.exports = async function office(t) {
   // unsaved plan edits: Escape asks first
   await p.getByRole('button', { name: 'Ubah UKM' }).click()
   const gd = p.getByRole('dialog', { name: 'Ubah UKM' })
+  // searchable dropdown inside a modal dialog: its list must render above the dialog (top layer)
+  await gd.getByRole('combobox', { name: 'Periode' }).click()
+  await p.waitForTimeout(300)
+  const comboOnTop = await p.evaluate(() => {
+    const pop = document.querySelector('.combo-pop:not([hidden])')
+    if (!pop) return 'no list'
+    const r = pop.getBoundingClientRect()
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + Math.min(r.height / 2, 40))
+    return pop.contains(hit) && pop.closest('dialog[open]') ? 'ok' : `hidden under ${hit?.className || hit?.tagName}`
+  })
+  t.check(comboOnTop === 'ok', 'dropdown search list is visible above the plan dialog', comboOnTop)
+  await p.keyboard.press('Escape')
+  await p.waitForTimeout(200)
+  t.check(await gd.isVisible(), 'Escape in the dropdown closes only the list, not the dialog')
   await gd.getByLabel('Tagline').fill('Tagline sementara')
   p.once('dialog', (d) => d.dismiss())
   await p.keyboard.press('Escape')

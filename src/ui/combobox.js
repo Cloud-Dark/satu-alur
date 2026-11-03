@@ -65,7 +65,7 @@ export function enhanceSelect(select, { placeholder = 'Pilih…', searchPlacehol
   select.tabIndex = -1
   select.setAttribute('aria-hidden', 'true')
 
-  // Popover lives on <body> so drawers with overflow don't clip it.
+  // Popover lives on <body> (or the open modal dialog) so overflow doesn't clip it.
   const pop = document.createElement('div')
   pop.className = 'combo-pop'
   pop.hidden = true
@@ -166,7 +166,9 @@ export function enhanceSelect(select, { placeholder = 'Pilih…', searchPlacehol
   function openPop(seed = '') {
     if (open || select.disabled) return
     open = true
-    document.body.append(pop)
+    // A modal <dialog> sits in the browser's top layer, above anything on <body>,
+    // so the list has to live inside the open dialog to be visible there.
+    ;(trigger.closest('dialog[open]') || document.body).append(pop)
     pop.hidden = false
     search.value = seed
     renderList()
