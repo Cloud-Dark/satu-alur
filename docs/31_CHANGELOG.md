@@ -8,6 +8,17 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-04 - Alur permintaan & penawaran v2
+
+#### Ditambahkan
+- Permintaan: **Isi otomatis dengan AI** (jenis layanan + deskripsi kebutuhan dari petunjuk singkat atau chat; dihitung sebagai fitur `offer`).
+- Penawaran: proses AI enam langkah yang terlihat (data klien, jadwal, penawaran, PDF, draf email & WhatsApp, draf tinjauan), tanpa JSON mentah di layar; tinjauan dengan semua isian bisa diubah, Unduh PDF, Kirim email, Kirim WhatsApp.
+- **Template penawaran** (Kantor › Bisnis): tabel `offer_templates` + 8 template bawaan (migrasi `0018_offer_templates.sql`), CRUD admin dengan pembuat pertanyaan; bisnis memilih template dan menjawab pertanyaannya sebelum AI menyusun penawaran. `offers.template_id`, `offers.template_answers_json`.
+- `src/docs/print.js`: dokumen cetak/PDF bergaya Tumbuh, dipakai juga untuk dokumen lain.
+
+#### Diubah
+- *Jadwal yang diminta klien* pindah dari form permintaan ke langkah penawaran (kolom `requests.requested_at` tetap).
+
 ### 2026-11-04 - Progres penugasan, invoice, petugas akun demo
 
 #### Ditambahkan

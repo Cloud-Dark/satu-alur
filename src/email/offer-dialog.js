@@ -12,10 +12,11 @@ import { isEmail } from '../admin/constants.js'
 const { el } = C
 let seq = 0
 
-export function openOfferEmail({ offer, request, businessName, opener }) {
+export function openOfferEmail({ offer, request, businessName, opener, draft: override = null }) {
   const id = ++seq
   const proposal = offer?.ai_proposal_json && typeof offer.ai_proposal_json === 'object' ? offer.ai_proposal_json : {}
-  const draft = offerEmailDraft({
+  // The offer wizard passes its own (possibly edited) draft; otherwise build one from the offer.
+  const draft = override?.subject ? override : offerEmailDraft({
     customer: request?.customer_name, service: request?.service_type, price: offer?.validated_price,
     scope: offer?.validated_scope || proposal.scope, terms: proposal.terms, businessName,
   })

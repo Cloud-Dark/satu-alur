@@ -36,6 +36,7 @@ import {
   featureFrom, meter, handleMyPlan, handleVoucherRedeem, handleAdminVouchers, handleAdminVoucherCreate, handleAdminVoucherUpdate,
   handleAdminRedemptions, handleAdminCustomerQuota, handleAdminCustomerCredit,
 } from './quota.js';
+import { handleTemplatesList, handleAdminTemplates, handleAdminTemplateCreate, handleAdminTemplateUpdate, handleAdminTemplateDelete } from './offer-templates.js';
 import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
 import {
   handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
@@ -112,8 +113,8 @@ export const TABLES = {
     columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'lat', 'lng', 'created_at'],
   },
   offers: {
-    columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'created_at'],
-    json: ['ai_proposal_json'],
+    columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'template_id', 'template_answers_json', 'created_at'],
+    json: ['ai_proposal_json', 'template_answers_json'],
     fks: { request_id: 'requests' },
   },
   assignments: {
@@ -1277,6 +1278,11 @@ const ROUTES = {
   'GET /api/site/:key': (req, env, params) => handleSiteGet(req, env, ROUTE_DEPS, params),
   'PUT /api/office/admin/site/:key': (req, env, params) => handleSitePut(req, env, ROUTE_DEPS, params),
   'GET /api/plans': (req, env) => handlePlansPublic(req, env, ROUTE_DEPS),
+  'GET /api/offer-templates': (req, env) => handleTemplatesList(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/offer-templates': (req, env) => handleAdminTemplates(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/offer-templates': (req, env) => handleAdminTemplateCreate(req, env, ROUTE_DEPS),
+  'PATCH /api/office/admin/offer-templates/:id': (req, env, params) => handleAdminTemplateUpdate(req, env, ROUTE_DEPS, params),
+  'DELETE /api/office/admin/offer-templates/:id': (req, env, params) => handleAdminTemplateDelete(req, env, ROUTE_DEPS, params),
   'GET /api/office/admin/plans': (req, env) => handleAdminPlans(req, env, ROUTE_DEPS),
   'POST /api/office/admin/plans': (req, env) => handleAdminPlanCreate(req, env, ROUTE_DEPS),
   'POST /api/office/admin/plans/reorder': (req, env) => handleAdminPlanReorder(req, env, ROUTE_DEPS),

@@ -11,6 +11,7 @@ import * as Contact from './contact.js'
 import * as Support from './support.js'
 import * as Campaigns from './campaigns.js'
 import * as Vouchers from './vouchers.js'
+import * as OfferTemplates from './offer-templates.js'
 import * as System from './system.js'
 import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
@@ -25,7 +26,8 @@ export const GROUPS = [
   { title: 'Bisnis', items: [
     { key: 'plans', label: 'Paket langganan', icon: 'ledger', draw: Plans.draw },
     { key: 'gateway', label: 'Payment gateway', icon: 'wallet', draw: Payment.draw },
-    { key: 'vouchers', label: 'Voucher', icon: 'receipt', draw: Vouchers.draw }] },
+    { key: 'vouchers', label: 'Voucher', icon: 'receipt', draw: Vouchers.draw },
+    { key: 'offer-templates', label: 'Template penawaran', icon: 'fileText', draw: OfferTemplates.draw }] },
   { title: 'Pelanggan', items: [
     { key: 'customers', label: 'Pelanggan & mitra', icon: 'users', draw: Customers.draw },
     { key: 'users', label: 'Pengguna', icon: 'shield', draw: Users.draw },

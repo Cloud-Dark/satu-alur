@@ -51,7 +51,66 @@ export function normalizeOffer(obj) {
   }
 }
 
-export async function generateOffer({ request, modelId, signal, onChunk }) {
+/** One streamed JSON-mode call; returns the full text. Shared by the offer helpers below. */
+async function streamJson({ messages, schema, feature, modelId, signal, onChunk, temperature, maxTokens }) {
+  const cloud = getCloud()
+  let fullText = ''
+  for await (const chunk of cloud.llm.chat.completions.create({
+    model: modelId, messages, stream: true,
+    response_format: { type: 'json_schema', json_schema: schema },
+    feature, temperature, max_tokens: maxTokens, signal,
+  })) {
+    const delta = chunk.choices[0]?.delta?.content
+    if (delta) {
+      fullText += delta
+      onChunk?.(delta, fullText)
+    }
+  }
+  return fullText
+}
+
+const REQUEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    service_type: { type: 'string', description: 'Jenis layanan utama, singkat (maks 6 kata).' },
+    description: { type: 'string', description: 'Deskripsi kebutuhan yang rinci: jumlah unit/luas, lokasi, waktu, batasan.' },
+  },
+  required: ['service_type', 'description'],
+}
+
+/**
+ * "Isi otomatis dengan AI" on the request form: turns a short hint or a pasted
+ * chat into a service type and a detailed needs description. Metered as the
+ * "offer" feature (it is the first half of making an offer).
+ */
+export async function autofillRequest({ customer = {}, hint, services = [], modelId, signal, onChunk }) {
+  const params = getAgentParams()
+  const known = [...new Set(services.map((s) => String(s || '').trim()).filter(Boolean))].slice(0, 30)
+  const messages = [
+    { role: 'system', content: `[agent:request-autofill] Anda membantu pemilik usaha jasa di Indonesia mencatat permintaan pelanggan. Dari petunjuk singkat atau potongan chat, tentukan "service_type" (pilih yang paling cocok dari daftar layanan yang sudah ada bila sesuai, atau usulkan nama baru yang singkat) dan tulis "description" yang rinci dalam bahasa Indonesia: jumlah unit atau luas, lokasi, waktu yang diinginkan, kondisi khusus, dan hal yang perlu ditanyakan bila belum jelas. Jangan mengarang angka yang tidak disebutkan; tulis "perlu dikonfirmasi". Keluarkan HANYA JSON dengan key "service_type" dan "description".` },
+    { role: 'user', content: [
+      `Pelanggan: ${customer.customer_name || '—'}`,
+      customer.location ? `Lokasi: ${customer.location}` : null,
+      known.length ? `Layanan yang sudah ada: ${known.join('; ')}` : null,
+      `Petunjuk dari pemilik usaha:\n${String(hint || '').slice(0, 4000)}`,
+    ].filter(Boolean).join('\n') },
+  ]
+  let text = ''
+  try {
+    text = await streamJson({ messages, schema: REQUEST_SCHEMA, feature: 'offer', modelId, signal, onChunk, temperature: params.temperature ?? 0.4, maxTokens: 800 })
+  } catch (err) {
+    if (err.name === 'AbortError' || isQuotaError(err)) throw err
+    throw new Error(`Gagal mengisi otomatis: ${err.message}`)
+  }
+  let obj
+  try { obj = parseModelJson(text) } catch { throw new Error('AI belum memberi jawaban yang bisa dipakai. Coba lagi.') }
+  return {
+    service_type: String(obj.service_type || obj.layanan || '').trim().slice(0, 120),
+    description: String(obj.description || obj.deskripsi || '').trim().slice(0, 2000),
+  }
+}
+
+export async function generateOffer({ request, modelId, signal, onChunk, context = '' }) {
   const cloud = getCloud()
   const prompts = getAgentPrompts()
   const params = getAgentParams()
@@ -60,7 +119,7 @@ export async function generateOffer({ request, modelId, signal, onChunk }) {
 
   const messages = [
     { role: 'system', content: `${systemPrompt}\n\n${OFFER_FORMAT_RULES}` },
-    { role: 'user', content: `Permintaan jasa:\n${JSON.stringify(request, null, 2)}` },
+    { role: 'user', content: `Permintaan jasa:\n${JSON.stringify(request, null, 2)}${context ? `\n\n${context}` : ''}` },
   ]
   let fullText = ''
   try {
