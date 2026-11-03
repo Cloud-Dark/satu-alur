@@ -1,4 +1,5 @@
 // Pure validators + price formatting for subscription plans. Errors carry Indonesian text.
+import { validateQuota } from '../quota/rules.js'
 
 export const PERIODS = ['month', 'year', 'once', 'custom']
 export const CTA_KINDS = ['signup', 'contact']
@@ -72,6 +73,7 @@ export function validatePlan(body) {
     badge: text(b.badge, 'Badge', 30),
     limits: limits.map((l) => ({ label: text(l?.label, 'Label batas', 30), value: text(l?.value, 'Nilai batas', 60) })).filter((l) => l.label && l.value),
     features: features.map((f) => text(f, 'Fitur', 100)).filter(Boolean),
+    quota: validateQuota(b.quota),
     cta_label,
     cta_kind: b.cta_kind,
     sort: b.sort ?? 0,

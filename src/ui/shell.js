@@ -28,6 +28,8 @@ import * as StageVas from '../stages/vas.js'
 import * as StageZeroWaste from '../stages/zero-waste.js'
 import * as Office from '../stages/office/index.js'
 import * as StageSupport from '../support/page.js'
+import * as StagePlan from '../quota/page.js'
+import { mountUpsell } from '../quota/upsell.js'
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home',
@@ -77,6 +79,9 @@ export const STAGES = [
     action: { label: 'Media Sosial', icon: 'megaphone', to: 'social-media' } },
   { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
     action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
+  { key: 'plan', group: 'help', label: 'Paket & kuota', sub: 'Kuota AI & voucher', icon: 'wallet',
+    hint: 'Paket Anda, sisa kuota AI bulan ini, saldo AI, dan tukar voucher.', module: StagePlan,
+    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
   // Every signed-in user (staff too, harmless); drawn last in the nav, just above Pengaturan.
   { key: 'support', group: 'help', label: 'Bantuan', sub: 'Tiket ke tim Satu Alur', icon: 'message',
     hint: 'Kirim pertanyaan atau keluhan ke tim Satu Alur dan ikuti balasannya di sini.', module: StageSupport,
@@ -451,6 +456,8 @@ export function renderShell(root, ctx) {
 
   show(current)
   refreshCounts()
+  // A used-up AI quota anywhere opens one upsell dialog (plans / voucher / contact).
+  if (!staff) disposers.push(mountUpsell((to, p) => show(to, p, { focus: true })))
 
   return () => {
     viewCtl?.abort()

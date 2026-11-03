@@ -1,6 +1,13 @@
 /**
- * Subscription tier and feature gating — one source of truth for the Worker,
+ * Business-scale tier and feature gating — one source of truth for the Worker,
  * the browser and the mock cloud.
+ *
+ * Two different things are called "plan" in this codebase:
+ * - tier (here): the account's business scale (sole, ukm, enterprise) in
+ *   `user_flags.plan`; it opens or locks features such as ERP integration.
+ * - subscription (src/quota/rules.js, worker/quota.js): the Free/Lite/Pro
+ *   plan in `customer_accounts.plan_id`; it sets the monthly AI quotas.
+ * UI copy calls the first "skala akun" and the second "paket".
  *
  * A tier is stored per user in `user_flags.plan` (migration 0010). Everything
  * that is not explicitly listed in FEATURES is available on every tier, so a
@@ -57,7 +64,7 @@ export function canUse(plan, feature) {
 export function planLockMessage(feature) {
   const spec = FEATURES[feature]
   if (!spec) return ''
-  return `${spec.label} tersedia pada paket ${planLabel(spec.minPlan)}.`
+  return `${spec.label} tersedia untuk akun skala ${planLabel(spec.minPlan)}.`
 }
 
 /**

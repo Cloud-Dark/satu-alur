@@ -274,7 +274,7 @@ export const INTEGRATION = {
     { no: '2', title: 'Petakan', desc: 'Cocokkan kolom sumber dengan kolom Satu Alur, termasuk format Rupiah dan tanggal Indonesia.' },
     { no: '3', title: 'Pindahkan bertahap', desc: 'Tenaga kerja dan katalog, lalu permintaan. Rollback mempertahankan baris yang sudah diedit atau dipakai.' },
   ],
-  note: 'Integrasi ERP dan migrasi data tersedia pada paket Enterprise. Pendekatan parallel running membuat dua sistem bisa dipakai bersamaan selama masa peralihan.',
+  note: 'Integrasi ERP dan migrasi data tersedia untuk akun skala Enterprise. Pendekatan parallel running membuat dua sistem bisa dipakai bersamaan selama masa peralihan.',
 }
 
 export const ROADMAP = [

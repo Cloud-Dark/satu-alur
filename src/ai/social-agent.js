@@ -14,6 +14,7 @@
 import { getCloud } from '../cloud.js'
 import { getAgentParams } from '../stages/settings.js'
 import { parseModelJson } from './agent.js'
+import { isQuotaError } from '../quota/errors.js'
 
 /** Marker the demo cloud uses to recognise these prompts. Keep it first. */
 export const SOCIAL_MARKER = '[agent:social]'
@@ -293,6 +294,7 @@ async function runTask(task, { instruction, user, modelId, signal, onChunk, maxT
       messages,
       stream: true,
       response_format: { type: 'json_schema', json_schema: SCHEMAS[task] },
+      feature: 'social',
       temperature: temperature ?? params.temperature ?? 0.7,
       max_tokens: Math.max(params.maxTokens ?? 2000, maxTokens ?? 0),
       signal,
@@ -304,7 +306,7 @@ async function runTask(task, { instruction, user, modelId, signal, onChunk, maxT
       }
     }
   } catch (err) {
-    if (err.name === 'AbortError') throw err
+    if (err.name === 'AbortError' || isQuotaError(err)) throw err
     throw new Error(`AI gagal merespons: ${err.message}`)
   }
   if (!raw.trim()) throw new Error('AI tidak mengembalikan teks. Coba lagi.')

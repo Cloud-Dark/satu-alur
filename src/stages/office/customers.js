@@ -5,11 +5,46 @@ import { adminListPlans } from '../../business/api.js'
 import { CUSTOMER_STATUS_LABEL, validateCustomer } from '../../customers/rules.js'
 import { stampLine } from './site-landing.js'
 import { LEAVE_MSG } from './site-doc.js'
+import { adminCustomerQuota, adminGrantCredit } from '../../quota/api.js'
+import { rupiah } from '../../quota/rules.js'
 
 const { el } = C
 const TONE = { trial: 'brand', active: 'ok', past_due: 'warn', cancelled: 'neutral' }
 const statusTag = (s) => (s ? C.tag(CUSTOMER_STATUS_LABEL[s], TONE[s]) : C.tag('Belum diatur', 'neutral'))
 let seq = 0
+const REASON = { voucher: 'Voucher', staff: 'Tim', refund: 'Dikembalikan' }
+
+// AI usage this month, credit balance and a staff top-up. Loads on its own so the dialog opens at once.
+function quotaSection(c, id) {
+  const box = el('div', { className: 'of-cu-quota', 'aria-live': 'polite' }, C.skeletonRows(2))
+  const amount = C.field({ label: 'Tambah / kurangi saldo AI (Rp)', id: `of-cu-credit-${id}`, type: 'number', hint: 'Negatif untuk koreksi. Tercatat atas nama Anda.', attrs: { step: '1000' } })
+  const note = C.field({ label: 'Alasan', id: `of-cu-credit-note-${id}`, attrs: { maxlength: '200' } })
+  const err = el('p', { className: 'field-error', role: 'alert' })
+  const apply = C.button({ label: 'Terapkan saldo', icon: 'wallet', variant: 'soft', size: 'sm' })
+  const drawQuota = (q) => box.replaceChildren(
+    el('p', { className: 'small' }, `Paket berlaku: ${q.plan.name}${q.demo ? ' (akun demo, tanpa batas)' : ''} · saldo AI `, el('strong', { className: 'tnum' }, rupiah(q.credit_idr))),
+    el('ul', { className: 'of-cu-usage small' }, ...q.usage.map((u) => el('li', {}, `${u.label}: `, el('span', { className: 'tnum' }, u.limit === null ? `${u.used} (tanpa batas)` : `${u.used} / ${u.limit}`)))),
+    q.entries?.length
+      ? el('ul', { className: 'of-cu-entries muted small' }, ...q.entries.slice(0, 5).map((e) => el('li', {},
+        `${C.formatDateTime(e.created_at)} · ${REASON[e.reason] || 'Pemakaian'} · `, el('span', { className: 'tnum' }, `${e.amount_idr > 0 ? '+' : '−'}${rupiah(Math.abs(e.amount_idr))}`), e.ref ? ` · ${e.ref}` : '')))
+      : '')
+  adminCustomerQuota(c.id).then(drawQuota).catch((ex) => box.replaceChildren(C.errorState(ex.message)))
+  apply.addEventListener('click', async () => {
+    err.textContent = ''
+    const n = Number(amount.input.value)
+    if (!Number.isInteger(n) || n === 0) { err.textContent = 'Isi jumlah saldo (bilangan bulat, bukan nol).'; return }
+    const restore = C.setBusy(apply, 'Menyimpan…')
+    try {
+      drawQuota(await adminGrantCredit(c.id, n, note.input.value.trim()))
+      amount.input.value = ''
+      note.input.value = ''
+      showToast('Saldo AI diperbarui.', 'success')
+    } catch (ex) { err.textContent = ex.message } finally { restore() }
+  })
+  return el('section', { className: 'of-cu-quota-wrap' },
+    el('h3', { className: 'field-label' }, 'Kuota & saldo AI'), box,
+    el('div', { className: 'form-row' }, amount.wrap, note.wrap), err, el('div', { className: 'form-actions' }, apply))
+}
 
 function customerDialog(ctx, c, plans, opener, onSaved, setDirty) {
   const id = ++seq
@@ -33,7 +68,7 @@ function customerDialog(ctx, c, plans, opener, onSaved, setDirty) {
   const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
   const { dialog, form, close } = C.modal({
     title: 'Kelola pelanggan', description: `${c.email}${c.name ? ` · ${c.name}` : ''}`, wide: true, opener, actions: [cancel, save],
-    children: [el('div', { className: 'form-row' }, company.wrap, phone.wrap), el('div', { className: 'form-row' }, plan.wrap, status.wrap), end.wrap, notes.wrap, stamp, err],
+    children: [el('div', { className: 'form-row' }, company.wrap, phone.wrap), el('div', { className: 'form-row' }, plan.wrap, status.wrap), end.wrap, notes.wrap, stamp, err, quotaSection(c, id)],
   })
   const touch = () => setDirty(dirty())
   form.addEventListener('input', touch)

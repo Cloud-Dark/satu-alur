@@ -13,6 +13,7 @@ import { getCloud } from '../cloud.js'
 import { getAgentParams } from '../stages/settings.js'
 import { parseModelJson } from './agent.js'
 import { heuristicRank, mergeRanking } from '../leads/scoring.js'
+import { isQuotaError } from '../quota/errors.js'
 
 export const LEADS_MARKER = '[agent:leads]'
 export const AI_RANK_LIMIT = 25
@@ -53,7 +54,7 @@ const OFFER_SCHEMA = {
   required: ['subject', 'pitch', 'scope', 'price', 'terms', 'notes'],
 }
 
-async function streamJson({ messages, schema, modelId, signal, onChunk, maxTokens, temperature }) {
+async function streamJson({ messages, schema, modelId, signal, onChunk, maxTokens, temperature, feature }) {
   const params = getAgentParams()
   let full = ''
   try {
@@ -62,6 +63,7 @@ async function streamJson({ messages, schema, modelId, signal, onChunk, maxToken
       messages,
       stream: true,
       response_format: { type: 'json_schema', json_schema: schema },
+      feature,
       temperature: temperature ?? params.temperature ?? 0.3,
       max_tokens: maxTokens,
       signal,
@@ -73,7 +75,7 @@ async function streamJson({ messages, schema, modelId, signal, onChunk, maxToken
       }
     }
   } catch (err) {
-    if (err.name === 'AbortError') throw err
+    if (err.name === 'AbortError' || isQuotaError(err)) throw err
     throw new Error(`AI gagal: ${err.message}`)
   }
   let data = null
@@ -121,6 +123,7 @@ Aturan:
       { role: 'user', content: `Data kandidat prospek (JSON):\n${JSON.stringify(payload)}` },
     ],
     schema: RANK_SCHEMA,
+    feature: 'leads',
     modelId,
     signal,
     onChunk,
@@ -177,6 +180,7 @@ Aturan:
       { role: 'user', content: `Susun draf penawaran untuk calon pelanggan berikut (JSON):\n${JSON.stringify(payload)}` },
     ],
     schema: OFFER_SCHEMA,
+    feature: 'offer',
     modelId,
     signal,
     onChunk,

@@ -4,6 +4,7 @@
  */
 
 import { SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from './customers/rules.js'
+import { QuotaError, announceQuota } from './quota/errors.js'
 
 const TOKEN_KEY = 'satualur_token'
 
@@ -237,12 +238,13 @@ const httpLLM = {
   },
   chat: {
     completions: {
-      async *create({ model, messages, temperature, max_tokens, response_format, signal }) {
+      // feature: the metered AI feature (src/quota/rules.js FEATURES); the Worker refuses calls without one.
+      async *create({ model, messages, temperature, max_tokens, response_format, signal, feature }) {
         let res
         try {
           res = await fetch('/api/llm/chat', {
             method: 'POST',
-            headers: authHeaders({ 'Content-Type': 'application/json' }),
+            headers: authHeaders({ 'Content-Type': 'application/json', 'X-Satualur-Feature': feature || '' }),
             body: JSON.stringify({ model, messages, temperature, max_tokens, response_format }),
             signal,
           })
@@ -256,6 +258,11 @@ const httpLLM = {
             const j = await res.json()
             message = j?.error?.message || (typeof j?.error === 'string' ? j.error : null) || j?.message || message
           } catch { /* bukan JSON */ }
+          if (res.status === 402) {
+            const err = new QuotaError(message, feature)
+            announceQuota(err)
+            throw err
+          }
           throw new Error(message)
         }
         if (!res.body) throw new Error('Respons AI kosong.')

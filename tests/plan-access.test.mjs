@@ -62,7 +62,7 @@ test('ERP integration requires enterprise and nothing else is gated', () => {
 test('the lock message names the tier in Indonesian', () => {
   const msg = planLockMessage('erpIntegration')
   assert.match(msg, /Enterprise/)
-  assert.match(msg, /tersedia pada paket/)
+  assert.match(msg, /tersedia untuk akun skala Enterprise/)
   assert.equal(planLockMessage('doesNotExist'), '')
 })
 

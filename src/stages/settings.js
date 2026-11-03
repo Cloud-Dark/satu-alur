@@ -158,7 +158,7 @@ async function withEnterpriseGate(container, render) {
 
 /** Marks a panel that only Enterprise accounts can use. */
 function enterpriseTag() {
-  return el('span', { className: 'mcp-plan-tag', title: 'Tersedia pada paket Enterprise' },
+  return el('span', { className: 'mcp-plan-tag', title: 'Tersedia untuk akun skala Enterprise' },
     icon('lock', { size: 11 }), 'Enterprise')
 }
 
@@ -175,11 +175,11 @@ function planLockedPanel(plan) {
       'Kalau perusahaan Anda sudah memakai ERP, aplikasi kasir, atau spreadsheet, Satu Alur tidak meminta Anda pindah sistem. Data yang sudah ada dihubungkan, dipetakan, lalu dipindahkan bertahap sambil dua sistem tetap berjalan.'),
     el('ul', { className: 'mcp-locked-list' }, ...bullets.map((b) => el('li', {}, b))),
     el('p', { className: 'mcp-locked-plan' },
-      `Paket Anda sekarang: ${planLabel(plan)}. `,
-      el('strong', {}, 'Fitur ini tersedia pada paket Enterprise.')),
+      `Skala akun Anda sekarang: ${planLabel(plan)}. `,
+      el('strong', {}, 'Fitur ini tersedia untuk akun skala Enterprise.')),
     el('div', { className: 'mcp-locked-actions' },
       C.button({
-        label: 'Diskusikan paket Enterprise',
+        label: 'Diskusikan akun Enterprise',
         icon: 'arrowRight',
         size: 'sm',
         variant: 'primary',

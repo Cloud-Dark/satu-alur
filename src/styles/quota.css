@@ -1,0 +1,31 @@
+/* Paket & kuota (src/quota/page.js) and the quota upsell dialog. Builds on panel, field, tag, note, btn. */
+
+.qt-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--s-5); align-items: start; }
+@media (max-width: 900px) { .qt-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.qt-plan { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-4); }
+.qt-plan-name { display: flex; align-items: center; gap: var(--s-2); font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
+.qt-credit { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.qt-credit strong { font-size: 1.15rem; color: var(--text); }
+
+.qt-rows { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-4); }
+.qt-row-head { display: flex; justify-content: space-between; gap: var(--s-3); font-size: 0.9rem; margin-bottom: 6px; }
+.qt-row-label { font-weight: 600; color: var(--text); }
+.qt-row-value { color: var(--text-muted); white-space: nowrap; }
+.qt-bar { height: 8px; border-radius: var(--r-pill); background: color-mix(in srgb, var(--line) 70%, transparent); overflow: hidden; }
+.qt-bar-fill { display: block; height: 100%; border-radius: inherit; background: var(--brand); transition: width var(--t-slow) var(--ease); }
+.qt-row.is-low .qt-bar-fill { background: var(--accent); }
+.qt-row.is-out .qt-bar-fill { background: var(--danger); }
+.qt-row.is-free .qt-bar-fill { background: repeating-linear-gradient(90deg, color-mix(in srgb, var(--brand) 35%, transparent) 0 10px, transparent 10px 16px); }
+.qt-row-note { margin-top: 6px; font-size: 0.8rem; color: var(--danger); }
+
+.qt-voucher-form { margin-top: var(--s-3); }
+.qt-voucher-form input { text-transform: uppercase; letter-spacing: 0.04em; }
+.qt-contact { margin-top: var(--s-4); display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+
+.qt-plans { background: none; }
+.qt-plans .lp-tiers { margin-top: 0; }
+
+.qt-upsell .modal-actions { flex-wrap: wrap; }
+
+@media (prefers-reduced-motion: reduce) { .qt-bar-fill { transition: none; } }

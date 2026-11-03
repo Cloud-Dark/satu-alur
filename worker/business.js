@@ -4,19 +4,20 @@
  */
 
 import { validatePlan, validateReorder } from '../src/business/plan-rules.js';
+import { parseQuota } from '../src/quota/rules.js';
 import { validatePaymentSettings, testGateway } from '../src/business/payment.js';
 import { encryptToken, decryptToken } from '../src/social/crypto.js';
 import { requireAdmin } from './office.js';
 
-const FIELDS = ['slug', 'name', 'tagline', 'price_idr', 'period', 'period_label', 'recommended', 'badge', 'limits', 'features', 'cta_label', 'cta_kind', 'sort', 'active'];
-const COLS = 'id, slug, name, tagline, price_idr, period, period_label, recommended, badge, limits_json, features_json, cta_label, cta_kind, sort, active, updated_at, updated_by';
+const FIELDS = ['slug', 'name', 'tagline', 'price_idr', 'period', 'period_label', 'recommended', 'badge', 'limits', 'features', 'quota', 'cta_label', 'cta_kind', 'sort', 'active'];
+const COLS = 'id, slug, name, tagline, price_idr, period, period_label, recommended, badge, limits_json, features_json, quota_json, cta_label, cta_kind, sort, active, updated_at, updated_by';
 
 function parseList(s) {
   try { const v = JSON.parse(s); return Array.isArray(v) ? v : []; } catch { return []; }
 }
 
-function toPlan({ limits_json, features_json, ...rest }) {
-  return { ...rest, limits: parseList(limits_json), features: parseList(features_json) };
+function toPlan({ limits_json, features_json, quota_json, ...rest }) {
+  return { ...rest, limits: parseList(limits_json), features: parseList(features_json), quota: parseQuota(quota_json) };
 }
 
 function validated(HttpError, fn) {
@@ -55,7 +56,7 @@ async function write(env, HttpError, recommended, clearStmt, stmt) {
 }
 
 const cols = (v) => [v.slug, v.name, v.tagline, v.price_idr, v.period, v.period_label, v.recommended, v.badge,
-  JSON.stringify(v.limits), JSON.stringify(v.features), v.cta_label, v.cta_kind, v.sort, v.active];
+  JSON.stringify(v.limits), JSON.stringify(v.features), JSON.stringify(v.quota), v.cta_label, v.cta_kind, v.sort, v.active];
 
 export async function handleAdminPlanCreate(request, env, deps) {
   const { readJson, ok, HttpError } = deps;
@@ -66,8 +67,8 @@ export async function handleAdminPlanCreate(request, env, deps) {
   await write(env, HttpError, v.recommended,
     env.DB.prepare('UPDATE subscription_plans SET recommended = 0 WHERE slug != ?').bind(v.slug),
     env.DB.prepare(
-      `INSERT INTO subscription_plans (slug, name, tagline, price_idr, period, period_label, recommended, badge, limits_json, features_json, cta_label, cta_kind, sort, active, updated_at, updated_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO subscription_plans (slug, name, tagline, price_idr, period, period_label, recommended, badge, limits_json, features_json, quota_json, cta_label, cta_kind, sort, active, updated_at, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(...cols(v), now, user.name));
   const row = await env.DB.prepare(`SELECT ${COLS} FROM subscription_plans WHERE slug = ?`).bind(v.slug).first();
   return ok(toPlan(row));
@@ -98,7 +99,7 @@ export async function handleAdminPlanUpdate(request, env, deps, params) {
   await write(env, HttpError, v.recommended,
     env.DB.prepare('UPDATE subscription_plans SET recommended = 0 WHERE id != ?').bind(id),
     env.DB.prepare(
-      `UPDATE subscription_plans SET slug = ?, name = ?, tagline = ?, price_idr = ?, period = ?, period_label = ?, recommended = ?, badge = ?, limits_json = ?, features_json = ?, cta_label = ?, cta_kind = ?, sort = ?, active = ?, updated_at = ?, updated_by = ?
+      `UPDATE subscription_plans SET slug = ?, name = ?, tagline = ?, price_idr = ?, period = ?, period_label = ?, recommended = ?, badge = ?, limits_json = ?, features_json = ?, quota_json = ?, cta_label = ?, cta_kind = ?, sort = ?, active = ?, updated_at = ?, updated_by = ?
        WHERE id = ?`,
     ).bind(...cols(v), new Date().toISOString(), user.name, id));
   const row = await env.DB.prepare(`SELECT ${COLS} FROM subscription_plans WHERE id = ?`).bind(id).first();

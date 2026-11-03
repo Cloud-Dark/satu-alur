@@ -172,6 +172,7 @@ export async function* runOptimization({ brief, context, model, signal, maxToken
         temperature: TEAMS[key].temperature,
         maxTokens,
         signal,
+        feature: 'income',
       })) {
         if (step.type === 'delta') { full = step.full; q.push({ type: 'team-delta', key, full }) }
         else if (step.type === 'retry') q.push({ type: 'team-retry', key })
@@ -207,6 +208,7 @@ export async function* runOptimization({ brief, context, model, signal, maxToken
       temperature: LEAD.temperature,
       maxTokens: 1100,
       signal,
+      feature: 'income',
     })) {
       if (step.type === 'delta') { lead = step.full; yield { type: 'lead-delta', full: lead } }
       else if (step.type === 'retry') yield { type: 'lead-retry' }
