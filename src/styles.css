@@ -220,6 +220,37 @@ body.scroll-lock { overflow: hidden; }
 }
 .avatar-sm { width: 34px; height: 34px; font-size: 0.72rem; background: var(--accent); color: var(--text-on-accent); box-shadow: none; }
 
+/* ---- Profile menu (topbar avatar) ---- */
+.pm-wrap { position: relative; display: inline-flex; }
+.avatar-btn { padding: 0; border: 0; background: none; border-radius: var(--r-pill); cursor: pointer; display: inline-flex; }
+.avatar-btn:focus-visible { outline: 2px solid var(--brand-500); outline-offset: 2px; }
+.avatar-btn:hover .avatar, .pm-wrap.is-open .avatar-btn .avatar { box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+.pm {
+  position: absolute; right: 0; top: calc(100% + 10px); z-index: 70;
+  width: min(300px, calc(100vw - 2 * var(--s-4)));
+  background: var(--surface); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg); padding: var(--s-2); animation: pm-in 140ms var(--ease);
+}
+@keyframes pm-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pm { animation: none; } }
+.pm-head { display: flex; gap: var(--s-3); align-items: center; padding: var(--s-3); border-bottom: 1px solid var(--line); margin-bottom: var(--s-2); }
+.pm-id { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.pm-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-email { font-size: 0.82rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-meta { display: flex; align-items: center; gap: var(--s-2); margin-top: 4px; flex-wrap: wrap; font-size: 0.78rem; }
+.pm-badge { font-size: 0.72rem; }
+.pm-badge-admin, .pm-badge-staf { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+.pm-badge-live { background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand-600, var(--brand)); }
+.pm-list { display: flex; flex-direction: column; }
+.pm-item {
+  display: flex; align-items: center; gap: var(--s-3); width: 100%; min-height: 40px; padding: 0 var(--s-3);
+  border: 0; border-radius: var(--r-md); background: none; color: var(--text); font: inherit; font-size: 0.9rem; text-align: left; cursor: pointer;
+}
+.pm-item svg { color: var(--text-muted); flex-shrink: 0; }
+.pm-item:hover, .pm-item:focus-visible { background: var(--surface-2); outline: none; }
+.pm-item.is-danger, .pm-item.is-danger svg { color: var(--danger); }
+.pm-sep { height: 1px; background: var(--line); margin: var(--s-2) 0; }
+
 /* Collapsed (desktop) */
 @media (min-width: 1024px) {
   .app-shell.is-collapsed .side-head { flex-direction: column; justify-content: center; padding: var(--s-5) 0 var(--s-3); gap: var(--s-3); }
@@ -1877,3 +1908,27 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .of-us-usage { margin: 0; padding-left: 1.1em; }
 .side-row-office { margin-bottom: 2px; }
 .row-actions { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---- Kantor › Sistem › Email: platform SMTP fields; Mesin AI provider fields ---- */
+.app-shell .of-tr-smtp, .app-shell .of-ai-provider, .app-shell .model-picker { display: flex; flex-direction: column; gap: var(--s-4); }
+.app-shell .model-picker-actions { margin-top: calc(-1 * var(--s-2)); }
+
+/* ---- Permintaan: pick the customer from the open map ---- */
+.app-shell .req-source { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.app-shell .req-picked { margin: 0; }
+.app-shell .mp-form { display: grid; grid-template-columns: 1.3fr 1fr auto; gap: var(--s-3); align-items: end; }
+.app-shell .mp-go { padding-bottom: 2px; }
+.app-shell .mp-map { flex-shrink: 0; height: 240px; border-radius: var(--r-md); border: 1px solid var(--line); overflow: hidden; background: var(--surface-2); }
+.app-shell .mp-note { margin: 0; }
+.app-shell .mp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+.app-shell .mp-item { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }
+.app-shell .mp-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.app-shell .mp-item-main > * { overflow-wrap: anywhere; }
+.app-shell .mp-item-side { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; }
+@media (max-width: 640px) {
+  .app-shell dialog.mp-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; margin: 0; }
+  .app-shell .mp-form { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .mp-map { height: 200px; }
+  .app-shell .mp-item { flex-direction: column; align-items: stretch; }
+  .app-shell .mp-item-side { justify-content: space-between; }
+}

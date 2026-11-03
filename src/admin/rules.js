@@ -79,6 +79,34 @@ export function validateEmailIntegration(input) {
   return { email_mode: 'smtp', smtp_host: host, smtp_port: port, smtp_secure: secure, smtp_user: user, smtp_from_email: fromEmail, smtp_from_name: fromName || null, smtp_pass: pass }
 }
 
+/**
+ * Platform email transport chosen by admins (system_settings key 'email_transport'):
+ * 'resend' (default) or 'smtp'. Password '' keeps the stored one; it is never sent back.
+ */
+export const PLATFORM_TRANSPORTS = ['resend', 'smtp']
+
+export function validatePlatformTransport(input) {
+  const mode = input?.mode === 'smtp' ? 'smtp' : 'resend'
+  if (mode === 'resend') return { mode: 'resend' }
+  const smtp = validateEmailIntegration({
+    email_mode: 'smtp', smtp_host: input.host, smtp_port: input.port, smtp_secure: input.secure, smtp_user: input.user,
+    smtp_from_email: input.from_email, smtp_from_name: input.from_name, smtp_pass: input.pass,
+  })
+  const replyTo = String(input.reply_to || '').trim().toLowerCase()
+  if (replyTo && !isEmail(replyTo)) fail('Alamat balasan (reply-to) tidak valid.')
+  return {
+    mode: 'smtp', host: smtp.smtp_host, port: smtp.smtp_port, secure: smtp.smtp_secure, user: smtp.smtp_user,
+    from_email: smtp.smtp_from_email, from_name: smtp.smtp_from_name, reply_to: replyTo || null, pass: smtp.smtp_pass,
+  }
+}
+
+/** What the admin UI may see of the stored transport: everything but the password. */
+export function publicTransport(stored) {
+  if (!stored || stored.mode !== 'smtp') return { mode: 'resend' }
+  const { pass_enc: _enc, ...rest } = stored
+  return { ...rest, pass_saved: Boolean(stored.pass_enc) }
+}
+
 export const AI_MODES = ['builtin', 'openai', 'anthropic']
 export const AI_MODE_LABELS = { builtin: 'Bawaan Satu Alur', openai: 'OpenAI-compatible', anthropic: 'Anthropic-compatible' }
 export const ANTHROPIC_DEFAULT_BASE = 'https://api.anthropic.com'
@@ -92,6 +120,43 @@ export function cleanBaseUrl(raw) {
   const h = u.hostname.toLowerCase()
   if (h === 'localhost' || /\.(local|internal)$/.test(h) || /^(\d+\.){3}\d+$/.test(h) || h.includes(':')) fail('Alamat API harus domain publik.')
   return `${u.origin}${u.pathname.replace(/\/+$/, '')}`
+}
+
+/**
+ * Platform AI provider chosen by admins (system_settings 'ai_provider'): what "Bawaan Satu Alur"
+ * means for live businesses. 'workers' = Workers AI (default). API key '' keeps the stored one.
+ */
+export const PLATFORM_AI_MODES = ['workers', 'openai', 'anthropic']
+export const PLATFORM_AI_LABELS = { workers: 'Workers AI (bawaan)', openai: 'OpenAI-compatible', anthropic: 'Anthropic-compatible' }
+export const OPENAI_DEFAULT_BASE = 'https://api.openai.com/v1'
+
+export function validatePlatformAi(input, { requireModel = true } = {}) {
+  const mode = PLATFORM_AI_MODES.includes(input?.mode) ? input.mode : 'workers'
+  if (mode === 'workers') return { mode: 'workers' }
+  const base = cleanBaseUrl(input.base_url || (mode === 'anthropic' ? ANTHROPIC_DEFAULT_BASE : OPENAI_DEFAULT_BASE))
+  const model = String(input.model || '').trim()
+  if (requireModel && !/^[\w.:@/-]{1,120}$/.test(model)) fail('Pilih atau ketik nama model.')
+  const key = typeof input.api_key === 'string' ? input.api_key.trim() : ''
+  if (key.length > 500) fail('API key terlalu panjang.')
+  const out = { mode, base_url: base, model, api_key: key }
+  if (input.max_tokens !== undefined && input.max_tokens !== null && input.max_tokens !== '') {
+    const n = Number(input.max_tokens)
+    if (!Number.isInteger(n) || n < 16 || n > 8192) fail('Maks token harus 16–8192.')
+    out.max_tokens = n
+  }
+  if (input.temperature !== undefined && input.temperature !== null && input.temperature !== '') {
+    const t = Number(input.temperature)
+    if (!(t >= 0 && t <= 2)) fail('Temperature harus 0–2.')
+    out.temperature = t
+  }
+  return out
+}
+
+/** What the admin UI may see of the stored platform provider: everything but the key. */
+export function publicPlatformAi(stored) {
+  if (!stored || stored.mode === 'workers' || !PLATFORM_AI_MODES.includes(stored.mode)) return { mode: 'workers' }
+  const { key_enc: _k, ...rest } = stored
+  return { ...rest, key_saved: Boolean(stored.key_enc) }
 }
 
 export function validateAiIntegration(input) {

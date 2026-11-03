@@ -5,7 +5,8 @@
  */
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
-import { getIntegrations, saveEmailIntegration, saveAiIntegration, testEmailIntegration, testAiIntegration } from '../integrations/api.js'
+import { getIntegrations, saveEmailIntegration, saveAiIntegration, testEmailIntegration, testAiIntegration, listAiModels } from '../integrations/api.js'
+import { modelPicker } from '../ui/model-picker.js'
 import { SMTP_PORTS_LIST } from '../admin/constants.js'
 import { ANTHROPIC_DEFAULT_BASE } from '../admin/rules.js'
 
@@ -106,7 +107,9 @@ function aiSection(data, container) {
   ], a.mode)
   const off = { autocomplete: 'off', spellcheck: 'false', maxlength: '300' }
   const base = C.field({ label: 'Alamat API', id: `set-ai-base-${id}`, value: a.base_url, placeholder: 'https://api.openai.com/v1', attrs: off })
-  const model = C.field({ label: 'Model', id: `set-ai-model-${id}`, value: a.model, placeholder: 'gpt-4o-mini', attrs: off })
+  const formValues = () => ({ ai_mode: mode.value(), ai_base_url: base.input.value, ai_model: model.input.value, ai_key: key.input.value })
+  const picker = modelPicker({ id: `set-ai-model-${id}`, value: a.model, placeholder: 'gpt-4o-mini', fetchModels: () => listAiModels(formValues()) })
+  const model = { input: picker.input, wrap: picker.wrap }
   const key = C.field({ label: 'API key', id: `set-ai-key-${id}`, type: 'password', placeholder: a.has_key ? KEEP : undefined,
     hint: 'Disimpan terenkripsi dan tidak pernah ditampilkan lagi.', attrs: { ...off, autocomplete: 'new-password' } })
   const box = el('div', { className: 'set-subgrid' }, base.wrap, model.wrap, key.wrap)
@@ -118,6 +121,7 @@ function aiSection(data, container) {
     if (m === 'anthropic' && !base.input.value) base.input.value = ANTHROPIC_DEFAULT_BASE
     base.input.placeholder = m === 'anthropic' ? ANTHROPIC_DEFAULT_BASE : 'https://api.openai.com/v1'
     model.input.placeholder = m === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o-mini'
+    picker.reset()
   }
   mode.wrap.addEventListener('change', sync)
   sync()
@@ -125,10 +129,14 @@ function aiSection(data, container) {
   const out = C.message()
   const save = C.button({ label: 'Simpan mesin AI', icon: 'save', variant: 'primary', size: 'sm' })
   const test = C.button({ label: 'Uji koneksi AI', icon: 'sparkles', variant: 'soft', size: 'sm' })
+  // Saving a custom provider wants a passing test with the same values (or an explicit confirm).
+  let tested = null
   save.addEventListener('click', async () => {
+    const v = formValues()
+    if (v.ai_mode !== 'builtin' && tested !== JSON.stringify(v) && !confirm('Penyedia ini belum diuji dengan nilai saat ini. Simpan tanpa uji?')) return
     const restore = C.setBusy(save, 'Menyimpan…')
     try {
-      await saveAiIntegration({ ai_mode: mode.value(), ai_base_url: base.input.value, ai_model: model.input.value, ai_key: key.input.value })
+      await saveAiIntegration(v)
       showToast('Mesin AI disimpan.', 'success')
       renderIntegrationsTab(container)
     } catch (ex) { out.show('danger', ex.message) } finally { restore() }
@@ -136,9 +144,11 @@ function aiSection(data, container) {
   test.addEventListener('click', async () => {
     const restore = C.setBusy(test, 'Menguji…')
     try {
-      const r = await testAiIntegration()
-      out.show('ok', r.mode === 'builtin' ? (r.reply || 'Mesin AI bawaan siap dipakai.') : `Terhubung ke ${r.model || 'model Anda'}: "${r.reply}".`)
-    } catch (ex) { out.show('danger', ex.message) } finally { restore() }
+      const v = formValues()
+      const r = await testAiIntegration(v)
+      tested = JSON.stringify(v)
+      out.show('ok', r.mode === 'builtin' ? (r.reply || 'Mesin AI bawaan siap dipakai.') : `Terhubung ke ${r.model || 'model Anda'}: "${r.reply}"${r.ms ? ` dalam ${r.ms} ms` : ''}.`)
+    } catch (ex) { tested = null; out.show('danger', ex.message) } finally { restore() }
   })
   return section('AI · 02', 'Mesin AI', 'Dipakai semua fitur AI: penawaran, laporan, radar, penasihat, media sosial, dan optimasi pendapatan.',
     mode.wrap, box, note, el('div', { className: 'form-actions' }, save, test), out)

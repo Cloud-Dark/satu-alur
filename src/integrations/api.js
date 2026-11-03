@@ -8,6 +8,7 @@ import { isUsingMockCloud, getCloud } from '../cloud.js'
 import { isDemoEmail } from '../auth/demo-accounts.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { validateEmailIntegration, validateAiIntegration } from '../admin/rules.js'
+import { DEMO_MODELS } from '../ai-providers/demo-models.js'
 import { isEmail } from '../admin/constants.js'
 
 const DEMO_KEY = 'satualur_integrations_demo_v1'
@@ -97,9 +98,28 @@ export async function testEmailIntegration() {
   return call('/api/integrations/email/test', { method: 'POST', body: {} })
 }
 
-export async function testAiIntegration() {
-  if (isUsingMockCloud()) { await delay(); return { mode: readDemo().ai_mode || 'builtin', reply: 'OK (simulasi)' } }
-  return call('/api/integrations/ai/test', { method: 'POST', body: {} })
+/** Tests the unsaved form values when given ({ ai_mode, ai_base_url, ai_model, ai_key }), else what is saved. */
+export async function testAiIntegration(form) {
+  if (isUsingMockCloud()) {
+    await delay(300)
+    if (form && form.ai_mode !== 'builtin') {
+      validateAiIntegration(form)
+      if (!form.ai_key && !readDemo().has_key) throw new Error('Isi API key penyedia AI.')
+      return { mode: form.ai_mode, model: form.ai_model, reply: 'OK (simulasi)', ms: 380 }
+    }
+    return { mode: readDemo().ai_mode || 'builtin', reply: 'OK (simulasi)' }
+  }
+  return call('/api/integrations/ai/test', { method: 'POST', body: form || {} })
+}
+
+/** Lists the provider's models for the unsaved form values (key '' = the saved key). */
+export async function listAiModels(form) {
+  if (isUsingMockCloud()) {
+    await delay(300)
+    if (!form.ai_key && !readDemo().has_key) throw new Error('Isi API key penyedia AI.')
+    return { supported: true, models: DEMO_MODELS[form.ai_mode] || [], simulated: true }
+  }
+  return call('/api/integrations/ai/models', { method: 'POST', body: form })
 }
 
 /** Sends an email written by the business: kind 'offer' (to the customer) or 'report' (to the owner). */

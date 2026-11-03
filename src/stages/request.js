@@ -5,6 +5,7 @@ import { openWaDialog } from '../ui/wa-dialog.js'
 import { followUpMessage } from '../wa/rules.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
+import { openMapPicker } from '../leads/picker.js'
 
 const { el } = C
 
@@ -19,6 +20,34 @@ export async function render(container, ctx = {}) {
   const requested = C.field({ label: 'Jadwal yang diminta klien', name: 'requested_at', type: 'datetime-local', hint: 'Opsional. Dipakai sebagai jadwal awal di tahap Penugasan.' })
   const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
   const reviewBox = el('div', { className: 'proposal' })
+
+  // Step 1 source: pick a business from the open map, or type it in by hand.
+  let coords = null
+  const mapBtn = C.button({ label: 'Cari dari peta', icon: 'mapPin', variant: 'soft', size: 'sm' })
+  const manualBtn = C.button({ label: 'Isi manual', icon: 'edit', variant: 'ghost', size: 'sm' })
+  const pickedNote = el('p', { className: 'muted small req-picked', hidden: true })
+  mapBtn.addEventListener('click', () => openMapPicker({
+    opener: mapBtn,
+    initialArea: location.input.value.trim(),
+    onPick: (f) => {
+      name.input.value = f.customer_name
+      if (f.location) location.input.value = f.location
+      if (f.phone) phone.input.value = f.phone
+      coords = f.lat !== null && f.lng !== null ? { lat: f.lat, lng: f.lng } : null
+      pickedNote.textContent = `Diisi dari peta: ${f.customer_name}. Periksa dan ubah bila perlu.`
+      pickedNote.hidden = false
+      ;[name, location, phone].forEach((x) => x.input.dispatchEvent(new Event('input', { bubbles: true })))
+      name.input.focus()
+    },
+  }))
+  manualBtn.addEventListener('click', () => {
+    coords = null
+    pickedNote.hidden = true
+    name.input.focus()
+  })
+  // Typing a different name by hand drops the coordinates of the picked place.
+  name.input.addEventListener('input', (e) => { if (e.isTrusted && coords) { coords = null; pickedNote.hidden = true } })
+  const sourceRow = el('div', { className: 'req-source' }, mapBtn, manualBtn)
 
   const PHONE_RE = /^[+()\d\s.-]{6,32}$/
   const values = () => ({
@@ -48,7 +77,7 @@ export async function render(container, ctx = {}) {
         key: 'customer',
         title: 'Pelanggan',
         description: 'Siapa yang meminta, dan di mana.',
-        content: [name.wrap, el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap)],
+        content: [sourceRow, pickedNote, name.wrap, el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap)],
         validate: customerErrors,
       },
       {
@@ -115,6 +144,7 @@ export async function render(container, ctx = {}) {
   async function save() {
     const data = values()
     if (requested.input.value) data.requested_at = new Date(requested.input.value).toISOString()
+    if (coords) Object.assign(data, coords)
     const restore = wiz.busy('Menyimpan…')
     try {
       const { data: created, error } = await getCloud().database.from('requests').insert(data)
@@ -130,6 +160,8 @@ export async function render(container, ctx = {}) {
       const again = C.button({ label: 'Catat permintaan lain', icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
         for (const f of [name, location, phone, service, requested, desc]) f.input.value = ''
+        coords = null
+        pickedNote.hidden = true
         reviewBox.replaceChildren()
         wiz.reset()
       })

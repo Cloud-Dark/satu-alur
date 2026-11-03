@@ -5,6 +5,7 @@
  * Every failure carries a readable Indonesian message.
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
+import { pageOf } from '../office/paging.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { PLATFORMS, validateScheduleAt, igEligibility, threadsEligibility } from './rules.js'
 import { REQUEST_STATUSES, validateServiceRequest, validateInfluencer, publicInfluencer } from '../office/rules.js'
@@ -356,12 +357,18 @@ export async function adminSaveInfluencer(row) {
     : call('/api/office/admin/influencers', { method: 'POST', body: fields })
 }
 
-export async function adminListRequests(status) {
+/** Kantor list. With { page } it returns { items, total, page, size } (server-side paging). */
+export async function adminListRequests(status, { page } = {}) {
   if (isUsingMockCloud()) {
     if (status && !REQUEST_STATUSES.includes(status)) throw new Error('Status tidak dikenal.')
-    return demo((s) => s.requests.filter((r) => !status || r.status === status).map((r) => ({ ...r, campaign_id: campaignIdOf(r.id) })).sort(newestFirst))
+    const rows = demo((s) => s.requests.filter((r) => !status || r.status === status).map((r) => ({ ...r, campaign_id: campaignIdOf(r.id) })).sort(newestFirst))
+    return page ? pageOf(rows, { page }) : rows
   }
-  return call(`/api/office/admin/requests${status ? `?status=${encodeURIComponent(status)}` : ''}`)
+  const q = new URLSearchParams()
+  if (status) q.set('status', status)
+  if (page) q.set('page', String(page))
+  const qs = q.toString()
+  return call(`/api/office/admin/requests${qs ? `?${qs}` : ''}`)
 }
 
 export async function adminUpdateRequest(id, patch) {

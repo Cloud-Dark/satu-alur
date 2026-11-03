@@ -5,7 +5,10 @@
  */
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
-import { getSystem, saveSystemSetting, testSystemEmail, testSystemAi, getSummary, getActivity, listAdmins, addAdmin, removeAdmin } from '../../admin/api.js'
+import { OFFICE_PAGE_SIZE } from '../../office/paging.js'
+import { listPlatformModels, testPlatformAi, savePlatformAi } from '../../admin/api.js'
+import { modelPicker } from '../../ui/model-picker.js'
+import { getSystem, saveSystemSetting, saveEmailTransport, testSystemEmail, testSystemAi, getSummary, getActivity, listAdmins, addAdmin, removeAdmin } from '../../admin/api.js'
 
 const { el } = C
 let seq = 0
@@ -103,10 +106,12 @@ export function drawEmail(host, ctx, setDirty) {
       const restore = C.setBusy(testBtn, 'Mengirim…')
       try {
         const r = await testSystemEmail(to.input.value.trim())
-        out.show('ok', r.simulated ? 'Simulasi: email uji dicatat (mode demo lokal).' : `Terkirim ke ${r.to} lewat ${r.provider}.`)
+        const via = PROVIDER_LABEL[r.provider] || r.provider
+        out.show('ok', r.simulated ? `Simulasi: email uji dicatat (mode demo lokal) lewat ${via}.` : `Terkirim ke ${r.to} lewat ${via}.`)
       } catch (ex) { out.show('danger', ex.message) } finally { restore() }
     })
     host.replaceChildren(
+      transportPanel(sys, ctx, setDirty),
       C.panel({ title: 'Pengiriman email', meta: 'Default: Resend' },
         C.defList([['Resend', yes(st.resend)], ['Alamat pengirim', el('code', {}, st.from)], ['Bisnis dengan SMTP sendiri', el('span', {}, C.number(st.businesses_with_smtp))]]),
         form),
@@ -115,20 +120,146 @@ export function drawEmail(host, ctx, setDirty) {
   })
 }
 
+function noKey() {
+  const m = C.message()
+  m.show('warn', 'Kunci enkripsi server belum diatur, jadi SMTP kustom belum bisa dipakai.')
+  return m
+}
+
+const PROVIDER_LABEL = { resend: 'Resend', platform_smtp: 'SMTP platform', smtp: 'SMTP bisnis', demo: 'simulasi' }
+
+/**
+ * Platform transport: Resend (default) or the admin's own SMTP server. It carries system email
+ * (login codes, notifications) and is the default for businesses without their own SMTP.
+ * If the custom SMTP fails, the Worker falls back to Resend so sign-in never breaks.
+ */
+function transportPanel(sys, ctx, setDirty) {
+  const t = sys.status.email.transport || { mode: 'resend' }
+  const n = ++seq
+  let modeValue = t.mode === 'smtp' ? 'smtp' : 'resend'
+  const mode = C.segmented({ label: 'Transport email platform', value: modeValue, options: [{ value: 'resend', label: 'Resend (bawaan)' }, { value: 'smtp', label: 'SMTP kustom' }], onChange: (v) => { modeValue = v; sync(); markDirty() } })
+  const host = C.field({ label: 'Host SMTP', id: `of-tr-host-${n}`, value: t.host || '', attrs: { placeholder: 'smtp.resend.com', autocomplete: 'off', spellcheck: 'false' } })
+  const port = C.select({ label: 'Port', id: `of-tr-port-${n}`, options: [465, 587, 2465, 2587].map((p) => ({ value: String(p), label: String(p) })), value: String(t.port || 465) })
+  const secure = C.select({ label: 'Keamanan', id: `of-tr-sec-${n}`, options: [{ value: 'tls', label: 'TLS langsung (465/2465)' }, { value: 'starttls', label: 'STARTTLS (587/2587)' }], value: t.secure || 'tls' })
+  const user = C.field({ label: 'Username', id: `of-tr-user-${n}`, value: t.user || '', attrs: { autocomplete: 'off' } })
+  const pass = C.field({ label: 'Password', id: `of-tr-pass-${n}`, type: 'password', hint: t.pass_saved ? `Tersimpan • …${t.pass_last4 || '****'}. Kosongkan untuk tetap memakai yang lama.` : 'Disimpan terenkripsi di server.', attrs: { autocomplete: 'new-password', placeholder: t.pass_saved ? '••••••••' : '' } })
+  const fromName = C.field({ label: 'Nama pengirim', id: `of-tr-fn-${n}`, value: t.from_name || '', attrs: { maxlength: '60', placeholder: 'Satu Alur' } })
+  const fromEmail = C.field({ label: 'Email pengirim', id: `of-tr-fe-${n}`, type: 'email', value: t.from_email || '', attrs: { placeholder: 'noreply@domainanda.id' } })
+  const replyTo = C.field({ label: 'Balas ke (reply-to)', id: `of-tr-rt-${n}`, type: 'email', value: t.reply_to || '', hint: 'Opsional.' })
+  port.input.addEventListener('change', () => { secure.input.value = ['465', '2465'].includes(port.input.value) ? 'tls' : 'starttls' })
+  const smtpBox = el('div', { className: 'of-tr-smtp' },
+    el('div', { className: 'form-row' }, host.wrap, port.wrap), el('div', { className: 'form-row' }, secure.wrap, user.wrap), pass.wrap,
+    el('div', { className: 'form-row' }, fromName.wrap, fromEmail.wrap), replyTo.wrap)
+  const err = el('p', { className: 'field-error', role: 'alert' })
+  const save = C.button({ label: 'Pakai transport ini', icon: 'save', variant: 'primary', type: 'submit' })
+  const read = () => ({ mode: modeValue, host: host.input.value.trim(), port: Number(port.input.value), secure: secure.input.value, user: user.input.value.trim(), pass: pass.input.value, from_name: fromName.input.value.trim(), from_email: fromEmail.input.value.trim(), reply_to: replyTo.input.value.trim() })
+  const sync = () => { smtpBox.hidden = modeValue !== 'smtp' }
+  let saved = JSON.stringify(read())
+  const markDirty = () => setDirty(JSON.stringify(read()) !== saved)
+  const form = el('form', { className: 'form', noValidate: true }, mode, smtpBox, err, el('div', { className: 'form-actions' }, save))
+  form.addEventListener('input', markDirty)
+  form.addEventListener('change', markDirty)
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    err.textContent = ''
+    const restore = C.setBusy(save, 'Menyimpan…')
+    try {
+      const r = await saveEmailTransport(read())
+      pass.input.value = ''
+      if (r.transport?.pass_saved) pass.wrap.querySelector('.field-hint').textContent = `Tersimpan • …${r.transport.pass_last4 || '****'}. Kosongkan untuk tetap memakai yang lama.`
+      saved = JSON.stringify(read())
+      setDirty(false)
+      showToast(r.transport?.mode === 'smtp' ? 'SMTP platform disimpan.' : 'Kembali memakai Resend.', 'success')
+    } catch (ex) { err.textContent = ex.message } finally { restore() }
+  })
+  sync()
+  if (!sys.status.encryption) mode.querySelector('[data-value="smtp"]')?.setAttribute('disabled', '')
+  return C.panel({ title: 'Transport email platform', meta: t.mode === 'smtp' ? 'SMTP kustom aktif' : 'Resend (bawaan)' },
+    el('p', { className: 'muted small' }, 'Dipakai untuk kode masuk, notifikasi, dan email bisnis yang belum memakai SMTP sendiri. Jika SMTP kustom gagal, email otomatis dikirim lewat Resend agar login tetap jalan.'),
+    sys.status.encryption ? '' : noKey(),
+    form)
+}
+
 /* --------------------------------------------------------------------- AI */
+
+const OPENAI_BASE = 'https://api.openai.com/v1'
+const ANTHROPIC_BASE = 'https://api.anthropic.com'
+
+/**
+ * Platform AI provider: what "Bawaan Satu Alur" runs on for every live business (quota still
+ * applies). Workers AI by default, or an OpenAI-/Anthropic-compatible provider with the
+ * platform's key. Saving needs a successful "Uji" with the same values, or an explicit confirm.
+ */
+function providerPanel(sys, setDirty) {
+  const p = sys.status.ai.provider || { mode: 'workers' }
+  const labels = sys.status.ai.provider_modes || { workers: 'Workers AI (bawaan)', openai: 'OpenAI-compatible', anthropic: 'Anthropic-compatible' }
+  const n = ++seq
+  let mode = p.mode || 'workers'
+  const seg = C.segmented({ label: 'Penyedia AI platform', value: mode, options: Object.entries(labels).map(([value, label]) => ({ value, label })), onChange: (v) => { mode = v; sync(); changed() } })
+  const base = C.field({ label: 'Alamat API', id: `of-ai-base-${n}`, value: p.base_url || '', attrs: { autocomplete: 'off', spellcheck: 'false', maxlength: '300' } })
+  const key = C.field({ label: 'API key', id: `of-ai-key-${n}`, type: 'password', hint: p.key_saved ? `Tersimpan • …${p.key_last4 || '****'}. Kosongkan untuk tetap memakai yang lama.` : 'Disimpan terenkripsi di server, tidak pernah ditampilkan lagi.', attrs: { autocomplete: 'new-password', placeholder: p.key_saved ? '••••••••' : '' } })
+  const values = () => ({ mode, base_url: base.input.value.trim(), model: picker.input.value.trim(), api_key: key.input.value.trim(), max_tokens: maxTok.input.value, temperature: temp.input.value })
+  const picker = modelPicker({ id: `of-ai-model-${n}`, value: p.model || '', fetchModels: () => listPlatformModels(values()) })
+  const maxTok = C.field({ label: 'Maks token bawaan', id: `of-ai-mt-${n}`, type: 'number', value: p.max_tokens ? String(p.max_tokens) : '', hint: 'Opsional, 16–8192.', attrs: { min: '16', max: '8192' } })
+  const temp = C.field({ label: 'Temperature bawaan', id: `of-ai-tp-${n}`, type: 'number', value: p.temperature ?? '', hint: 'Opsional, 0–2.', attrs: { min: '0', max: '2', step: '0.1' } })
+  const box = el('div', { className: 'of-ai-provider' }, base.wrap, key.wrap, picker.wrap, el('div', { className: 'form-row' }, maxTok.wrap, temp.wrap))
+  const out = C.message()
+  const testBtn = C.button({ label: 'Uji', icon: 'sparkles', variant: 'soft' })
+  const save = C.button({ label: 'Simpan penyedia', icon: 'save', variant: 'primary' })
+  let tested = null
+  const snapshot = () => JSON.stringify(values())
+  let saved = snapshot()
+  const changed = () => { tested = tested === snapshot() ? tested : null; setDirty(snapshot() !== saved) }
+  function sync() {
+    box.hidden = mode === 'workers'
+    if (mode === 'openai' && (!base.input.value || base.input.value === ANTHROPIC_BASE)) base.input.value = OPENAI_BASE
+    if (mode === 'anthropic' && (!base.input.value || base.input.value === OPENAI_BASE)) base.input.value = ANTHROPIC_BASE
+    picker.input.placeholder = mode === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o-mini'
+    picker.reset()
+  }
+  box.addEventListener('input', changed)
+  box.addEventListener('change', changed)
+  testBtn.addEventListener('click', async () => {
+    out.hide()
+    const restore = C.setBusy(testBtn, 'Menguji…')
+    try {
+      const r = await testPlatformAi(values())
+      tested = snapshot()
+      out.show('ok', `${mode === 'workers' ? 'Workers AI' : r.model} menjawab "${r.reply || '…'}" dalam ${C.number(r.ms || 0)} ms.`)
+    } catch (ex) { tested = null; out.show('danger', ex.message) } finally { restore() }
+  })
+  save.addEventListener('click', async () => {
+    out.hide()
+    if (mode !== 'workers' && tested !== snapshot() && !confirm('Penyedia ini belum diuji dengan nilai saat ini. Simpan tanpa uji?')) return
+    const restore = C.setBusy(save, 'Menyimpan…')
+    try {
+      const r = await savePlatformAi(values())
+      key.input.value = ''
+      if (r.provider?.key_saved) key.wrap.querySelector('.field-hint').textContent = `Tersimpan • …${r.provider.key_last4 || '****'}. Kosongkan untuk tetap memakai yang lama.`
+      saved = snapshot()
+      setDirty(false)
+      showToast(r.provider?.mode === 'workers' ? 'Kembali ke Workers AI.' : `Penyedia AI platform: ${labels[r.provider.mode]}.`, 'success')
+    } catch (ex) { out.show('danger', ex.message) } finally { restore() }
+  })
+  sync()
+  return C.panel({ title: 'Penyedia AI platform', meta: labels[p.mode] || labels.workers },
+    el('p', { className: 'muted small' }, 'Mesin di balik "Bawaan Satu Alur" untuk semua bisnis live (tetap memakai kuota paket). Akun demo selalu memakai AI contoh. Jika penyedia ini gagal, permintaan otomatis dijawab Workers AI dan dicatat di Log aktivitas.'),
+    sys.status.encryption ? null : (() => { const m = C.message(); m.show('warn', 'Kunci enkripsi server belum diatur, jadi API key belum bisa disimpan.'); return m })(),
+    seg, box, el('div', { className: 'form-actions' }, testBtn, save), out)
+}
 
 export function drawAi(host, ctx, setDirty) {
   loadInto(host, ctx, getSystem, (sys) => {
     const s = sys.settings.ai
     const st = sys.status.ai
-    const model = C.select({ label: 'Model bawaan', id: `of-sys-model-${++seq}`, options: st.builtin_models.map((m) => ({ value: m.id, label: m.name })), value: s.default_model })
+    const model = C.select({ label: 'Model Workers AI', id: `of-sys-model-${++seq}`, options: st.builtin_models.map((m) => ({ value: m.id, label: m.name })), value: s.default_model, hint: 'Dipakai saat penyedia platform Workers AI, dan sebagai cadangan.' })
     const allow = toggle('Izinkan bisnis memakai penyedia AI sendiri', s.allow_custom, 'OpenAI-compatible atau Anthropic-compatible, dengan API key milik bisnis. Tidak memakai kuota AI Satu Alur.')
     const form = settingsForm({
       key: 'ai', ctx, setDirty, fields: [model.wrap, allow.wrap],
       read: () => ({ default_model: model.input.value, allow_custom: allow.input.checked }),
     })
     const out = C.message()
-    const testBtn = C.button({ label: 'Uji mesin AI', icon: 'sparkles', variant: 'soft' })
+    const testBtn = C.button({ label: 'Uji Workers AI', icon: 'sparkles', variant: 'soft' })
     testBtn.addEventListener('click', async () => {
       const restore = C.setBusy(testBtn, 'Menguji…')
       try {
@@ -137,7 +268,8 @@ export function drawAi(host, ctx, setDirty) {
       } catch (ex) { out.show('danger', ex.message) } finally { restore() }
     })
     host.replaceChildren(
-      C.panel({ title: 'Mesin AI', meta: 'Workers AI (bawaan)' },
+      providerPanel(sys, setDirty),
+      C.panel({ title: 'Workers AI & bisnis', meta: 'Model cadangan' },
         C.defList([
           ['Pilihan per bisnis', el('span', {}, Object.values(st.modes).join(' · '))],
           ['Bisnis dengan penyedia sendiri', el('span', {}, C.number(st.businesses_with_custom))],
@@ -198,8 +330,11 @@ const KINDS = [
 export function drawActivity(host, ctx) {
   const kind = C.select({ label: 'Jenis email', id: `of-sys-kind-${++seq}`, options: KINDS, value: '' })
   const body = el('div', { 'aria-live': 'polite' })
+  const pg = C.pager({ label: 'log email', pageSize: OFFICE_PAGE_SIZE, sizes: [OFFICE_PAGE_SIZE], hideSize: true, onChange: () => load(pg.page), scrollTarget: () => body })
   host.replaceChildren(body)
-  const load = () => loadInto(body, ctx, () => getActivity(kind.input.value), (a) => {
+  const load = (page = 1) => loadInto(body, ctx, () => getActivity(kind.input.value, page), (a) => {
+    if (page === 1) pg.reset()
+    pg.slice(new Array(a.emails_total ?? a.emails.length))
     const emails = a.emails.length
       ? C.dataTable({
         columns: [
@@ -207,7 +342,7 @@ export function drawActivity(host, ctx) {
           { label: 'Jenis', render: (r) => KINDS.find((k) => k.value === r.kind)?.label || r.kind },
           { label: 'Penerima', render: (r) => r.recipient },
           { label: 'Bisnis', render: (r) => r.owner_email || '—' },
-          { label: 'Lewat', render: (r) => r.provider },
+          { label: 'Lewat', render: (r) => PROVIDER_LABEL[r.provider] || r.provider },
           { label: 'Status', render: (r) => C.tag(r.status === 'sent' ? 'Terkirim' : 'Gagal', r.status === 'sent' ? 'ok' : 'danger') },
         ],
         rows: a.emails,
@@ -223,18 +358,29 @@ export function drawActivity(host, ctx) {
         rows: a.usage,
       })
       : C.emptyState({ title: 'Belum ada pemakaian AI', body: `Periode ${a.period}.`, iconName: 'sparkles' })
+    const events = (a.ai_events || []).length
+      ? C.dataTable({
+        columns: [
+          { label: 'Waktu', render: (r) => C.formatDateTime(r.created_at) },
+          { label: 'Penyedia', render: (r) => r.target || '—' },
+          { label: 'Alasan', render: (r) => r.detail || '—' },
+        ],
+        rows: a.ai_events,
+      })
+      : C.emptyState({ title: 'Tidak ada gangguan', body: 'Jika penyedia AI platform gagal dan Workers AI menjawab sebagai cadangan, kejadiannya tercatat di sini.', iconName: 'sparkles' })
     body.replaceChildren(
-      C.panel({ title: 'Email terkirim', meta: '100 terbaru' }, kind.wrap, emails),
+      C.panel({ title: 'Email terkirim', meta: `${C.number(a.emails_total ?? a.emails.length)} email` }, kind.wrap, emails, pg.root),
       C.panel({ title: 'Pemakaian AI per fitur', meta: `Periode ${a.period}` }, usage),
+      C.panel({ title: 'Cadangan AI', meta: '20 terbaru' }, events),
     )
   })
-  kind.input.addEventListener('change', load)
-  load()
+  kind.input.addEventListener('change', () => load(1))
+  load(1)
 }
 
 /* ----------------------------------------------------------- Akses admin */
 
-const ACTIONS = { 'admin.add': 'Menambah admin', 'admin.remove': 'Menghapus admin', 'setting.update': 'Mengubah pengaturan', 'user.tier': 'Mengubah skala akun' }
+const ACTIONS = { 'admin.add': 'Menambah admin', 'admin.remove': 'Menghapus admin', 'setting.update': 'Mengubah pengaturan', 'user.tier': 'Mengubah skala akun', 'ai.fallback': 'AI cadangan (Workers AI) dipakai' }
 
 export function drawAccess(host, ctx) {
   const load = () => loadInto(host, ctx, listAdmins, (d) => {
@@ -249,7 +395,7 @@ export function drawAccess(host, ctx) {
       try { await addAdmin(email.input.value); showToast('Admin ditambahkan.', 'success'); if (!ctx.signal.aborted) load() } catch (ex) { err.textContent = ex.message } finally { restore() }
     })
     const rows = d.admins.length
-      ? el('div', { className: 'of-cust-list' }, d.admins.map((a) => {
+      ? C.paginate({ key: 'office-admins', label: 'daftar admin', pageSize: 10, items: d.admins, render: (page) => el('div', { className: 'of-cust-list' }, page.map((a) => {
         const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm' })
         rm.addEventListener('click', async () => {
           if (!confirm(`Cabut akses admin ${a.email}?`)) return
@@ -260,18 +406,18 @@ export function drawAccess(host, ctx) {
           el('span', { className: 'of-cust-main' }, el('strong', {}, a.email), el('span', { className: 'muted small' }, `Ditambahkan ${C.formatDate(a.added_at)} oleh ${a.added_by}`)),
           el('span', { className: 'of-cust-meta' }, d.bootstrap.includes(a.email) ? C.tag('Juga bawaan', 'brand') : null),
           el('span', { className: 'of-cust-meta' }, rm))
-      }))
+      })) }).root
       : C.emptyState({ title: 'Belum ada admin tambahan', body: 'Admin bawaan tetap bisa masuk.', iconName: 'shield' })
     const auditList = d.audit.length
-      ? C.dataTable({
+      ? C.paginate({ key: 'office-audit', label: 'catatan audit', pageSize: 10, items: d.audit, render: (page) => C.dataTable({
         columns: [
           { label: 'Waktu', render: (r) => C.formatDateTime(r.created_at) },
           { label: 'Oleh', render: (r) => r.actor },
           { label: 'Tindakan', render: (r) => ACTIONS[r.action] || r.action },
           { label: 'Sasaran', render: (r) => r.target || '—' },
         ],
-        rows: d.audit,
-      })
+        rows: page,
+      }) }).root
       : C.emptyState({ title: 'Belum ada catatan', body: 'Perubahan akses dan pengaturan akan tercatat di sini.', iconName: 'activity' })
     host.replaceChildren(
       C.panel({ title: 'Akses admin', meta: `${d.admins.length} admin` },

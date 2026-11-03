@@ -103,7 +103,7 @@ export function draw(host, ctx, setDirty) {
       return b
     }
     const list = rows.length
-      ? C.dataTable({
+      ? C.paginate({ key: 'office-vouchers', label: 'daftar voucher', pageSize: 10, items: rows, render: (pageRows) => C.dataTable({
         caption: 'Daftar voucher',
         columns: [
           { label: 'Kode', render: (v) => C.cellStack(el('span', { className: 'of-voucher-code' }, v.code), v.note || null) },
@@ -114,13 +114,13 @@ export function draw(host, ctx, setDirty) {
           { label: 'Status', render: (v) => status(v, today) },
           { label: 'Aksi', render: toggle },
         ],
-        rows,
+        rows: pageRows,
         rowAttrs: (v) => ({ dataset: { code: v.code } }),
-      })
+      }) }).root
       : C.emptyState({ title: 'Belum ada voucher', body: 'Buat voucher paket, saldo AI, atau gabungan untuk peluncuran dan calon pelanggan.', iconName: 'sprout' })
 
     const redList = reds.length
-      ? C.dataTable({
+      ? C.paginate({ key: 'office-redemptions', label: 'penukaran voucher', pageSize: 10, items: reds, render: (pageRows) => C.dataTable({
         caption: 'Penukaran voucher terbaru',
         columns: [
           { label: 'Waktu', render: (r) => C.formatDateTime(r.redeemed_at) },
@@ -129,8 +129,8 @@ export function draw(host, ctx, setDirty) {
           { label: 'Usaha', render: (r) => C.cellStack(r.company || null, r.phone || null) },
           { label: 'Tindak lanjut', render: (r) => (r.email ? el('a', { className: 'btn btn-ghost btn-sm', href: `mailto:${r.email}?subject=${encodeURIComponent('Voucher Satu Alur')}` }, 'Email') : null) },
         ],
-        rows: reds,
-      })
+        rows: pageRows,
+      }) }).root
       : C.emptyState({ title: 'Belum ada penukaran', body: 'Pengguna yang menukar voucher muncul di sini, lengkap dengan kontaknya.', iconName: 'inbox' })
 
     host.replaceChildren(

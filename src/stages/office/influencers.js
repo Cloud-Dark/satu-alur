@@ -139,8 +139,9 @@ export function draw(host, ctx, setDirty) {
         handles(i) ? el('p', { className: 'small' }, handles(i)) : null,
         el('p', { className: 'small muted' }, rateSummary(i.rates || [])), b)
     })
+    const paged = items.length ? C.paginate({ key: 'office-influencers', label: 'katalog influencer', pageSize: 10, items, render: (page) => page }).root : null
     host.replaceChildren(C.panel({ title: 'Katalog influencer', meta: `${rows.length} influencer`, actions: add },
-      ...(items.length ? items : [C.emptyState({ title: 'Belum ada influencer', iconName: 'users' })])))
+      paged || C.emptyState({ title: 'Belum ada influencer', iconName: 'users' })))
   }
   load()
 }

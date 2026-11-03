@@ -10,6 +10,7 @@
  *
  * MVP: nothing is ever sent to a lead (no email, no WhatsApp).
  */
+import { loadLeaflet } from '../leads/leaflet.js'
 import '../styles/leads.css'
 import { getCloud } from '../cloud.js'
 import * as C from '../ui/components.js'
@@ -58,17 +59,6 @@ const fmtFactor = (n) => Number(n).toLocaleString('id-ID', { minimumFractionDigi
 function parseMeta(v) {
   if (v && typeof v === 'object') return v
   try { const o = JSON.parse(v); return o && typeof o === 'object' ? o : {} } catch { return {} }
-}
-
-let leafletPromise = null
-/** Leaflet is only downloaded when this page opens. */
-function loadLeaflet() {
-  if (!leafletPromise) {
-    leafletPromise = Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')])
-      .then(([mod]) => mod.default || mod)
-      .catch((err) => { leafletPromise = null; throw err })
-  }
-  return leafletPromise
 }
 
 const cssVar = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback

@@ -8,6 +8,15 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-03 - Menu profil, paging Kantor, SMTP platform, cari pelanggan dari peta
+
+#### Ditambahkan
+- Avatar di topbar menjadi tombol menu akun (Profil saya, Paket & kuota, Pengaturan, Kantor Satu Alur / Kembali ke usaha saya untuk admin email, tema, Keluar); `PUT /api/me/profile` mengubah nama tampilan (akun demo dan staf tidak bisa).
+- Kantor › Sistem › Mesin AI: admin memilih penyedia AI platform (Workers AI, OpenAI-compatible, Anthropic-compatible) dengan daftar model dari penyedia, uji sebelum simpan, dan cadangan otomatis ke Workers AI yang tercatat di Log aktivitas. Pengaturan › Email & AI bisnis mendapat "Ambil daftar model" dan uji nilai yang belum disimpan.
+- Kantor › Sistem › Email: admin memilih transport email platform, Resend atau SMTP kustom (password terenkripsi), dengan cadangan otomatis ke Resend.
+- Paging di semua daftar Kantor (server untuk Permintaan dan Log aktivitas) dan di daftar bisnis yang sebelumnya tanpa batas (konten & jadwal media sosial, unggahan Repliz, permintaan kolaborasi/iklan, tiket Bantuan).
+- Wizard Permintaan: tombol "Cari dari peta" (OpenStreetMap lewat pencari prospek; akun demo memakai data contoh) dan "Isi manual". Migrasi `0016_request_coords.sql` menambah `requests.lat/lng` (nullable).
+
 ### 2026-11-03 - Google Identity Services
 
 #### Ditambahkan

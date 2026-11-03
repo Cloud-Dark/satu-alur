@@ -129,7 +129,7 @@ export async function render(container, ctx) {
     }
     if (!live(mine)) return
     body.replaceChildren(panel(rows.length
-      ? el('div', { className: 'of-cust-list' }, ...rows.map(row))
+      ? C.paginate({ key: 'support-tickets', label: 'tiket bantuan', pageSize: 10, items: rows, render: (page) => el('div', { className: 'of-cust-list' }, ...page.map(row)) }).root
       : C.emptyState({ title: 'Belum ada tiket', body: 'Buat tiket bila ada kendala teknis, tagihan, atau akun.', iconName: 'inbox' })))
   }
 
