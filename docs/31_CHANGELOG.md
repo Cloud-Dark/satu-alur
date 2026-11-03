@@ -8,6 +8,17 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-03 - Google Identity Services
+
+#### Ditambahkan
+- Tombol resmi "Lanjutkan dengan Google" dan One Tap (Google Identity Services, FedCM bila didukung peramban) di halaman Masuk (`src/auth/gis.js`). Script GIS dimuat hanya di halaman Masuk dan hanya bila Google dikonfigurasi; bila gagal dimuat, tombol redirect lama tetap dipakai.
+- `GET /api/auth/google/nonce` dan `POST /api/auth/google/credential`: ID token diverifikasi di Worker (RS256 dengan JWKS Google yang di-cache, `iss`, `aud`, `exp`, `email_verified`, nonce sekali pakai), lalu sesi dibuat seperti login lain. Batas 30 permintaan per 10 menit per IP.
+- Migrasi `0015_gis_nonces.sql` (tabel `gis_nonces`).
+- `/api/auth/providers` kini menyertakan `google_client_id` bila Google aktif.
+
+#### Diubah
+- Jalur redirect Google juga menolak alamat 9 akun demo (masuk lewat tab "Akun demo").
+
 ### 2026-11-03 - Integrasi milik usaha: WhatsApp (WAPilot/WAConsole) dan Repliz
 
 #### Ditambahkan

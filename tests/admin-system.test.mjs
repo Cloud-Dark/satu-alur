@@ -395,7 +395,7 @@ test('worker: Google hand-off code is single use and creates a session', async (
   if (!ctx) return
   const { default: worker } = await import('../worker/index.js')
   const call = caller(worker, ctx.env)
-  assert.deepEqual(await call(null, 'GET', '/api/auth/providers'), { google: true, otp_email: true, demo_login: true })
+  assert.deepEqual(await call(null, 'GET', '/api/auth/providers'), { google: true, google_client_id: 'cid', otp_email: true, demo_login: true })
   const code = 'abcdefghijklmnopqrstuvwxyz0123456789'
   ctx.sqlite.prepare("INSERT INTO oauth_logins (id, kind, value, expires_at) VALUES (?, 'handoff', 'bob', '2099-01-01T00:00:00Z')")
     .run(createHash('sha256').update(code).digest('hex'))

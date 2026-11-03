@@ -68,7 +68,7 @@ import {
   handleIntegrationsGet, handleIntegrationsEmailSave, handleIntegrationsAiSave, handleIntegrationsEmailTest,
   handleIntegrationsAiTest, handleEmailSend,
 } from './integrations.js';
-import { handleAuthProviders, handleGoogleStart, handleGoogleCallback, handleGoogleExchange } from './google.js';
+import { handleAuthProviders, handleGoogleStart, handleGoogleCallback, handleGoogleExchange, handleGoogleNonce, handleGoogleCredential } from './google.js';
 import {
   handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
   handleAdminUserDetail, handleAdminUserTier, handleAdminsList, handleAdminsAdd, handleAdminsRemove,
@@ -1089,6 +1089,8 @@ const ROUTES = {
   'GET /api/auth/google/start': (req, env) => handleGoogleStart(req, env, ROUTE_DEPS),
   'GET /api/auth/google/callback': (req, env) => handleGoogleCallback(req, env, ROUTE_DEPS),
   'POST /api/auth/google/exchange': (req, env) => handleGoogleExchange(req, env, ROUTE_DEPS),
+  'GET /api/auth/google/nonce': (req, env) => handleGoogleNonce(req, env, ROUTE_DEPS),
+  'POST /api/auth/google/credential': (req, env) => handleGoogleCredential(req, env, ROUTE_DEPS),
   'GET /api/integrations': (req, env) => handleIntegrationsGet(req, env, ROUTE_DEPS),
   'PUT /api/integrations/email': (req, env) => handleIntegrationsEmailSave(req, env, ROUTE_DEPS),
   'PUT /api/integrations/ai': (req, env) => handleIntegrationsAiSave(req, env, ROUTE_DEPS),

@@ -39,7 +39,7 @@ Sumber: `wrangler.toml`, `package.json`, `vite.config.js`, `src/cloud.js`. Pemas
 | `EMAIL_FROM` | var | `"Satu Alur <noreply@apipedia.id>"` | Alamat pengirim email platform. Nama tampilan bisa diganti admin di Kantor › Sistem › Email. |
 | `ADMIN_EMAILS` | var | `"apipedia22@gmail.com"` | Email (dipisah koma) yang otomatis menjadi admin Kantor Satu Alur saat masuk dengan kode email atau Google. Hanya berlaku saat `DEMO_OTP` bukan `"true"`. Akun staf (`/super-admin-login`) tetap berlaku terpisah. |
 | `TOKEN_KEY` | secret | `openssl rand -base64 32` | Kunci AES-GCM 32 byte. Mengenkripsi token Meta/Threads, password SMTP pribadi bisnis, dan API key AI milik bisnis. Tanpa kunci ini opsi "SMTP sendiri" dan "penyedia AI sendiri" mati (semua memakai bawaan). Mengganti kunci membuat data terenkripsi lama tidak bisa dibuka (bisnis harus menyimpan ulang). |
-| `GOOGLE_CLIENT_ID` | var | ID klien OAuth | "Masuk dengan Google". Tombol hanya muncul bila ini dan `GOOGLE_CLIENT_SECRET` ada. |
+| `GOOGLE_CLIENT_ID` | var | ID klien OAuth | "Masuk dengan Google". Tombol hanya muncul bila ini dan `GOOGLE_CLIENT_SECRET` ada. Juga dikirim ke peramban (`/api/auth/providers`) untuk Google Identity Services; Authorized JavaScript origin di Google Cloud wajib berisi `https://satu-alur.apipedia.workers.dev`. Lihat [integrations/google-login.md](integrations/google-login.md). |
 | `GOOGLE_CLIENT_SECRET` | secret | rahasia klien OAuth | Dipakai Worker saat menukar kode Google. Redirect URI: `<PUBLIC_BASE_URL atau origin>/api/auth/google/callback` (produksi: `https://satu-alur.apipedia.workers.dev/api/auth/google/callback`). |
 | `PUBLIC_BASE_URL` | var | origin tanpa `/` di akhir | Bila kosong, redirect Google memakai origin permintaan. |
 ## Binding yang Dibaca Worker

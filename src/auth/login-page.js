@@ -9,7 +9,8 @@
  * panel becomes a compact band above the card.
  */
 import '../styles/auth.css'
-import { sendEmailCode, submitEmailOtp, loginWithDemo, authProviders, finishGoogleLogin } from './auth.js'
+import { sendEmailCode, submitEmailOtp, loginWithDemo, authProviders, finishGoogleLogin, googleNonce, loginWithGoogleCredential } from './auth.js'
+import { mountGoogleIdentity } from './gis.js'
 import { DEMO_ACCOUNTS, DEMO_SCALES } from './demo-accounts.js'
 import { AUTH_NOTICE_KEY } from '../customers/rules.js'
 import { enhanceSelect } from '../ui/combobox.js'
@@ -249,8 +250,11 @@ export function renderLoginPage(root, ctx = {}) {
   // "Masuk dengan Google": shown only when the server has Google configured (GET /api/auth/providers).
   const googleBtn = h('a', { class: 'btn btn-soft btn-lg auth-google', href: '/api/auth/google/start' },
     h('span', { class: 'auth-google-mark', 'aria-hidden': 'true', html: GOOGLE_MARK }), h('span', { class: 'auth-btn-label' }, 'Masuk dengan Google'))
+  // Google Identity Services renders the official button (FedCM where supported) into gisSlot;
+  // the redirect link above stays as the fallback when GIS can't load.
+  const gisSlot = h('div', { class: 'auth-gis', role: 'group', 'aria-label': 'Masuk dengan Google' })
   const googleBox = h('div', { class: 'auth-google-box', hidden: true },
-    h('p', { class: 'auth-or', 'aria-hidden': 'true' }, h('span', {}, 'atau')), googleBtn)
+    h('p', { class: 'auth-or', 'aria-hidden': 'true' }, h('span', {}, 'atau')), gisSlot, googleBtn)
   const livePanel = h('div', { class: 'auth-live', id: 'auth-live', role: 'tabpanel', 'aria-labelledby': 'auth-mode-live' }, stepper, emailForm, codeForm, googleBox)
   const card = h('div', { class: 'auth-card surface' },
     modeSwitch,
@@ -701,7 +705,34 @@ export function renderLoginPage(root, ctx = {}) {
   if (/[?&]demo\b/.test(location.hash)) setMode('demo')
 
   /* ---- Google sign-in: show the button when configured; finish a returning flow ---- */
-  authProviders().then((p) => { if (!disposed) googleBox.hidden = !p?.google })
+  let gis = null
+  function onGoogleCredential(credential, nonce) {
+    if (disposed) return
+    say('Memeriksa akun Google…', 'info')
+    loginWithGoogleCredential(credential, nonce)
+      .then((result) => { if (!disposed) { say('Berhasil. Membuka dasbor…', 'ok'); ctx.onSignedIn?.(result?.user) } })
+      .catch((err) => {
+        if (disposed) return
+        say(err?.message || 'Masuk dengan Google gagal. Coba lagi.', 'error')
+        gis?.retry().catch(() => {}) // the nonce is spent; get a fresh one for the next try
+      })
+  }
+  authProviders().then((p) => {
+    if (disposed) return
+    googleBox.hidden = !p?.google
+    if (!p?.google || !p.google_client_id) { gisSlot.remove(); return }
+    mountGoogleIdentity({
+      container: gisSlot, clientId: p.google_client_id, mock: Boolean(p.gis_mock),
+      getNonce: googleNonce, onCredential: onGoogleCredential,
+    })
+      .then((ctrl) => {
+        if (disposed) { ctrl.cancel(); return }
+        gis = ctrl
+        googleBtn.hidden = true
+        googleBox.classList.add('has-gis')
+      })
+      .catch(() => { gisSlot.remove() }) // blocked/offline/unsupported: keep the redirect button
+  })
   const back = new URLSearchParams(location.hash.split('?')[1] || '')
   if (back.get('google_error')) say(back.get('google_error'), 'error')
   if (back.get('google')) {
@@ -737,6 +768,7 @@ export function renderLoginPage(root, ctx = {}) {
 
   return () => {
     disposed = true
+    gis?.cancel()
     stopResend()
     clearTimeout(successTimer)
     clearTimeout(enterTimer)

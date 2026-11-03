@@ -843,4 +843,10 @@
 .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .auth-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; text-decoration: none; }
 .auth-google-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; }
+.auth-google[hidden] { display: none; }
+/* Official GIS button: Google sizes it (max 400px); keep it centred and reserve its height. */
+.auth-gis { display: flex; justify-content: center; min-height: 44px; }
+.auth-gis:empty { display: none; }
+.gis-mock-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; width: 100%; max-width: 400px; padding: 0 20px; border-radius: 999px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; font: 500 0.94rem/1 var(--font-sans, system-ui); cursor: pointer; }
+.gis-mock-btn[data-theme='filled_black'] { background: #131314; color: #e3e3e3; border-color: #8e918f; }
 .auth-form-code:not([hidden]) ~ .auth-google-box { display: none; }

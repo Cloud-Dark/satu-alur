@@ -69,3 +69,63 @@ export function validateIdTokenClaims(claims, { clientId, now = Date.now() }) {
   if (!email || !email.includes('@')) bad('Akun Google tidak punya email.')
   return { email, name: typeof claims.name === 'string' ? claims.name.slice(0, 100) : null, sub: String(claims.sub || '') }
 }
+
+/* ------------------------------------------------- Google Identity Services (ID token) */
+
+export const GOOGLE_JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs'
+export const GIS_SCRIPT_URL = 'https://accounts.google.com/gsi/client'
+
+const b64urlBytes = (s) => {
+  const bin = atob(String(s).replace(/-/g, '+').replace(/_/g, '/'))
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0))
+}
+
+/** Splits a compact JWS into its parts; returns null when it is not one. */
+export function parseJwt(jwt) {
+  const parts = String(jwt || '').split('.')
+  if (parts.length !== 3 || parts.some((p) => !/^[A-Za-z0-9_-]+$/.test(p))) return null
+  try {
+    const json = (p) => JSON.parse(new TextDecoder().decode(b64urlBytes(p)))
+    return {
+      header: json(parts[0]),
+      payload: json(parts[1]),
+      signingInput: new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
+      signature: b64urlBytes(parts[2]),
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Seconds to keep Google's JWKS, from its Cache-Control header (bounded to 5 min … 24 h). */
+export function jwksMaxAge(cacheControl) {
+  const m = /max-age=(\d+)/i.exec(String(cacheControl || ''))
+  const s = m ? Number(m[1]) : 3600
+  return Math.min(24 * 3600, Math.max(300, s))
+}
+
+export const importRsaJwk = (jwk) => crypto.subtle.importKey(
+  'jwk', { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: 'RS256', ext: true },
+  { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify'],
+)
+
+/**
+ * Verifies a Google ID token from Google Identity Services (button / One Tap): RS256 signature
+ * against Google's published keys (getKey(kid) → CryptoKey), then the OpenID claims, then the
+ * nonce this server issued. Returns { email, name, sub } or throws a user-facing Error.
+ */
+export async function verifyGoogleIdToken(jwt, { clientId, nonce, getKey, now = Date.now() }) {
+  const bad = (m) => { throw new Error(m) }
+  const t = parseJwt(jwt)
+  if (!t) bad('Token Google tidak valid.')
+  if (t.header?.alg !== 'RS256' || typeof t.header?.kid !== 'string') bad('Token Google tidak valid.')
+  const key = await getKey(t.header.kid)
+  if (!key) bad('Kunci tanda tangan Google tidak dikenal. Coba lagi.')
+  const ok = await crypto.subtle.verify({ name: 'RSASSA-PKCS1-v1_5' }, key, t.signature, t.signingInput)
+  if (!ok) bad('Tanda tangan token Google tidak valid.')
+  const claims = t.payload
+  // iss, aud, exp, iat (5 min future skew) and email_verified; Google ID tokens live one hour.
+  const profile = validateIdTokenClaims(claims, { clientId, now })
+  if (!nonce || claims.nonce !== nonce) bad('Sesi masuk Google tidak cocok. Muat ulang halaman lalu coba lagi.')
+  return profile
+}

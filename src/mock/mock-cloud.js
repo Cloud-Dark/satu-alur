@@ -157,9 +157,41 @@ const mockAuth = {
     return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
-  // Google sign-in is a Worker flow; the mock has no Google, so these say so.
-  async providers() { return { google: false, otp_email: false, demo_login: true } },
+  // Google sign-in is a Worker flow; the mock has no Google. localStorage satualur_mock_google
+  // turns on a Google Identity Services sign-in for dev/e2e.
+  async providers() {
+    // '1' = simulated GIS button; 'script' = load the real GIS script (e2e blocks it to test the fallback).
+    let gis = null
+    try { gis = localStorage.getItem('satualur_mock_google') } catch { /* storage off */ }
+    return gis === '1' || gis === 'script'
+      ? { google: true, google_client_id: 'mock-gis-client', gis_mock: gis === '1', otp_email: false, demo_login: true }
+      : { google: false, otp_email: false, demo_login: true }
+  },
   async googleExchange() { throw new Error('Masuk dengan Google tidak tersedia di mode demo lokal.') },
+  async googleNonce() {
+    const nonce = crypto.randomUUID().replace(/-/g, '')
+    const store = JSON.parse(sessionStorage.getItem('satualur_mock_gis_nonces') || '[]')
+    sessionStorage.setItem('satualur_mock_gis_nonces', JSON.stringify([...store, nonce].slice(-5)))
+    return { data: { nonce }, error: null }
+  },
+  async googleCredential({ credential, nonce }) {
+    const store = JSON.parse(sessionStorage.getItem('satualur_mock_gis_nonces') || '[]')
+    if (!store.includes(nonce)) throw new Error('Sesi masuk Google sudah kedaluwarsa. Muat ulang halaman lalu coba lagi.')
+    sessionStorage.setItem('satualur_mock_gis_nonces', JSON.stringify(store.filter((n) => n !== nonce)))
+    let claims = null
+    try { claims = JSON.parse(decodeURIComponent(escape(atob(String(credential).replace(/^mockgis\./, ''))))) } catch { /* invalid */ }
+    if (!claims?.email || claims.nonce !== nonce || claims.email_verified !== true) throw new Error('Token Google tidak valid.')
+    const users = ensureTable('users')
+    let user = users.find(u => u.email === claims.email)
+    if (!user) {
+      user = { id: crypto.randomUUID(), email: claims.email, name: claims.name || claims.email.split('@')[0], created_at: new Date().toISOString() }
+      users.push(user)
+      persist()
+    }
+    refuseSuspended(user)
+    startSession(user)
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
+  },
 
   async demoLogin({ email }) {
     const users = ensureTable('users')

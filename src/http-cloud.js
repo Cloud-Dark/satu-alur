@@ -102,6 +102,22 @@ const httpAuth = {
     return { data: { user }, error: null }
   },
 
+  async googleNonce() {
+    const res = await request('/api/auth/google/nonce')
+    if (res.error) throw new Error(res.error.message)
+    return { data: res.data, error: null }
+  },
+
+  /** Google Identity Services: verified on the Worker, then a normal session. */
+  async googleCredential({ credential, nonce }) {
+    const res = await request('/api/auth/google/credential', { method: 'POST', body: { credential, nonce } })
+    if (res.error) throw new Error(res.error.message)
+    const { user, access_token } = res.data
+    setToken(access_token)
+    notifyAuth('SIGNED_IN', { user, access_token })
+    return { data: { user }, error: null }
+  },
+
   async providers() {
     const res = await request('/api/auth/providers')
     return res.data || { google: false, otp_email: true, demo_login: true }
