@@ -21,8 +21,8 @@ test('isDemoEmail / demoAccount are case-insensitive', () => {
   assert.equal(demoAccount('x@y.z'), null)
 })
 
-test('client list matches DEMO_EMAILS in worker/index.js', async () => {
-  const src = await readFile(new URL('../worker/index.js', import.meta.url), 'utf8')
+test('client list matches DEMO_EMAILS in worker/demo.js', async () => {
+  const src = await readFile(new URL('../worker/demo.js', import.meta.url), 'utf8')
   const block = src.match(/const DEMO_EMAILS = new Set\(\[([\s\S]*?)\]\)/)
   assert.ok(block, 'DEMO_EMAILS found in worker')
   const worker = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()

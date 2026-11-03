@@ -8,6 +8,7 @@
  */
 
 import { handleLeadSearch, handleLeadGeocode, handleLeadSources } from './leads.js';
+import { DEMO_EMAILS } from './demo.js';
 import { handleStaffLogin } from './staff.js';
 import {
   handleSocialAccount, handleSocialDisconnect, handleSocialOauthStart, handleSocialOauthCallback,
@@ -370,11 +371,6 @@ async function handleVerifyOtp(request, env) {
 
 // Demo accounts (seeded by scripts/seed-demo.mjs). Keep in sync with
 // src/auth/demo-accounts.js. Set DEMO_LOGIN = "false" to disable.
-const DEMO_EMAILS = new Set([
-  'demo-ac@satualur.id', 'demo-cleaning@satualur.id', 'demo-listrik@satualur.id',
-  'demo-pest@satualur.id', 'demo-laundry@satualur.id', 'demo-dinding@satualur.id',
-  'demo-mall@satualur.id', 'demo-fm@satualur.id', 'demo-rs@satualur.id',
-]);
 
 async function handleDemoLogin(request, env) {
   if (env.DEMO_LOGIN === 'false') throw new HttpError(403, 'Mode demo tidak aktif.');

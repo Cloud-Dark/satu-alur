@@ -15,11 +15,16 @@
  *
  * Rate limit: 20 searches and 60 address lookups per user per hour, counted
  * in the Cache API (no D1 writes) with an in-memory fallback.
+ *
+ * Demo accounts never reach any of these sources: they get fictional
+ * businesses and an offline gazetteer (src/leads/demo.js).
  */
 import {
   validateKeywords, roundSearch, cacheKeyOf, buildOverpassQuery, leadsFromOverpass, inIndonesia, specForKeyword,
   haversineKm, cleanPhone, cleanWebsite, dedupeLeads, MIN_RADIUS_KM, MAX_RADIUS_KM, MAX_RESULTS, OVERPASS_TIMEOUT_S,
 } from '../src/leads/osm.js';
+import { demoSearch, demoGeocode } from '../src/leads/demo.js';
+import { isDemoUser } from './demo.js';
 
 const USER_AGENT = 'SatuAlur/0.1 (lead finder for Indonesian service businesses; https://github.com/Cloud-Dark/satu-alur)';
 const OVERPASS_DEFAULT = 'https://overpass-api.de/api/interpreter';
@@ -311,6 +316,13 @@ async function searchGoogle(env, search, HttpError) {
 export async function handleLeadSearch(request, env, { authenticate, readJson, ok, HttpError }) {
   const { user } = await authenticate(request, env);
   const search = parseSearchBody(await readJson(request, 8 * 1024), HttpError);
+  if (isDemoUser(user)) {
+    try {
+      return ok(demoSearch({ lat: search.lat, lon: search.lon, radiusKm: search.radiusKm, keywords: search.keywords, seed: user.id }));
+    } catch (e) {
+      throw new HttpError(400, e.message);
+    }
+  }
   const googleOn = Boolean(env.GOOGLE_PLACES_API_KEY);
   if (search.source === 'google' && !googleOn) throw new HttpError(400, 'Google Places belum diaktifkan di server ini.');
 
@@ -355,6 +367,7 @@ export async function handleLeadGeocode(request, env, { authenticate, ok, HttpEr
   const { user } = await authenticate(request, env);
   const q = String(new URL(request.url).searchParams.get('q') || '').replace(/\s+/g, ' ').trim();
   if (q.length < 3 || q.length > 120 || /[<>{}\\]/.test(q)) throw new HttpError(400, 'Alamat minimal 3 huruf dan maksimal 120 karakter.');
+  if (isDemoUser(user)) return ok(demoGeocode(q));
   const key = q.toLowerCase();
   const hit = await cacheGet('geo', key);
   if (hit) return ok(hit);
@@ -387,6 +400,7 @@ export async function handleLeadGeocode(request, env, { authenticate, ok, HttpEr
 }
 
 export async function handleLeadSources(request, env, { authenticate, ok }) {
-  await authenticate(request, env);
+  const { user } = await authenticate(request, env);
+  if (isDemoUser(user)) return ok({ osm: true, google: false, demo: true, max_radius_km: MAX_RADIUS_KM, searches_per_hour: SEARCHES_PER_HOUR });
   return ok({ osm: true, google: Boolean(env.GOOGLE_PLACES_API_KEY), max_radius_km: MAX_RADIUS_KM, searches_per_hour: SEARCHES_PER_HOUR });
 }

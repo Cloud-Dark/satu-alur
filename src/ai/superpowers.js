@@ -10,18 +10,30 @@ import { isQuotaError } from '../quota/errors.js'
  */
 
 // ---- Conversation Memory ----
+// Stored per signed-in account so a demo session and a live account on the
+// same browser never see each other's chats. The shell calls setOwner().
 const MEMORY_KEY = 'satualur_ai_memory'
 const MAX_HISTORY = 20
+let owner = 'anon'
+
+/** Scopes conversation memory and analytics to one account (user id). */
+export function setOwner(id) {
+  owner = id ? String(id) : 'anon'
+  // Drop the pre-scoping device-wide keys: they cannot be attributed to an account.
+  try { localStorage.removeItem(MEMORY_KEY); localStorage.removeItem(ANALYTICS_KEY) } catch { /* storage unavailable */ }
+}
+const memoryKey = () => `${MEMORY_KEY}:${owner}`
+const analyticsKey = () => `${ANALYTICS_KEY}:${owner}`
 
 function loadMemory() {
   try {
-    const memory = JSON.parse(localStorage.getItem(MEMORY_KEY) || '{}')
+    const memory = JSON.parse(localStorage.getItem(memoryKey()) || '{}')
     return memory && typeof memory === 'object' && !Array.isArray(memory) ? memory : {}
   } catch { return {} }
 }
 
 function saveMemory(memory) {
-  try { localStorage.setItem(MEMORY_KEY, JSON.stringify(memory)) } catch { /* storage penuh atau diblokir */ }
+  try { localStorage.setItem(memoryKey(), JSON.stringify(memory)) } catch { /* storage penuh atau diblokir */ }
 }
 
 let fallbackSessionId = null
@@ -374,12 +386,12 @@ export function trackAnalytics(event) {
   data.push({ ...event, timestamp: Date.now() })
   // Keep last 100 events
   if (data.length > 100) data.shift()
-  try { localStorage.setItem(ANALYTICS_KEY, JSON.stringify(data)) } catch { /* analytics bersifat opsional */ }
+  try { localStorage.setItem(analyticsKey(), JSON.stringify(data)) } catch { /* analytics bersifat opsional */ }
 }
 
 export function getAnalytics() {
   try {
-    const data = JSON.parse(localStorage.getItem(ANALYTICS_KEY) || '[]')
+    const data = JSON.parse(localStorage.getItem(analyticsKey()) || '[]')
     return Array.isArray(data) ? data : []
   } catch { return [] }
 }

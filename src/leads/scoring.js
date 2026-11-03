@@ -279,14 +279,17 @@ const SAMPLE_NAMES = {
   supermarket: [['Swalayan Sumber Rejeki', 'shop', 'supermarket'], ['Minimarket Berkah', 'shop', 'convenience']],
 }
 
+const SAMPLE_STREETS = ['Jl. Merdeka', 'Jl. Sudirman', 'Jl. Melati', 'Jl. Pahlawan', 'Jl. Diponegoro', 'Jl. Kenanga', 'Jl. Raya Utama', 'Jl. Cempaka', 'Jl. Gatot Subroto', 'Jl. Anggrek']
+
 /**
- * Deterministic sample around a point for demo mode (no network). The UI
- * labels these "Data contoh (mode demo)". Phone numbers use a 0000 block so
- * they are obviously not real.
+ * Deterministic sample around a point for demo accounts (no network). The UI
+ * labels these "Data contoh (akun demo)". Addresses end in "(contoh)" and
+ * phone numbers use the 0812-0000 block so they are obviously not real.
+ * `seed` (e.g. the owner id) varies the sample per account; same input, same output.
  */
-export function sampleLeads({ lat, lon, radiusKm, keywords }) {
+export function sampleLeads({ lat, lon, radiusKm, keywords, seed = '' }) {
   const origin = { lat, lon }
-  const rand = seededRandom(`${lat.toFixed(3)}|${lon.toFixed(3)}|${[...keywords].sort().join(',')}`)
+  const rand = seededRandom(`${seed}|${lat.toFixed(3)}|${lon.toFixed(3)}|${[...keywords].sort().join(',')}`)
   const rows = []
   let n = 0
   for (const kw of [...keywords].sort()) {
@@ -306,8 +309,8 @@ export function sampleLeads({ lat, lon, radiusKm, keywords }) {
         tags: { [k]: v },
         lat: Math.round(p.lat * 1e6) / 1e6,
         lon: Math.round(p.lon * 1e6) / 1e6,
-        address: rand() < 0.7 ? `Jl. Contoh No. ${1 + Math.floor(rand() * 120)}` : '',
-        phone: hasPhone ? `+62812000000${String(10 + n).slice(-2)}` : '',
+        address: rand() < 0.8 ? `${SAMPLE_STREETS[Math.floor(rand() * SAMPLE_STREETS.length)]} No. ${1 + Math.floor(rand() * 120)} (contoh)` : '',
+        phone: hasPhone ? `0812-0000-${String(1000 + Math.floor(rand() * 9000))}` : '',
         website: hasWeb ? `https://contoh-${n}.example` : '',
         distance_km: 0,
         matched: [kw],

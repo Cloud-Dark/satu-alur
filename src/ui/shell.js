@@ -9,6 +9,7 @@ import { el, button, infoTip } from './components.js'
 import { animateView } from './animations.js'
 import { isUsingMockCloud } from '../cloud.js'
 import { loadFlow } from '../stages/data.js'
+import { setOwner as setAiOwner } from '../ai/superpowers.js'
 
 import * as StageDashboard from '../stages/dashboard.js'
 import * as StageRequest from '../stages/request.js'
@@ -112,6 +113,7 @@ function initials(user) {
 
 export function renderShell(root, ctx) {
   const user = ctx.user || {}
+  setAiOwner(user.id) // AI chat memory is per account, never shared on a device
   const staff = ctx.isAdmin === true
   const stages = staff ? STAFF_STAGES : STAGES
   const storeKey = staff ? STAFF_KEY : STAGE_KEY
