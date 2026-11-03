@@ -131,6 +131,12 @@ const httpAuth = {
     return httpAuth.getSession()
   },
 
+  async updateProfile({ name }) {
+    const res = await request('/api/me/profile', { method: 'PUT', body: { name } })
+    if (res.error) throw new Error(res.error.message)
+    return res.data
+  },
+
   async getUser() {
     return httpAuth.getSession()
   },

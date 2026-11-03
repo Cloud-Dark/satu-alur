@@ -5,6 +5,7 @@ import { REQUEST_STATUS_LABEL } from '../../social/rules.js'
 import { GOALS } from '../social-media/requests.js'
 import { adminCreateCampaign } from '../../agency/api.js'
 import { openCampaignEditor } from './campaigns.js'
+import { OFFICE_PAGE_SIZE } from '../../office/paging.js'
 
 const { el } = C
 const FILTERS = [{ value: 'new', label: 'Baru' }, { value: 'in_progress', label: 'Diproses' }, { value: 'done', label: 'Selesai' }, { value: 'all', label: 'Semua' }]
@@ -71,20 +72,25 @@ function requestCard(r, onSaved, ctx, setDirty) {
 export function draw(host, ctx, setDirty) {
   const list = el('div')
   let run = 0
-  async function load() {
+  const pg = C.pager({ label: 'daftar permintaan', pageSize: OFFICE_PAGE_SIZE, sizes: [OFFICE_PAGE_SIZE], hideSize: true, onChange: () => load(pg.page), scrollTarget: () => list })
+  async function load(page = 1) {
     const mine = ++run
     list.replaceChildren(C.skeletonRows(3))
-    let rows
-    try { rows = await Social.adminListRequests(filter === 'all' ? undefined : filter) } catch (e) {
+    let data
+    try { data = await Social.adminListRequests(filter === 'all' ? undefined : filter, { page }) } catch (e) {
       if (!ctx.signal.aborted && mine === run) list.replaceChildren(C.errorState(e.message))
       return
     }
     if (ctx.signal.aborted || mine !== run) return
-    rows.sort((a, b) => (b.created_at < a.created_at ? -1 : b.created_at > a.created_at ? 1 : b.id - a.id))
-    list.replaceChildren(...(rows.length ? rows.map((r) => requestCard(r, load, ctx, setDirty))
+    if (page === 1) pg.reset()
+    pg.slice(new Array(data.total))
+    // The list shrank under us (page now past the end): show the last page that exists.
+    if (!data.items.length && data.total && pg.page !== page) return load(pg.page)
+    const reload = () => load(pg.page)
+    list.replaceChildren(...(data.items.length ? data.items.map((r) => requestCard(r, reload, ctx, setDirty))
       : [C.emptyState({ title: 'Tidak ada permintaan', iconName: 'inbox', body: 'Belum ada permintaan dengan status ini.' })]))
   }
-  const seg = C.segmented({ options: FILTERS, value: filter, label: 'Filter status', onChange: (v) => { filter = v; load() } })
-  host.replaceChildren(seg, list)
-  load()
+  const seg = C.segmented({ options: FILTERS, value: filter, label: 'Filter status', onChange: (v) => { filter = v; load(1) } })
+  host.replaceChildren(seg, list, pg.root)
+  load(1)
 }

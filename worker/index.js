@@ -70,10 +70,11 @@ import {
 } from './integrations.js';
 import { handleAuthProviders, handleGoogleStart, handleGoogleCallback, handleGoogleExchange } from './google.js';
 import {
-  handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
+  handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemTransportPut, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
   handleAdminUserDetail, handleAdminUserTier, handleAdminsList, handleAdminsAdd, handleAdminsRemove,
 } from './admin-system.js';
 import { demoAccount } from '../src/auth/demo-accounts.js';
+import { cleanProfileName } from '../src/auth/profile-rules.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -106,7 +107,7 @@ const JSON_HINT =
 // Exported so tests can assert the contract the client relies on.
 export const TABLES = {
   requests: {
-    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'created_at'],
+    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'lat', 'lng', 'created_at'],
   },
   offers: {
     columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'created_at'],
@@ -453,6 +454,19 @@ async function handleSession(request, env) {
   const { is_staff, admin_email, ...pub } = user;
   const adminVia = is_staff === 1 ? 'staff' : admin_email === 1 ? 'email' : null;
   return ok({ user: pub, is_admin: isAdminUser(user), admin_via: adminVia });
+}
+
+// PUT /api/me/profile { name } — display name only (email is the login identity).
+async function handleProfileUpdate(request, env) {
+  const { user } = await authenticate(request, env);
+  if (user.is_staff === 1) throw new HttpError(403, 'Akun staf dikelola lewat terminal.');
+  if (isDemoUser(user)) throw new HttpError(403, 'Profil akun demo tidak bisa diubah.');
+  const body = await readJson(request);
+  let name;
+  try { name = cleanProfileName(body.name); } catch (err) { throw new HttpError(400, err.message); }
+  await env.DB.prepare('UPDATE users SET name = ? WHERE id = ?').bind(name, user.id).run();
+  const { is_staff, admin_email, ...pub } = user;
+  return ok({ user: { ...pub, name } });
 }
 
 async function handleSignout(request, env) {
@@ -1097,6 +1111,7 @@ const ROUTES = {
   'POST /api/email/send': (req, env) => handleEmailSend(req, env, ROUTE_DEPS),
   'GET /api/office/admin/system': (req, env) => handleSystemGet(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/email/test': (req, env) => handleSystemEmailTest(req, env, ROUTE_DEPS),
+  'PUT /api/office/admin/system/email-transport': (req, env) => handleSystemTransportPut(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/ai/test': (req, env) => handleSystemAiTest(req, env, ROUTE_DEPS),
   'GET /api/office/admin/system/admins': (req, env) => handleAdminsList(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/admins': (req, env) => handleAdminsAdd(req, env, ROUTE_DEPS),
@@ -1197,6 +1212,7 @@ const ROUTES = {
   'PATCH /api/office/admin/support/:id': (req, env, params) => handleAdminSupportUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/media/:key': handleMediaGet,
   'GET /api/me/plan': (req, env) => handleMyPlan(req, env, ROUTE_DEPS),
+  'PUT /api/me/profile': handleProfileUpdate,
   'POST /api/vouchers/redeem': (req, env) => handleVoucherRedeem(req, env, ROUTE_DEPS),
   'GET /api/office/admin/vouchers': (req, env) => handleAdminVouchers(req, env, ROUTE_DEPS),
   'POST /api/office/admin/vouchers': (req, env) => handleAdminVoucherCreate(req, env, ROUTE_DEPS),

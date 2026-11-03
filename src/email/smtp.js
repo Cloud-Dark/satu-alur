@@ -28,7 +28,7 @@ const STEP_MESSAGES = {
 }
 
 /**
- * Sends one message. cfg: { host, port, secure, user, pass, from, fromName, to, subject, text, html }.
+ * Sends one message. cfg: { host, port, secure, user, pass, from, fromName, replyTo?, to, subject, text, html }.
  * Resolves { accepted: true, response } or throws SmtpError with an Indonesian message.
  */
 export async function sendSmtp(cfg, { connect, timeoutMs = 20000, hostname = 'satualur.local' } = {}) {
@@ -95,7 +95,7 @@ export async function sendSmtp(cfg, { connect, timeoutMs = 20000, hostname = 'sa
     await expect('mail', [250], `MAIL FROM:<${cfg.from}>`)
     await expect('rcpt', [250, 251], `RCPT TO:<${cfg.to}>`)
     await expect('data', [354], 'DATA')
-    const message = buildMessage({ from: cfg.from, fromName: cfg.fromName, to: cfg.to, subject: cfg.subject, text: cfg.text, html: cfg.html })
+    const message = buildMessage({ from: cfg.from, fromName: cfg.fromName, to: cfg.to, subject: cfg.subject, text: cfg.text, html: cfg.html, replyTo: cfg.replyTo })
     const done = await expect('data', [250], `${dotStuff(message)}\r\n.`)
     try { await send('QUIT') } catch { /* closing anyway */ }
     return { accepted: true, response: done.lines.join(' ') }

@@ -4,8 +4,9 @@
  * computed from the mock's users table and email tests are simulated.
  */
 import { isUsingMockCloud } from '../cloud.js'
+import { pageOf } from '../office/paging.js'
 import { call } from '../integrations/api.js'
-import { withDefaults, normalizeSetting, AI_MODE_LABELS } from './rules.js'
+import { withDefaults, normalizeSetting, AI_MODE_LABELS, validatePlatformTransport, publicTransport } from './rules.js'
 import { isEmail } from './constants.js'
 import { PLANS } from '../business/plan-access.js'
 
@@ -22,7 +23,7 @@ export async function getSystem() {
     return {
       settings: withDefaults(d.settings || {}),
       status: {
-        email: { resend: true, from: 'Satu Alur <noreply@apipedia.id>', businesses_with_smtp: 0 },
+        email: { resend: true, from: 'Satu Alur <noreply@apipedia.id>', businesses_with_smtp: 0, transport: publicTransport(d.transport) },
         encryption: true,
         ai: { builtin_models: [{ id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B Instruct (fast)' }, { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Instruct (fast)' }], businesses_with_custom: 0, modes: AI_MODE_LABELS },
         login: { otp_email: false, demo_otp: true, demo_login: true, google: false, google_redirect_uri: `${location.origin}/api/auth/google/callback`, admin_emails: 1 },
@@ -46,16 +47,35 @@ export async function saveSystemSetting(key, value) {
   return call(`/api/office/admin/system/${encodeURIComponent(key)}`, { method: 'PUT', body: { value: clean } })
 }
 
-export async function testSystemEmail(to) {
+/** Platform email transport (Resend or a custom SMTP server). The password never comes back. */
+export async function saveEmailTransport(input) {
+  const v = validatePlatformTransport(input)
+  if (isUsingMockCloud()) {
+    await delay()
+    const d = readDemo()
+    const prev = d.transport?.mode === 'smtp' ? d.transport : null
+    if (v.mode === 'smtp') {
+      const { pass, ...rest } = v
+      if (!pass && !prev?.pass_enc) throw new Error('Isi password SMTP.')
+      d.transport = { ...rest, pass_enc: pass ? 'demo' : prev.pass_enc, pass_last4: pass ? pass.slice(-4) : prev.pass_last4 }
+    } else d.transport = { mode: 'resend' }
+    writeDemo(d)
+    return { transport: publicTransport(d.transport) }
+  }
+  return call('/api/office/admin/system/email-transport', { method: 'PUT', body: v })
+}
+
+export async function testSystemEmail(to, via) {
   if (to && !isEmail(to)) throw new Error('Alamat email tujuan tidak valid.')
   if (isUsingMockCloud()) {
     await delay()
     const d = readDemo()
-    d.emails = [{ kind: 'admin_test', recipient: to || 'admin', subject: 'Email uji Satu Alur', provider: 'demo', status: 'sent', created_at: new Date().toISOString() }, ...(d.emails || [])].slice(0, 50)
+    const provider = via !== 'resend' && d.transport?.mode === 'smtp' ? 'platform_smtp' : 'resend'
+    d.emails = [{ kind: 'admin_test', recipient: to || 'admin', subject: 'Email uji Satu Alur', provider, status: 'sent', created_at: new Date().toISOString() }, ...(d.emails || [])].slice(0, 50)
     writeDemo(d)
-    return { provider: 'demo', to: to || 'admin', simulated: true }
+    return { provider, to: to || 'admin', simulated: true }
   }
-  return call('/api/office/admin/system/email/test', { method: 'POST', body: to ? { to } : {} })
+  return call('/api/office/admin/system/email/test', { method: 'POST', body: { ...(to ? { to } : {}), ...(via ? { via } : {}) } })
 }
 
 export async function testSystemAi() {
@@ -77,13 +97,17 @@ export async function getSummary() {
   return call('/api/office/admin/summary')
 }
 
-export async function getActivity(kind = '') {
+/** Activity log; emails are paged server-side ({ emails, emails_total, page, size }). */
+export async function getActivity(kind = '', page = 1) {
   if (isUsingMockCloud()) {
     await delay()
-    const emails = (readDemo().emails || []).filter((e) => !kind || e.kind === kind)
-    return { emails, usage: [], whatsapp: { platform_fallback: false, wapilot: null, waconsole: null, repliz: null }, period: new Date().toISOString().slice(0, 7) }
+    const all = (readDemo().emails || []).filter((e) => !kind || e.kind === kind)
+    const { items, total, size } = pageOf(all, { page })
+    return { emails: items, emails_total: total, page, size, usage: [], whatsapp: { platform_fallback: false, wapilot: null, waconsole: null, repliz: null }, period: new Date().toISOString().slice(0, 7) }
   }
-  return call(`/api/office/admin/activity${kind ? `?kind=${encodeURIComponent(kind)}` : ''}`)
+  const q = new URLSearchParams({ page: String(page) })
+  if (kind) q.set('kind', kind)
+  return call(`/api/office/admin/activity?${q}`)
 }
 
 export async function getUserDetail(userId) {

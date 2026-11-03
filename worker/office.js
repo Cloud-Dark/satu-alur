@@ -4,6 +4,7 @@
  */
 
 import { isAdminUser } from './social.js';
+import { parsePage } from '../src/office/paging.js';
 import { validateServiceRequest, validateInfluencer, publicInfluencer, REQUEST_STATUSES } from '../src/office/rules.js';
 
 const INFLUENCER_FIELDS = ['name', 'photo_key', 'niche', 'city', 'ig_followers', 'tiktok_followers', 'bio', 'visible',
@@ -114,17 +115,27 @@ export async function handleAdminInfluencerUpdate(request, env, deps, params) {
 
 export async function handleAdminRequests(request, env, deps) {
   await requireAdmin(request, env, deps);
-  const status = new URL(request.url).searchParams.get('status');
+  const params = new URL(request.url).searchParams;
+  const status = params.get('status');
   if (status && !REQUEST_STATUSES.includes(status)) throw new deps.HttpError(400, 'Status tidak dikenal.');
-  const { results } = await env.DB.prepare(
-    `${REQUEST_SELECT}, r.owner_id, u.name AS business_name, u.email AS business_email, c.id AS campaign_id
+  const { page, limit, offset, paged } = parsePage(params);
+  const where = status ? 'WHERE r.status = ?' : '';
+  const args = status ? [status] : [];
+  const select = `${REQUEST_SELECT}, r.owner_id, u.name AS business_name, u.email AS business_email, c.id AS campaign_id
      FROM service_requests r
      LEFT JOIN influencers i ON i.id = r.influencer_id
      LEFT JOIN users u ON u.id = r.owner_id
      LEFT JOIN campaigns c ON c.request_id = r.id
-     ${status ? 'WHERE r.status = ?' : ''} ORDER BY r.created_at DESC, r.id DESC`,
-  ).bind(...(status ? [status] : [])).all();
-  return deps.ok(results.map(withPayload));
+     ${where} ORDER BY r.created_at DESC, r.id DESC`;
+  if (!paged) {
+    const { results } = await env.DB.prepare(select).bind(...args).all();
+    return deps.ok(results.map(withPayload));
+  }
+  const [{ results }, count] = await Promise.all([
+    env.DB.prepare(`${select} LIMIT ? OFFSET ?`).bind(...args, limit, offset).all(),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM service_requests r ${where}`).bind(...args).first(),
+  ]);
+  return deps.ok({ items: results.map(withPayload), total: count?.n || 0, page, size: limit });
 }
 
 export async function handleAdminRequestUpdate(request, env, deps, params) {

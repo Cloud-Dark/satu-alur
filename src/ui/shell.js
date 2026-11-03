@@ -4,6 +4,7 @@
  */
 import { logoLink } from './brand.js'
 import { themeToggleButton } from './theme.js'
+import { profileMenu } from './profile-menu.js'
 import { icon } from './icons.js'
 import { el, button, infoTip } from './components.js'
 import { animateView } from './animations.js'
@@ -179,10 +180,7 @@ export function renderShell(root, ctx) {
     ? el('button', { type: 'button', className: 'side-row side-row-office', title: staff ? 'Kembali ke usaha saya' : 'Kantor Satu Alur' },
       icon(staff ? 'home' : 'shield'), el('span', { className: 'side-row-label' }, staff ? 'Kembali ke usaha saya' : 'Kantor Satu Alur'))
     : null
-  officeSwitch?.addEventListener('click', () => {
-    store.set(sessionStorage, ADMIN_VIEW_KEY, staff ? 'app' : 'office')
-    ctx.navigate('/app')
-  })
+  officeSwitch?.addEventListener('click', () => switchOffice())
 
   const signOutBtn = el('button', { type: 'button', className: 'icon-btn', 'aria-label': 'Keluar', title: 'Keluar' }, icon('logout'))
   signOutBtn.addEventListener('click', async () => {
@@ -236,7 +234,19 @@ export function renderShell(root, ctx) {
   const crumbTitle = el('span', { className: 'crumb-title' })
   const crumbTip = el('span', { className: 'crumb-tip' })
   const actionSlot = el('div', { className: 'topbar-action' })
-  const avatar = el('span', { className: 'avatar', role: 'img', title: user.email || '', 'aria-label': `Masuk sebagai ${user.email || 'pengguna'}` }, initials(user))
+  const switchOffice = () => {
+    store.set(sessionStorage, ADMIN_VIEW_KEY, staff ? 'app' : 'office')
+    ctx.navigate('/app')
+  }
+  const profile = profileMenu({
+    user, initials: initials(user), isAdmin: ctx.isAdmin === true, adminVia: ctx.adminVia || null, inOffice: staff,
+    onPlan: () => show('plan', {}, { focus: true }),
+    onSettings: () => openSettings(),
+    onSwitchOffice: switchOffice,
+    onSignOut: () => ctx.signOut(),
+  })
+  disposers.push(profile.destroy)
+  const avatar = profile.button
 
   const topbar = el('header', { className: 'topbar' },
     menuBtn,

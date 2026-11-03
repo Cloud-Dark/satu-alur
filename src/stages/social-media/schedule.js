@@ -82,14 +82,15 @@ export async function render(host, ctx) {
     try { items = await Social.listContents('content') } catch (err) { if (!ctx.signal.aborted && mine === run) body.replaceChildren(C.errorState(err.message)); return }
     if (ctx.signal.aborted || mine !== run) return
     if (!items.length) { body.replaceChildren(C.emptyState({ title: 'Belum ada konten tersimpan', iconName: 'file', body: 'Simpan konten di tab Konten, lalu jadwalkan di sini.' })); return }
-    body.replaceChildren(...items.map((s) => {
+    const renderItem = (s) => {
       const btn = C.button({ label: 'Jadwalkan tayang', icon: 'calendar', variant: 'soft', size: 'sm' })
       btn.addEventListener('click', () => openDialog(ctx, s, btn))
       const rz = replizReady(ctx) ? C.button({ label: 'Unggah ke akun terhubung', icon: 'send', variant: 'soft', size: 'sm' }) : null
       rz?.addEventListener('click', () => openPostDialog({ ...ctx, onPosted: () => { sub = 'report'; draw() } }, { body: s.body }, rz))
       return el('article', { className: 'workspace-entry sm-schedule-item' },
         el('p', { className: 'workspace-preview' }, s.body.slice(0, 160)), el('div', { className: 'form-actions' }, btn, rz))
-    }))
+    }
+    body.replaceChildren(C.paginate({ key: 'sm-contents', label: 'daftar konten', pageSize: 10, items, render: (page) => page.map(renderItem) }).root)
   }
 
   async function drawReport(mine) {
@@ -100,7 +101,7 @@ export async function render(host, ctx) {
     rows = [...rows].sort((a, b) => (b.scheduled_at < a.scheduled_at ? -1 : b.scheduled_at > a.scheduled_at ? 1 : b.id - a.id))
     const reload = C.button({ label: 'Muat ulang', icon: 'refresh', variant: 'ghost', size: 'sm' })
     reload.addEventListener('click', () => draw())
-    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : null, ...(rows.length ? rows.map((r) => {
+    const renderRow = (r) => {
       let action = null
       if (r.status === 'posted' && String(r.permalink || '').startsWith('https://')) action = el('a', { href: r.permalink, target: '_blank', rel: 'noopener' }, 'Lihat posting ↗')
       else if (r.status === 'scheduled') {
@@ -118,7 +119,10 @@ export async function render(host, ctx) {
           C.tag(SCHEDULE_STATUS_LABEL[r.status] || r.status, TONE[r.status] || 'neutral'), el('span', { className: 'muted small' }, C.formatDateTime(r.scheduled_at))),
         el('p', { className: 'workspace-preview' }, (r.content || '').slice(0, 120)),
         r.status === 'failed' && r.error ? el('p', { className: 'field-error' }, r.error) : null, action)
-    }) : [C.emptyState({ title: 'Belum ada jadwal', iconName: 'calendar', body: 'Jadwalkan konten dari Daftar konten.' })]))
+    }
+    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : null,
+      rows.length ? C.paginate({ key: 'sm-schedules', label: 'laporan tayang', pageSize: 10, items: rows, render: (page) => page.map(renderRow) }).root
+        : C.emptyState({ title: 'Belum ada jadwal', iconName: 'calendar', body: 'Jadwalkan konten dari Daftar konten.' }))
   }
 
   function draw() {

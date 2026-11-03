@@ -3,10 +3,11 @@
  *
  *   GET  /api/office/admin/system                  { settings, status } (secrets only as configured true/false)
  *   PUT  /api/office/admin/system/:key             { value } for key email | ai | login
- *   POST /api/office/admin/system/email/test       { to? } test email via the platform provider
+ *   PUT  /api/office/admin/system/email-transport  { mode: resend | smtp, host, port, secure, user, pass?, from_email, from_name, reply_to }
+ *   POST /api/office/admin/system/email/test       { to?, via?: 'resend' } test email via the platform transport
  *   POST /api/office/admin/system/ai/test          one short reply from the built-in model
  *   GET  /api/office/admin/summary                 dashboard counts
- *   GET  /api/office/admin/activity                recent emails + AI usage per feature (this month) + connector counts
+ *   GET  /api/office/admin/activity?page=&kind=    emails (paged) + AI usage per feature (this month) + connector counts
  *   GET  /api/office/admin/users/:userId/detail    one user: tier, plan, usage, credit, integrations (no secrets), emails
  *   PUT  /api/office/admin/users/:userId/tier      { plan: sole | ukm | enterprise }
  *   GET  /api/office/admin/system/admins           { admins, bootstrap, audit }
@@ -15,13 +16,15 @@
  * Every change is written to admin_audit.
  */
 import { requireAdmin } from './office.js';
-import { normalizeSetting, SETTING_KEYS, adminEmailSet, AI_MODE_LABELS } from '../src/admin/rules.js';
+import { normalizeSetting, SETTING_KEYS, adminEmailSet, AI_MODE_LABELS, validatePlatformTransport, publicTransport } from '../src/admin/rules.js';
+import { encryptToken } from '../src/social/crypto.js';
+import { parsePage } from '../src/office/paging.js';
 import { isEmail } from '../src/admin/constants.js';
 import { testEmail } from '../src/email/templates.js';
 import { isGoogleConfigured, googleRedirectUri } from '../src/auth/google.js';
 import { PLANS } from '../src/business/plan-access.js';
 import { STAFF_EMAIL_SUFFIX } from '../src/customers/rules.js';
-import { loadSystemSettings, sendEmail, resendConfigured, customSecretsEnabled, DEFAULT_FROM } from './email.js';
+import { loadSystemSettings, sendEmail, resendConfigured, customSecretsEnabled, DEFAULT_FROM, loadPlatformTransport, TRANSPORT_KEY } from './email.js';
 
 export async function audit(env, actor, action, target, detail) {
   try {
@@ -52,7 +55,7 @@ export async function handleSystemGet(request, env, deps) {
   return deps.ok({
     settings,
     status: {
-      email: { resend: resendConfigured(env), from: env.EMAIL_FROM || DEFAULT_FROM, businesses_with_smtp: byoSmtp?.n || 0 },
+      email: { resend: resendConfigured(env), from: env.EMAIL_FROM || DEFAULT_FROM, businesses_with_smtp: byoSmtp?.n || 0, transport: publicTransport(await loadPlatformTransport(env)) },
       encryption: customSecretsEnabled(env),
       ai: { builtin_models: deps.LLM_MODELS.map((m) => ({ id: m.id, name: m.name })), businesses_with_custom: byoAi?.n || 0, modes: AI_MODE_LABELS },
       login: {
@@ -98,13 +101,42 @@ export async function handleSystemPut(request, env, deps, params) {
   return deps.ok({ key: params.key, value });
 }
 
+export async function handleSystemTransportPut(request, env, deps) {
+  const admin = await requireAdmin(request, env, deps);
+  const body = await deps.readJson(request);
+  let v;
+  try { v = validatePlatformTransport(body); } catch (err) {
+    if (err?.validation) throw new deps.HttpError(400, err.message);
+    throw err;
+  }
+  const stored = await loadPlatformTransport(env);
+  let value = { mode: 'resend' };
+  if (v.mode === 'smtp') {
+    if (!customSecretsEnabled(env)) throw new deps.HttpError(400, 'Kunci enkripsi server (TOKEN_KEY) belum diatur, jadi password SMTP belum bisa disimpan.');
+    const { pass, ...rest } = v;
+    let passEnc = stored.mode === 'smtp' ? stored.pass_enc : null;
+    let last4 = stored.mode === 'smtp' ? stored.pass_last4 : null;
+    if (pass) { passEnc = await encryptToken(pass, env.TOKEN_KEY); last4 = pass.slice(-4); }
+    if (!passEnc) throw new deps.HttpError(400, 'Isi password SMTP.');
+    value = { ...rest, pass_enc: passEnc, pass_last4: last4 };
+  }
+  await env.DB.prepare(
+    `INSERT INTO system_settings (key, value_json, updated_at, updated_by) VALUES (?, ?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+  ).bind(TRANSPORT_KEY, JSON.stringify(value), new Date().toISOString(), admin.email).run();
+  const shown = publicTransport(value);
+  await audit(env, admin.email, 'setting.update', TRANSPORT_KEY, JSON.stringify({ ...shown, pass_last4: undefined }));
+  return deps.ok({ transport: shown });
+}
+
 export async function handleSystemEmailTest(request, env, deps) {
   const admin = await requireAdmin(request, env, deps);
   const body = await deps.readJson(request).catch(() => ({}));
   const to = String(body.to || (admin.email.endsWith(STAFF_EMAIL_SUFFIX) ? '' : admin.email)).trim().toLowerCase();
   if (!isEmail(to)) throw new deps.HttpError(400, 'Isi alamat email tujuan.');
-  const t = testEmail({ via: 'layanan email Satu Alur (default)' });
-  const { provider } = await sendEmail(env, deps, { ownerId: admin.id, kind: 'admin_test', to, subject: t.subject, html: t.html, text: t.text, useBusiness: false });
+  const forceResend = body.via === 'resend';
+  const t = testEmail({ via: forceResend ? 'Resend (bawaan)' : 'transport email platform Satu Alur' });
+  const { provider } = await sendEmail(env, deps, { ownerId: admin.id, kind: 'admin_test', to, subject: t.subject, html: t.html, text: t.text, useBusiness: false, forceResend });
   return deps.ok({ provider, to });
 }
 
@@ -146,19 +178,21 @@ export async function handleAdminSummary(request, env, deps) {
 
 export async function handleAdminActivity(request, env, deps) {
   await requireAdmin(request, env, deps);
-  const url = new URL(request.url);
-  const kind = url.searchParams.get('kind') || '';
+  const params = new URL(request.url).searchParams;
+  const kind = params.get('kind') || '';
+  const { page, limit, offset } = parsePage(params);
   const where = /^[a-z_]{2,20}$/.test(kind) ? 'WHERE kind = ?' : '';
-  const emailStmt = env.DB.prepare(
-    `SELECT e.id, e.kind, e.recipient, e.subject, e.provider, e.status, e.error, e.created_at, u.email AS owner_email
-       FROM email_log e LEFT JOIN users u ON u.id = e.owner_id ${where} ORDER BY e.id DESC LIMIT 100`,
-  );
-  const [emails, usage, whatsapp] = await Promise.all([
-    safeAll(where ? emailStmt.bind(kind) : emailStmt),
+  const args = where ? [kind] : [];
+  const [emails, total, usage, whatsapp] = await Promise.all([
+    safeAll(env.DB.prepare(
+      `SELECT e.id, e.kind, e.recipient, e.subject, e.provider, e.status, e.error, e.created_at, u.email AS owner_email
+         FROM email_log e LEFT JOIN users u ON u.id = e.owner_id ${where} ORDER BY e.id DESC LIMIT ? OFFSET ?`,
+    ).bind(...args, limit, offset)),
+    safeFirst(env.DB.prepare(`SELECT COUNT(*) AS n FROM email_log ${where}`).bind(...args), { n: 0 }),
     safeAll(env.DB.prepare('SELECT feature, SUM(count) AS calls, COUNT(DISTINCT user_id) AS users FROM usage_counters WHERE period = ? GROUP BY feature ORDER BY calls DESC').bind(period())),
     whatsappStatus(env),
   ]);
-  return deps.ok({ emails, usage, whatsapp, period: period() });
+  return deps.ok({ emails, emails_total: total?.n || 0, page, size: limit, usage, whatsapp, period: period() });
 }
 
 async function targetUser(env, deps, params) {

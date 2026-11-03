@@ -3,11 +3,12 @@
  * memory + localStorage. Used for local development and e2e tests
  * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
+import { cleanProfileName } from '../auth/profile-rules.js'
 import { isBlocked, isStaffEmail, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
 import {
   validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS,
 } from '../pendapatan/rules.js'
-import { demoAccount } from '../auth/demo-accounts.js'
+import { demoAccount, isDemoEmail } from '../auth/demo-accounts.js'
 import { normalizePlan } from '../business/plan-access.js'
 import { simulateAnswer as mockAnswer } from '../ai/simulate.js'
 
@@ -220,6 +221,18 @@ const mockAuth = {
 
   async refreshSession() {
     return mockAuth.getSession()
+  },
+
+  /** Display name only; same rules as PUT /api/me/profile. */
+  async updateProfile({ name }) {
+    if (!_session) throw new Error('Belum masuk.')
+    const clean = cleanProfileName(name)
+    if (isDemoEmail(_session.user.email)) throw new Error('Profil akun demo tidak bisa diubah.')
+    _session.user = { ..._session.user, name: clean }
+    const row = ensureTable('users').find((u) => u.id === _session.user.id)
+    if (row) row.name = clean
+    persist()
+    return { user: _session.user }
   },
 
   async getUser() {

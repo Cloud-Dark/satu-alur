@@ -79,6 +79,34 @@ export function validateEmailIntegration(input) {
   return { email_mode: 'smtp', smtp_host: host, smtp_port: port, smtp_secure: secure, smtp_user: user, smtp_from_email: fromEmail, smtp_from_name: fromName || null, smtp_pass: pass }
 }
 
+/**
+ * Platform email transport chosen by admins (system_settings key 'email_transport'):
+ * 'resend' (default) or 'smtp'. Password '' keeps the stored one; it is never sent back.
+ */
+export const PLATFORM_TRANSPORTS = ['resend', 'smtp']
+
+export function validatePlatformTransport(input) {
+  const mode = input?.mode === 'smtp' ? 'smtp' : 'resend'
+  if (mode === 'resend') return { mode: 'resend' }
+  const smtp = validateEmailIntegration({
+    email_mode: 'smtp', smtp_host: input.host, smtp_port: input.port, smtp_secure: input.secure, smtp_user: input.user,
+    smtp_from_email: input.from_email, smtp_from_name: input.from_name, smtp_pass: input.pass,
+  })
+  const replyTo = String(input.reply_to || '').trim().toLowerCase()
+  if (replyTo && !isEmail(replyTo)) fail('Alamat balasan (reply-to) tidak valid.')
+  return {
+    mode: 'smtp', host: smtp.smtp_host, port: smtp.smtp_port, secure: smtp.smtp_secure, user: smtp.smtp_user,
+    from_email: smtp.smtp_from_email, from_name: smtp.smtp_from_name, reply_to: replyTo || null, pass: smtp.smtp_pass,
+  }
+}
+
+/** What the admin UI may see of the stored transport: everything but the password. */
+export function publicTransport(stored) {
+  if (!stored || stored.mode !== 'smtp') return { mode: 'resend' }
+  const { pass_enc: _enc, ...rest } = stored
+  return { ...rest, pass_saved: Boolean(stored.pass_enc) }
+}
+
 export const AI_MODES = ['builtin', 'openai', 'anthropic']
 export const AI_MODE_LABELS = { builtin: 'Bawaan Satu Alur', openai: 'OpenAI-compatible', anthropic: 'Anthropic-compatible' }
 export const ANTHROPIC_DEFAULT_BASE = 'https://api.anthropic.com'

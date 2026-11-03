@@ -242,7 +242,7 @@ export function postsSection(ctx, redraw) {
     if (ctx.signal.aborted) return
     panel.querySelector('.panel-meta').textContent = `${rows.length} unggahan`
     if (!rows.length) { list.replaceChildren(C.emptyState({ title: 'Belum ada unggahan', iconName: 'send', body: 'Unggah dari tab Konten atau dari Daftar konten.' })); return }
-    list.replaceChildren(...rows.map((r) => {
+    const renderRow = (r) => {
       let action = null
       if (r.status === 'success' && r.link) action = el('a', { href: r.link, target: '_blank', rel: 'noopener' }, 'Lihat unggahan ↗')
       else if (r.status === 'pending') {
@@ -263,7 +263,8 @@ export function postsSection(ctx, redraw) {
         r.preview ? el('p', { className: 'workspace-preview' }, r.preview.slice(0, 160)) : null,
         r.status === 'error' && r.error ? el('p', { className: 'field-error' }, r.error) : null,
         action)
-    }))
+    }
+    list.replaceChildren(C.paginate({ key: 'rz-posts', label: 'unggahan', pageSize: 10, items: rows, render: (page) => page.map(renderRow) }).root)
   }).catch((err) => { if (!ctx.signal.aborted) list.replaceChildren(C.errorState(err.message)) })
   return panel
 }

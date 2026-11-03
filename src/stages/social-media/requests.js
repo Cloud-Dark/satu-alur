@@ -76,15 +76,16 @@ export function requestsPanel(kind, signal) {
     }
     if (signal.aborted || mine !== run) return
     rows.sort((a, b) => (b.created_at < a.created_at ? -1 : b.created_at > a.created_at ? 1 : b.id - a.id))
-    body.replaceChildren(...(rows.length ? rows.map((r) => el('article', { className: 'workspace-entry sm-request' },
+    const renderRow = (r) => el('article', { className: 'workspace-entry sm-request' },
       el('div', { className: 'workspace-entry-head' },
         el('strong', {}, kind === 'collab' ? (r.influencer_name || 'Influencer') : 'Permintaan iklan'),
         C.tag(REQUEST_STATUS_LABEL[r.status] || r.status, TONE[r.status] || 'neutral'),
         el('span', { className: 'muted small' }, C.formatDateTime(r.created_at))),
       el('p', {}, summary(r)),
       r.admin_note ? el('p', {}, el('strong', {}, 'Catatan tim Satu Alur: '), r.admin_note) : null,
-      kind === 'collab' && r.has_campaign ? progressToggle(r, signal) : null))
-      : [C.emptyState({ title: 'Belum ada permintaan', iconName: 'message', body: 'Permintaan yang Anda kirim akan muncul di sini.' })]))
+      kind === 'collab' && r.has_campaign ? progressToggle(r, signal) : null)
+    body.replaceChildren(rows.length ? C.paginate({ key: `sm-requests-${kind}`, label: 'permintaan saya', pageSize: 10, items: rows, render: (page) => page.map(renderRow) }).root
+      : C.emptyState({ title: 'Belum ada permintaan', iconName: 'message', body: 'Permintaan yang Anda kirim akan muncul di sini.' }))
   }
   const panel = C.panel({ title: 'Permintaan saya' }, body)
   panel.load = load
