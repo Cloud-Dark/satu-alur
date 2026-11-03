@@ -74,6 +74,8 @@ import {
   handleAdminUserDetail, handleAdminUserTier, handleAdminsList, handleAdminsAdd, handleAdminsRemove,
 } from './admin-system.js';
 import { demoAccount } from '../src/auth/demo-accounts.js';
+import { PROGRESS_KEYS, NOTE_MAX as PROGRESS_NOTE_MAX } from '../src/domain/progress.js';
+import { STATUS_KEYS as INVOICE_STATUS_KEYS, LIMITS as INVOICE_LIMITS, formatNumber as invoiceNumber } from '../src/invoice/rules.js';
 import { cleanProfileName } from '../src/auth/profile-rules.js';
 
 // ---------------------------------------------------------------- constants
@@ -115,8 +117,12 @@ export const TABLES = {
     fks: { request_id: 'requests' },
   },
   assignments: {
-    columns: ['id', 'owner_id', 'offer_id', 'worker_name', 'scheduled_at', 'status', 'created_at'],
+    columns: ['id', 'owner_id', 'offer_id', 'worker_name', 'scheduled_at', 'status', 'progress', 'progress_note', 'progress_updated_at', 'created_at'],
     fks: { offer_id: 'offers' },
+  },
+  assignment_progress_log: {
+    columns: ['id', 'owner_id', 'assignment_id', 'progress', 'note', 'created_at'],
+    fks: { assignment_id: 'assignments' },
   },
   workers: {
     columns: ['id', 'owner_id', 'name', 'phone', 'address', 'skills', 'lat', 'lng', 'zone', 'status', 'created_at'],
@@ -147,6 +153,22 @@ export const TABLES = {
   // on insert and on update (against the stored row).
   waste_entries: {
     columns: ['id', 'owner_id', 'stream', 'title', 'detail', 'monthly_loss', 'saved', 'action', 'owner', 'status', 'created_at', 'updated_at'],
+  },
+  // Invoice per pekerjaan selesai (migrations/0019). Nomor dibuat lewat POST /api/invoices/next-number.
+  invoices: {
+    columns: [
+      'id', 'owner_id', 'completion_id', 'request_id', 'number', 'customer_name', 'customer_phone', 'customer_email', 'customer_address',
+      'issue_date', 'due_date', 'discount', 'tax_rate', 'subtotal', 'tax_amount', 'total', 'payment_info', 'notes', 'status',
+      'sent_at', 'paid_at', 'ledger_entry_id', 'created_at', 'updated_at',
+    ],
+    fks: { completion_id: 'completions', request_id: 'requests', ledger_entry_id: 'ledger_entries' },
+  },
+  invoice_items: {
+    columns: ['id', 'owner_id', 'invoice_id', 'description', 'qty', 'unit_price', 'amount', 'position', 'created_at'],
+    fks: { invoice_id: 'invoices' },
+  },
+  invoice_settings: {
+    columns: ['id', 'owner_id', 'payment_info', 'due_days', 'updated_at'],
   },
   reports: {
     columns: ['id', 'owner_id', 'period_start', 'period_end', 'summary_json', 'explanation_html', 'status', 'created_at'],
@@ -694,6 +716,7 @@ export async function assertFlowRules(env, table, rows, userId, ctx = {}) {
       }
     }
   }
+  assertRowValues(table, rows);
   if (table === 'completions') {
     const seen = new Set();
     for (const r of rows) {
@@ -706,6 +729,47 @@ export async function assertFlowRules(env, table, rows, userId, ctx = {}) {
       seen.add(key);
     }
   }
+}
+
+// Value checks for progress and invoice rows (insert and update).
+function assertRowValues(table, rows) {
+  const money = (v) => Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= INVOICE_LIMITS.priceMax;
+  for (const r of rows) {
+    if (table === 'assignments') {
+      if ('progress' in r && !PROGRESS_KEYS.has(r.progress)) throw bad('Status progres tidak dikenal.');
+      if (r.progress_note != null && String(r.progress_note).length > PROGRESS_NOTE_MAX) throw bad('Catatan progres terlalu panjang.');
+    }
+    if (table === 'assignment_progress_log') {
+      if (!PROGRESS_KEYS.has(r.progress)) throw bad('Status progres tidak dikenal.');
+      if (r.note != null && String(r.note).length > PROGRESS_NOTE_MAX) throw bad('Catatan progres terlalu panjang.');
+    }
+    if (table === 'invoices') {
+      if ('status' in r && !INVOICE_STATUS_KEYS.has(r.status)) throw bad('Status invoice tidak dikenal.');
+      for (const k of ['discount', 'subtotal', 'tax_amount', 'total']) if (k in r && !money(r[k])) throw bad('Nilai invoice tidak valid.');
+      if ('tax_rate' in r && ![0, 11].includes(Number(r.tax_rate))) throw bad('PPN hanya 0% atau 11%.');
+      if ('number' in r && !/^INV-\d{4}-\d{4,}$/.test(String(r.number))) throw bad('Nomor invoice tidak valid.');
+      if (r.notes != null && String(r.notes).length > INVOICE_LIMITS.notes) throw bad('Catatan invoice terlalu panjang.');
+      if (r.payment_info != null && String(r.payment_info).length > INVOICE_LIMITS.payment) throw bad('Instruksi pembayaran terlalu panjang.');
+    }
+    if (table === 'invoice_items') {
+      if ('qty' in r && !(Number(r.qty) > 0 && Number(r.qty) <= INVOICE_LIMITS.qtyMax)) throw bad('Jumlah baris invoice tidak valid.');
+      for (const k of ['unit_price', 'amount']) if (k in r && !money(r[k])) throw bad('Harga baris invoice tidak valid.');
+      if ('description' in r && !(String(r.description || '').trim() && String(r.description).length <= INVOICE_LIMITS.description)) throw bad('Keterangan baris invoice tidak valid.');
+    }
+  }
+}
+
+// POST /api/invoices/next-number { year? } -> { number, seq }: atomic per business and year.
+async function handleInvoiceNextNumber(request, env) {
+  const { user } = await authenticate(request, env);
+  const body = await readJson(request);
+  const now = new Date();
+  const year = Number.isInteger(body?.year) && body.year >= 2000 && body.year <= 2100 ? body.year : now.getUTCFullYear();
+  const row = await env.DB.prepare(
+    'INSERT INTO invoice_seq (owner_id, year, last_no) VALUES (?, ?, 1) ON CONFLICT(owner_id, year) DO UPDATE SET last_no = last_no + 1 RETURNING last_no',
+  ).bind(user.id, year).first();
+  const seq = Number(row?.last_no) || 1;
+  return ok({ number: invoiceNumber(year, seq), seq, year });
 }
 
 function mapDbError(err) {
@@ -762,6 +826,8 @@ async function handleDb(request, env) {
         // Stamped server-side so two devices cannot disagree about freshness.
         ch.updated_at = new Date().toISOString();
       }
+      assertRowValues(table, [ch]);
+      if (table === 'invoices') ch.updated_at = new Date().toISOString();
       if (table === 'ledger_entries' && ('amount' in ch || 'category' in ch)) {
         if ('amount' in ch && !(Number(ch.amount) > 0)) throw bad('Jumlah jurnal harus lebih dari nol.');
         if ('category' in ch && !LEDGER_CATEGORY_SET.has(ch.category)) throw bad('Kategori jurnal tidak dikenal.');
@@ -1242,6 +1308,7 @@ const ROUTES = {
   'GET /api/media/:key': handleMediaGet,
   'GET /api/me/plan': (req, env) => handleMyPlan(req, env, ROUTE_DEPS),
   'PUT /api/me/profile': handleProfileUpdate,
+  'POST /api/invoices/next-number': handleInvoiceNextNumber,
   'POST /api/vouchers/redeem': (req, env) => handleVoucherRedeem(req, env, ROUTE_DEPS),
   'GET /api/office/admin/vouchers': (req, env) => handleAdminVouchers(req, env, ROUTE_DEPS),
   'POST /api/office/admin/vouchers': (req, env) => handleAdminVoucherCreate(req, env, ROUTE_DEPS),

@@ -8,6 +8,17 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-04 - Progres penugasan, invoice, petugas akun demo
+
+#### Ditambahkan
+- **Invoice** (menu Pendapatan › Invoice): buat dari pekerjaan selesai (juga dari Penyelesaian dan Pembukuan), baris jumlah × harga, diskon, PPN 11% opsional, tempo, cara pembayaran bawaan. Unduh PDF/cetak, kirim lewat email atau WhatsApp (akun demo disimulasikan), Tandai lunas → pendapatan (tanpa PPN) diposting ke Pembukuan sekali saja, atau ditautkan bila sudah ada. Nomor `INV-YYYY-0001` per bisnis per tahun lewat `POST /api/invoices/next-number` (atomik).
+- **Progres penugasan**: Belum dikerjakan / Sedang dikerjakan / Ditunda / Selesai, dengan catatan dan riwayat. "Selesai" lewat tahap Penyelesaian sehingga tetap satu penyelesaian per penugasan. Tampil di Daftar penugasan, popup Peta, Performa, dan aksi dasbor ("Lewat jadwal" hanya untuk yang belum dikerjakan).
+- **Petugas contoh** untuk 9 akun demo: `seeds/demo-workers.sql` (75 baris: 44 petugas + 31 keahlian, dibuat oleh `scripts/seed-demo-workers.mjs` dari `src/demo/demo-workers.js`); juga ikut di `scripts/seed-demo.mjs`.
+- Migrasi `0019_progress_invoices.sql`: kolom progres di `assignments`, tabel `assignment_progress_log`, `invoices`, `invoice_items`, `invoice_seq`, `invoice_settings`.
+
+#### Diubah
+- Pilihan penawaran di form Tugaskan hanya berisi penawaran disetujui yang belum ditugaskan.
+
 ### 2026-11-03 - Rapikan tampilan mobile, keahlian petugas, peta petugas
 
 #### Diperbaiki

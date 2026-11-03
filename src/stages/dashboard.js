@@ -5,6 +5,7 @@
 import * as C from '../ui/components.js'
 import { staggerChildren } from '../ui/animations.js'
 import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from './data.js'
+import { progressOf, progressLabel } from '../domain/progress.js'
 
 const { el, icon } = C
 const DAY = 86400000
@@ -450,11 +451,13 @@ function renderActions(m, navigate) {
   for (const a of m.activeAssignments()) {
     const r = m.requestOfAssignment(a)
     const sched = C.toDate(a.scheduled_at)
-    const overdue = sched && sched.getTime() < now
+    // Work already started or on hold is not "late"; its progress is shown instead.
+    const prog = progressOf(a, false)
+    const overdue = prog === 'belum' && sched && sched.getTime() < now
     items.push({
       rank: overdue ? 0 : 2, num: '04', type: 'Penyelesaian', title: `Konfirmasi selesai: ${cust(r)}`,
-      meta: `${a.worker_name || 'Tanpa nama'} · jadwal ${C.formatDate(a.scheduled_at)}`,
-      flag: overdue ? overdueLabel(now - sched.getTime()) : null,
+      meta: `${a.worker_name || 'Tanpa nama'} · jadwal ${C.formatDate(a.scheduled_at)}${prog !== 'belum' ? ` · ${progressLabel(prog)}` : ''}`,
+      flag: overdue ? overdueLabel(now - sched.getTime()) : prog === 'ditunda' ? 'Ditunda' : null,
       to: 'complete', params: { assignmentId: a.id }, cta: 'Tandai',
     })
   }

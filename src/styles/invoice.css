@@ -1,0 +1,26 @@
+/* Invoice editor (src/stages/invoice.js). Mobile first. */
+.inv-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.inv-number { font-size: 1.05rem; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.form-grid-2 { display: grid; grid-template-columns: 1fr; gap: var(--s-4); }
+@media (min-width: 560px) { .form-grid-2 { grid-template-columns: 1fr 1fr; } }
+.inv-lines { display: flex; flex-direction: column; gap: var(--s-3); }
+.inv-line { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); min-width: 0; }
+.inv-line-desc .input { width: 100%; }
+.inv-line-nums { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1.3fr) auto; gap: var(--s-2); align-items: end; }
+.inv-mini { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 0.75rem; color: var(--text-muted); }
+.inv-mini .input { width: 100%; min-width: 0; }
+.inv-mini-amt span:last-child, .inv-line-amt { color: var(--text); font-weight: 600; font-size: 0.9rem; padding: 10px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) {
+  .inv-line-nums { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; }
+  .inv-mini-amt { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
+  .inv-mini-amt span:last-child { padding: 0; }
+}
+.inv-ppn { justify-content: flex-end; }
+.inv-totals { margin: 0; display: flex; flex-direction: column; gap: var(--s-1); padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--surface-2); }
+.inv-totals > div { display: flex; justify-content: space-between; gap: var(--s-3); }
+.inv-totals dt { color: var(--text-muted); }
+.inv-totals dd { margin: 0; }
+.inv-totals .inv-grand { border-top: 1px solid var(--line); padding-top: var(--s-2); margin-top: var(--s-1); font-weight: 700; font-size: 1.05rem; }
+.inv-totals .inv-grand dt { color: var(--text); }
+.inv-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.inv-actions:empty { display: none; }

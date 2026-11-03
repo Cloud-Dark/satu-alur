@@ -1979,3 +1979,19 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
   .app-shell .mp-item { flex-direction: column; align-items: stretch; }
   .app-shell .mp-item-side { justify-content: space-between; }
 }
+
+/* ---- Progres penugasan (src/stages/assign.js) ---- */
+.cell-actions { display: inline-flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; justify-content: flex-end; }
+.progress-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--text-muted); cursor: pointer; font: inherit; }
+.progress-chip:hover .tag, .progress-chip:focus-visible .tag { box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent); }
+.progress-opts { display: grid; grid-template-columns: 1fr; gap: var(--s-2); }
+@media (min-width: 520px) { .progress-opts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.progress-opt .tag { white-space: normal; }
+.progress-opt { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); cursor: pointer; min-width: 0; }
+.progress-opt:has(input:checked) { border-color: var(--brand-500); background: color-mix(in srgb, var(--brand) 7%, var(--surface)); }
+.progress-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-2); max-height: 220px; overflow: auto; }
+.progress-log li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.progress-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+@media (min-width: 720px) { .progress-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.progress-stat { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
+.progress-stat strong { font-size: 1.2rem; }

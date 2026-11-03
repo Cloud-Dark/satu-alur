@@ -17,7 +17,7 @@ import { WA_LIMITS, normalizePhone, maskPhone, dayWib, validateText, capProblem 
 import { PROVIDERS, PROVIDER_LABEL, WaError, sendText, status as providerStatus, platformConfig } from './wa/index.js'
 import { loadCredentials, connectedProviders, integrationsEnabled, isDemo } from './connectors.js'
 
-const KINDS = new Set(['offer', 'followup', 'custom', 'test'])
+const KINDS = new Set(['offer', 'invoice', 'followup', 'custom', 'test'])
 const NOT_CONNECTED = 'WhatsApp belum dihubungkan. Isi kunci akun WAPilot atau WAConsole Anda di Pengaturan › Konektor.'
 
 // The provider this business sends with: its saved choice when still connected, else the first connected one.

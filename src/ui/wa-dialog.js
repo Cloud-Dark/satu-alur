@@ -8,8 +8,8 @@ import '../styles/repliz.css'
 const { el } = C
 let seq = 0
 
-/** opts: { requestId?, customer, phone, text, kind: 'offer' | 'followup' | 'custom', opener, openSettings? } */
-export function openWaDialog({ requestId = null, customer, phone, text, kind = 'custom', opener, openSettings }) {
+/** opts: { requestId?, customer, phone, text, kind: 'offer' | 'invoice' | 'followup' | 'custom', opener, openSettings?, onSent? } */
+export function openWaDialog({ requestId = null, customer, phone, text, kind = 'custom', opener, openSettings, onSent }) {
   const id = ++seq
   const to = C.field({ label: 'Nomor WhatsApp tujuan', id: `wa-to-${id}`, type: 'tel', required: true, value: phone || '', placeholder: '0812 3456 7890',
     attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '20' } })
@@ -49,6 +49,7 @@ export function openWaDialog({ requestId = null, customer, phone, text, kind = '
     try {
       const out = await WA.send({ requestId, phone: to.input.value, text: msg.input.value, kind })
       close()
+      onSent?.(out)
       showToast(out.status === 'simulated' ? `Pesan disimulasikan ke ${out.to}.` : `Pesan WhatsApp terkirim ke ${out.to}.`, 'success', 5000)
     } catch (e2) { err.textContent = e2.message; restore() }
   })

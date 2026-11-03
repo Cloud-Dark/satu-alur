@@ -122,9 +122,9 @@ export async function listAiModels(form) {
   return call('/api/integrations/ai/models', { method: 'POST', body: form })
 }
 
-/** Sends an email written by the business: kind 'offer' (to the customer) or 'report' (to the owner). */
+/** Sends an email written by the business: kind 'offer' / 'invoice' (to the customer) or 'report' (to the owner). */
 export async function sendBusinessEmail({ kind = 'offer', to, subject, body }) {
-  if (kind === 'offer' && !isEmail(String(to || ''))) throw new Error('Alamat email penerima tidak valid.')
+  if (kind !== 'report' && !isEmail(String(to || ''))) throw new Error('Alamat email penerima tidak valid.')
   if (!String(subject || '').trim()) throw new Error('Subjek wajib diisi.')
   if (!String(body || '').trim()) throw new Error('Isi email wajib diisi.')
   if (isUsingMockCloud()) {

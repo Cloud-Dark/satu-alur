@@ -7,6 +7,8 @@ import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 import { labelMap, sortSkills, nameProblem, workersUsing, NAME_MAX } from '../domain/skills.js'
+import { PROGRESS, progressOf, progressChip, progressCounts, planProgress, progressLabel, NOTE_MAX } from '../domain/progress.js'
+import { saveProgress, loadProgressLog } from './progress-repo.js'
 
 const { el } = C
 
@@ -195,16 +197,18 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
   function fillOffers() {
     if (!flow) return
     const approved = flow.offers.filter((o) => o.status === 'approved')
-    const free = approved.filter((o) => !flow.assignmentsOf(o.id).length)
-    const taken = approved.filter((o) => flow.assignmentsOf(o.id).length)
+    // Only offers still waiting for a team; once assigned they live in Daftar penugasan.
+    const free = assignableOffers(flow)
     const label = (o) => { const r = flow.requestOfOffer(o); return `${customerLabel(r)} — ${C.rupiah(o.validated_price)}` }
-    const opts = [{ value: '', label: approved.length ? 'Pilih penawaran' : 'Belum ada penawaran disetujui' }]
+    const opts = [{ value: '', label: free.length ? 'Pilih penawaran' : approved.length ? 'Semua penawaran sudah ditugaskan' : 'Belum ada penawaran disetujui' }]
     free.forEach((o) => opts.push({ value: o.id, label: label(o) }))
-    taken.forEach((o) => opts.push({ value: o.id, label: `${label(o)} (sudah ditugaskan)` }))
-    const keep = offerSel.input.value || (params.offerId != null ? String(params.offerId) : '')
+    const wanted = offerSel.input.value || (params.offerId != null ? String(params.offerId) : '')
+    const keep = free.some((o) => String(o.id) === wanted) ? wanted : ''
     C.setOptions(offerSel.input, opts, keep)
-    submit.disabled = !approved.length
-    if (!approved.length) {
+    submit.disabled = !free.length
+    if (approved.length && !free.length) {
+      msg.show('info', 'Semua penawaran yang disetujui sudah ditugaskan. Pantau progresnya di Daftar penugasan.')
+    } else if (!approved.length) {
       msg.show('info', 'Belum ada penawaran yang disetujui. Simpan penawaran di tahap 02 terlebih dahulu.')
       const go = C.button({ label: 'Ke penawaran', iconRight: 'arrowRight', size: 'sm' })
       go.addEventListener('click', () => navigate('offer'))
@@ -301,20 +305,23 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
           },
         },
         {
-          label: 'Status',
+          label: 'Progres',
           render: (a) => {
-            if (a.status === 'done' || flow.completionsOf(a.id).length) return C.tag('Selesai', 'ok')
-            const sched = C.toDate(a.scheduled_at)
-            return sched && sched.getTime() < now ? C.tag('Lewat jadwal', 'warn') : C.tag('Ditugaskan', 'brand')
+            const chip = progressChip(a, { hasCompletion: flow.completionsOf(a.id).length > 0, now })
+            const tagEl = C.tag(chip.label, chip.tone)
+            if (chip.value === 'selesai') return tagEl
+            const b = el('button', { type: 'button', className: 'progress-chip', title: 'Ubah progres', 'aria-label': `Progres: ${chip.label}. Ubah progres` }, tagEl, C.icon('chevronDown', { size: 14 }))
+            b.addEventListener('click', () => openProgress(a, b))
+            return el('div', { className: 'cell-stack' }, b, a.progress_note ? el('span', { className: 'cell-secondary small', title: a.progress_note }, a.progress_note) : '')
           },
         },
         {
           label: 'Aksi',
           className: 'col-action',
           render: (a) => {
-            if (a.status === 'done' || flow.completionsOf(a.id).length) return el('span', { className: 'muted nil' }, '—')
-            const b = C.button({ label: 'Tandai selesai', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
-            b.addEventListener('click', () => navigate('complete', { assignmentId: a.id }))
+            if (progressOf(a, flow.completionsOf(a.id).length > 0) === 'selesai') return el('span', { className: 'muted nil' }, '—')
+            const b = C.button({ label: 'Ubah progres', icon: 'refresh', size: 'sm', variant: 'soft' })
+            b.addEventListener('click', () => openProgress(a, b))
             return b
           },
         },
@@ -322,8 +329,59 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
     }), pg.root)
   }
 
+  /** Progress editor: choose a status, add a note, see the history. "Selesai" opens Penyelesaian. */
+  async function openProgress(a, opener) {
+    const from = progressOf(a, flow.completionsOf(a.id).length > 0)
+    const id = `pg-${a.id}-${Date.now()}`
+    let choice = from
+    const opts = el('div', { className: 'progress-opts', role: 'radiogroup', 'aria-label': 'Progres pekerjaan' },
+      ...PROGRESS.map((p) => {
+        const input = el('input', { type: 'radio', name: id, value: p.value, id: `${id}-${p.value}` })
+        input.checked = p.value === from
+        input.addEventListener('change', () => { choice = p.value; hint.hidden = choice !== 'selesai' })
+        return el('label', { className: 'progress-opt', htmlFor: `${id}-${p.value}` }, input, C.tag(p.label, p.tone))
+      }))
+    const hint = el('p', { className: 'muted small', hidden: true }, 'Selesai dicatat di tahap Penyelesaian (catatan hasil), supaya tidak tercatat dua kali.')
+    const note = C.textarea({ label: 'Catatan (opsional)', id: `${id}-note`, rows: 2, value: a.progress_note || '', placeholder: 'Mis. menunggu sparepart, pelanggan minta jadwal ulang…', attrs: { maxlength: String(NOTE_MAX) } })
+    const history = el('div', { className: 'progress-history' }, el('p', { className: 'muted small' }, 'Memuat riwayat…'))
+    const err = el('p', { className: 'field-error', role: 'alert' })
+    const save = C.button({ label: 'Simpan progres', icon: 'check', variant: 'primary', type: 'submit' })
+    const r = flow.requestOfAssignment(a)
+    const { form, close } = C.modal({
+      title: 'Ubah progres', description: `${customerLabel(r)} · ${a.worker_name || 'Tanpa petugas'} · ${C.formatDateTime(a.scheduled_at)}`,
+      opener, children: [opts, hint, note.wrap, el('div', { className: 'field' }, el('span', { className: 'field-label' }, 'Riwayat'), history), err],
+      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), save],
+    })
+    loadProgressLog(a.id).then((log) => {
+      history.replaceChildren(log.length
+        ? el('ol', { className: 'progress-log' }, ...log.map((x) => el('li', {}, C.tag(progressLabel(x.progress), PROGRESS.find((p) => p.value === x.progress)?.tone),
+          el('time', { className: 'muted small tnum', datetime: x.created_at }, C.formatDateTime(x.created_at)), x.note ? el('span', { className: 'small' }, x.note) : '')))
+        : el('p', { className: 'muted small' }, 'Belum ada perubahan progres.'))
+    }).catch(() => history.replaceChildren(el('p', { className: 'muted small' }, 'Riwayat tidak bisa dimuat.')))
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      err.textContent = ''
+      const noteText = note.input.value.trim()
+      const plan = planProgress(from, choice)
+      if (!plan.ok && !(choice === from && noteText !== (a.progress_note || ''))) { err.textContent = plan.reason; return }
+      if (plan.complete) { close(); navigate('complete', { assignmentId: a.id }); return }
+      const restore = C.setBusy(save, 'Menyimpan…')
+      try {
+        await saveProgress(a, choice, noteText)
+        showToast(`Progres: ${progressLabel(choice)}.`, 'success')
+        close()
+        await reload()
+      } catch (ex) { restore(); err.textContent = ex.message }
+    })
+  }
+
   fillOffers()
   loadList()
+}
+
+/** Approved offers that are not assigned yet (cancelled / rejected offers are not approved). */
+export function assignableOffers(flow) {
+  return flow.offers.filter((o) => o.status === 'approved' && !flow.assignmentsOf(o.id).length)
 }
 
 /* ================================================================ Tab: Team */
@@ -569,6 +627,14 @@ function renderMap(target, { workers, assignments, links, flow }) {
       const pop = el('div', { className: 'worker-lpop' },
         el('strong', {}, w.name),
         el('div', {}, C.tag(STATE_LABELS[state], state === 'available' ? 'ok' : state === 'on_job' ? 'warn' : 'neutral')),
+        (() => {
+          const ids = new Set(links.filter((l) => l.worker_id === w.id).map((l) => l.assignment_id))
+          const open = assignments.filter((a) => ids.has(a.id) && progressOf(a, flow.completionsOf(a.id).length > 0) !== 'selesai')
+          if (!open.length) return ''
+          const counts = progressCounts(open)
+          const parts = ['dikerjakan', 'ditunda', 'belum'].filter((k) => counts[k]).map((k) => `${counts[k]} ${progressLabel(k).toLowerCase()}`)
+          return el('div', { className: 'muted small' }, `Tugas terbuka: ${parts.join(', ')}`)
+        })(),
         (w.skills || []).length ? el('div', { className: 'muted small' }, (w.skills || []).map((k) => labels[k] || k).join(', ')) : '',
         w.phone ? el('a', { href: `tel:${w.phone}` }, w.phone) : '',
         w.zone ? el('div', { className: 'muted small' }, w.zone) : '')
@@ -579,7 +645,8 @@ function renderMap(target, { workers, assignments, links, flow }) {
       bounds.push(ll)
       const pop = el('div', { className: 'worker-lpop' },
         el('strong', {}, customerLabel(r)),
-        el('div', { className: 'muted small' }, `${a.worker_name || 'Tanpa petugas'} · ${C.formatDateTime(a.scheduled_at)}`))
+        el('div', { className: 'muted small' }, `${a.worker_name || 'Tanpa petugas'} · ${C.formatDateTime(a.scheduled_at)}`),
+        (() => { const c = progressChip(a, { hasCompletion: flow.completionsOf(a.id).length > 0 }); return el('div', {}, C.tag(c.label, c.tone)) })())
       L.marker(ll, { icon: icon(cssVar('--accent', '#e7a13a'), surface), title: customerLabel(r), keyboard: true }).addTo(map).bindPopup(pop)
     }
     if (bounds.length) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false })
@@ -591,6 +658,8 @@ function renderMap(target, { workers, assignments, links, flow }) {
 
 /* ================================================================ Tab: Performance */
 function renderPerformance(target, { workers, assignments, completions, links }) {
+  const completedIds = new Set((completions || []).map((c) => String(c.assignment_id)))
+  const pc = progressCounts(assignments, completedIds)
   const activeList = workers.filter((w) => w.status === 'active')
   const done = new Map(workers.map((w) => [w.id, completedCount(w.id, links, completions)]))
   const total = [...done.values()].reduce((a, n) => a + n, 0)
@@ -602,6 +671,9 @@ function renderPerformance(target, { workers, assignments, completions, links })
     C.kpi({ label: 'Job selesai', value: String(total), iconName: 'check' }),
     C.kpi({ label: 'Dalam tugas hari ini', value: String(onJob), iconName: 'clock' }),
   ))
+  target.appendChild(C.panel({ title: 'Progres pekerjaan', meta: `${assignments.length} penugasan` },
+    el('div', { className: 'progress-summary' }, ...PROGRESS.map((p) => el('div', { className: 'progress-stat' },
+      C.tag(p.label, p.tone), el('strong', { className: 'tnum' }, String(pc[p.value])))))))
   target.appendChild(C.panel({ title: 'Peringkat petugas', meta: 'Berdasarkan job selesai' },
     ranked.length
       ? C.dataTable({

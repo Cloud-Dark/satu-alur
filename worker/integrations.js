@@ -6,7 +6,7 @@
  *   PUT  /api/integrations/ai              { ai_mode: builtin|openai|anthropic, ai_base_url, ai_model, ai_key? }
  *   POST /api/integrations/email/test      sends a test email to the signed-in user's own address
  *   POST /api/integrations/ai/test         one short completion through the chosen provider
- *   POST /api/email/send                   { kind: offer|report, to, subject, body } (offer: daily cap; report: own address only)
+ *   POST /api/email/send                   { kind: offer|invoice|report, to, subject, body } (offer: daily cap; report: own address only)
  *
  * Shared demo accounts can read but never change integrations or send real email (sends are simulated).
  */
@@ -149,7 +149,7 @@ export async function handleIntegrationsAiTest(request, env, deps) {
 export async function handleEmailSend(request, env, deps) {
   const { user } = await deps.authenticate(request, env);
   const body = await deps.readJson(request);
-  const kind = body.kind === 'report' ? 'report' : 'offer';
+  const kind = body.kind === 'report' ? 'report' : body.kind === 'invoice' ? 'invoice' : 'offer';
   const to = kind === 'report' ? user.email : String(body.to || '').trim().toLowerCase();
   if (!isEmail(to)) throw new deps.HttpError(400, 'Alamat email penerima tidak valid.');
   const subject = String(body.subject || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
@@ -158,8 +158,9 @@ export async function handleEmailSend(request, env, deps) {
   if (!text || text.length > 10000) throw new deps.HttpError(400, 'Isi email wajib diisi (maks. 10.000 karakter).');
   if (isDemo(user, deps)) return deps.ok({ simulated: true, provider: 'demo', to });
   const settings = await loadSystemSettings(env);
-  const cap = kind === 'offer' ? settings.email.offer_daily_cap : 10;
-  if ((await sentToday(env, user.id, kind)) >= cap) throw new deps.HttpError(429, `Batas ${cap} email ${kind === 'offer' ? 'penawaran' : 'laporan'} per hari tercapai.`);
+  // Invoices share the customer-email cap with offers.
+  const cap = kind === 'report' ? 10 : settings.email.offer_daily_cap;
+  if ((await sentToday(env, user.id, kind)) >= cap) throw new deps.HttpError(429, `Batas ${cap} email ${kind === 'report' ? 'laporan' : kind === 'invoice' ? 'invoice' : 'penawaran'} per hari tercapai.`);
   const mail = businessEmail({ subject, body: text, businessName: user.name });
   const { provider } = await sendEmail(env, deps, { ownerId: user.id, kind, to, subject: mail.subject, html: mail.html, text: mail.text, replyTo: user.email });
   return deps.ok({ provider, to });

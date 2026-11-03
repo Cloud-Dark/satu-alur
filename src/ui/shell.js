@@ -28,6 +28,7 @@ import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
 import * as StageVas from '../stages/vas.js'
 import * as StageZeroWaste from '../stages/zero-waste.js'
+import * as StageInvoice from '../stages/invoice.js'
 import * as Office from '../stages/office/index.js'
 import * as StageSupport from '../support/page.js'
 import * as StagePlan from '../quota/page.js'
@@ -55,6 +56,9 @@ export const STAGES = [
   { key: 'report', num: '06', label: 'Laporan', icon: 'chart',
     hint: 'Angka periode terpilih dari buku besar, plus penjelasan AI.', module: StageReport,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
+  { key: 'invoice', group: 'income', label: 'Invoice', sub: 'Tagihan pelanggan', icon: 'receipt',
+    hint: 'Buat invoice dari pekerjaan selesai, kirim lewat email atau WhatsApp, lalu tandai lunas. Pendapatannya otomatis masuk Pembukuan.',
+    module: StageInvoice, action: { label: 'Ke pembukuan', iconRight: 'arrowRight', to: 'bookkeeping' } },
   { key: 'vas', group: 'income', label: 'Layanan tambahan', sub: 'VAS & katalog', icon: 'layers',
     hint: 'Dua cara menambah pendapatan: jual layanan tambahan ke pekerjaan yang sudah ada, dan hentikan kebocoran biaya. Di sini Anda menemukan peluang VAS, mengelola katalognya, lalu membahas rencananya bersama lima tim AI.',
     module: StageVas,

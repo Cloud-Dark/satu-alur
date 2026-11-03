@@ -116,7 +116,8 @@ export async function render(container, ctx = {}) {
         completed_at: new Date().toISOString(),
       })
       if (error) throw new Error(error.message)
-      const upd = await db.from('assignments').update({ status: 'done' }).eq('id', a.id)
+      const upd = await db.from('assignments').update({ status: 'done', progress: 'selesai', progress_updated_at: new Date().toISOString() }).eq('id', a.id)
+      if (!upd.error) await db.from('assignment_progress_log').insert({ assignment_id: Number(a.id), progress: 'selesai', note: notes.input.value.trim().slice(0, 500) || null })
       // The completion is the source of truth (activeAssignments skips assignments
       // that have one), so a failed status update can't cause a second completion.
       if (upd.error) showToast(`Selesai tercatat, tetapi status penugasan belum diperbarui: ${upd.error.message}`, 'warning', 6000)
@@ -124,6 +125,8 @@ export async function render(container, ctx = {}) {
       restore()
       const next = C.button({ label: 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       next.addEventListener('click', () => navigate('bookkeeping', { completionId: row?.id }))
+      const bill = C.button({ label: 'Buat invoice', icon: 'receipt', size: 'sm', variant: 'soft' })
+      bill.addEventListener('click', () => navigate('invoice', { completionId: row?.id }))
       const again = C.button({ label: 'Selesaikan lainnya', icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
         notes.input.value = ''
@@ -132,7 +135,7 @@ export async function render(container, ctx = {}) {
         wiz.reset()
         fillAssignments()
       })
-      wiz.complete({ text: `Pekerjaan untuk ${customerLabel(flow.requestOfAssignment(a))} ditandai selesai. Siap dibukukan.`, actions: [next, again] })
+      wiz.complete({ text: `Pekerjaan untuk ${customerLabel(flow.requestOfAssignment(a))} ditandai selesai. Siap dibukukan dan ditagih.`, actions: [next, bill, again] })
       showToast('Pekerjaan ditandai selesai.', 'success')
       notifyDataChanged()
       await loadList()
@@ -173,10 +176,12 @@ export async function render(container, ctx = {}) {
           label: 'Pembukuan',
           className: 'col-action',
           render: (c) => {
-            if (flow.ledgerOf(c.id).length) return C.tag('Terbukukan', 'ok')
+            const bill = C.button({ label: 'Invoice', icon: 'receipt', size: 'sm', variant: 'ghost', title: 'Buat atau buka invoice pekerjaan ini' })
+            bill.addEventListener('click', () => navigate('invoice', { completionId: c.id }))
+            if (flow.ledgerOf(c.id).length) return el('div', { className: 'cell-actions' }, C.tag('Terbukukan', 'ok'), bill)
             const b = C.button({ label: 'Posting', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
             b.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
-            return b
+            return el('div', { className: 'cell-actions' }, b, bill)
           },
         },
       ],
