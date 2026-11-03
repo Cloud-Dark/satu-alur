@@ -8,6 +8,16 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-03 - Rilis gabungan dan materi lomba
+
+#### Ditambahkan
+- Gabungan `main` Zulfikar (Kantor Satu Alur, VAS & Tanpa limbah, konektor ERP, Threads) dengan kuota trial per fitur dan voucher (migrasi `0012_quota_vouchers.sql`), data contoh kantor (`seeds/office.sql`) dan panduan uji lokal (`docs/TESTING_LOKAL.md`).
+- Materi lomba di `docs/lomba/`: dokumen submisi, PDF 16 halaman, naskah dan skrip rekam video demo dengan narasi dan musik latar orisinal.
+- `wrangler.deploy.toml`: konfigurasi deploy production tanpa binding R2 dan cron (keduanya belum tersedia di akun).
+
+#### Deploy
+- Migrasi `0003_workers` dan `0007`–`0012` diterapkan ke D1 production; `seeds/office.sql` dimuat (201 baris tertulis).
+
 ### 2026-11-02 - Integrasi ERP Enterprise
 
 - Konektor REST, CSV/JSON, dan webhook masuk; pemetaan, pratinjau, sinkronisasi upsert, log, dan dead letter.

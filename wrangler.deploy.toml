@@ -1,0 +1,44 @@
+# Production deploy config used while R2 and cron triggers are unavailable on the account.
+# Deploy with: npx wrangler deploy --config wrangler.deploy.toml
+name = "satu-alur"
+main = "worker/index.js"
+compatibility_date = "2025-09-01"
+
+# Static SPA (Vite build) + Worker API. Only /api/* runs the Worker first;
+# everything else is served from ./dist with SPA fallback.
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "satu-alur-db"
+database_id = "085c9a7a-64c5-4ced-b0f3-3158870d64f4"
+migrations_dir = "migrations"
+
+[vars]
+# Demo mode: send-otp returns the OTP code in the response (no email provider yet).
+# Set to "false" (or remove) in production once an email provider is wired in.
+DEMO_OTP = "true"
+# Demo accounts: one-click login to the seeded demo businesses (POST /api/auth/demo-login).
+DEMO_LOGIN = "true"
+# Meta publishing (Social Media). Secrets (wrangler secret put): META_APP_SECRET, TOKEN_KEY (32-byte base64).
+# The integration stays "not configured" until DEMO_OTP is "false" and META_APP_ID, META_APP_SECRET, TOKEN_KEY and PUBLIC_BASE_URL are all set.
+META_APP_ID = ""
+# Threads publishing (Social Media). Secret (wrangler secret put): THREADS_APP_SECRET. Needs TOKEN_KEY and PUBLIC_BASE_URL too.
+# Independent of META_*: Threads stays "not configured" until DEMO_OTP is "false" and THREADS_APP_ID, THREADS_APP_SECRET,
+# TOKEN_KEY and PUBLIC_BASE_URL are all set.
+THREADS_APP_ID = ""
+# Staff (Kantor Satu Alur) sign in at /super-admin-login with accounts made by `npm run staff`.
+# Public origin without a trailing slash (OAuth redirect + media URLs Meta fetches).
+PUBLIC_BASE_URL = ""
+
+# R2 binding omitted: R2 is not enabled on this account yet (uploads answer 503).
+
+# Cron trigger omitted: the account is at its cron limit on the Free plan, and scheduled
+# publishing never runs while DEMO_OTP = "true" anyway. Restore [triggers] from wrangler.toml when needed.
