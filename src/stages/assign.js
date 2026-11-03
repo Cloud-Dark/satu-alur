@@ -1,10 +1,12 @@
 /** 03 — Penugasan: assign an approved offer to a worker with AI matching, map, and team management. */
-import { loadWorkers, loadLinks, saveWorker, removeWorker, createTeamAssignment } from './workers-repo.js'
+import { loadWorkers, loadLinks, saveWorker, removeWorker, createTeamAssignment, loadSkills, addSkill, renameSkill, deleteSkill, saveWorkerLocation } from './workers-repo.js'
 import { geocode } from '../geo.js'
+import { loadLeaflet, addBaseLayer, disposeMap } from '../ui/leaflet.js'
 import { SKILL_LABELS, workerState, completedCount, hasHistory, inferSkill, scoreWorkers, pickRecommended, joinWorkerNames } from '../domain/workers.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
+import { labelMap, sortSkills, nameProblem, workersUsing, NAME_MAX } from '../domain/skills.js'
 
 const { el } = C
 
@@ -26,6 +28,8 @@ const TABS = [
   { value: 'performance', label: 'Performa' },
 ]
 let currentTab = 'assign'
+// key → display name of this business's skills (built-in names until loaded).
+let labels = { ...SKILL_LABELS }
 
 /* ================================================================ Main Render */
 export async function render(container, ctx = {}) {
@@ -49,10 +53,12 @@ export async function render(container, ctx = {}) {
   let flow = null
   let workers = []
   let links = []
+  let skills = []
 
   async function load() {
     try {
-      ;[flow, workers, links] = await Promise.all([loadFlow(), loadWorkers(), loadLinks()])
+      ;[flow, workers, links, skills] = await Promise.all([loadFlow(), loadWorkers(), loadLinks(), loadSkills().catch(() => [])])
+      labels = labelMap(skills)
       status.hide()
     } catch (err) {
       status.show('danger', `Gagal memuat data: ${err.message}`)
@@ -64,13 +70,17 @@ export async function render(container, ctx = {}) {
     notifyDataChanged()
   }
 
+  let cleanupTab = null
+  ctx.signal?.addEventListener?.('abort', () => { cleanupTab?.(); cleanupTab = null })
   function draw() {
+    cleanupTab?.()
+    cleanupTab = null
     host.replaceChildren()
     if (!flow) return
     switch (currentTab) {
       case 'assign': renderAssign(host, ctx, flow, workers, links, reload, status, () => tabs.querySelector('[data-value="team"]').click()); break
-      case 'team': renderTeam(host, { workers, assignments: flow.assignments, completions: flow.completions, links, reload, status }); break
-      case 'map': renderMap(host, { workers, assignments: flow.assignments, links }); break
+      case 'team': renderTeam(host, { workers, skills, assignments: flow.assignments, completions: flow.completions, links, reload, status }); break
+      case 'map': cleanupTab = renderMap(host, { workers, assignments: flow.assignments, links, flow }); break
       case 'performance': renderPerformance(host, { workers, assignments: flow.assignments, completions: flow.completions, links }); break
     }
   }
@@ -155,7 +165,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
         el('span', { className: 'worker-pick-body' },
           el('span', { className: 'worker-pick-tags' },
             el('strong', {}, w.name),
-            ...(w.skills || []).map((k) => C.tag(SKILL_LABELS[k] || k)),
+            ...(w.skills || []).map((k) => C.tag(labels[k] || k)),
             s.clash ? C.tag('Bentrok', 'warn') : null,
             s.distanceKm !== null ? el('span', { className: 'muted small' }, `${s.distanceKm.toFixed(1).replace('.', ',')} km`) : null,
           ),
@@ -177,7 +187,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
     if (job?.skill && !sel.some((s) => s.skillMatch === 'full')) warns.push('Tidak ada petugas terpilih yang memiliki keahlian yang dibutuhkan.')
     summary.replaceChildren(
       el('div', {}, el('strong', {}, 'Tim: '), joinWorkerNames(sel.map((s) => s.worker))),
-      el('div', {}, el('strong', {}, 'Keahlian: '), skills.map((k) => SKILL_LABELS[k] || k).join(', ') || '—'),
+      el('div', {}, el('strong', {}, 'Keahlian: '), skills.map((k) => labels[k] || k).join(', ') || '—'),
       ...warns.map((t) => C.tag(t, 'warn')),
     )
   }
@@ -320,7 +330,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
 const PHONE_RE = /^[+()\d\s.-]{6,32}$/
 const STATE_TAG = { available: ['Tersedia', 'ok'], on_job: ['Dalam tugas', 'warn'], inactive: ['Nonaktif', 'neutral'] }
 
-function renderTeam(target, { workers, assignments, completions, links, reload, status }) {
+function renderTeam(target, { workers, skills, assignments, completions, links, reload, status }) {
   const dialog = el('dialog', { className: 'panel', 'aria-labelledby': 'worker-dialog-title' })
   dialog.addEventListener('close', () => dialog.replaceChildren())
 
@@ -329,18 +339,53 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
     const name = C.field({ label: 'Nama', name: 'name', required: true, value: worker?.name || '' })
     const phone = C.field({ label: 'No. HP', name: 'phone', type: 'tel', value: worker?.phone || '' })
     const address = C.field({ label: 'Alamat', name: 'address', value: worker?.address || '', hint: 'Dipakai untuk menentukan zona dan jarak.' })
-    const boxes = Object.entries(SKILL_LABELS).map(([key, label]) => {
-      const input = el('input', { type: 'checkbox', value: key })
-      input.checked = !!worker?.skills?.includes(key)
-      return { input, wrap: el('label', { className: 'check-row' }, input, ` ${label}`) }
-    })
+    const picked = new Set(worker?.skills || [])
+    const skillList = sortSkills(skills.length ? skills : Object.entries(labels).map(([key, name]) => ({ key, name })))
+    const chipsLabelId = `skills-label-${Date.now()}`
+    const chips = el('div', { className: 'chip-toggles', role: 'group', 'aria-labelledby': chipsLabelId })
+    const drawChips = () => chips.replaceChildren(...skillList.map((sk) => {
+      const on = picked.has(sk.key)
+      const b = el('button', { type: 'button', className: `chip-toggle${on ? ' is-on' : ''}`, 'aria-pressed': on ? 'true' : 'false' },
+        on ? C.icon('check', { size: 14 }) : '', sk.name)
+      b.addEventListener('click', () => { if (picked.has(sk.key)) picked.delete(sk.key); else picked.add(sk.key); drawChips() })
+      return b
+    }))
+    drawChips()
+    // Inline "add new skill": saved to the business list and selected right away.
+    const newSkill = el('input', { className: 'input', type: 'text', placeholder: 'Keahlian baru, mis. Instalasi CCTV', maxLength: NAME_MAX, 'aria-label': 'Nama keahlian baru' })
+    const addBtn = C.button({ label: 'Tambah', icon: 'plus', size: 'sm', variant: 'soft' })
+    const addNew = async () => {
+      const name = newSkill.value
+      const problem = nameProblem(name, skillList)
+      if (problem) { msg.show('danger', problem); return }
+      const restore = C.setBusy(addBtn, '…')
+      try {
+        await addSkill(name, skillList)
+        const fresh = await loadSkills()
+        const made = fresh.find((x) => !skillList.some((y) => y.key === x.key))
+        skillList.splice(0, skillList.length, ...sortSkills(fresh))
+        labels = labelMap(fresh)
+        if (made) picked.add(made.key)
+        newSkill.value = ''
+        msg.hide()
+        drawChips()
+      } catch (err) { msg.show('danger', err.message) }
+      restore()
+    }
+    addBtn.addEventListener('click', addNew)
+    newSkill.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addNew() } })
+    const skillField = el('div', { className: 'field' },
+      el('span', { className: 'field-label', id: chipsLabelId }, 'Keahlian'),
+      chips,
+      el('div', { className: 'chip-add' }, newSkill, addBtn),
+      el('span', { className: 'field-hint' }, 'Ketuk untuk memilih. Ubah nama atau hapus keahlian di panel Keahlian.'))
     const statusSel = isEdit ? C.select({ label: 'Status', name: 'status', options: [{ value: 'active', label: 'Aktif' }, { value: 'inactive', label: 'Nonaktif' }], value: worker.status }) : null
     const msg = C.message()
     const submit = C.button({ label: isEdit ? 'Simpan perubahan' : 'Tambah petugas', icon: 'check', variant: 'primary', type: 'submit' })
     const cancel = C.button({ label: 'Batal', variant: 'ghost', onClick: () => dialog.close() })
     const form = el('form', { className: 'form' },
       name.wrap, phone.wrap, address.wrap,
-      el('fieldset', { className: 'field' }, el('legend', { className: 'field-label' }, 'Keahlian'), ...boxes.map((b) => b.wrap)),
+      skillField,
       statusSel?.wrap, msg,
       el('div', { className: 'form-actions' }, submit, cancel),
     )
@@ -350,7 +395,7 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
       msg.hide()
       const fields = {
         name: name.input.value.trim(), phone: phone.input.value.trim(), address: address.input.value.trim(),
-        skills: boxes.filter((b) => b.input.checked).map((b) => b.input.value),
+        skills: skillList.map((sk) => sk.key).filter((k) => picked.has(k)),
       }
       if (!fields.name) { msg.show('danger', 'Nama wajib diisi.'); return }
       if (fields.phone && !PHONE_RE.test(fields.phone)) { msg.show('danger', 'Nomor HP tidak valid.'); return }
@@ -392,7 +437,7 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
     return el('article', { className: 'workspace-entry' },
       el('div', { className: 'workspace-entry-head' }, el('strong', {}, w.name), C.tag(stateLabel, tone)),
       el('p', { className: 'muted small' }, [w.phone, w.zone].filter(Boolean).join(' · ') || 'Belum ada kontak'),
-      el('div', {}, ...(w.skills || []).map((s) => C.tag(SKILL_LABELS[s] || s))),
+      el('div', {}, ...(w.skills || []).map((s) => C.tag(labels[s] || s))),
       el('p', { className: 'muted small' }, `${completedCount(w.id, links, completions)} job selesai`),
       el('div', { className: 'form-actions' },
         C.button({ label: 'Edit', icon: 'edit', variant: 'soft', size: 'sm', onClick: () => openWorkerForm(w) }),
@@ -404,6 +449,44 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
     )
   }
 
+  /* Keahlian: add, rename (inline) and delete; stored per business. */
+  function skillsPanel() {
+    const list = sortSkills(skills)
+    const rows = el('div', { className: 'skill-rows' })
+    const draw = () => rows.replaceChildren(...list.map((sk) => {
+      const used = workersUsing(sk.key, workers).length
+      const name = el('span', { className: 'skill-name' }, sk.name)
+      const meta = el('span', { className: 'muted small' }, used ? `${used} petugas` : 'Belum dipakai')
+      const row = el('div', { className: 'skill-row' }, el('div', { className: 'skill-text' }, name, meta))
+      const edit = C.button({ label: 'Ubah', icon: 'edit', size: 'sm', variant: 'ghost', onClick: () => {
+        const input = el('input', { className: 'input', type: 'text', value: sk.name, maxLength: NAME_MAX, 'aria-label': `Nama baru untuk ${sk.name}` })
+        const save = C.button({ label: 'Simpan', icon: 'check', size: 'sm', variant: 'soft' })
+        const cancel = C.button({ label: 'Batal', size: 'sm', variant: 'ghost', onClick: draw })
+        const commit = () => act('Ubah keahlian gagal', () => renameSkill(sk, input.value, list), `Keahlian diganti menjadi ${input.value.trim()}.`)
+        save.addEventListener('click', commit)
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit() } if (e.key === 'Escape') { e.stopPropagation(); draw() } })
+        row.replaceChildren(input, el('div', { className: 'skill-actions' }, save, cancel))
+        input.focus()
+        input.select()
+      } })
+      const del = C.button({ label: 'Hapus', icon: 'trash', size: 'sm', variant: 'ghost', onClick: () => {
+        const q = used ? `Hapus keahlian "${sk.name}"? Keahlian ini juga dilepas dari ${used} petugas.` : `Hapus keahlian "${sk.name}"?`
+        if (!window.confirm(q)) return
+        act('Hapus keahlian gagal', () => deleteSkill(sk, workers), `Keahlian ${sk.name} dihapus.`)
+      } })
+      row.append(el('div', { className: 'skill-actions' }, edit, del))
+      return row
+    }))
+    draw()
+    const input = el('input', { className: 'input', type: 'text', placeholder: 'Nama keahlian baru', maxLength: NAME_MAX, 'aria-label': 'Nama keahlian baru' })
+    const add = C.button({ label: 'Tambah', icon: 'plus', size: 'sm', variant: 'primary' })
+    const submit = () => act('Tambah keahlian gagal', () => addSkill(input.value, list), `Keahlian ${input.value.trim()} ditambahkan.`)
+    add.addEventListener('click', submit)
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } })
+    return C.panel({ title: 'Keahlian', meta: `${list.length} keahlian`, className: 'skills-panel' },
+      el('div', { className: 'chip-add' }, input, add), rows)
+  }
+
   const byName = [...workers].sort((a, b) => a.name.localeCompare(b.name))
   const active = byName.filter((w) => w.status === 'active')
   const inactive = byName.filter((w) => w.status !== 'active')
@@ -413,48 +496,97 @@ function renderTeam(target, { workers, assignments, completions, links, reload, 
     el('div', { className: 'form-actions' }, C.button({ label: 'Tambah petugas', icon: 'plus', variant: 'primary', onClick: () => openWorkerForm() })),
     C.panel({ title: 'Tim petugas', meta: `${active.length} aktif` },
       active.length ? active.map(card) : C.emptyState({ title: 'Belum ada petugas aktif', iconName: 'users', body: 'Tambahkan petugas untuk mulai menugaskan pekerjaan.' })),
-    inactive.length ? C.panel({ title: 'Nonaktif', meta: `${inactive.length} petugas` }, inactive.map(card)) : null,
+    inactive.length ? C.panel({ title: 'Nonaktif', meta: `${inactive.length} petugas` }, inactive.map(card)) : '',
+    skillsPanel(),
   )
 }
 
 /* ================================================================ Tab: Map */
 const STATE_LABELS = { available: 'Tersedia', on_job: 'Dalam tugas', inactive: 'Nonaktif' }
+const STATE_COLORS = { available: '--success', on_job: '--warning', inactive: '--text-muted' }
+const located = (o) => Number.isFinite(Number(o?.lat)) && Number.isFinite(Number(o?.lng ?? o?.lon)) && o.lat !== null
+const cssVar = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
+const MAX_GEOCODE_PER_VISIT = 8
 
-function renderMap(target, { workers, assignments, links }) {
-  const located = workers.filter((w) => Number.isFinite(w.lat) && Number.isFinite(w.lng))
-  if (!located.length) {
-    target.appendChild(C.emptyState({ title: 'Belum ada lokasi petugas', body: 'Lokasi muncul setelah integrasi peta aktif.' }))
-    return
-  }
-  // Bounds fit the located workers, padded so a single pin sits mid-map.
-  const W = 800
-  const H = 400
-  const lats = located.map((w) => w.lat)
-  const lngs = located.map((w) => w.lng)
-  const span = (v) => Math.max(...v) - Math.min(...v)
-  const padLat = Math.max(0.02, span(lats) * 0.1)
-  const padLng = Math.max(0.02, span(lngs) * 0.1)
-  const minLat = Math.min(...lats) - padLat
-  const maxLat = Math.max(...lats) + padLat
-  const minLng = Math.min(...lngs) - padLng
-  const maxLng = Math.max(...lngs) + padLng
-  // el() builds HTML-namespace nodes, so the SVG is assembled as a string (names escaped).
-  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-  let body = ''
-  for (let i = 0; i <= 5; i++) {
-    body += `<line class="worker-map-grid" x1="0" y1="${(H / 5) * i}" x2="${W}" y2="${(H / 5) * i}"/><line class="worker-map-grid" x1="${(W / 5) * i}" y1="0" x2="${(W / 5) * i}" y2="${H}"/>`
-  }
-  located.forEach((w) => {
-    const state = workerState(w, assignments, links)
-    const cx = ((w.lng - minLng) / (maxLng - minLng)) * W
-    const cy = H - ((w.lat - minLat) / (maxLat - minLat)) * H
-    body += `<circle class="worker-pin is-${state}" cx="${cx}" cy="${cy}" r="8"/><text class="worker-map-label" x="${cx}" y="${cy - 12}" text-anchor="middle">${esc(w.name.split(' ')[0])}</text>`
-  })
-  const svg = el('div', { className: 'worker-map-wrap' })
-  svg.innerHTML = `<svg class="worker-map" viewBox="0 0 ${W} ${H}" role="img" aria-label="Peta lokasi petugas">${body}</svg>`
+/** Leaflet map of petugas (OpenStreetMap). Returns a cleanup function. */
+function renderMap(target, { workers, assignments, links, flow }) {
+  let map = null
+  let disposed = false
+  const mapEl = el('div', { className: 'worker-lmap', role: 'region', 'aria-label': 'Peta lokasi petugas' })
+  const note = el('p', { className: 'muted small worker-map-note' })
   const legend = el('div', { className: 'worker-map-legend' },
-    ['available', 'on_job', 'inactive'].map((k) => el('span', { className: 'muted small' }, el('i', { className: `worker-pin-dot is-${k}` }), STATE_LABELS[k])))
-  target.appendChild(C.panel({ title: 'Lokasi petugas', meta: `${located.length} dari ${workers.length} petugas punya koordinat` }, svg, legend))
+    ['available', 'on_job', 'inactive'].map((k) => el('span', { className: 'muted small' }, el('i', { className: `worker-pin-dot is-${k}` }), STATE_LABELS[k])),
+    el('span', { className: 'muted small' }, el('i', { className: 'worker-pin-dot is-job' }), 'Lokasi job hari ini'))
+
+  if (!workers.length) {
+    target.appendChild(C.emptyState({ title: 'Belum ada petugas', iconName: 'users', body: 'Tambahkan petugas di tab Tim, lalu isi alamatnya.' }))
+    return () => {}
+  }
+  const withAddress = workers.filter((w) => String(w.address || '').trim().length >= 3)
+  if (!workers.some(located) && !withAddress.length) {
+    target.appendChild(C.emptyState({ title: 'Belum ada lokasi petugas', iconName: 'mapPin', body: 'Isi alamat petugas di tab Tim untuk menampilkannya di peta.' }))
+    return () => {}
+  }
+  const panel = C.panel({ title: 'Lokasi petugas', meta: 'Memuat peta…' }, mapEl, legend, note)
+  target.appendChild(panel)
+  const meta = panel.querySelector('.panel-meta')
+
+  const today = new Date()
+  const jobs = (assignments || []).filter((a) => a.status === 'assigned' && a.scheduled_at && new Date(a.scheduled_at).toDateString() === today.toDateString())
+    .map((a) => ({ a, r: flow?.requestOfAssignment?.(a) }))
+    .filter(({ r }) => r && located({ lat: r.lat, lng: r.lng ?? r.lon }))
+
+  ;(async () => {
+    // Fill missing coordinates from addresses (server geocoder, cached); a few per visit.
+    const missing = withAddress.filter((w) => !located(w)).slice(0, MAX_GEOCODE_PER_VISIT)
+    let filled = 0
+    for (const w of missing) {
+      if (disposed) return
+      const geo = await geocode(w.address)
+      if (geo) { Object.assign(w, geo); filled++; saveWorkerLocation(w.id, geo).catch(() => {}) }
+    }
+    let L
+    try { L = await loadLeaflet() } catch {
+      mapEl.replaceWith(C.errorState('Peta gagal dimuat. Periksa koneksi lalu buka tab ini lagi.'))
+      return
+    }
+    if (disposed) return
+    const pins = workers.filter(located)
+    const noLoc = workers.filter((w) => !located(w))
+    meta.textContent = `${pins.length} dari ${workers.length} petugas punya lokasi`
+    note.textContent = noLoc.length
+      ? `Belum di peta: ${noLoc.map((w) => w.name).join(', ')}. ${noLoc.some((w) => !w.address) ? 'Isi alamatnya di tab Tim.' : 'Alamatnya belum ditemukan; perjelas alamat (kelurahan, kota).'}`
+      : ''
+    map = L.map(mapEl, { zoomControl: true, attributionControl: true, zoomAnimation: false, markerZoomAnimation: false, scrollWheelZoom: false })
+    addBaseLayer(L, map)
+    const icon = (color, ring) => L.divIcon({ className: 'worker-lpin', html: `<span style="background:${color};box-shadow:0 0 0 3px ${ring}"></span>`, iconSize: [18, 18], iconAnchor: [9, 9] })
+    const bounds = []
+    const surface = cssVar('--surface', '#fff')
+    for (const w of pins) {
+      const state = workerState(w, assignments, links)
+      const ll = [Number(w.lat), Number(w.lng)]
+      bounds.push(ll)
+      const pop = el('div', { className: 'worker-lpop' },
+        el('strong', {}, w.name),
+        el('div', {}, C.tag(STATE_LABELS[state], state === 'available' ? 'ok' : state === 'on_job' ? 'warn' : 'neutral')),
+        (w.skills || []).length ? el('div', { className: 'muted small' }, (w.skills || []).map((k) => labels[k] || k).join(', ')) : '',
+        w.phone ? el('a', { href: `tel:${w.phone}` }, w.phone) : '',
+        w.zone ? el('div', { className: 'muted small' }, w.zone) : '')
+      L.marker(ll, { icon: icon(cssVar(STATE_COLORS[state], '#888'), surface), title: w.name, keyboard: true, alt: w.name }).addTo(map).bindPopup(pop)
+    }
+    for (const { a, r } of jobs) {
+      const ll = [Number(r.lat), Number(r.lng ?? r.lon)]
+      bounds.push(ll)
+      const pop = el('div', { className: 'worker-lpop' },
+        el('strong', {}, customerLabel(r)),
+        el('div', { className: 'muted small' }, `${a.worker_name || 'Tanpa petugas'} · ${C.formatDateTime(a.scheduled_at)}`))
+      L.marker(ll, { icon: icon(cssVar('--accent', '#e7a13a'), surface), title: customerLabel(r), keyboard: true }).addTo(map).bindPopup(pop)
+    }
+    if (bounds.length) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14, animate: false })
+    else map.setView([-2.5, 118], 4)
+  })()
+
+  return () => { disposed = true; disposeMap(map); map = null }
 }
 
 /* ================================================================ Tab: Performance */

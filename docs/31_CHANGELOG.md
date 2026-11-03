@@ -8,6 +8,19 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 
 ## [Unreleased]
 
+### 2026-11-03 - Rapikan tampilan mobile, keahlian petugas, peta petugas
+
+#### Diperbaiki
+- Pengaturan di HP: bar tab tidak lagi mendorong isi drawer keluar layar; tab menggulir di kotaknya sendiri dengan tepi memudar dan tab aktif selalu terlihat (`C.segmented({ scroll: true })`). Tabel Log dan pemetaan ERP menggulir di dalam kartu.
+- Teks "null" di Penugasan › Tim (dan 4 tempat serupa): `append()`/`replaceChildren()` bawaan DOM mengubah `null` menjadi teks.
+- Login: tombol Google (GIS / cadangan) dipindah ke atas form email.
+- Checkbox, radio, fieldset, dan input file memakai gaya design system.
+
+#### Ditambahkan
+- Keahlian petugas per bisnis (migrasi `0017_worker_skills.sql`, tabel `worker_skills`): tambah, ubah nama, hapus (keahlian yang dihapus dilepas dari petugas setelah konfirmasi). Daftar bawaan dibuat saat pertama dibuka. Form petugas memakai chip pilihan dan bisa menambah keahlian langsung.
+- Penugasan › Peta memakai Leaflet + OpenStreetMap: alamat petugas di-geocode lewat `/api/leads/geocode` (akun demo: gazetteer offline) dan koordinatnya disimpan.
+- `tests/e2e/mobile-sweep.spec.cjs` (cek overflow 390 px di semua halaman) dan `tests/e2e/petugas.spec.cjs`; dokumen `docs/specs/2026-11-03-mobile-ui-sweep.md`.
+
 ### 2026-11-03 - Menu profil, paging Kantor, SMTP platform, cari pelanggan dari peta
 
 #### Ditambahkan

@@ -368,7 +368,7 @@ export async function render(container, ctx = {}) {
           el('span', { className: 'ld-value-name' }, s.name),
           el('span', { className: 'tnum' }, C.rupiahCompact(s.avg)),
           el('span', { className: 'ld-value-n tnum' }, `${s.count} pekerjaan`)))),
-        stats.length > 4 ? el('span', { className: 'field-hint' }, `+${stats.length - 4} layanan lain dipakai bila cocok.`) : null,
+        stats.length > 4 ? el('span', { className: 'field-hint' }, `+${stats.length - 4} layanan lain dipakai bila cocok.`) : '',
       )
     } else {
       valueBox.replaceChildren(

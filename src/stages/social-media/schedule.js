@@ -120,7 +120,7 @@ export async function render(host, ctx) {
         el('p', { className: 'workspace-preview' }, (r.content || '').slice(0, 120)),
         r.status === 'failed' && r.error ? el('p', { className: 'field-error' }, r.error) : null, action)
     }
-    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : null,
+    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : '',
       rows.length ? C.paginate({ key: 'sm-schedules', label: 'laporan tayang', pageSize: 10, items: rows, render: (page) => page.map(renderRow) }).root
         : C.emptyState({ title: 'Belum ada jadwal', iconName: 'calendar', body: 'Jadwalkan konten dari Daftar konten.' }))
   }

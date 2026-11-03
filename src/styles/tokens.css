@@ -156,6 +156,18 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 body { min-height: 100vh; overflow-x: hidden; transition: background var(--t) var(--ease), color var(--t) var(--ease); }
+
+/* Native controls follow the design system (zero specificity: component classes win). */
+:where(input[type='checkbox'], input[type='radio']) { accent-color: var(--brand); width: 18px; height: 18px; margin: 0; flex-shrink: 0; cursor: pointer; }
+:where(fieldset) { border: 0; margin: 0; padding: 0; min-width: 0; }
+:where(legend) { padding: 0; }
+:where(input[type='file']) { max-width: 100%; font: inherit; font-size: 0.86rem; color: var(--text-muted); }
+input[type='file']::file-selector-button {
+  margin-right: 12px; padding: 8px 16px; border: 1px solid var(--line-strong); border-radius: 999px;
+  background: var(--surface); color: var(--text); font: 600 0.84rem/1.2 var(--font-sans); cursor: pointer;
+}
+input[type='file']::file-selector-button:hover { border-color: var(--brand-300); background: var(--brand-50); }
+:where(img, video, iframe, canvas) { max-width: 100%; }
 #app { min-height: 100vh; position: relative; }
 
 h1, h2, h3, h4 { margin: 0; color: var(--text); font-family: var(--font-sans); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }

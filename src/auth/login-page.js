@@ -253,9 +253,10 @@ export function renderLoginPage(root, ctx = {}) {
   // Google Identity Services renders the official button (FedCM where supported) into gisSlot;
   // the redirect link above stays as the fallback when GIS can't load.
   const gisSlot = h('div', { class: 'auth-gis', role: 'group', 'aria-label': 'Masuk dengan Google' })
+  // Google first (one tap for most people), then "atau", then the email code flow.
   const googleBox = h('div', { class: 'auth-google-box', hidden: true },
-    h('p', { class: 'auth-or', 'aria-hidden': 'true' }, h('span', {}, 'atau')), gisSlot, googleBtn)
-  const livePanel = h('div', { class: 'auth-live', id: 'auth-live', role: 'tabpanel', 'aria-labelledby': 'auth-mode-live' }, stepper, emailForm, codeForm, googleBox)
+    gisSlot, googleBtn, h('p', { class: 'auth-or', 'aria-hidden': 'true' }, h('span', {}, 'atau dengan email')))
+  const livePanel = h('div', { class: 'auth-live', id: 'auth-live', role: 'tabpanel', 'aria-labelledby': 'auth-mode-live' }, googleBox, stepper, emailForm, codeForm)
   const card = h('div', { class: 'auth-card surface' },
     modeSwitch,
     eyebrow,
