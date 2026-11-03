@@ -11,12 +11,20 @@ import * as Contact from './contact.js'
 import * as Support from './support.js'
 import * as Campaigns from './campaigns.js'
 import * as Vouchers from './vouchers.js'
+import * as System from './system.js'
 import { adminContactCounts, adminTicketCounts } from '../../customers/api.js'
 
 const { el } = C
 
 // Single source of the staff menu: the shell turns each section into a sidebar item.
 export const GROUPS = [
+  { title: 'Sistem', items: [
+    { key: 'sys-overview', label: 'Ringkasan', icon: 'chart', draw: System.drawOverview },
+    { key: 'sys-email', label: 'Email', icon: 'mail', draw: System.drawEmail },
+    { key: 'sys-ai', label: 'Mesin AI', icon: 'sparkles', draw: System.drawAi },
+    { key: 'sys-login', label: 'Login', icon: 'lock', draw: System.drawLogin },
+    { key: 'sys-whatsapp', label: 'WhatsApp & sosial', icon: 'plug', draw: System.drawWhatsapp },
+    { key: 'sys-activity', label: 'Log aktivitas', icon: 'activity', draw: System.drawActivity }] },
   { title: 'Konten Situs', items: [
     { key: 'landing', label: 'Landing page', icon: 'home', draw: Landing.draw },
     { key: 'about', label: 'Tentang kami', icon: 'building', draw: Doc.drawAbout },

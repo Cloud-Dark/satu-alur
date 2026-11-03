@@ -1,4 +1,5 @@
 /** 06 — Laporan: period figures computed from the ledger + AI explanation. */
+import { sendBusinessEmail } from '../integrations/api.js'
 import * as C from '../ui/components.js'
 import { explainReport } from '../ai/agent.js'
 import { showToast } from '../ui/animations.js'
@@ -53,12 +54,14 @@ export async function render(container, ctx = {}) {
   const custPanel = C.panel({ title: 'Pelanggan teratas', meta: 'berdasarkan pendapatan', className: 'span-5' }, custBody)
 
   const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'primary' })
+  const mailBtn = C.button({ label: 'Kirim ke email saya', icon: 'mail', variant: 'soft', disabled: true })
+  let lastExplanation = ''
   const modelNote = el('span', { className: 'model-note', hidden: true })
   const msg = C.message()
   const aiOut = el('div', { className: 'report-ai-out' })
   const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'Bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
     el('p', { className: 'panel-lead' }, 'AI membaca angka periode terpilih, membandingkannya dengan periode sebelumnya, lalu memberi ringkasan dan rekomendasi. Angka di atas tetap menjadi acuan.'),
-    el('div', { className: 'form-actions' }, explainBtn, modelNote),
+    el('div', { className: 'form-actions' }, explainBtn, mailBtn, modelNote),
     msg,
     aiOut,
   )
@@ -170,6 +173,8 @@ export async function render(container, ctx = {}) {
       entries: entries.map((l) => ({ id: l.id, category: l.category, amount: Number(l.amount) || 0, posted_at: ledgerDate(l) })),
     }
     explainBtn.disabled = entries.length === 0
+    mailBtn.disabled = entries.length === 0
+    lastExplanation = ''
     if (!entries.length) msg.show('info', 'Tidak ada jurnal di periode ini, jadi belum ada yang bisa dijelaskan.')
     else msg.hide()
   }
@@ -210,6 +215,7 @@ export async function render(container, ctx = {}) {
         onChunk: (_d, full) => { if (!ac.signal.aborted) ui.writeHTML(C.sanitizeHTML(full)) },
       }), ac.signal)
       ui.writeHTML(C.sanitizeHTML(html), { caretOn: false })
+      lastExplanation = ui.body?.textContent || ''
       ui.setStatus('Selesai', false)
       showToast('Penjelasan laporan selesai.', 'success')
     } catch (err) {
@@ -226,6 +232,25 @@ export async function render(container, ctx = {}) {
       restore()
       explainBtn.disabled = !report?.entries.length
     }
+  })
+
+  // Report email to the signed-in owner: the period's figures plus the latest AI explanation.
+  mailBtn.addEventListener('click', async () => {
+    if (!report) return
+    const lines = [
+      `Laporan keuangan ${report.period}`,
+      '',
+      `Pendapatan: ${C.rupiah(report.total_revenue)}`,
+      `Biaya: ${C.rupiah(report.total_cost)}`,
+      `Laba sebelum pajak: ${C.rupiah(report.net_profit)}${report.margin_pct == null ? '' : ` (margin ${report.margin_pct}%)`}`,
+      report.previous_period ? `Pembanding ${report.previous_period.label}: laba ${C.rupiah(report.previous_period.net_profit)}` : null,
+      lastExplanation ? `\nPenjelasan AI:\n${lastExplanation.trim()}` : null,
+    ].filter((l) => l !== null)
+    const restore = C.setBusy(mailBtn, 'Mengirim…')
+    try {
+      const r = await sendBusinessEmail({ kind: 'report', subject: `Laporan ${report.period}`, body: lines.join('\n') })
+      showToast(r.simulated ? 'Simulasi: email tidak dikirim dari akun demo.' : `Laporan terkirim ke ${r.to}.`, 'success')
+    } catch (err) { msg.show('danger', err.message) } finally { restore() }
   })
 
   draw()

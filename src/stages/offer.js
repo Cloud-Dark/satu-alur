@@ -7,6 +7,7 @@ import { loadModels } from '../ai/models.js'
 import { getAgentParams } from './settings.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
+import { offerEmailButton } from '../email/offer-dialog.js'
 
 const { el, icon } = C
 
@@ -329,7 +330,8 @@ export async function render(container, ctx = {}) {
         reviewBox.replaceChildren()
         wiz.reset()
       })
-      wiz.complete({ text: `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`, actions: [next, again] })
+      const mail = offerEmailButton({ offer: { ...row, validated_price: o.price, validated_scope: o.scope, ai_proposal_json: offerJson }, request, businessName: ctx.user?.name })
+      wiz.complete({ text: `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`, actions: [next, mail, again] })
       showToast('Penawaran disimpan.', 'success')
       notifyDataChanged()
       await loadList()
@@ -415,12 +417,13 @@ export async function render(container, ctx = {}) {
               b.addEventListener('click', () => approve(o, b))
               return b
             }
+            const mail = offerEmailButton({ offer: o, request: flow.requestOfOffer(o), businessName: ctx.user?.name })
             if (!flow.assignmentsOf(o.id).length) {
               const b = C.button({ label: 'Tugaskan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
               b.addEventListener('click', () => navigate('assign', { offerId: o.id }))
-              return b
+              return el('span', { className: 'row-actions' }, mail, b)
             }
-            return el('span', { className: 'muted small' }, 'Ditugaskan')
+            return el('span', { className: 'row-actions' }, mail, el('span', { className: 'muted small' }, 'Ditugaskan'))
           },
         },
       ],

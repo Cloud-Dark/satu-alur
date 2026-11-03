@@ -171,12 +171,16 @@ export async function handleAdminUsers(request, env, deps) {
       `SELECT u.id, u.email, u.name, u.created_at,
          (SELECT COUNT(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active_sessions,
          (SELECT MAX(s.created_at) FROM sessions s WHERE s.user_id = u.id) AS last_session_at,
-         COALESCE(f.suspended, 0) AS suspended, COALESCE(f.reason, '') AS reason
+         COALESCE(f.suspended, 0) AS suspended, COALESCE(f.reason, '') AS reason,
+         COALESCE(f.plan, 'sole') AS tier,
+         (SELECT p.name FROM customer_accounts c JOIN subscription_plans p ON p.id = c.plan_id WHERE c.owner_id = u.id) AS plan_name,
+         (SELECT COALESCE(SUM(uc.count), 0) FROM usage_counters uc WHERE uc.user_id = u.id AND uc.period = ?) AS ai_calls_month,
+         (SELECT balance_idr FROM ai_credits ac WHERE ac.user_id = u.id) AS credit_idr
        FROM users u LEFT JOIN user_flags f ON f.user_id = u.id
        WHERE ${where} ORDER BY u.created_at DESC, u.id LIMIT ? OFFSET ?`,
-    ).bind(new Date().toISOString(), ...args, PAGE_SIZE, (page - 1) * PAGE_SIZE).all(),
+    ).bind(new Date().toISOString(), new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 7), ...args, PAGE_SIZE, (page - 1) * PAGE_SIZE).all(),
   ]);
-  const items = results.map((r) => ({ ...r, suspended: r.suspended === 1, demo: deps.DEMO_EMAILS.has(String(r.email).toLowerCase()) }));
+  const items = results.map((r) => ({ ...r, credit_idr: r.credit_idr || 0, suspended: r.suspended === 1, demo: deps.DEMO_EMAILS.has(String(r.email).toLowerCase()) }));
   return deps.ok({ items, total: count.n, page });
 }
 

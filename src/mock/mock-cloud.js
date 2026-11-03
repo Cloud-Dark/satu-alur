@@ -111,6 +111,10 @@ function startSession(user, extra) {
   notifyAuth('SIGNED_IN')
 }
 
+function mockAdminEmails() {
+  return new Set(String(import.meta.env?.VITE_ADMIN_EMAILS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean))
+}
+
 const mockAuth = {
   async sendOtp({ email }) {
     // Same rule as the Worker: staff addresses come only from staff login.
@@ -148,6 +152,10 @@ const mockAuth = {
     startSession(user)
     return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
+
+  // Google sign-in is a Worker flow; the mock has no Google, so these say so.
+  async providers() { return { google: false, otp_email: false, demo_login: true } },
+  async googleExchange() { throw new Error('Masuk dengan Google tidak tersedia di mode demo lokal.') },
 
   async demoLogin({ email }) {
     const users = ensureTable('users')
@@ -195,11 +203,13 @@ const mockAuth = {
         return { data: null, error: { message: 'Sesi tidak valid atau sudah berakhir.', status: 401 } }
       }
     }
-    // Same rule as the Worker: only a staff-login session is an admin.
+    // Same rule as the Worker: a staff-login session, or an email listed in VITE_ADMIN_EMAILS
+    // (the mock's stand-in for ADMIN_EMAILS; dev/e2e only).
     if (_session) {
       const { is_staff, ...pub } = _session
       const user = { ...pub.user, plan: mockPlanFor(pub.user) }
-      return { data: { ...pub, user, is_admin: is_staff === true }, error: null }
+      const emailAdmin = !is_staff && mockAdminEmails().has(String(pub.user.email).toLowerCase())
+      return { data: { ...pub, user, is_admin: is_staff === true || emailAdmin, admin_via: is_staff ? 'staff' : emailAdmin ? 'email' : null }, error: null }
     }
     return { data: null, error: { message: 'Belum masuk.' } }
   },

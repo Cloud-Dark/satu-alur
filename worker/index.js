@@ -51,6 +51,19 @@ import {
   handleMigrationRollback, handleWebhook,
 } from './mcp.js';
 import { canUse, planLockMessage, planForScale, normalizePlan } from '../src/business/plan-access.js';
+import { isEmailAdmin } from '../src/admin/rules.js';
+import { otpEmail } from '../src/email/templates.js';
+import { sendEmail, loadSystemSettings } from './email.js';
+import { resolveAi, customChatStream, countByo } from './ai-provider.js';
+import {
+  handleIntegrationsGet, handleIntegrationsEmailSave, handleIntegrationsAiSave, handleIntegrationsEmailTest,
+  handleIntegrationsAiTest, handleEmailSend,
+} from './integrations.js';
+import { handleAuthProviders, handleGoogleStart, handleGoogleCallback, handleGoogleExchange } from './google.js';
+import {
+  handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
+  handleAdminUserDetail, handleAdminUserTier,
+} from './admin-system.js';
 import { demoAccount } from '../src/auth/demo-accounts.js';
 
 // ---------------------------------------------------------------- constants
@@ -260,6 +273,21 @@ async function refuseSuspended(env, userId) {
 
 // --------------------------------------------------------------------- auth
 
+// New session for a signed-in user; also stamps users.last_login_at (migration 0014).
+async function createSession(env, userId, { staff = false, ttlMs = SESSION_TTL_MS } = {}) {
+  const accessToken = randomHex(32);
+  const now = nowIso();
+  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at, is_staff) VALUES (?, ?, ?, ?, ?)')
+    .bind(await sha256Hex(accessToken), userId, new Date(Date.now() + ttlMs).toISOString(), now, staff ? 1 : 0)
+    .run();
+  try {
+    await env.DB.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').bind(now, userId).run();
+  } catch (err) {
+    if (!/no such column/i.test(String(err?.message))) throw err;
+  }
+  return accessToken;
+}
+
 async function authenticate(request, env) {
   const h = request.headers.get('authorization') || '';
   const m = /^Bearer\s+([A-Za-z0-9._~-]{16,200})$/.exec(h);
@@ -278,6 +306,8 @@ async function authenticate(request, env) {
   const { suspended, ...user } = row;
   if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
   user.plan = normalizePlan(user.plan);
+  // ADMIN_EMAILS users are admins too, but only while OTP codes really go to the inbox.
+  user.admin_email = user.is_staff !== 1 && isEmailAdmin(user.email, env, DEMO_EMAILS) ? 1 : 0;
   return { user, tokenHash };
 }
 
@@ -318,11 +348,21 @@ async function handleSendOtp(request, env) {
   ]);
   const isExistingUser = (existing.results || []).length > 0;
 
-  // TODO(email-provider): deliver `code` to `email` here (e.g. Resend, MailChannels,
-  // Cloudflare Email Service) via env.EMAIL_API_KEY. Until a provider exists the
-  // code is only exposed in the response when DEMO_OTP === "true".
   const data = { verificationId: id, isExistingUser };
-  if (env.DEMO_OTP === 'true') data.demoCode = code;
+  if (env.DEMO_OTP === 'true') {
+    // Demo mode: no email, the code is shown on screen.
+    data.demoCode = code;
+    return ok(data);
+  }
+  const settings = await loadSystemSettings(env);
+  if (!settings.login.otp_email) throw new HttpError(503, 'Masuk dengan kode email sedang dimatikan. Gunakan cara masuk lain.');
+  const mail = otpEmail({ code, minutes: OTP_TTL_MS / 60000 });
+  try {
+    await sendEmail(env, { HttpError }, { kind: 'otp', to: email, subject: mail.subject, html: mail.html, text: mail.text, useBusiness: false });
+  } catch (err) {
+    await env.DB.prepare('DELETE FROM otp_codes WHERE id = ?').bind(id).run();
+    throw new HttpError(err?.status === 429 ? 429 : 502, 'Kode belum bisa dikirim ke email Anda. Coba lagi sebentar.');
+  }
   return ok(data);
 }
 
@@ -360,11 +400,7 @@ async function handleVerifyOtp(request, env) {
   if (!user) throw new Error('user missing after upsert');
   await refuseSuspended(env, user.id);
 
-  const accessToken = randomHex(32);
-  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256Hex(accessToken), user.id, new Date(Date.now() + SESSION_TTL_MS).toISOString(), nowIso())
-    .run();
-
+  const accessToken = await createSession(env, user.id);
   return ok({ user, access_token: accessToken });
 }
 
@@ -395,17 +431,15 @@ async function handleDemoLogin(request, env) {
        ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, updated_at = excluded.updated_at`,
   ).bind(user.id, nowIso(), user.plan).run();
 
-  const accessToken = randomHex(32);
-  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256Hex(accessToken), user.id, new Date(Date.now() + SESSION_TTL_MS).toISOString(), nowIso())
-    .run();
+  const accessToken = await createSession(env, user.id);
   return ok({ user, access_token: accessToken });
 }
 
 async function handleSession(request, env) {
   const { user } = await authenticate(request, env);
-  const { is_staff, ...pub } = user;
-  return ok({ user: pub, is_admin: isAdminUser(user) });
+  const { is_staff, admin_email, ...pub } = user;
+  const adminVia = is_staff === 1 ? 'staff' : admin_email === 1 ? 'email' : null;
+  return ok({ user: pub, is_admin: isAdminUser(user), admin_via: adminVia });
 }
 
 async function handleSignout(request, env) {
@@ -781,8 +815,14 @@ async function handleDb(request, env) {
 // ---------------------------------------------------------------------- LLM
 
 async function handleModels(request, env) {
-  await authenticate(request, env);
-  return ok(LLM_MODELS.map((m) => ({ ...m })));
+  const { user } = await authenticate(request, env);
+  // A business on its own provider sees that model only; the chat route uses it whatever id is sent.
+  const ai = await resolveAi(env, user, ROUTE_DEPS);
+  if (ai.mode !== 'builtin') return ok([{ id: ai.model, name: `${ai.model} (penyedia Anda)`, disabled: false, provider: ai.mode }]);
+  const settings = await loadSystemSettings(env);
+  const first = LLM_MODELS.find((m) => m.id === settings.ai.default_model);
+  const list = first ? [first, ...LLM_MODELS.filter((m) => m !== first)] : LLM_MODELS;
+  return ok(list.map((m) => ({ ...m })));
 }
 
 function sse(obj) {
@@ -846,8 +886,9 @@ async function handleChat(request, env) {
   const { user } = await authenticate(request, env);
   const feature = featureFrom(request, HttpError);
   const body = await readJson(request, MAX_CHAT_BODY_BYTES);
+  const ai = await resolveAi(env, user, ROUTE_DEPS);
 
-  if (typeof body.model !== 'string' || !LLM_MODELS.some((m) => m.id === body.model && !m.disabled)) {
+  if (ai.mode === 'builtin' && (typeof body.model !== 'string' || !LLM_MODELS.some((m) => m.id === body.model && !m.disabled))) {
     throw bad('Model tidak didukung.');
   }
   if (!Array.isArray(body.messages) || body.messages.length === 0 || body.messages.length > MAX_CHAT_MESSAGES) {
@@ -875,6 +916,15 @@ async function handleChat(request, env) {
   const schema = rf && rf.type === 'json_schema' ? rf.json_schema : null;
   if (rf && rf.type === 'json_schema' && (!schema || typeof schema !== 'object' || Array.isArray(schema) || JSON.stringify(schema).length > 8000)) {
     throw bad('json_schema tidak valid.');
+  }
+  if (ai.mode !== 'builtin') {
+    // The business pays its own provider: no Satu Alur quota or credit, counted for analytics only.
+    const stream = await customChatStream(ai, {
+      messages, temperature: params.temperature, max_tokens: params.max_tokens,
+      schema, json: Boolean(rf && rf.type === 'json_object'),
+    }, { HttpError });
+    await countByo(env, user.id, feature);
+    return sseResponse(stream);
   }
   // Counted only once the request is valid; a model that never starts gives the call back.
   const usage = await meter(env, user, feature, ROUTE_DEPS);
@@ -986,7 +1036,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex, canUse, planLockMessage };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex, canUse, planLockMessage, LLM_MODELS, createSession };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
@@ -994,6 +1044,24 @@ const ROUTES = {
   'POST /api/auth/demo-login': handleDemoLogin,
   'POST /api/auth/staff-login': (req, env) => handleStaffLogin(req, env, ROUTE_DEPS),
   'GET /api/auth/session': handleSession,
+  'GET /api/auth/providers': (req, env) => handleAuthProviders(req, env, ROUTE_DEPS),
+  'GET /api/auth/google/start': (req, env) => handleGoogleStart(req, env, ROUTE_DEPS),
+  'GET /api/auth/google/callback': (req, env) => handleGoogleCallback(req, env, ROUTE_DEPS),
+  'POST /api/auth/google/exchange': (req, env) => handleGoogleExchange(req, env, ROUTE_DEPS),
+  'GET /api/integrations': (req, env) => handleIntegrationsGet(req, env, ROUTE_DEPS),
+  'PUT /api/integrations/email': (req, env) => handleIntegrationsEmailSave(req, env, ROUTE_DEPS),
+  'PUT /api/integrations/ai': (req, env) => handleIntegrationsAiSave(req, env, ROUTE_DEPS),
+  'POST /api/integrations/email/test': (req, env) => handleIntegrationsEmailTest(req, env, ROUTE_DEPS),
+  'POST /api/integrations/ai/test': (req, env) => handleIntegrationsAiTest(req, env, ROUTE_DEPS),
+  'POST /api/email/send': (req, env) => handleEmailSend(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/system': (req, env) => handleSystemGet(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/system/email/test': (req, env) => handleSystemEmailTest(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/system/ai/test': (req, env) => handleSystemAiTest(req, env, ROUTE_DEPS),
+  'PUT /api/office/admin/system/:key': (req, env, params) => handleSystemPut(req, env, ROUTE_DEPS, params),
+  'GET /api/office/admin/summary': (req, env) => handleAdminSummary(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/activity': (req, env) => handleAdminActivity(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/users/:userId/detail': (req, env, params) => handleAdminUserDetail(req, env, ROUTE_DEPS, params),
+  'PUT /api/office/admin/users/:userId/tier': (req, env, params) => handleAdminUserTier(req, env, ROUTE_DEPS, params),
   'POST /api/auth/signout': handleSignout,
   'POST /api/db': handleDb,
   'GET /api/llm/models': handleModels,

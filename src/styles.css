@@ -1868,3 +1868,12 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
   margin: 0; max-width: 62ch;
   font-size: 0.8rem; line-height: 1.55; color: var(--text-muted);
 }
+
+/* Pengaturan › Email & AI and Kantor › Sistem */
+.set-subgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--s-3); margin: var(--s-3) 0; }
+.set-subgrid[hidden] { display: none; }
+.of-sys-kpis { margin-bottom: var(--s-5); }
+.of-sys-code { font-size: 0.8rem; word-break: break-all; }
+.of-us-usage { margin: 0; padding-left: 1.1em; }
+.side-row-office { margin-bottom: 2px; }
+.row-actions { display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; justify-content: flex-end; }

@@ -3,6 +3,8 @@ import { showToast } from '../../ui/animations.js'
 import { adminListUsers, adminSuspendUser, adminRestoreUser, adminRevokeUserSessions, PAGE_SIZE } from '../../customers/api.js'
 import { validateSuspendReason } from '../../customers/rules.js'
 import { LEAVE_MSG } from './site-doc.js'
+import { getUserDetail, setUserTier } from '../../admin/api.js'
+import { PLANS, PLAN_LABELS } from '../../business/plan-access.js'
 
 const { el } = C
 let seq = 0
@@ -30,6 +32,52 @@ function suspendDialog(ctx, u, opener, onDone, setDirty) {
       await adminSuspendUser(u.id, clean)
       close()
       showToast('Pengguna ditangguhkan.', 'success')
+      if (!ctx.signal.aborted) onDone()
+    } catch (ex) { err.textContent = ex.message } finally { restore() }
+  })
+}
+
+const FEATURE_LABEL = (f) => (f.startsWith('byo_') ? `${f.slice(4)} (penyedia sendiri)` : f)
+
+// Detail: tier (skala akun), subscription, AI usage this month, credit, integrations, recent emails.
+async function detailDialog(ctx, u, opener, onDone) {
+  let d
+  try { d = await getUserDetail(u.id) } catch (ex) { showToast(ex.message, 'error'); return }
+  if (ctx.signal.aborted) return
+  const tier = C.select({ label: 'Skala akun', id: `of-us-tier-${++seq}`, options: PLANS.map((p) => ({ value: p, label: PLAN_LABELS[p] || p })), value: d.tier,
+    hint: d.demo ? 'Akun demo mengikuti skalanya sendiri.' : 'Membuka atau mengunci fitur (mis. integrasi ERP untuk Enterprise).' })
+  if (d.demo) tier.input.disabled = true
+  const err = el('p', { className: 'field-error', role: 'alert' })
+  const save = C.button({ label: 'Simpan skala', variant: 'primary', type: 'submit' })
+  const close = C.button({ label: 'Tutup', variant: 'ghost', dismiss: true })
+  const usage = d.usage.length
+    ? el('ul', { className: 'of-us-usage' }, d.usage.map((r) => el('li', {}, `${FEATURE_LABEL(r.feature)}: ${C.number(r.count)}`)))
+    : el('span', { className: 'muted' }, 'Belum ada')
+  const { form, close: done } = C.modal({
+    title: 'Detail pengguna', description: d.user.email, opener, wide: true, actions: [close, d.demo ? null : save].filter(Boolean),
+    children: [
+      C.defList([
+        ['Nama', d.user.name || '—'],
+        ['Terdaftar', C.formatDate(d.user.created_at)],
+        ['Terakhir masuk', d.user.last_login_at ? C.formatDateTime(d.user.last_login_at) : (d.sessions.last ? C.formatDateTime(d.sessions.last) : '—')],
+        ['Paket', d.subscription?.plan_name ? `${d.subscription.plan_name} (${d.subscription.status})` : 'Free'],
+        ['Saldo AI', C.rupiah(d.credit_idr)],
+        ['Pemakaian AI bulan ini', usage],
+        ['Email', d.integrations.email_mode === 'smtp' ? `SMTP sendiri (${d.integrations.smtp_host})` : 'Layanan Satu Alur'],
+        ['Mesin AI', d.integrations.ai_mode === 'builtin' ? 'Bawaan' : `${d.integrations.ai_mode} · ${d.integrations.ai_model || ''}`],
+        ['Status', d.suspended ? `Ditangguhkan: ${d.reason || '—'}` : 'Aktif'],
+      ]),
+      tier.wrap, err,
+    ],
+  })
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    err.textContent = ''
+    const restore = C.setBusy(save, 'Menyimpan…')
+    try {
+      await setUserTier(u.id, tier.input.value)
+      showToast('Skala akun disimpan.', 'success')
+      done()
       if (!ctx.signal.aborted) onDone()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
@@ -76,6 +124,9 @@ export function draw(host, ctx, setDirty) {
       b.addEventListener('click', () => suspendDialog(ctx, u, b, () => load(pg.page), setDirty))
       actions.append(b)
     }
+    const det = C.button({ label: 'Detail', variant: 'ghost', size: 'sm' })
+    det.addEventListener('click', () => detailDialog(ctx, u, det, () => load(pg.page)))
+    actions.prepend(det)
     const end = C.button({ label: 'Akhiri sesi', variant: 'ghost', size: 'sm' })
     end.addEventListener('click', () => {
       if (!confirm(`Akhiri semua sesi ${u.email}? Pengguna harus masuk lagi.`)) return
@@ -90,6 +141,10 @@ export function draw(host, ctx, setDirty) {
       el('span', { className: 'of-cust-meta' },
         u.demo ? C.tag('Demo', 'neutral') : null,
         u.suspended ? C.tag('Ditangguhkan', 'danger') : null,
+        u.tier ? C.tag(PLAN_LABELS[u.tier] || u.tier, 'brand') : null,
+        u.plan_name ? el('span', { className: 'small' }, `Paket ${u.plan_name}`) : null,
+        u.ai_calls_month ? el('span', { className: 'small' }, `AI bulan ini: ${C.number(u.ai_calls_month)}`) : null,
+        u.credit_idr ? el('span', { className: 'small' }, `Saldo ${C.rupiah(u.credit_idr)}`) : null,
         el('span', { className: 'small' }, `Sesi aktif: ${u.active_sessions}`),
         el('span', { className: 'muted small' }, u.last_session_at ? `Terakhir masuk ${C.formatDate(u.last_session_at)}` : '')),
       actions)
