@@ -11,14 +11,15 @@
  * Shared demo accounts can read but never change integrations or send real email (sends are simulated).
  */
 import { encryptToken } from '../src/social/crypto.js';
+import { isDemoUser } from './demo.js';
 import { validateEmailIntegration, validateAiIntegration } from '../src/admin/rules.js';
 import { isEmail } from '../src/admin/constants.js';
 import { testEmail, businessEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings, loadIntegration, resendConfigured, customSecretsEnabled, sentToday } from './email.js';
 import { resolveAi, testProvider } from './ai-provider.js';
 
-const DEMO_DENIED = 'Tidak tersedia di akun demo.';
-const isDemo = (user, deps) => deps.DEMO_EMAILS.has(String(user.email || '').toLowerCase());
+const DEMO_DENIED = 'Akun demo memakai data dan AI contoh, jadi pengaturan ini tidak bisa diubah.';
+const isDemo = (user) => isDemoUser(user);
 
 function validated(HttpError, fn) {
   try { return fn(); } catch (err) {
@@ -27,7 +28,7 @@ function validated(HttpError, fn) {
   }
 }
 
-function publicView(row, settings, env) {
+function publicView(row, settings, env, demo = false) {
   const r = row || {};
   return {
     email: {
@@ -37,7 +38,7 @@ function publicView(row, settings, env) {
     ai: { mode: r.ai_mode || 'builtin', base_url: r.ai_base_url || '', model: r.ai_model || '', has_key: Boolean(r.ai_key_enc) },
     options: {
       custom_smtp_allowed: settings.email.allow_custom_smtp, custom_ai_allowed: settings.ai.allow_custom,
-      secrets_enabled: customSecretsEnabled(env), platform_email_ready: resendConfigured(env),
+      secrets_enabled: customSecretsEnabled(env), platform_email_ready: resendConfigured(env), demo,
     },
   };
 }
@@ -53,7 +54,7 @@ async function upsert(env, ownerId, fields) {
 export async function handleIntegrationsGet(request, env, deps) {
   const { user } = await deps.authenticate(request, env);
   const [row, settings] = await Promise.all([loadIntegration(env, user.id), loadSystemSettings(env)]);
-  return deps.ok(publicView(row, settings, env));
+  return deps.ok(publicView(row, settings, env, isDemo(user)));
 }
 
 async function emailPut(request, env, deps) {

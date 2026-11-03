@@ -52,6 +52,8 @@ import {
 } from './mcp.js';
 import { canUse, planLockMessage, planForScale, normalizePlan } from '../src/business/plan-access.js';
 import { isEmailAdmin } from '../src/admin/rules.js';
+import { DEMO_EMAILS, isDemoUser } from './demo.js';
+import { simulateAnswer } from '../src/ai/simulate.js';
 import { otpEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings } from './email.js';
 import { resolveAi, customChatStream, countByo } from './ai-provider.js';
@@ -62,7 +64,7 @@ import {
 import { handleAuthProviders, handleGoogleStart, handleGoogleCallback, handleGoogleExchange } from './google.js';
 import {
   handleSystemGet, handleSystemPut, handleSystemEmailTest, handleSystemAiTest, handleAdminSummary, handleAdminActivity,
-  handleAdminUserDetail, handleAdminUserTier,
+  handleAdminUserDetail, handleAdminUserTier, handleAdminsList, handleAdminsAdd, handleAdminsRemove,
 } from './admin-system.js';
 import { demoAccount } from '../src/auth/demo-accounts.js';
 
@@ -273,6 +275,16 @@ async function refuseSuspended(env, userId) {
 
 // --------------------------------------------------------------------- auth
 
+async function listedAdmin(env, user) {
+  if (env.DEMO_OTP === 'true' || isDemoUser(user) || isStaffEmail(String(user.email || ''))) return false;
+  try {
+    return Boolean(await env.DB.prepare('SELECT 1 AS x FROM admin_users WHERE email = ?').bind(String(user.email).toLowerCase()).first());
+  } catch (err) {
+    if (/no such table/i.test(String(err?.message))) return false;
+    throw err;
+  }
+}
+
 // New session for a signed-in user; also stamps users.last_login_at (migration 0014).
 async function createSession(env, userId, { staff = false, ttlMs = SESSION_TTL_MS } = {}) {
   const accessToken = randomHex(32);
@@ -306,8 +318,9 @@ async function authenticate(request, env) {
   const { suspended, ...user } = row;
   if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
   user.plan = normalizePlan(user.plan);
-  // ADMIN_EMAILS users are admins too, but only while OTP codes really go to the inbox.
-  user.admin_email = user.is_staff !== 1 && isEmailAdmin(user.email, env, DEMO_EMAILS) ? 1 : 0;
+  // Email admins: ADMIN_EMAILS (bootstrap) or admin_users (Kantor › Sistem › Akses admin), only while
+  // OTP codes really go to the inbox and never for staff or demo accounts.
+  user.admin_email = user.is_staff !== 1 && (isEmailAdmin(user.email, env, DEMO_EMAILS) || await listedAdmin(env, user)) ? 1 : 0;
   return { user, tokenHash };
 }
 
@@ -404,13 +417,6 @@ async function handleVerifyOtp(request, env) {
   return ok({ user, access_token: accessToken });
 }
 
-// Demo accounts (seeded by scripts/seed-demo.mjs). Keep in sync with
-// src/auth/demo-accounts.js. Set DEMO_LOGIN = "false" to disable.
-const DEMO_EMAILS = new Set([
-  'demo-ac@satualur.id', 'demo-cleaning@satualur.id', 'demo-listrik@satualur.id',
-  'demo-pest@satualur.id', 'demo-laundry@satualur.id', 'demo-dinding@satualur.id',
-  'demo-mall@satualur.id', 'demo-fm@satualur.id', 'demo-rs@satualur.id',
-]);
 
 async function handleDemoLogin(request, env) {
   if (env.DEMO_LOGIN === 'false') throw new HttpError(403, 'Mode demo tidak aktif.');
@@ -917,6 +923,10 @@ async function handleChat(request, env) {
   if (rf && rf.type === 'json_schema' && (!schema || typeof schema !== 'object' || Array.isArray(schema) || JSON.stringify(schema).length > 8000)) {
     throw bad('json_schema tidak valid.');
   }
+  if (isDemoUser(user)) {
+    // Demo is 100% demo: a simulated answer, never Workers AI or a provider, and no quota.
+    return sseResponse(simulatedStream({ messages, response_format: rf || undefined }));
+  }
   if (ai.mode !== 'builtin') {
     // The business pays its own provider: no Satu Alur quota or credit, counted for analytics only.
     const stream = await customChatStream(ai, {
@@ -1023,6 +1033,30 @@ async function structuredChat(env, model, params, schema, refund = async () => {
   return sseResponse(out);
 }
 
+// Streams a simulated answer (src/ai/simulate.js) in the same SSE shape and pace as a model.
+function simulatedStream(opts) {
+  const gen = simulateAnswer(opts);
+  return new ReadableStream({
+    async pull(c) {
+      try {
+        const { value, done } = await gen.next();
+        if (done) {
+          c.enqueue(sse('[DONE]'));
+          c.close();
+          return;
+        }
+        c.enqueue(sse({ choices: value.choices }));
+      } catch (e) {
+        console.error('simulated answer failed', e);
+        c.enqueue(sse({ error: { message: 'Jawaban contoh tidak tersedia.' } }));
+        c.enqueue(sse('[DONE]'));
+        c.close();
+      }
+    },
+    cancel() { gen.return?.(); },
+  });
+}
+
 function sseResponse(stream) {
   return new Response(stream, {
     headers: {
@@ -1036,7 +1070,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex, canUse, planLockMessage, LLM_MODELS, createSession };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, isDemoUser, sha256Hex, randomHex, canUse, planLockMessage, LLM_MODELS, createSession };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
@@ -1057,6 +1091,9 @@ const ROUTES = {
   'GET /api/office/admin/system': (req, env) => handleSystemGet(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/email/test': (req, env) => handleSystemEmailTest(req, env, ROUTE_DEPS),
   'POST /api/office/admin/system/ai/test': (req, env) => handleSystemAiTest(req, env, ROUTE_DEPS),
+  'GET /api/office/admin/system/admins': (req, env) => handleAdminsList(req, env, ROUTE_DEPS),
+  'POST /api/office/admin/system/admins': (req, env) => handleAdminsAdd(req, env, ROUTE_DEPS),
+  'DELETE /api/office/admin/system/admins/:email': (req, env, params) => handleAdminsRemove(req, env, ROUTE_DEPS, params),
   'PUT /api/office/admin/system/:key': (req, env, params) => handleSystemPut(req, env, ROUTE_DEPS, params),
   'GET /api/office/admin/summary': (req, env) => handleAdminSummary(req, env, ROUTE_DEPS),
   'GET /api/office/admin/activity': (req, env) => handleAdminActivity(req, env, ROUTE_DEPS),

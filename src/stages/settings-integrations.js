@@ -28,7 +28,15 @@ export async function renderIntegrationsTab(container) {
     container.replaceChildren(C.errorState(ex.message), again)
     return
   }
-  container.replaceChildren(emailSection(data, container), aiSection(data, container))
+  const parts = [emailSection(data, container), aiSection(data, container)]
+  if (data.options.demo) {
+    // Demo is 100% demo: sample data and simulated AI; nothing here can be changed.
+    const note = C.message()
+    note.show('info', 'Akun demo memakai data dan AI contoh. Pengaturan email dan mesin AI hanya bisa diubah di akun sungguhan.')
+    parts.forEach((p) => p.querySelectorAll('input, select, textarea, button').forEach((x) => { x.disabled = true }))
+    parts.unshift(note)
+  }
+  container.replaceChildren(...parts)
 }
 
 function section(num, title, desc, ...children) {

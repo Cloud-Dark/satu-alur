@@ -111,3 +111,49 @@ export async function setUserTier(userId, plan) {
   }
   return call(`/api/office/admin/users/${encodeURIComponent(userId)}/tier`, { method: 'PUT', body: { plan } })
 }
+
+/* ---------------------------------------------------------- admin access */
+
+const mockBootstrap = () => String(import.meta.env?.VITE_ADMIN_EMAILS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)
+
+export async function listAdmins() {
+  if (isUsingMockCloud()) {
+    await delay()
+    const d = readDemo()
+    return { admins: d.admins || [], bootstrap: mockBootstrap(), audit: d.audit || [], email_admins_active: true }
+  }
+  return call('/api/office/admin/system/admins')
+}
+
+function mockAudit(d, action, target) {
+  d.audit = [{ actor: 'admin', action, target, detail: null, created_at: new Date().toISOString() }, ...(d.audit || [])].slice(0, 50)
+}
+
+export async function addAdmin(email) {
+  const e = String(email || '').trim().toLowerCase()
+  if (!isEmail(e)) throw new Error('Email tidak valid.')
+  if (isUsingMockCloud()) {
+    await delay()
+    const d = readDemo()
+    d.admins = d.admins || []
+    if (d.admins.some((a) => a.email === e)) throw new Error('Email ini sudah menjadi admin.')
+    d.admins.push({ email: e, role: 'admin', added_by: 'admin', added_at: new Date().toISOString() })
+    mockAudit(d, 'admin.add', e)
+    writeDemo(d)
+    return { email: e }
+  }
+  return call('/api/office/admin/system/admins', { method: 'POST', body: { email: e } })
+}
+
+export async function removeAdmin(email) {
+  if (isUsingMockCloud()) {
+    await delay()
+    const d = readDemo()
+    if ((d.admins || []).length <= 1) throw new Error('Admin terakhir tidak bisa dihapus. Tambahkan admin lain dulu.')
+    d.admins = d.admins.filter((a) => a.email !== email)
+    mockAudit(d, 'admin.remove', email)
+    writeDemo(d)
+    return { email }
+  }
+  return call(`/api/office/admin/system/admins/${encodeURIComponent(email)}`, { method: 'DELETE' })
+}

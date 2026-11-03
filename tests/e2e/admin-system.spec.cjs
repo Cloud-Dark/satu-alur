@@ -57,6 +57,19 @@ module.exports = async function adminSystem(t) {
   await p.getByText('Cadangan pengirim platform').waitFor({ timeout: 5000 })
   t.check(await p.getByText('Mati (default)').count() === 1, 'Sistem › WhatsApp: platform fallback off by default')
 
+  // Akses admin: add one, it is listed and audited; the last listed admin can't be removed.
+  await p.click('.flow-item[data-stage="sys-access"]')
+  await p.getByRole('heading', { name: 'Admin bawaan' }).waitFor({ timeout: 8000 })
+  t.check(await p.getByText('boss@contoh.id').count() >= 1, 'Akses admin: bootstrap admin listed')
+  await p.fill('input[id^="of-sys-adm-"]', 'kedua@contoh.id')
+  await p.getByRole('button', { name: 'Tambah admin' }).click()
+  await p.locator('.of-admin-row', { hasText: 'kedua@contoh.id' }).waitFor({ timeout: 5000 }).catch(() => {})
+  t.check(await p.locator('.of-admin-row', { hasText: 'kedua@contoh.id' }).count() === 1 && await p.locator('.data-table td', { hasText: 'Menambah admin' }).count() >= 1, 'Akses admin: added, listed and audited')
+  p.once('dialog', (dlg) => dlg.accept())
+  await p.locator('.of-admin-row', { hasText: 'kedua@contoh.id' }).getByRole('button', { name: 'Hapus' }).click()
+  await p.getByText('Admin terakhir tidak bisa dihapus').first().waitFor({ timeout: 5000 }).catch(() => {})
+  t.check(await p.getByText(/Admin terakhir tidak bisa dihapus/).count() >= 1, 'Akses admin: last listed admin cannot be removed')
+
   // Pengguna: list + detail dialog with skala akun.
   await p.click('.flow-item[data-stage="users"]')
   await p.locator('.of-user').first().waitFor({ timeout: 8000 })
@@ -88,4 +101,17 @@ module.exports = async function adminSystem(t) {
   t.check(await p.getByText(/Simulasi: di akun demo|Email uji terkirim/).count() === 1, 'Email & AI: test email (simulated in mock)')
   await t.noErrors?.(p)
   await p.close()
+
+  // Demo account: Email & AI is read-only with the demo note.
+  const d = await t.page()
+  await loginLive(d, t.base, 'demo-ac@satualur.id')
+  await d.getByRole('button', { name: 'Pengaturan' }).first().click()
+  await d.waitForSelector('.drawer.is-open')
+  await d.click('.drawer .seg-btn[data-value="integrations"]')
+  await d.getByText('Akun demo memakai data dan AI contoh').waitFor({ timeout: 8000 }).catch(() => {})
+  t.check(await d.getByText(/Akun demo memakai data dan AI contoh/).count() === 1, 'demo account: integrations note shown')
+  t.check(await d.locator('.drawer button:has-text("Simpan mesin AI")').isDisabled() && await d.locator('.drawer input[id^="set-ai-base-"]').isDisabled(), 'demo account: integration forms are read-only')
+  t.check(await d.locator('.side-row-office').count() === 0, 'demo account: no Kantor switch')
+  await t.noErrors?.(d)
+  await d.close()
 }

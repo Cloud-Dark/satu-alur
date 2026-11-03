@@ -16,4 +16,4 @@ Setiap bisnis memilih mesin AI di Pengaturan › Email & AI:
 - Mode JSON (`response_format: json_schema`) untuk penyedia sendiri diganti instruksi sistem berisi skema; klien sudah memakai parser toleran (`parseModelJson`).
 - API key dienkripsi (`TOKEN_KEY`). Tanpa `TOKEN_KEY`, atau bila admin mematikan "Izinkan bisnis memakai penyedia AI sendiri", semua bisnis kembali ke mesin bawaan.
 - Alamat API wajib `https`, domain publik, tanpa kredensial di URL.
-- Akun demo selalu memakai mesin bawaan.
+- Akun demo tidak memanggil mesin AI apa pun: `/api/llm/chat` mengalirkan jawaban contoh dari `src/ai/simulate.js` (juga untuk mode JSON), tanpa kuota. Pengaturan mesin AI akun demo hanya-baca.

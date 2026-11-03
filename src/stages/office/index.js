@@ -40,6 +40,7 @@ export const GROUPS = [
     { key: 'sys-email', label: 'Email', icon: 'mail', draw: System.drawEmail },
     { key: 'sys-ai', label: 'Mesin AI', icon: 'sparkles', draw: System.drawAi },
     { key: 'sys-login', label: 'Login', icon: 'lock', draw: System.drawLogin },
+    { key: 'sys-access', label: 'Akses admin', icon: 'shield', draw: System.drawAccess },
     { key: 'sys-whatsapp', label: 'WhatsApp & sosial', icon: 'plug', draw: System.drawWhatsapp },
     { key: 'sys-activity', label: 'Log aktivitas', icon: 'activity', draw: System.drawActivity }] },
 ]

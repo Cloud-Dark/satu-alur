@@ -9,6 +9,7 @@
  * custom providers (system_settings.ai.allow_custom), everyone uses the built-in engine.
  */
 import { decryptToken } from '../src/social/crypto.js';
+import { isDemoUser } from './demo.js';
 import {
   openAiRequest, anthropicRequest, openAiToAppStream, anthropicToAppStream, providerErrorMessage, JSON_HINT,
 } from '../src/ai-providers/providers.js';
@@ -17,8 +18,8 @@ import { loadSystemSettings, loadIntegration } from './email.js';
 const PROVIDER_TIMEOUT_MS = 60000;
 
 /** { mode: 'builtin' } or { mode, baseUrl, model, apiKey }. */
-export async function resolveAi(env, user, { HttpError, DEMO_EMAILS }) {
-  if (!env.TOKEN_KEY || DEMO_EMAILS?.has(String(user.email || '').toLowerCase())) return { mode: 'builtin' };
+export async function resolveAi(env, user, { HttpError }) {
+  if (!env.TOKEN_KEY || isDemoUser(user)) return { mode: 'builtin' };
   const row = await loadIntegration(env, user.id);
   if (!row || row.ai_mode === 'builtin' || !row.ai_key_enc || !row.ai_base_url || !row.ai_model) return { mode: 'builtin' };
   const settings = await loadSystemSettings(env);

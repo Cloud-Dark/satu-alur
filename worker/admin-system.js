@@ -9,6 +9,10 @@
  *   GET  /api/office/admin/activity                recent emails + AI usage per feature (this month) + connector counts
  *   GET  /api/office/admin/users/:userId/detail    one user: tier, plan, usage, credit, integrations (no secrets), emails
  *   PUT  /api/office/admin/users/:userId/tier      { plan: sole | ukm | enterprise }
+ *   GET  /api/office/admin/system/admins           { admins, bootstrap, audit }
+ *   POST /api/office/admin/system/admins           { email } grant admin access
+ *   DELETE /api/office/admin/system/admins/:email  revoke (never the last listed admin)
+ * Every change is written to admin_audit.
  */
 import { requireAdmin } from './office.js';
 import { normalizeSetting, SETTING_KEYS, adminEmailSet, AI_MODE_LABELS } from '../src/admin/rules.js';
@@ -18,6 +22,15 @@ import { isGoogleConfigured, googleRedirectUri } from '../src/auth/google.js';
 import { PLANS } from '../src/business/plan-access.js';
 import { STAFF_EMAIL_SUFFIX } from '../src/customers/rules.js';
 import { loadSystemSettings, sendEmail, resendConfigured, customSecretsEnabled, DEFAULT_FROM } from './email.js';
+
+export async function audit(env, actor, action, target, detail) {
+  try {
+    await env.DB.prepare('INSERT INTO admin_audit (actor, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(String(actor || '?'), action, target ?? null, detail === undefined ? null : String(detail).slice(0, 500), new Date().toISOString()).run();
+  } catch (err) {
+    if (!/no such table/i.test(String(err?.message))) console.error('admin_audit insert failed', err);
+  }
+}
 
 const missingTable = (err) => /no such (table|column)/i.test(String(err?.message));
 const period = () => new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 7);
@@ -77,6 +90,7 @@ export async function handleSystemPut(request, env, deps, params) {
     `INSERT INTO system_settings (key, value_json, updated_at, updated_by) VALUES (?, ?, ?, ?)
      ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
   ).bind(params.key, JSON.stringify(value), new Date().toISOString(), admin.email).run();
+  await audit(env, admin.email, 'setting.update', params.key, JSON.stringify(value));
   return deps.ok({ key: params.key, value });
 }
 
@@ -195,5 +209,43 @@ export async function handleAdminUserTier(request, env, deps, params) {
     `INSERT INTO user_flags (user_id, updated_at, updated_by, plan) VALUES (?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
   ).bind(u.id, new Date().toISOString(), admin.email, plan).run();
+  await audit(env, admin.email, 'user.tier', u.email, plan);
   return deps.ok({ plan });
+}
+
+// ------------------------------------------------------------ admin access
+
+export async function handleAdminsList(request, env, deps) {
+  await requireAdmin(request, env, deps);
+  const [admins, auditRows] = await Promise.all([
+    safeAll(env.DB.prepare('SELECT email, role, added_by, added_at FROM admin_users ORDER BY added_at, email')),
+    safeAll(env.DB.prepare('SELECT actor, action, target, detail, created_at FROM admin_audit ORDER BY id DESC LIMIT 50')),
+  ]);
+  return deps.ok({ admins, bootstrap: [...adminEmailSet(env.ADMIN_EMAILS)], audit: auditRows, email_admins_active: env.DEMO_OTP !== 'true' });
+}
+
+export async function handleAdminsAdd(request, env, deps) {
+  const admin = await requireAdmin(request, env, deps);
+  const body = await deps.readJson(request);
+  const email = String(body.email || '').trim().toLowerCase();
+  if (!isEmail(email)) throw new deps.HttpError(400, 'Email tidak valid.');
+  if (email.endsWith(STAFF_EMAIL_SUFFIX)) throw new deps.HttpError(400, 'Akun staf dikelola lewat terminal.');
+  if (deps.DEMO_EMAILS.has(email)) throw new deps.HttpError(400, 'Akun demo tidak bisa menjadi admin.');
+  const res = await env.DB.prepare("INSERT OR IGNORE INTO admin_users (email, role, added_by, added_at) VALUES (?, 'admin', ?, ?)")
+    .bind(email, admin.email, new Date().toISOString()).run();
+  if (res.meta?.changes === 0) throw new deps.HttpError(409, 'Email ini sudah menjadi admin.');
+  await audit(env, admin.email, 'admin.add', email);
+  return deps.ok({ email });
+}
+
+export async function handleAdminsRemove(request, env, deps, params) {
+  const admin = await requireAdmin(request, env, deps);
+  const email = decodeURIComponent(String(params.email || '')).trim().toLowerCase();
+  const row = await env.DB.prepare('SELECT email FROM admin_users WHERE email = ?').bind(email).first();
+  if (!row) throw new deps.HttpError(404, 'Admin tidak ditemukan.');
+  const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM admin_users').first();
+  if ((count?.n || 0) <= 1) throw new deps.HttpError(400, 'Admin terakhir tidak bisa dihapus. Tambahkan admin lain dulu.');
+  await env.DB.prepare('DELETE FROM admin_users WHERE email = ?').bind(email).run();
+  await audit(env, admin.email, 'admin.remove', email);
+  return deps.ok({ email, still_bootstrap: adminEmailSet(env.ADMIN_EMAILS).has(email) });
 }

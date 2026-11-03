@@ -16,7 +16,9 @@ Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Ve
 - Mesin AI per bisnis: bawaan, OpenAI-compatible, atau Anthropic-compatible dengan API key sendiri; tidak memakai kuota Satu Alur ([docs/integrations/ai-providers.md](integrations/ai-providers.md)).
 - Admin lewat email (`ADMIN_EMAILS`) dan grup Kantor › Sistem (Dasbor sistem, Email, Mesin AI, Login, WhatsApp & sosial, Log aktivitas), detail pengguna dengan skala akun ([docs/admin.md](admin.md)).
 - Masuk dengan Google (OIDC + PKCE, kode serah-terima sekali pakai).
-- Migrasi `0014_admin_system.sql`: `system_settings`, `business_integrations`, `email_log`, `oauth_logins`, kolom `users.last_login_at`.
+- Kantor › Sistem › Akses admin: admin dipilih dari daftar `admin_users` (bawaan `apipedia22@gmail.com`, `ADMIN_EMAILS` tetap bootstrap), admin terakhir tidak bisa dihapus, semua perubahan tercatat di `admin_audit`.
+- Akun demo 100% demo: AI disimulasikan di Worker (`src/ai/simulate.js`, dipakai juga oleh mock), integrasi hanya-baca, email ke pelanggan disimulasikan; helper `isDemoUser` di `worker/demo.js`.
+- Migrasi `0014_admin_system.sql`: `system_settings`, `business_integrations`, `email_log`, `oauth_logins`, `admin_users`, `admin_audit`, kolom `users.last_login_at`.
 
 ### 2026-11-03 - Rilis gabungan dan materi lomba
 

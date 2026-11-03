@@ -52,4 +52,25 @@ CREATE TABLE IF NOT EXISTS oauth_logins (
   expires_at TEXT NOT NULL
 );
 
+-- Admins chosen in Kantor › Sistem › Akses admin (email logins). ADMIN_EMAILS in the Worker env
+-- stays an always-allowed bootstrap list, so nobody can lock the platform out.
+CREATE TABLE IF NOT EXISTS admin_users (
+  email TEXT PRIMARY KEY,
+  role TEXT NOT NULL DEFAULT 'admin' CHECK (role IN ('admin')),
+  added_by TEXT NOT NULL,
+  added_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO admin_users (email, role, added_by, added_at)
+VALUES ('apipedia22@gmail.com', 'admin', 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+
+-- Audit trail of admin actions (access changes, system settings, user tier changes).
+CREATE TABLE IF NOT EXISTS admin_audit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor TEXT NOT NULL,
+  action TEXT NOT NULL,
+  target TEXT,
+  detail TEXT,
+  created_at TEXT NOT NULL
+);
+
 ALTER TABLE users ADD COLUMN last_login_at TEXT;

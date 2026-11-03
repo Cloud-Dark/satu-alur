@@ -410,3 +410,80 @@ test('worker: Google hand-off code is single use and creates a session', async (
   assert.equal(loc.searchParams.get('redirect_uri'), 'https://satu-alur.apipedia.workers.dev/api/auth/google/callback')
   assert.match(start.headers.get('set-cookie'), /__Host-g_nonce=/)
 })
+
+// ------------------------------------------------------ demo vs live, admin access
+
+test('isDemoUser: the nine shared demo accounts only, case-insensitive', async () => {
+  const { isDemoUser, DEMO_EMAILS } = await import('../worker/demo.js')
+  assert.equal(DEMO_EMAILS.size, 9)
+  assert.equal(isDemoUser({ email: 'Demo-AC@SatuAlur.id' }), true)
+  assert.equal(isDemoUser({ email: 'bob@example.com' }), false)
+  assert.equal(isDemoUser(null), false)
+})
+
+function addUser(sqlite, uid, email) {
+  sqlite.prepare('INSERT INTO users(id, email, name, created_at) VALUES (?, ?, ?, ?)').run(uid, email, uid, '2026-11-01T00:00:00Z')
+  sqlite.prepare('INSERT INTO sessions(token_hash, user_id, expires_at) VALUES (?, ?, ?)')
+    .run(createHash('sha256').update(uid.repeat(8)).digest('hex'), uid, '2099-01-01T00:00:00Z')
+}
+
+test('worker: demo accounts get simulated AI (no Workers AI, no provider, no quota); live accounts get the real engine', async (t) => {
+  let aiCalls = 0
+  const ctx = await sqliteEnv(t, {
+    AI: { run: async () => { aiCalls++; return new ReadableStream({ start(c) { c.enqueue(new TextEncoder().encode('data: {"response":"Nyata"}\n\ndata: [DONE]\n\n')); c.close() } }) } },
+  })
+  if (!ctx) return
+  addUser(ctx.sqlite, 'demo', 'demo-ac@satualur.id')
+  const { default: worker } = await import('../worker/index.js')
+  const fetchCalls = stubFetch(t, async () => { throw new Error('no network for demo') })
+  const call = caller(worker, ctx.env)
+  const model = '@cf/meta/llama-3.3-70b-instruct-fp8-fast'
+  const offer = await call('demo', 'POST', '/api/llm/chat', {
+    model, messages: [{ role: 'system', content: 'Anda agen penawaran.' }, { role: 'user', content: 'Permintaan jasa: Servis AC, lokasi Bekasi' }],
+    response_format: { type: 'json_schema', json_schema: { type: 'object', properties: { scope: { type: 'string' }, price: { type: 'number' } } } },
+  })
+  const joined = (sse) => sse.split('\n').filter((l) => l.startsWith('data: {')).map((l) => JSON.parse(l.slice(6)).choices?.[0]?.delta?.content || '').join('')
+  const text = joined(offer)
+  assert.ok(JSON.parse(text).price > 0, text.slice(0, 200))
+  assert.match(offer, /data: \[DONE\]/)
+  const advice = await call('demo', 'POST', '/api/llm/chat', { model, messages: [{ role: 'system', content: '[agent:keuangan] Data: Pendapatan bulan ini: Rp10.000.000' }, { role: 'user', content: 'Bagaimana naik 2%?' }] })
+  assert.match(joined(advice), /Jawaban contoh/)
+  assert.equal(aiCalls, 0)
+  assert.equal(fetchCalls.length, 0)
+  assert.equal(ctx.sqlite.prepare("SELECT COUNT(*) AS n FROM usage_counters WHERE user_id = 'demo'").get().n, 0)
+  // Demo can't change integrations and sees the read-only flag.
+  assert.equal((await call('demo', 'GET', '/api/integrations')).options.demo, true)
+  await call('demo', 'PUT', '/api/integrations/ai', { ai_mode: 'openai', ai_base_url: 'https://api.x.com/v1', ai_model: 'm', ai_key: 'k' }, 403)
+  const mail = await call('demo', 'POST', '/api/email/send', { kind: 'offer', to: 'pelanggan@x.id', subject: 'S', body: 'B' })
+  assert.equal(mail.simulated, true)
+
+  // Live account: the built-in model really runs and the call is metered.
+  const live = await call('bob', 'POST', '/api/llm/chat', { model, messages: [{ role: 'user', content: 'hai' }] })
+  assert.match(live, /Nyata/)
+  assert.equal(aiCalls, 1)
+  assert.equal(ctx.sqlite.prepare("SELECT count FROM usage_counters WHERE user_id = 'bob' AND feature = 'offer'").get().count, 1)
+})
+
+test('worker: admin access list — add, use, remove, never the last, audited', async (t) => {
+  const ctx = await sqliteEnv(t, { ADMIN_EMAILS: 'alice@example.com' })
+  if (!ctx) return
+  addUser(ctx.sqlite, 'carol', 'carol@example.com')
+  const { default: worker } = await import('../worker/index.js')
+  const call = caller(worker, ctx.env)
+  const list = await call('alice', 'GET', '/api/office/admin/system/admins')
+  assert.deepEqual(list.admins.map((a) => a.email), ['apipedia22@gmail.com']) // seeded by the migration
+  assert.deepEqual(list.bootstrap, ['alice@example.com'])
+  await call('carol', 'GET', '/api/office/admin/system', undefined, 403)
+  await call('alice', 'POST', '/api/office/admin/system/admins', { email: 'Carol@Example.com' })
+  await call('alice', 'POST', '/api/office/admin/system/admins', { email: 'carol@example.com' }, 409)
+  await call('alice', 'POST', '/api/office/admin/system/admins', { email: 'demo-ac@satualur.id' }, 400)
+  assert.equal((await call('carol', 'GET', '/api/auth/session')).admin_via, 'email')
+  await call('carol', 'GET', '/api/office/admin/system')
+  // DEMO_OTP on: listed admins don't count either.
+  await caller(worker, { ...ctx.env, DEMO_OTP: 'true' })('carol', 'GET', '/api/office/admin/system', undefined, 403)
+  await call('carol', 'DELETE', '/api/office/admin/system/admins/apipedia22%40gmail.com')
+  await call('alice', 'DELETE', '/api/office/admin/system/admins/carol%40example.com', undefined, 400) // last listed admin
+  await call('carol', 'GET', '/api/office/admin/system') // still admin (listed)
+  const actions = ctx.sqlite.prepare('SELECT action, target FROM admin_audit ORDER BY id').all().map((r) => `${r.action}:${r.target}`)
+  assert.deepEqual(actions, ['admin.add:carol@example.com', 'admin.remove:apipedia22@gmail.com'])
+})

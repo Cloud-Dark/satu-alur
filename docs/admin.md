@@ -8,7 +8,7 @@
 | Cara | Keterangan |
 |------|------------|
 | Akun staf | Username + password di `/super-admin-login` (`npm run staff`). Hanya melihat menu Kantor. |
-| Admin lewat email | Email di var `ADMIN_EMAILS` (produksi: `apipedia22@gmail.com`) yang masuk dengan kode email atau Google. Berlaku hanya saat `DEMO_OTP` bukan `"true"`. Admin ini tetap punya aplikasi bisnisnya sendiri dan berpindah lewat tombol "Kantor Satu Alur" / "Kembali ke usaha saya" di sidebar. |
+| Admin lewat email | Email di tabel `admin_users` (diatur di Kantor › Sistem › Akses admin; migrasi 0014 mengisi `apipedia22@gmail.com`) atau di var `ADMIN_EMAILS` (bootstrap yang selalu berlaku, agar tidak ada yang terkunci). Masuk dengan kode email atau Google; berlaku hanya saat `DEMO_OTP` bukan `"true"`; akun demo dan alamat staf tidak pernah bisa menjadi admin. Admin ini tetap punya aplikasi bisnisnya sendiri dan berpindah lewat tombol "Kantor Satu Alur" / "Kembali ke usaha saya" di sidebar. |
 
 Semua rute `/api/office/admin/*` memakai `requireAdmin` (worker/office.js) yang mengakui keduanya.
 
@@ -20,6 +20,7 @@ Semua rute `/api/office/admin/*` memakai `requireAdmin` (worker/office.js) yang 
 - **Sistem › Email**: nama pengirim, izinkan SMTP milik bisnis, batas email penawaran per hari, kirim email uji.
 - **Sistem › Mesin AI**: model bawaan default, izinkan penyedia AI milik bisnis, uji mesin AI.
 - **Sistem › Login**: status OTP email/demo/Google, redirect URI Google, sakelar "masuk dengan kode email".
+- **Sistem › Akses admin**: tambah admin lewat email, cabut akses (admin terakhir di daftar tidak bisa dihapus), daftar admin bawaan (`ADMIN_EMAILS`), dan catatan audit 50 terbaru (tambah/hapus admin, ubah pengaturan, ubah skala akun) dari tabel `admin_audit`.
 - **Sistem › WhatsApp & sosial**: jumlah bisnis yang menghubungkan WAPilot/WAConsole/Repliz (bila tabelnya ada) dan status cadangan pengirim platform (`WA_PLATFORM_FALLBACK`, mati secara bawaan). Kredensial tiap bisnis tidak ditampilkan.
 - **Sistem › Log aktivitas**: 100 email terbaru (filter per jenis) dan pemakaian AI per fitur bulan ini.
 
@@ -32,3 +33,7 @@ Jenis klien: Web application.
 - Authorized JavaScript origins: `https://satu-alur.apipedia.workers.dev`
 - Authorized redirect URIs: `https://satu-alur.apipedia.workers.dev/api/auth/google/callback`
 - Scope: `openid email profile`
+
+## Akun demo vs akun sungguhan
+
+Sembilan akun demo (`worker/demo.js`, `isDemoUser(user)`) 100% demo: semua jawaban AI disimulasikan di Worker (`src/ai/simulate.js`, format SSE dan tempo sama seperti model, tanpa Workers AI/penyedia dan tanpa kuota), pengaturan Email & AI hanya-baca, dan email ke pelanggan tidak pernah dikirim. Akun sungguhan 100% sungguhan: data sendiri, mesin AI pilihan, dan email nyata.

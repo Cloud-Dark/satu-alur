@@ -4,7 +4,8 @@
  * localStorage `satualur_integrations_demo_v1`, and test/send calls are simulated.
  * Secrets typed by the user are sent once and never read back (only has_password / has_key).
  */
-import { isUsingMockCloud } from '../cloud.js'
+import { isUsingMockCloud, getCloud } from '../cloud.js'
+import { isDemoEmail } from '../auth/demo-accounts.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { validateEmailIntegration, validateAiIntegration } from '../admin/rules.js'
 import { isEmail } from '../admin/constants.js'
@@ -42,19 +43,24 @@ const readDemo = () => { try { return JSON.parse(localStorage.getItem(DEMO_KEY))
 const writeDemo = (v) => { try { localStorage.setItem(DEMO_KEY, JSON.stringify(v)) } catch { /* storage unavailable */ } }
 const delay = (ms = 200) => new Promise((r) => setTimeout(r, ms))
 
-function demoView(d) {
+function demoView(d, demo = false) {
   return {
     email: {
       mode: d.email_mode || 'platform', smtp_host: d.smtp_host || '', smtp_port: d.smtp_port || 465, smtp_secure: d.smtp_secure || 'tls',
       smtp_user: d.smtp_user || '', smtp_from_email: d.smtp_from_email || '', smtp_from_name: d.smtp_from_name || '', has_password: Boolean(d.has_password),
     },
     ai: { mode: d.ai_mode || 'builtin', base_url: d.ai_base_url || '', model: d.ai_model || '', has_key: Boolean(d.has_key) },
-    options: { custom_smtp_allowed: true, custom_ai_allowed: true, secrets_enabled: true, platform_email_ready: true },
+    options: { custom_smtp_allowed: true, custom_ai_allowed: true, secrets_enabled: true, platform_email_ready: true, demo },
   }
 }
 
 export async function getIntegrations() {
-  if (isUsingMockCloud()) { await delay(); return demoView(readDemo()) }
+  if (isUsingMockCloud()) {
+    await delay()
+    let email = ''
+    try { email = (await getCloud().auth.getSession()).data?.user?.email || '' } catch { /* signed out */ }
+    return demoView(readDemo(), isDemoEmail(email))
+  }
   return call('/api/integrations')
 }
 

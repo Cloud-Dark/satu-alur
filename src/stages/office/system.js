@@ -5,7 +5,7 @@
  */
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
-import { getSystem, saveSystemSetting, testSystemEmail, testSystemAi, getSummary, getActivity } from '../../admin/api.js'
+import { getSystem, saveSystemSetting, testSystemEmail, testSystemAi, getSummary, getActivity, listAdmins, addAdmin, removeAdmin } from '../../admin/api.js'
 
 const { el } = C
 let seq = 0
@@ -227,5 +227,59 @@ export function drawActivity(host, ctx) {
     )
   })
   kind.input.addEventListener('change', load)
+  load()
+}
+
+/* ----------------------------------------------------------- Akses admin */
+
+const ACTIONS = { 'admin.add': 'Menambah admin', 'admin.remove': 'Menghapus admin', 'setting.update': 'Mengubah pengaturan', 'user.tier': 'Mengubah skala akun' }
+
+export function drawAccess(host, ctx) {
+  const load = () => loadInto(host, ctx, listAdmins, (d) => {
+    const email = C.field({ label: 'Email admin baru', id: `of-sys-adm-${++seq}`, type: 'email', hint: 'Orang ini mendapat akses Kantor Satu Alur saat masuk dengan email atau Google.', attrs: { maxlength: '254', autocomplete: 'off' } })
+    const err = el('p', { className: 'field-error', role: 'alert' })
+    const add = C.button({ label: 'Tambah admin', icon: 'plus', variant: 'primary', type: 'submit' })
+    const form = el('form', { className: 'form', noValidate: true }, email.wrap, err, el('div', { className: 'form-actions' }, add))
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      err.textContent = ''
+      const restore = C.setBusy(add, 'Menambah…')
+      try { await addAdmin(email.input.value); showToast('Admin ditambahkan.', 'success'); if (!ctx.signal.aborted) load() } catch (ex) { err.textContent = ex.message } finally { restore() }
+    })
+    const rows = d.admins.length
+      ? el('div', { className: 'of-cust-list' }, d.admins.map((a) => {
+        const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm' })
+        rm.addEventListener('click', async () => {
+          if (!confirm(`Cabut akses admin ${a.email}?`)) return
+          const restore = C.setBusy(rm, 'Menghapus…')
+          try { await removeAdmin(a.email); showToast('Akses admin dicabut.', 'success'); if (!ctx.signal.aborted) load() } catch (ex) { showToast(ex.message, 'error') } finally { restore() }
+        })
+        return el('div', { className: 'of-user of-admin-row' },
+          el('span', { className: 'of-cust-main' }, el('strong', {}, a.email), el('span', { className: 'muted small' }, `Ditambahkan ${C.formatDate(a.added_at)} oleh ${a.added_by}`)),
+          el('span', { className: 'of-cust-meta' }, d.bootstrap.includes(a.email) ? C.tag('Juga bawaan', 'brand') : null),
+          el('span', { className: 'of-cust-meta' }, rm))
+      }))
+      : C.emptyState({ title: 'Belum ada admin tambahan', body: 'Admin bawaan tetap bisa masuk.', iconName: 'shield' })
+    const auditList = d.audit.length
+      ? C.dataTable({
+        columns: [
+          { label: 'Waktu', render: (r) => C.formatDateTime(r.created_at) },
+          { label: 'Oleh', render: (r) => r.actor },
+          { label: 'Tindakan', render: (r) => ACTIONS[r.action] || r.action },
+          { label: 'Sasaran', render: (r) => r.target || '—' },
+        ],
+        rows: d.audit,
+      })
+      : C.emptyState({ title: 'Belum ada catatan', body: 'Perubahan akses dan pengaturan akan tercatat di sini.', iconName: 'activity' })
+    host.replaceChildren(
+      C.panel({ title: 'Akses admin', meta: `${d.admins.length} admin` },
+        d.email_admins_active ? null : (() => { const m = C.message(); m.show('warn', 'Mode kode demo aktif: admin lewat email tidak berlaku sampai DEMO_OTP dimatikan.'); return m })(),
+        rows, form),
+      C.panel({ title: 'Admin bawaan', meta: 'ADMIN_EMAILS' },
+        el('p', { className: 'muted small' }, 'Selalu punya akses agar tidak ada yang terkunci. Diubah lewat konfigurasi server.'),
+        d.bootstrap.length ? el('ul', {}, d.bootstrap.map((x) => el('li', {}, x))) : el('p', { className: 'muted' }, '—')),
+      C.panel({ title: 'Catatan audit', meta: '50 terbaru' }, auditList),
+    )
+  })
   load()
 }
