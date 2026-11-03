@@ -1,0 +1,31 @@
+-- Template penawaran (Kantor › Bisnis): jenis penawaran siap pakai. Admin mengelola,
+-- bisnis hanya memakai. Penawaran menyimpan template yang dipakai beserta jawabannya.
+CREATE TABLE IF NOT EXISTS offer_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'jasa',
+  description TEXT NOT NULL DEFAULT '',
+  fields_json TEXT NOT NULL DEFAULT '[]',
+  prompt_hint TEXT NOT NULL DEFAULT '',
+  default_terms TEXT NOT NULL DEFAULT '',
+  price_hint_min INTEGER,
+  price_hint_max INTEGER,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_by TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
+
+ALTER TABLE offers ADD COLUMN template_id INTEGER;
+ALTER TABLE offers ADD COLUMN template_answers_json TEXT;
+
+-- 8 template bawaan (8 baris, tanpa indeks tambahan).
+INSERT INTO offer_templates (name, category, description, fields_json, prompt_hint, default_terms, price_hint_min, price_hint_max, active, sort, created_by, updated_at) VALUES
+  ('Pengembangan website', 'digital', 'Website profil usaha, toko online, atau landing page.', '[{"key":"jenis","label":"Jenis website","type":"select","required":true,"options":["Profil usaha","Toko online","Landing page","Aplikasi web"]},{"key":"halaman","label":"Perkiraan jumlah halaman","type":"number","required":false},{"key":"fitur","label":"Fitur utama","type":"text","required":true},{"key":"tenggat","label":"Tenggat","type":"date","required":false}]', 'Rinci tahapan: desain, pengembangan, uji, peluncuran. Sebutkan jumlah revisi, hosting/domain (termasuk atau tidak), dan masa dukungan.', 'DP 50% saat mulai, 50% saat peluncuran. Termasuk 2 kali revisi desain. Dukungan perbaikan bug 30 hari.', 3000000, 45000000, 1, 1, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Pengembangan agentic AI / chatbot', 'digital', 'Asisten AI untuk layanan pelanggan, penjualan, atau operasional.', '[{"key":"kanal","label":"Kanal","type":"select","required":true,"options":["WhatsApp","Website","Instagram","Internal tim"]},{"key":"tugas","label":"Tugas yang diotomatiskan","type":"text","required":true},{"key":"integrasi","label":"Sistem yang perlu terhubung","type":"text","required":false},{"key":"volume","label":"Perkiraan percakapan per bulan","type":"number","required":false}]', 'Jelaskan alur agen, sumber pengetahuan, batasan jawaban, eskalasi ke manusia, dan biaya pemakaian AI bulanan terpisah dari biaya pembuatan.', 'DP 40%, 40% saat uji coba, 20% saat serah terima. Biaya pemakaian AI ditagih bulanan sesuai pemakaian.', 5000000, 80000000, 1, 2, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Servis & perawatan AC', 'jasa', 'Cuci, isi freon, perbaikan, atau kontrak perawatan AC.', '[{"key":"unit","label":"Jumlah unit","type":"number","required":true},{"key":"jenis","label":"Jenis pekerjaan","type":"select","required":true,"options":["Cuci rutin","Isi freon","Perbaikan","Bongkar pasang","Kontrak perawatan"]},{"key":"pk","label":"Kapasitas (PK)","type":"text","required":false}]', 'Hitung per unit, sebutkan material (freon, sparepart) terpisah bila belum pasti, dan estimasi durasi kerja.', 'Pembayaran setelah pekerjaan selesai. Garansi pengerjaan 30 hari.', 75000, 15000000, 1, 3, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Cleaning service', 'jasa', 'Pembersihan rumah, kantor, atau pasca renovasi.', '[{"key":"luas","label":"Luas area (m²)","type":"number","required":true},{"key":"jenis","label":"Jenis pembersihan","type":"select","required":true,"options":["Harian","Deep cleaning","Pasca renovasi","Kontrak bulanan"]},{"key":"frekuensi","label":"Frekuensi","type":"text","required":false}]', 'Sebutkan jumlah petugas, durasi, perlengkapan dan bahan yang termasuk.', 'DP 30%, pelunasan setelah pekerjaan diterima. Kontrak bulanan ditagih di awal bulan.', 150000, 60000000, 1, 4, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Laundry B2B (selimut & linen hotel)', 'jasa', 'Cuci linen untuk hotel, penginapan, dan kos.', '[{"key":"volume","label":"Volume per minggu (kg)","type":"number","required":true},{"key":"jenis","label":"Jenis linen","type":"text","required":true},{"key":"antar","label":"Antar-jemput","type":"select","required":true,"options":["Ya","Tidak"]}]', 'Hitung per kg atau per potong, jadwal antar-jemput, waktu proses, dan penanganan noda/kerusakan.', 'Tagihan mingguan, jatuh tempo 7 hari. Kerusakan akibat proses diganti sesuai nilai wajar.', 500000, 50000000, 1, 5, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Pengadaan barang', 'barang', 'Penawaran harga barang beserta pengiriman.', '[{"key":"barang","label":"Nama barang & spesifikasi","type":"text","required":true},{"key":"jumlah","label":"Jumlah","type":"number","required":true},{"key":"kirim","label":"Lokasi pengiriman","type":"text","required":false}]', 'Rinci harga satuan, total, ongkos kirim, waktu pengiriman, dan garansi barang.', 'Pembayaran 100% sebelum pengiriman, atau tempo 14 hari untuk pelanggan tetap. Harga berlaku 7 hari.', 100000, 500000000, 1, 6, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Konsultasi bisnis', 'konsultasi', 'Pendampingan strategi, keuangan, atau pemasaran.', '[{"key":"topik","label":"Topik","type":"text","required":true},{"key":"sesi","label":"Jumlah sesi","type":"number","required":true},{"key":"format","label":"Format","type":"select","required":false,"options":["Online","Tatap muka","Campuran"]}]', 'Sebutkan keluaran tiap sesi, materi yang diterima klien, dan cara mengukur hasil.', 'Pembayaran di muka per paket sesi. Penjadwalan ulang paling lambat 24 jam sebelumnya.', 500000, 30000000, 1, 7, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  ('Desain grafis', 'digital', 'Logo, materi promosi, kemasan, atau konten media sosial.', '[{"key":"jenis","label":"Jenis desain","type":"select","required":true,"options":["Logo & identitas","Konten media sosial","Kemasan","Materi cetak"]},{"key":"jumlah","label":"Jumlah desain","type":"number","required":true},{"key":"tenggat","label":"Tenggat","type":"date","required":false}]', 'Sebutkan jumlah konsep awal, revisi, format file akhir, dan hak penggunaan.', 'DP 50%, pelunasan sebelum file akhir dikirim. Termasuk 3 kali revisi.', 250000, 20000000, 1, 8, 'migration', strftime('%Y-%m-%dT%H:%M:%fZ','now'));
