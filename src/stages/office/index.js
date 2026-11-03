@@ -18,13 +18,6 @@ const { el } = C
 
 // Single source of the staff menu: the shell turns each section into a sidebar item.
 export const GROUPS = [
-  { title: 'Sistem', items: [
-    { key: 'sys-overview', label: 'Ringkasan', icon: 'chart', draw: System.drawOverview },
-    { key: 'sys-email', label: 'Email', icon: 'mail', draw: System.drawEmail },
-    { key: 'sys-ai', label: 'Mesin AI', icon: 'sparkles', draw: System.drawAi },
-    { key: 'sys-login', label: 'Login', icon: 'lock', draw: System.drawLogin },
-    { key: 'sys-whatsapp', label: 'WhatsApp & sosial', icon: 'plug', draw: System.drawWhatsapp },
-    { key: 'sys-activity', label: 'Log aktivitas', icon: 'activity', draw: System.drawActivity }] },
   { title: 'Konten Situs', items: [
     { key: 'landing', label: 'Landing page', icon: 'home', draw: Landing.draw },
     { key: 'about', label: 'Tentang kami', icon: 'building', draw: Doc.drawAbout },
@@ -42,6 +35,13 @@ export const GROUPS = [
     { key: 'influencers', label: 'Influencer', icon: 'sparkles', draw: Influencers.draw },
     { key: 'requests', label: 'Permintaan', icon: 'inbox', draw: Requests.draw },
     { key: 'campaigns', label: 'Kampanye', icon: 'megaphone', draw: Campaigns.draw }] },
+  { title: 'Sistem', items: [
+    { key: 'sys-overview', label: 'Dasbor sistem', icon: 'chart', draw: System.drawOverview },
+    { key: 'sys-email', label: 'Email', icon: 'mail', draw: System.drawEmail },
+    { key: 'sys-ai', label: 'Mesin AI', icon: 'sparkles', draw: System.drawAi },
+    { key: 'sys-login', label: 'Login', icon: 'lock', draw: System.drawLogin },
+    { key: 'sys-whatsapp', label: 'WhatsApp & sosial', icon: 'plug', draw: System.drawWhatsapp },
+    { key: 'sys-activity', label: 'Log aktivitas', icon: 'activity', draw: System.drawActivity }] },
 ]
 export const ITEMS = GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, group: g.title })))
 

@@ -1,12 +1,22 @@
 # Changelog
 
 > Status: Draft
-> Terakhir diperbarui: 2026-11-02
+> Terakhir diperbarui: 2026-11-03
 > Pemilik: _TBD_
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Versi mengikuti `package.json` (saat ini `0.1.0`); penetapan nomor versi rilis: _TBD_.
 
 ## [Unreleased]
+
+### 2026-11-03 - Admin, email, penyedia AI, dan login Google
+
+#### Ditambahkan
+- Email: Resend sebagai pengirim bawaan (`RESEND_API_KEY`, `EMAIL_FROM`) dan SMTP milik bisnis (klien SMTP di Worker, password terenkripsi `TOKEN_KEY`); email penawaran ke pelanggan, laporan ke pemilik, email uji; semua tercatat di `email_log` ([docs/integrations/email.md](integrations/email.md)).
+- Login kode email sungguhan: kode dikirim ke inbox; `DEMO_OTP` di konfigurasi menjadi `"false"`. Tab "Akun demo" tetap ada.
+- Mesin AI per bisnis: bawaan, OpenAI-compatible, atau Anthropic-compatible dengan API key sendiri; tidak memakai kuota Satu Alur ([docs/integrations/ai-providers.md](integrations/ai-providers.md)).
+- Admin lewat email (`ADMIN_EMAILS`) dan grup Kantor › Sistem (Dasbor sistem, Email, Mesin AI, Login, WhatsApp & sosial, Log aktivitas), detail pengguna dengan skala akun ([docs/admin.md](admin.md)).
+- Masuk dengan Google (OIDC + PKCE, kode serah-terima sekali pakai).
+- Migrasi `0014_admin_system.sql`: `system_settings`, `business_integrations`, `email_log`, `oauth_logins`, kolom `users.last_login_at`.
 
 ### 2026-11-03 - Rilis gabungan dan materi lomba
 
