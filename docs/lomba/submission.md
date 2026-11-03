@@ -3,7 +3,8 @@
 > Status: Draf submission lomba (batas kirim 7 November 2026)
 > Terakhir diperbarui: 2026-11-03
 > Tim: Syahdan · Zulfikar · Margareta Lola
-> Demo: <https://satu-alur.apipedia.workers.dev>
+> Demo: <https://satu-alur.apipedia.workers.dev>  
+> Video demo: <https://youtu.be/seXJmshTh0U>
 
 **Satu Alur** adalah sistem kerja berbasis AI untuk bisnis jasa di Indonesia. Permintaan pelanggan, penawaran, penugasan, penyelesaian, pembukuan, dan laporan berjalan dalam **satu alur**. Setelah alurnya rapi, dua mesin lain ikut bekerja: **mesin pendapatan** (layanan tambahan dan tanpa limbah) dan **mesin pertumbuhan** (radar peluang, pencari prospek, media sosial, penasihat AI).
 
@@ -236,6 +237,8 @@ As the product grew we moved the runtime to Cloudflare Workers + D1 + Workers AI
 1. Buka <https://satu-alur.apipedia.workers.dev>.
 2. Klik **Masuk**, pilih **Akun demo**, pilih skala usaha (Sole Trader, UKM, atau Enterprise), lalu pilih salah satu dari 9 akun.
 3. Atau masuk dengan email apa pun. Pada mode demo, kode OTP ditampilkan langsung di layar.
+
+Video demo (2:48, dengan narasi): <https://youtu.be/seXJmshTh0U>
 
 Semua data akun demo adalah **data fiktif** untuk keperluan demonstrasi.
 

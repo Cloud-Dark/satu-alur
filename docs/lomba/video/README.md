@@ -45,3 +45,7 @@ Butuh Playwright dengan Chromium (`require('playwright')`) dan ffmpeg dengan `li
 - Konektor ERP ditampilkan dari akun demo Enterprise, belum ada konektor yang tersimpan (tampil template dan langkah migrasi).
 - Publikasi otomatis ke Instagram/Threads dan notifikasi WhatsApp tidak diperagakan.
 - Narasi memakai suara sintetis (text-to-speech). Musik latar orisinal, dibuat oleh `make-audio.py`, jadi aman diunggah ke YouTube.
+
+## Terbit
+
+Versi lengkap (narasi + musik) terbit publik di YouTube: <https://youtu.be/seXJmshTh0U>

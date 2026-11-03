@@ -15,6 +15,7 @@ const DIR = __dirname
 const OUT_HTML = path.join(DIR, 'pdf', 'index.html')
 const PDF = path.join(DIR, 'Satu-Alur-Submission.pdf')
 const DEMO_HOST = 'satu-alur.apipedia.workers.dev'
+const VIDEO_URL = 'youtu.be/seXJmshTh0U'
 
 /* -------------------------------------------------------------- Icons */
 // Reuse the app's icon set so the document speaks the product's visual language.
@@ -428,6 +429,7 @@ pages.push(page(`
         <li>Pilih skala usaha (Sole Trader, UKM, Enterprise) dan salah satu dari 9 akun.</li>
         <li>Atau masuk dengan email apa pun; pada mode demo kode OTP tampil di layar.</li>
       </ol>
+      <p class="small" style="margin-top:3mm">Video demo (2:48): <b>${VIDEO_URL}</b></p>
       <p class="small muted" style="margin-top:3mm">Semua data akun demo adalah data fiktif.</p>
     </div>
     <div style="background:var(--paper);border-radius:4mm;padding:4mm;width:44mm;height:44mm">${qr}</div>
