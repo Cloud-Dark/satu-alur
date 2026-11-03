@@ -7,13 +7,23 @@
  */
 
 // Simulasi AI streaming dengan chunk
-async function* mockStreamOffer(request) {
+async function* mockStreamOffer(request, context = '') {
   const scope = request.service_type || 'Pembersihan umum'
-  const price = Math.floor(Math.random() * 900000) + 100000
+  // A chosen offer template steers the sample: its price range, default terms and answers.
+  const num = (t) => Number(String(t || '').replace(/[^\d]/g, '')) || 0
+  const range = /Kisaran harga wajar:\s*(?:mulai\s*)?(Rp[\d.]+)?(?:\s*[–-]\s*|\s*hingga\s*)?(Rp[\d.]+)?/.exec(context)
+  const lo = range ? num(range[1]) : 0
+  const hi = range ? num(range[2]) : 0
+  const price = lo || hi
+    ? Math.round(((lo || hi * 0.3) + Math.random() * ((hi || lo * 3) - (lo || hi * 0.3)) * 0.4) / 1000) * 1000
+    : Math.floor(Math.random() * 900000) + 100000
+  const tmpl = /Template penawaran:\s*([^(\n]+)/.exec(context)?.[1]?.trim()
+  const details = [...context.matchAll(/^- ([^:\n]+):\s*(.+)$/gm)].map((m) => `${m[1].toLowerCase()} ${m[2]}`)
+  const terms = /Ketentuan bawaan[^:]*:\s*(.+)/.exec(context)?.[1]?.trim()
   const json = JSON.stringify({
-    scope: `${scope} untuk area ${request.location || ' Jakarta'} — mencakup persiapan alat, pelaksanaan, dan pembersihan pasca kerja.`,
+    scope: `${tmpl ? `${tmpl}: ` : ''}${scope} untuk ${request.customer_name || 'pelanggan'} di ${request.location || 'Jakarta'}${details.length ? ` (${details.join('; ')})` : ''} — mencakup persiapan, pelaksanaan, pemeriksaan hasil, dan serah terima.`,
     price,
-    terms: 'Pembayaran 50% di muka, sisa setelah pekerjaan selesai dan diterima. Garansi 7 hari.',
+    terms: terms || 'Pembayaran 50% di muka, sisa setelah pekerjaan selesai dan diterima. Garansi 7 hari.',
     notes: 'Harga estimasi berdasarkan deskripsi singkat. Survei lapangan mungkin diperlukan.',
   }, null, 2)
   // Stream token demi token
@@ -405,7 +415,38 @@ Apa yang ingin Anda tindaklanjuti?`
 }
 
 function parseRequest(text) {
-  try { return JSON.parse(String(text).replace(/^Permintaan jasa:\s*/, '')) } catch { return { description: text } }
+  // The request JSON comes first; a template/context block may follow after a blank line.
+  const body = String(text).replace(/^Permintaan jasa:\s*/, '')
+  const cut = body.indexOf('\n\n')
+  try { return JSON.parse(cut === -1 ? body : body.slice(0, cut)) } catch { return { description: text } }
+}
+
+/* "Isi otomatis dengan AI" on the request form: a plausible service + needs from the hint. */
+const AUTOFILL_SERVICES = [
+  [/\bac\b|freon|pendingin/i, 'Servis AC'],
+  [/laundry|cuci (?:selimut|linen|sprei|baju)|linen|selimut/i, 'Laundry B2B'],
+  [/website|web\b|toko online|landing/i, 'Pengembangan website'],
+  [/chatbot|agentic|asisten ai|\bai\b/i, 'Pengembangan agentic AI'],
+  [/desain|logo|feed|konten/i, 'Desain grafis'],
+  [/hama|rayap|kecoa|tikus/i, 'Pest control'],
+  [/listrik|korslet|instalasi/i, 'Instalasi listrik'],
+  [/bersih|cleaning|sapu|pel/i, 'Cleaning service'],
+]
+function mockAutofill(userMsg) {
+  const hint = (/Petunjuk dari pemilik usaha:\n([\s\S]*)$/.exec(userMsg)?.[1] || userMsg).trim()
+  const known = (/Layanan yang sudah ada:\s*(.+)/.exec(userMsg)?.[1] || '').split(';').map((x) => x.trim()).filter(Boolean)
+  const loc = /Lokasi:\s*(.+)/.exec(userMsg)?.[1]?.trim()
+  const found = AUTOFILL_SERVICES.find(([re]) => re.test(hint))?.[1]
+  const service = known.find((k) => found && k.toLowerCase().includes(found.split(' ')[0].toLowerCase())) || found || known[0] || 'Layanan umum'
+  const qty = /(\d+)\s*(unit|kg|m2|m²|halaman|titik|ruang|lantai)/i.exec(hint)
+  const parts = [
+    `Pelanggan membutuhkan ${service.toLowerCase()}${loc ? ` di ${loc}` : ''}.`,
+    qty ? `Jumlah: ${qty[1]} ${qty[2]}.` : 'Jumlah unit/luas: perlu dikonfirmasi.',
+    `Keterangan dari pelanggan: ${hint.replace(/\s+/g, ' ').slice(0, 280)}.`,
+    'Waktu pelaksanaan yang diinginkan: perlu dikonfirmasi.',
+    'Perlu ditanyakan: akses lokasi, kondisi saat ini, dan anggaran.',
+  ]
+  return JSON.stringify({ service_type: service, description: parts.join(' ') }, null, 2)
 }
 
 function parseReport(text) {
@@ -748,7 +789,8 @@ function leadMockAnswer(ctx) {
 export function simulateAnswer({ messages, response_format }) {
   const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || ''
   const system = messages.filter(m => m.role === 'system').map(m => m.content).join('\n')
-  if (system.includes('agen penawaran') || userMsg.includes('Permintaan jasa')) return mockStreamOffer(parseRequest(userMsg))
+  if (system.includes('[agent:request-autofill]')) return streamText(mockAutofill(userMsg), { step: 5, delay: 18 })
+  if (system.includes('agen penawaran') || userMsg.includes('Permintaan jasa')) return mockStreamOffer(parseRequest(userMsg), userMsg)
   if (response_format?.type === 'json_schema' || response_format?.type === 'json_object') {
     return streamText(schemaJson(response_format), { step: 10, delay: 14 })
   }

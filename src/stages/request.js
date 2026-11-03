@@ -6,6 +6,11 @@ import { followUpMessage } from '../wa/rules.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 import { openMapPicker } from '../leads/picker.js'
+import { autofillRequest } from '../ai/agent.js'
+import { readPartialJson } from '../offer/partial-json.js'
+import { listTemplates } from '../offer/api.js'
+import { isQuotaError } from '../quota/errors.js'
+import { resolveModel } from './offer.js'
 
 const { el } = C
 
@@ -17,7 +22,6 @@ export async function render(container, ctx = {}) {
   const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
   const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
   const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
-  const requested = C.field({ label: 'Jadwal yang diminta klien', name: 'requested_at', type: 'datetime-local', hint: 'Opsional. Dipakai sebagai jadwal awal di tahap Penugasan.' })
   const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
   const reviewBox = el('div', { className: 'proposal' })
 
@@ -65,10 +69,60 @@ export async function render(container, ctx = {}) {
     return errs
   }
   const needErrors = () => {
-    const errs = values().service_type ? [] : [{ text: 'Jenis layanan wajib diisi.', input: service.input }]
-    if (requested.input.value && Number.isNaN(new Date(requested.input.value).getTime())) errs.push({ text: 'Isi jadwal yang diminta klien dengan tanggal yang valid.', input: requested.input })
-    return errs
+    return values().service_type ? [] : [{ text: 'Jenis layanan wajib diisi.', input: service.input }]
   }
+
+  /* --------------------------------------------- AI autofill (step 2) */
+  const hint = C.textarea({ label: 'Petunjuk singkat', name: 'ai_hint', rows: 3, placeholder: 'Contoh: AC 3 unit bocor di ruang rapat, minta Sabtu pagi. Atau tempel chat WhatsApp pelanggan.', hint: 'AI mengisi jenis layanan dan deskripsi. Hasilnya tetap bisa Anda ubah.', attrs: { maxlength: '4000' } })
+  const fillBtn = C.button({ label: 'Isi otomatis dengan AI', icon: 'sparkles', variant: 'soft', size: 'sm' })
+  const fillStatus = el('p', { className: 'muted small ai-fill-status', role: 'status', 'aria-live': 'polite' })
+  const aiFill = el('div', { className: 'ai-fill' }, hint.wrap, el('div', { className: 'ai-fill-actions' }, fillBtn, fillStatus))
+  let fillCtl = null
+  const knownServices = async () => {
+    const fromHistory = (model?.requests || []).map((r) => r.service_type)
+    const fromTemplates = (await listTemplates().catch(() => [])).map((t) => t.name)
+    return [...fromHistory, ...fromTemplates]
+  }
+  fillBtn.addEventListener('click', async () => {
+    if (fillCtl) { fillCtl.abort(); return }
+    const text = hint.input.value.trim()
+    if (!text) { fillStatus.textContent = 'Tulis petunjuk singkat dulu, misalnya "AC 3 unit bocor".'; hint.input.focus(); return }
+    const ac = new AbortController()
+    fillCtl = ac
+    ctx.signal?.addEventListener('abort', () => ac.abort(), { once: true })
+    const label = fillBtn.querySelector('.btn-label')
+    if (label) label.textContent = 'Hentikan'
+    fillStatus.textContent = 'AI sedang menulis…'
+    service.input.closest('.field')?.classList.add('is-filling')
+    desc.input.closest('.field')?.classList.add('is-filling')
+    try {
+      const mdl = await resolveModel()
+      if (!mdl) throw new Error('AI sedang tidak tersedia.')
+      const result = await autofillRequest({
+        customer: values(),
+        hint: text,
+        services: await knownServices(),
+        modelId: mdl.id,
+        signal: ac.signal,
+        onChunk: (_d, full) => {
+          const { fields, closed } = readPartialJson(full)
+          if (closed.has('service_type') && fields.service_type) service.input.value = String(fields.service_type).slice(0, 120)
+          if (typeof fields.description === 'string') { desc.input.value = fields.description; desc.input.scrollTop = desc.input.scrollHeight }
+        },
+      })
+      if (result.service_type) service.input.value = result.service_type
+      if (result.description) desc.input.value = result.description
+      ;[service, desc].forEach((f) => f.input.dispatchEvent(new Event('input', { bubbles: true })))
+      fillStatus.textContent = 'Terisi. Periksa dan ubah bila perlu.'
+    } catch (err) {
+      fillStatus.textContent = err.name === 'AbortError' ? 'Dihentikan.' : isQuotaError(err) ? err.message : (err.message || 'Gagal mengisi otomatis.')
+    } finally {
+      fillCtl = null
+      if (label) label.textContent = 'Isi otomatis dengan AI'
+      service.input.closest('.field')?.classList.remove('is-filling')
+      desc.input.closest('.field')?.classList.remove('is-filling')
+    }
+  })
 
   const wiz = C.wizard({
     label: 'Permintaan baru',
@@ -84,7 +138,7 @@ export async function render(container, ctx = {}) {
         key: 'need',
         title: 'Kebutuhan',
         description: 'Layanan yang diminta dan rinciannya.',
-        content: [service.wrap, requested.wrap, desc.wrap],
+        content: [aiFill, service.wrap, desc.wrap],
         validate: needErrors,
       },
       {
@@ -132,7 +186,6 @@ export async function render(container, ctx = {}) {
           { icon: 'layers', text: d.service_type || '—', title: `Layanan: ${d.service_type || '—'}` },
           d.location ? { icon: 'mapPin', text: d.location, title: `Lokasi: ${d.location}` } : null,
           d.phone ? { icon: 'phone', text: d.phone, title: `Telepon: ${d.phone}` } : null,
-          requested.input.value ? { icon: 'calendar', text: C.formatDateTime(requested.input.value) } : null,
         ],
         note: d.description || 'Tanpa deskripsi kebutuhan.',
         noteLines: 4,
@@ -143,7 +196,6 @@ export async function render(container, ctx = {}) {
 
   async function save() {
     const data = values()
-    if (requested.input.value) data.requested_at = new Date(requested.input.value).toISOString()
     if (coords) Object.assign(data, coords)
     const restore = wiz.busy('Menyimpan…')
     try {
@@ -159,7 +211,8 @@ export async function render(container, ctx = {}) {
       }
       const again = C.button({ label: 'Catat permintaan lain', icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
-        for (const f of [name, location, phone, service, requested, desc]) f.input.value = ''
+        for (const f of [name, location, phone, service, desc, hint]) f.input.value = ''
+        fillStatus.textContent = ''
         coords = null
         pickedNote.hidden = true
         reviewBox.replaceChildren()
