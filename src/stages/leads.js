@@ -401,9 +401,9 @@ export async function render(container, ctx = {}) {
   // --- Source ---
   const sourceBox = el('div', { className: 'ld-source' })
   function drawSource() {
-    if (ctx.isMock) {
+    if (ctx.isMock || sources.demo) {
       sourceBox.hidden = false
-      sourceBox.replaceChildren(el('span', { className: 'field-hint' }, 'Mode demo: hasil berupa data contoh di sekitar titik.'))
+      sourceBox.replaceChildren(el('span', { className: 'field-hint' }, 'Akun demo: hasil berupa data contoh di sekitar titik, bukan usaha sungguhan.'))
       return
     }
     sourceBox.hidden = !sources.google
@@ -637,7 +637,7 @@ export async function render(container, ctx = {}) {
     const nodes = []
     if (src === 'demo') {
       nodes.push(el('div', { className: 'note note-warn' }, icon('alert'), el('div', { className: 'note-body' },
-        el('p', {}, el('b', {}, 'Data contoh (mode demo). '), 'Nama, lokasi, dan kontak di bawah dibuat acak di sekitar titik Anda, bukan usaha sungguhan.'))))
+        el('p', {}, el('b', {}, 'Data contoh (akun demo). '), 'Nama, lokasi, dan kontak di bawah dibuat acak di sekitar titik Anda, bukan usaha sungguhan.'))))
     } else if (src === 'osm') {
       nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }),
         el('span', {}, `Data usaha di peta belum lengkap dan kontak sering kosong; periksa ulang sebelum menghubungi.${state.search.truncated ? ' Hasil dibatasi 150 terdekat; perkecil radius untuk area padat.' : ''}`)))
@@ -682,6 +682,7 @@ export async function render(container, ctx = {}) {
             el('span', {}, l.category),
             el('span', { 'aria-hidden': 'true' }, '·'),
             el('span', { className: 'tnum' }, km(l.distance_km)),
+            l.source === 'demo' ? el('span', { className: 'tag status status-live', title: 'Usaha fiktif untuk akun demo' }, 'contoh') : null,
             l.address ? el('span', { className: 'ld-addr', title: l.address }, l.address) : null)),
         el('div', { className: 'ld-score', title: 'Skor peluang 0–100' },
           el('span', { className: 'ld-score-num tnum' }, String(l.score)),

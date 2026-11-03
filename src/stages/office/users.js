@@ -9,6 +9,9 @@ import { PLANS, PLAN_LABELS } from '../../business/plan-access.js'
 const { el } = C
 let seq = 0
 
+// Sample sign-ups from seeds/office.sql: fictional admin-panel rows, never a real business.
+const isSampleEmail = (email) => String(email || '').toLowerCase().endsWith('@contoh.satualur.id')
+
 function suspendDialog(ctx, u, opener, onDone, setDirty) {
   const reason = C.textarea({ label: 'Alasan', id: `of-us-reason-${++seq}`, rows: 3, hint: 'Dicatat untuk tim. Pengguna langsung keluar dari semua sesi.', attrs: { maxlength: '300' } })
   const err = el('p', { className: 'field-error', role: 'alert' })
@@ -140,6 +143,7 @@ export function draw(host, ctx, setDirty) {
         u.suspended ? el('span', { className: 'small of-user-reason' }, `Alasan: ${u.reason || '—'}`) : null),
       el('span', { className: 'of-cust-meta' },
         u.demo ? C.tag('Demo', 'neutral') : null,
+        isSampleEmail(u.email) ? C.tag('Contoh', 'neutral') : null,
         u.suspended ? C.tag('Ditangguhkan', 'danger') : null,
         u.tier ? C.tag(PLAN_LABELS[u.tier] || u.tier, 'brand') : null,
         u.plan_name ? el('span', { className: 'small' }, `Paket ${u.plan_name}`) : null,

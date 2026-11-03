@@ -61,7 +61,12 @@ test('integrasi AI: mock, tool, pembatalan, fallback dan memori', async () => {
     }
     assert.equal((await collect({ agentKey: 'general', message: 'Partial' })).at(-1).type, 'error')
     assert.equal(calls, 1, 'Jangan gabungkan jawaban parsial dari model berbeda')
-    storage.setItem('satualur_ai_analytics', '{bad json')
+    // Memory and analytics are per account: another account sees none of it.
+    assert.ok(AI.getAnalytics().length > 0)
+    AI.setOwner('akun-lain')
+    assert.deepEqual(AI.getConversationHistory('general'), [])
+    assert.deepEqual(AI.getAnalytics(), [])
+    storage.setItem('satualur_ai_analytics:akun-lain', '{bad json')
     assert.deepEqual(AI.getAnalytics(), [])
     cloud.llm.chat.completions.create = mockCreate
   } finally {

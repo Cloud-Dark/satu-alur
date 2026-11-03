@@ -2,6 +2,7 @@ import * as AI from '../ai/superpowers.js'
 import { loadModels, pickDefaultModel } from '../ai/models.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
+import { isDemoEmail } from '../auth/demo-accounts.js'
 
 const { el } = C
 
@@ -246,8 +247,31 @@ function typeLabel(type) {
   return map[type] || type
 }
 
+/* ------------------------------------------------------------- Live view */
+// The cards, notifications, predictions and chat replies on this page are
+// fixed sample content. Only demo accounts see them; a live account gets the
+// features that are computed from its own data instead.
+function renderLive(container, ctx) {
+  const go = (key, label, iconName) => C.button({ label, icon: iconName, variant: 'soft', size: 'sm', onClick: () => ctx.navigate?.(key) })
+  container.replaceChildren(
+    C.pageHeader({ title: 'Pertumbuhan Bisnis', em: 'Pertumbuhan' }),
+    C.panel({ title: 'Pertumbuhan dari data Anda sendiri' },
+      C.emptyState({
+        kicker: 'Akun Anda',
+        iconName: 'trendingUp',
+        title: 'Peluang dan rekomendasi dihitung dari transaksi Anda.',
+        body: 'Belum ada contoh di sini: semua angka berasal dari permintaan, penawaran, dan pembukuan akun ini. Mulai dari Permintaan baru, lalu buka Radar peluang dan Penasihat AI.',
+        action: el('div', { className: 'form-actions' },
+          go('request', 'Permintaan baru', 'plus'),
+          go('radar', 'Radar peluang', 'radar'),
+          go('leads', 'Pencari prospek', 'mapPin'),
+          go('advisor', 'Penasihat AI', 'bot')),
+      })))
+}
+
 /* ------------------------------------------------------------------ Render */
 export async function render(container, ctx = {}) {
+  if (!isDemoEmail(ctx.user?.email)) { renderLive(container, ctx); return }
   let controller = null
   let modelId = null
   const status = C.message()
@@ -261,6 +285,8 @@ export async function render(container, ctx = {}) {
   tabs.classList.add('workspace-tabs')
   container.replaceChildren(
     C.pageHeader({ title: 'Pertumbuhan Bisnis', em: 'Pertumbuhan', description: 'Temukan peluang baru, terima rekomendasi AI, dan tingkatkan potensi keberhasilan bisnis Anda.' }),
+    el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' },
+      el('p', {}, el('b', {}, 'Data contoh (akun demo). '), 'Peluang, notifikasi, prediksi, dan jawaban asisten di halaman ini adalah contoh tetap, bukan hasil analisis data akun.'))),
     tabs, status, host)
   ctx.signal?.addEventListener('abort', () => controller?.abort(), { once: true })
 
