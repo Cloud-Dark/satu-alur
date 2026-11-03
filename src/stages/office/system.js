@@ -137,7 +137,7 @@ function transportPanel(sys, ctx, setDirty) {
   const t = sys.status.email.transport || { mode: 'resend' }
   const n = ++seq
   let modeValue = t.mode === 'smtp' ? 'smtp' : 'resend'
-  const mode = C.segmented({ label: 'Transport email platform', value: modeValue, options: [{ value: 'resend', label: 'Resend (bawaan)' }, { value: 'smtp', label: 'SMTP kustom' }], onChange: (v) => { modeValue = v; sync(); markDirty() } })
+  const mode = C.segmented({ label: 'Transport email platform', scroll: true, value: modeValue, options: [{ value: 'resend', label: 'Resend (bawaan)' }, { value: 'smtp', label: 'SMTP kustom' }], onChange: (v) => { modeValue = v; sync(); markDirty() } })
   const host = C.field({ label: 'Host SMTP', id: `of-tr-host-${n}`, value: t.host || '', attrs: { placeholder: 'smtp.resend.com', autocomplete: 'off', spellcheck: 'false' } })
   const port = C.select({ label: 'Port', id: `of-tr-port-${n}`, options: [465, 587, 2465, 2587].map((p) => ({ value: String(p), label: String(p) })), value: String(t.port || 465) })
   const secure = C.select({ label: 'Keamanan', id: `of-tr-sec-${n}`, options: [{ value: 'tls', label: 'TLS langsung (465/2465)' }, { value: 'starttls', label: 'STARTTLS (587/2587)' }], value: t.secure || 'tls' })
@@ -195,7 +195,7 @@ function providerPanel(sys, setDirty) {
   const labels = sys.status.ai.provider_modes || { workers: 'Workers AI (bawaan)', openai: 'OpenAI-compatible', anthropic: 'Anthropic-compatible' }
   const n = ++seq
   let mode = p.mode || 'workers'
-  const seg = C.segmented({ label: 'Penyedia AI platform', value: mode, options: Object.entries(labels).map(([value, label]) => ({ value, label })), onChange: (v) => { mode = v; sync(); changed() } })
+  const seg = C.segmented({ label: 'Penyedia AI platform', scroll: true, value: mode, options: Object.entries(labels).map(([value, label]) => ({ value, label })), onChange: (v) => { mode = v; sync(); changed() } })
   const base = C.field({ label: 'Alamat API', id: `of-ai-base-${n}`, value: p.base_url || '', attrs: { autocomplete: 'off', spellcheck: 'false', maxlength: '300' } })
   const key = C.field({ label: 'API key', id: `of-ai-key-${n}`, type: 'password', hint: p.key_saved ? `Tersimpan • …${p.key_last4 || '****'}. Kosongkan untuk tetap memakai yang lama.` : 'Disimpan terenkripsi di server, tidak pernah ditampilkan lagi.', attrs: { autocomplete: 'new-password', placeholder: p.key_saved ? '••••••••' : '' } })
   const values = () => ({ mode, base_url: base.input.value.trim(), model: picker.input.value.trim(), api_key: key.input.value.trim(), max_tokens: maxTok.input.value, temperature: temp.input.value })
