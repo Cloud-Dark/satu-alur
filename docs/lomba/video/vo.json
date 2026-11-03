@@ -1,0 +1,34 @@
+{
+  "voice": "id-ID-GadisNeural",
+  "note": "start/end are seconds in the final MP4 (from the concat lists in out/tmp). 'say' is what the TTS reads; 'text' is the plain line.",
+  "full": [
+    { "id": "title", "start": 0.6,  "end": 2.9,   "text": "Satu Alur." },
+    { "id": "s1",  "start": 3.3,   "end": 11.3,  "text": "Bagi usaha jasa, pekerjaan sering tercecer di chat, catatan, dan spreadsheet." },
+    { "id": "s2",  "start": 11.8,  "end": 18.7,  "text": "Coba langsung dengan sembilan akun demo dari tiga skala usaha. Semua datanya fiktif." },
+    { "id": "s3",  "start": 19.2,  "end": 27.3,  "text": "Ringkasan menampilkan pendapatan, biaya, dan laba, dihitung langsung dari data Anda." },
+    { "id": "s4",  "start": 28.0,  "end": 49.3,  "text": "Permintaan pelanggan masuk. Agen penawaran menyusun ruang lingkup, harga, dan ketentuan. Sebelum disimpan, hasilnya diperiksa aturan bisnis, dan keputusan tetap di tangan Anda.", "say": "Permintaan pelanggan masuk. Agen penawaran menyusun ruang lingkup, harga, dan ketentuan. Sebelum disimpan, hasilnya diperiksa aturan bisnis, dan keputusan tetap di tangan Anda." },
+    { "id": "s5",  "start": 50.0,  "end": 58.8,  "text": "Penawaran yang disetujui dijadwalkan ke pelaksana, lalu ditandai selesai." },
+    { "id": "s6",  "start": 59.4,  "end": 67.3,  "text": "Setiap pekerjaan dibukukan, dengan saldo yang berjalan otomatis." },
+    { "id": "s7",  "start": 67.9,  "end": 74.7,  "text": "Agen laporan menjelaskan angka periode ini, langsung mengalir di layar." },
+    { "id": "s8",  "start": 75.4,  "end": 89.8,  "text": "Mesin pendapatan, yaitu Layanan tambahan atau VAS, dan Tanpa limbah, membantu menemukan pendapatan baru dan menutup kebocoran biaya.", "say": "Mesin pendapatan, yaitu Layanan tambahan atau V A S, dan Tanpa limbah, membantu menemukan pendapatan baru dan menutup kebocoran biaya." },
+    { "id": "s9",  "start": 90.4,  "end": 96.8,  "text": "Lima tim agen dan satu pimpinan menyusun rencana optimasi." },
+    { "id": "s10", "start": 97.4,  "end": 105.1, "text": "Radar peluang mencari peluang dari data Anda sendiri, lengkap dengan faktor skornya." },
+    { "id": "s11", "start": 105.7, "end": 118.0, "text": "Pencari prospek memetakan calon pelanggan di sekitar Anda dari sumber data yang legal, lalu AI menilai kecocokannya.", "say": "Pencari prospek memetakan calon pelanggan di sekitar Anda dari sumber data yang legal, lalu A I menilai kecocokannya." },
+    { "id": "s12", "start": 118.6, "end": 129.3, "text": "Di Media Sosial, AI menulis konten per platform dan membantu mengatur jadwal unggah.", "say": "Di Media Sosial, A I menulis konten per platform dan membantu mengatur jadwal unggah." },
+    { "id": "s13", "start": 129.8, "end": 136.2, "text": "Lima penasihat AI menjawab dengan konteks bisnis Anda.", "say": "Lima penasihat A I menjawab dengan konteks bisnis Anda." },
+    { "id": "s14", "start": 136.8, "end": 147.7, "text": "Dari Kantor Satu Alur, tim mengelola landing page, paket, pelanggan, dan pembayaran." },
+    { "id": "s15", "start": 148.3, "end": 159.5, "text": "Untuk enterprise, konektor ERP memindahkan data lama secara bertahap, dengan uji coba dan rollback.", "say": "Untuk enterprise, konektor E R P memindahkan data lama secara bertahap, dengan uji coba dan rollback." },
+    { "id": "s16", "start": 160.2, "end": 167.2, "text": "Bisnis jasa Anda, tumbuh dalam satu alur. Coba sekarang." }
+  ],
+  "short": [
+    { "id": "title", "start": 0.5,  "end": 2.4,  "text": "Satu Alur." },
+    { "id": "c1",  "start": 2.8,  "end": 9.2,  "text": "Pekerjaan usaha jasa sering tercecer di mana-mana." },
+    { "id": "c4",  "start": 9.7,  "end": 16.1, "text": "Agen AI menyusun penawaran, lalu diperiksa aturan bisnis.", "say": "Agen A I menyusun penawaran, lalu diperiksa aturan bisnis." },
+    { "id": "c7",  "start": 16.6, "end": 23.0, "text": "Laporan dijelaskan AI, langsung mengalir.", "say": "Laporan dijelaskan A I, langsung mengalir." },
+    { "id": "c8",  "start": 23.5, "end": 29.9, "text": "Mesin pendapatan menemukan peluang dan kebocoran biaya." },
+    { "id": "c10", "start": 30.4, "end": 36.8, "text": "Radar peluang membaca data Anda sendiri." },
+    { "id": "c11", "start": 37.3, "end": 43.6, "text": "Prospek baru dari peta, dengan data yang legal." },
+    { "id": "c13", "start": 44.1, "end": 50.5, "text": "Penasihat AI paham konteks bisnis Anda.", "say": "Penasihat A I paham konteks bisnis Anda." },
+    { "id": "c16", "start": 51.0, "end": 57.5, "text": "Satu Alur. Bisnis jasa Anda, tumbuh dalam satu alur." }
+  ]
+}

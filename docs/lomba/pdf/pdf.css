@@ -1,0 +1,283 @@
+/* Satu Alur — submission document, print layout (A4, design system "Tumbuh"). */
+
+@page { size: A4; margin: 0; }
+
+:root {
+  --paper: #F6F1E7;
+  --paper-2: #EFE7D8;
+  --card: #FFFCF6;
+  --brand-900: #10291F;
+  --brand-800: #16392E;
+  --brand-700: #1F4D3F;
+  --brand-500: #2B7560;
+  --brand-300: #8DB8A6;
+  --brand-100: #DCEAE2;
+  --accent: #E7A13A;
+  --accent-soft: #F7E3C2;
+  --ink: #1B2420;
+  --muted: #5C6B63;
+  --faint: #8B978F;
+  --line: rgba(27, 36, 32, 0.12);
+  --shadow: 0 1px 1px rgba(16, 41, 31, 0.04), 0 6px 18px -8px rgba(16, 41, 31, 0.18);
+  --serif: 'Instrument Serif', 'Times New Roman', serif;
+  --sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --mx: 18mm;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body {
+  background: #888;
+  font-family: var(--sans);
+  font-size: 10pt;
+  line-height: 1.55;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- Page box */
+.page {
+  width: 210mm;
+  height: 297mm;
+  position: relative;
+  overflow: hidden;
+  background: var(--paper);
+  padding: 20mm var(--mx) 24mm;
+  break-after: page;
+  display: flex;
+  flex-direction: column;
+}
+.page:last-child { break-after: auto; }
+@media screen { .page { margin: 8mm auto; box-shadow: 0 4px 24px rgba(0,0,0,.25); } }
+
+.folio {
+  position: absolute; left: var(--mx); right: var(--mx); bottom: 11mm;
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 3mm; border-top: 0.6pt solid var(--line);
+  font-size: 7.4pt; letter-spacing: 0.02em; color: var(--faint);
+}
+.folio b { color: var(--brand-700); font-weight: 600; }
+
+/* ---------------------------------------------------------------- Type */
+.kicker {
+  display: inline-flex; align-items: center; gap: 2.2mm;
+  font-size: 7.6pt; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--brand-500);
+}
+.kicker .num {
+  display: inline-grid; place-items: center; min-width: 6.4mm; height: 6.4mm; padding: 0 1.4mm;
+  border-radius: 99px; background: var(--brand-800); color: var(--paper); letter-spacing: 0.04em;
+}
+h1, h2, h3, .display { font-family: var(--serif); font-weight: 400; letter-spacing: -0.01em; color: var(--brand-800); text-wrap: balance; }
+h1 em, h2 em, .display em { font-style: italic; color: var(--brand-500); }
+h2 { font-size: 30pt; line-height: 1.02; margin-top: 3mm; }
+h3 { font-size: 15pt; line-height: 1.15; }
+h4 { font-size: 10.4pt; font-weight: 700; color: var(--ink); line-height: 1.35; }
+.lead { font-size: 11.6pt; line-height: 1.55; color: var(--muted); max-width: 150mm; margin-top: 4mm; text-wrap: pretty; }
+p { text-wrap: pretty; }
+p + p { margin-top: 2.2mm; }
+.muted { color: var(--muted); }
+.small { font-size: 8.4pt; line-height: 1.5; }
+strong, b { font-weight: 700; }
+.tag {
+  display: inline-flex; align-items: center; gap: 1.2mm;
+  padding: 0.6mm 2.4mm; border-radius: 99px;
+  font-size: 7pt; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--accent-soft); color: #8A5A12;
+}
+.tag.green { background: var(--brand-100); color: var(--brand-700); }
+.tag.ghost { background: transparent; color: var(--faint); box-shadow: inset 0 0 0 0.6pt var(--line); }
+
+.head { margin-bottom: 8mm; }
+.rule { height: 0.6pt; background: var(--line); margin: 6mm 0; }
+
+/* ---------------------------------------------------------------- Layout */
+.grid { display: grid; gap: 5mm; }
+.g2 { grid-template-columns: repeat(2, 1fr); }
+.g3 { grid-template-columns: repeat(3, 1fr); }
+.g4 { grid-template-columns: repeat(4, 1fr); }
+.g-5-7 { grid-template-columns: 5fr 7fr; }
+.g-7-5 { grid-template-columns: 7fr 5fr; }
+.fill { flex: 1; }
+.stack > * + * { margin-top: 3mm; }
+
+.card {
+  background: var(--card);
+  border-radius: 4mm;
+  padding: 5.4mm;
+  box-shadow: var(--shadow);
+}
+.card.tint { background: var(--brand-100); box-shadow: none; }
+.card.dark { background: var(--brand-800); color: #E9F1EC; box-shadow: none; }
+.card.dark h3, .card.dark h4 { color: #fff; }
+.card.dark .muted { color: var(--brand-300); }
+.card h4 { margin-bottom: 1.4mm; }
+.card p { font-size: 9.3pt; line-height: 1.5; }
+
+.ico {
+  display: inline-grid; place-items: center;
+  width: 9mm; height: 9mm; border-radius: 2.6mm;
+  background: var(--brand-100); color: var(--brand-700);
+  margin-bottom: 3mm;
+}
+.ico svg { width: 4.8mm; height: 4.8mm; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.card.dark .ico { background: rgba(255,255,255,.08); color: var(--accent); }
+.ico.accent { background: var(--accent-soft); color: #8A5A12; }
+
+ul.ticks { list-style: none; }
+ul.ticks li { position: relative; padding-left: 4.6mm; font-size: 9.3pt; line-height: 1.5; }
+ul.ticks li + li { margin-top: 1.6mm; }
+ul.ticks li::before {
+  content: ''; position: absolute; left: 0; top: 1.85mm; width: 1.8mm; height: 1.8mm; border-radius: 50%;
+  background: var(--accent);
+}
+
+/* ---------------------------------------------------------------- Figures */
+.shot { position: relative; }
+.browser {
+  border-radius: 3mm; overflow: hidden; background: #fff;
+  box-shadow: 0 0 0 0.5pt rgba(16,41,31,.10), 0 10px 28px -12px rgba(16,41,31,.35);
+}
+.browser .bar {
+  height: 5.2mm; display: flex; align-items: center; gap: 1.2mm; padding: 0 2.6mm;
+  background: #ECE6DA;
+}
+.browser .bar i { width: 1.7mm; height: 1.7mm; border-radius: 50%; background: #CFC6B5; display: block; }
+.browser .bar span {
+  margin-left: 3mm; flex: 1; height: 2.8mm; border-radius: 99px; background: #F7F3EB;
+  font-size: 5.4pt; line-height: 2.8mm; color: var(--faint); padding-left: 2.2mm; font-style: normal;
+}
+.browser img { display: block; width: 100%; }
+figcaption { margin-top: 2.4mm; font-size: 7.6pt; color: var(--muted); display: flex; gap: 2mm; align-items: baseline; }
+figcaption .tag { flex-shrink: 0; }
+
+/* ---------------------------------------------------------------- Cover */
+.cover { background: var(--brand-800); color: #EAF2ED; padding: 22mm 20mm 20mm; }
+.cover::before {
+  content: ''; position: absolute; right: -40mm; top: -30mm; width: 170mm; height: 170mm; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(43,117,96,.55), rgba(43,117,96,0) 70%);
+}
+.cover::after {
+  content: ''; position: absolute; left: -30mm; bottom: -60mm; width: 140mm; height: 140mm; border-radius: 50%;
+  background: radial-gradient(circle, rgba(231,161,58,.16), rgba(231,161,58,0) 70%);
+}
+.cover > * { position: relative; z-index: 1; }
+.brandline { display: flex; align-items: center; gap: 3mm; font-weight: 700; font-size: 12pt; letter-spacing: -0.02em; }
+.brandline .thin { font-weight: 500; color: var(--brand-300); }
+.cover h1 { color: #fff; font-size: 52pt; line-height: 0.98; margin-top: 46mm; max-width: 150mm; }
+.cover h1 em { color: var(--accent); }
+.cover .lead { color: #C9DBD2; font-size: 12.5pt; max-width: 130mm; margin-top: 7mm; }
+.steps-line { display: flex; gap: 1.6mm; margin-top: 16mm; flex-wrap: wrap; }
+.steps-line span {
+  font-size: 7.6pt; font-weight: 600; padding: 1.2mm 3mm; border-radius: 99px;
+  background: rgba(255,255,255,.07); color: #DCE9E2; box-shadow: inset 0 0 0 0.5pt rgba(255,255,255,.12);
+}
+.steps-line span.on { background: var(--accent); color: var(--brand-900); box-shadow: none; }
+.cover-foot {
+  margin-top: auto; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 6mm;
+  padding-top: 6mm; border-top: 0.6pt solid rgba(255,255,255,.16);
+}
+.cover-foot dt { font-size: 7pt; letter-spacing: .14em; text-transform: uppercase; color: var(--brand-300); font-weight: 700; }
+.cover-foot dd { font-size: 9.6pt; margin-top: 1.2mm; color: #fff; font-weight: 500; }
+.badge-line { margin-top: 6mm; }
+.badge-line .tag { background: rgba(231,161,58,.16); color: var(--accent); }
+
+/* ---------------------------------------------------------------- Facts strip */
+.facts { display: grid; grid-template-columns: repeat(4, 1fr); border-radius: 4mm; overflow: hidden; background: var(--brand-800); }
+.facts div { padding: 5mm 5mm 4.6mm; color: #DCE9E2; }
+.facts div + div { box-shadow: inset 0.5pt 0 0 rgba(255,255,255,.12); }
+.facts b { display: block; font-family: var(--serif); font-weight: 400; font-size: 32pt; line-height: 1; color: #fff; }
+.facts b em { color: var(--accent); font-style: normal; }
+.facts span { display: block; font-size: 7.6pt; line-height: 1.4; margin-top: 2mm; color: var(--brand-300); }
+
+/* ---------------------------------------------------------------- Pull quote */
+.pull {
+  font-family: var(--serif); font-size: 19pt; line-height: 1.22; color: var(--brand-800);
+  padding-left: 6mm; border-left: 1.2mm solid var(--accent); text-wrap: balance;
+}
+.pull em { color: var(--brand-500); }
+
+/* ---------------------------------------------------------------- Tables */
+table.t { width: 100%; border-collapse: collapse; font-size: 9.2pt; }
+table.t th {
+  text-align: left; font-size: 6.8pt; letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+  font-weight: 700; padding: 0 3mm 2mm 0; border-bottom: 0.6pt solid var(--line);
+}
+table.t td { padding: 2.6mm 3mm 2.6mm 0; vertical-align: top; border-bottom: 0.6pt solid var(--line); line-height: 1.45; }
+table.t tr:last-child td { border-bottom: 0; }
+table.t td:first-child { font-weight: 700; color: var(--brand-800); white-space: nowrap; }
+
+/* ---------------------------------------------------------------- Flow diagram */
+.flow { margin-top: 2mm; }
+.flow svg { width: 100%; height: auto; display: block; }
+
+/* ---------------------------------------------------------------- Pricing */
+.price { display: flex; flex-direction: column; }
+.price .amt { font-family: var(--serif); font-size: 26pt; line-height: 1; color: var(--brand-800); margin: 3mm 0 1mm; }
+.price .amt small { font-family: var(--sans); font-size: 8pt; color: var(--muted); margin-left: 1mm; }
+.price.pro { background: var(--brand-800); color: #E3EEE8; }
+.price.pro .amt, .price.pro h4 { color: #fff; }
+.price.pro .muted { color: var(--brand-300); }
+.price.pro ul.ticks li::before { background: var(--accent); }
+.price ul { margin-top: 3mm; }
+
+/* ---------------------------------------------------------------- Timeline */
+.timeline { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm; }
+.timeline::before {
+  content: ''; position: absolute; left: 3mm; right: 3mm; top: 3mm; height: 0.8pt; background: var(--brand-300);
+}
+.timeline .node { position: relative; padding-top: 9mm; }
+.timeline .node::before {
+  content: ''; position: absolute; left: 0; top: 0.6mm; width: 4.8mm; height: 4.8mm; border-radius: 50%;
+  background: var(--paper); box-shadow: inset 0 0 0 1.4pt var(--brand-500);
+}
+.timeline .node.now::before { background: var(--accent); box-shadow: 0 0 0 1.6mm rgba(231,161,58,.22); }
+
+/* ---------------------------------------------------------------- Bilingual */
+.bi { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8mm; }
+.bi .lang { font-size: 6.8pt; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin-bottom: 2mm; }
+.bi p, .bi li { font-size: 9.4pt; line-height: 1.55; }
+.bi .col + .col { padding-left: 8mm; box-shadow: inset 0.6pt 0 0 var(--line); margin-left: -8mm; }
+ol.nums { list-style: none; counter-reset: n; }
+ol.nums li { counter-increment: n; position: relative; padding-left: 7mm; }
+ol.nums li + li { margin-top: 2.4mm; }
+ol.nums li::before {
+  content: counter(n, decimal-leading-zero); position: absolute; left: 0; top: 0.1mm;
+  font-size: 7.2pt; font-weight: 700; color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- Team */
+.person .avatar {
+  width: 14mm; height: 14mm; border-radius: 50%; display: grid; place-items: center;
+  background: var(--brand-800); color: var(--accent); font-family: var(--serif); font-size: 17pt; margin-bottom: 3.4mm;
+}
+.person .role { font-size: 7.4pt; letter-spacing: .12em; text-transform: uppercase; color: var(--brand-500); font-weight: 700; margin-top: 0.6mm; }
+
+/* ---------------------------------------------------------------- Code */
+.code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 7.6pt; line-height: 1.7;
+  background: var(--brand-900); color: #CFE2D8; border-radius: 3mm; padding: 4mm 5mm; white-space: pre;
+}
+.code .c { color: #7FA595; }
+
+/* ---------------------------------------------------------------- Back cover */
+.back { background: var(--brand-800); color: #DCE9E2; justify-content: center; align-items: flex-start; padding: 0 22mm; }
+.back h2 { color: #fff; font-size: 40pt; }
+.back h2 em { color: var(--accent); }
+
+/* Compact side card: icon left, text right. */
+.card.row { display: grid; grid-template-columns: 9mm 1fr; gap: 4mm; align-items: start; }
+.card.row .ico { margin: 0; }
+.stretch { display: flex; flex-direction: column; gap: 4mm; }
+.stretch > .card { flex: 1; display: grid; grid-template-columns: 9mm 1fr; gap: 4mm; align-content: center; }
+.stretch > .card .ico { margin: 0; }
+
+/* Journey strip (WorkBuddy page). */
+.journey { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-radius: 4mm; overflow: hidden; }
+.journey div { padding: 5mm; background: var(--card); box-shadow: inset -0.6pt 0 0 var(--line); }
+.journey div:last-child { box-shadow: none; background: var(--brand-800); color: #DCE9E2; }
+.journey div:last-child h4 { color: #fff; }
+.journey div:last-child .kicker { color: var(--accent); }
+.journey h4 { margin: 1.6mm 0 1.2mm; }
+.journey p { font-size: 9pt; line-height: 1.45; }
