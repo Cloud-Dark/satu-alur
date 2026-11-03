@@ -859,6 +859,20 @@ body.scroll-lock { overflow: hidden; }
 :root[data-theme='dark'] .seg-btn[aria-checked='true'] { background: var(--surface-2); }
 .seg-btn:focus-visible { border-radius: var(--r-pill); }
 .seg-block { display: flex; width: 100%; }
+/* Many options: the bar scrolls inside its own box, never the page. */
+.seg-scroll {
+  display: flex; max-width: 100%; min-width: 0;
+  overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  --fade-l: 0px; --fade-r: 0px;
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent 100%);
+}
+.seg-scroll::-webkit-scrollbar { display: none; }
+.seg-scroll.fade-start { --fade-l: 22px; }
+.seg-scroll.fade-end { --fade-r: 22px; }
+.seg-scroll .seg-btn { flex: 0 0 auto; scroll-snap-align: center; min-height: 38px; }
+@media (min-width: 640px) { .seg-scroll .seg-btn { flex: 1 0 auto; } }
 .seg-block .seg-btn { flex: 1; min-height: 38px; }
 
 /* To-do list */
@@ -1312,7 +1326,8 @@ body.scroll-lock { overflow: hidden; }
 .drawer-pre { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
 .drawer-title { font-size: 2.2rem; margin-top: 2px; }
 .drawer-body { flex: 1; overflow-y: auto; padding: var(--s-5) var(--s-6); display: flex; flex-direction: column; gap: var(--s-5); }
-.drawer-body > * { flex-shrink: 0; }
+.drawer-body > * { flex-shrink: 0; min-width: 0; max-width: 100%; }
+.drawer-body { overflow-x: hidden; }
 .drawer-foot {
   display: flex; align-items: center; justify-content: space-between; gap: var(--s-3);
   padding: var(--s-3) var(--s-6);
@@ -1602,7 +1617,39 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .pick-recommend { display: flex; align-items: flex-end; gap: var(--s-3); flex-wrap: wrap; }
 .pick-recommend .field { width: 6rem; }
 
-/* Worker map (Peta tab) */
+/* Worker map (Peta tab): Leaflet + OpenStreetMap */
+.worker-lmap { width: 100%; height: clamp(280px, 52vh, 520px); border-radius: var(--r-md); border: 1px solid var(--line); overflow: hidden; background: var(--surface-sunken); z-index: 0; }
+.worker-lpin { background: none; border: 0; }
+.worker-lpin span { display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%; }
+.worker-lpop { display: grid; gap: 4px; min-width: 160px; font-family: var(--font-sans); }
+.worker-map-note { margin: var(--s-2) 0 0; overflow-wrap: anywhere; }
+.worker-map-note:empty { display: none; }
+.worker-pin-dot.is-job { background: var(--accent); }
+
+/* Keahlian: toggle chips + manager */
+.chip-toggles { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.chip-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface);
+  color: var(--text); font: 600 0.84rem/1 var(--font-sans); cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.chip-toggle:hover { border-color: var(--brand-300); }
+.chip-toggle.is-on { background: var(--brand-50); border-color: var(--brand-500); color: var(--brand-600); }
+:root[data-theme='dark'] .chip-toggle.is-on { background: color-mix(in srgb, var(--brand) 22%, transparent); color: var(--text); }
+.chip-toggle svg { flex-shrink: 0; }
+.chip-add { display: flex; gap: var(--s-2); align-items: center; min-width: 0; }
+.chip-add .input { flex: 1; min-width: 0; }
+.skill-rows { display: grid; }
+.skill-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-3) 0; border-bottom: 1px solid var(--line); min-width: 0; flex-wrap: wrap; }
+.skill-row:last-child { border-bottom: 0; }
+.skill-row > .input { flex: 1 1 12rem; min-width: 0; }
+.skill-text { display: grid; gap: 2px; min-width: 0; }
+.skill-name { font-weight: 600; overflow-wrap: anywhere; }
+.skill-actions { display: flex; gap: var(--s-1); flex-shrink: 0; }
+.skills-panel .panel-body { display: grid; gap: var(--s-3); }
+
+/* Worker map (Peta tab), legacy SVG styles */
 .worker-map { width: 100%; height: auto; background: var(--surface-sunken); border-radius: var(--r-sm); }
 .worker-map-grid { stroke: var(--line); stroke-width: 1; }
 .worker-map-label { font-size: 11px; font-weight: 600; fill: var(--text); }

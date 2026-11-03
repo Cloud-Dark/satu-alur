@@ -121,6 +121,9 @@ export const TABLES = {
     columns: ['id', 'owner_id', 'name', 'phone', 'address', 'skills', 'lat', 'lng', 'zone', 'status', 'created_at'],
     json: ['skills'],
   },
+  worker_skills: {
+    columns: ['id', 'owner_id', 'key', 'name', 'created_at'],
+  },
   assignment_workers: {
     columns: ['id', 'owner_id', 'assignment_id', 'worker_id', 'created_at'],
     fks: { assignment_id: 'assignments', worker_id: 'workers' },
