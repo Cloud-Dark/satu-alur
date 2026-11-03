@@ -125,6 +125,15 @@ test('every AI call site names its metered feature', async () => {
   assert.ok(sites >= 6, `found ${sites} call sites`)
 })
 
+test('optimisation teams (Layanan tambahan & Tanpa limbah) are metered as income', async () => {
+  const src = await readFile(new URL('../src/ai/teams.js', import.meta.url), 'utf8')
+  const calls = [...src.matchAll(/streamAnswer\(\{([\s\S]*?)\}\)\)/g)]
+  assert.equal(calls.length, 2, 'five team calls share one site, plus the lead call')
+  for (const m of calls) assert.match(m[1], /feature: 'income'/)
+  assert.ok(FEATURES.some((f) => f.key === 'income'))
+  assert.equal(FREE_QUOTA.income, 10)
+})
+
 /* ----------------------------------------------------------------- worker */
 
 // Scripted fake D1: `firsts` answers .first() calls in order (by SQL match), batches are logged.
@@ -195,7 +204,7 @@ test('meter: demo accounts are never refused but still counted (no WHERE guard)'
   assert.doesNotMatch(up.sql, /WHERE/)
 })
 
-test('meter: before migration 0008 (no quota_json) AI keeps working, unmetered', async () => {
+test('meter: before migration 0012 (no quota_json) AI keeps working, unmetered', async () => {
   const env = { DB: { prepare: () => ({ bind() { return this }, async all() { throw new Error('D1_ERROR: no such column: quota_json') }, async first() { return null } }) } }
   const r = await meter(env, user, 'offer', deps)
   assert.equal(r.via, 'off')

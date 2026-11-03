@@ -20,14 +20,14 @@ Berisi **data demo DUMMY** untuk D1. Semua pelanggan, telepon, alamat, pekerja, 
 
 ## Data Kantor (`office.sql`)
 
-> **Jangan terapkan ke produksi** sebelum migrasi `0007_social_meta.sql`, `0008_quota_vouchers.sql` (dan `0003_workers.sql`) diterapkan ke D1 produksi dan lead memutuskan jadwalnya.
+> **Jangan terapkan ke produksi** sebelum migrasi `0003_workers.sql`, `0007_social_meta.sql` sampai `0012_quota_vouchers.sql` diterapkan ke D1 produksi dan lead memutuskan jadwalnya.
 
 Dibuat oleh `node scripts/seed-office.mjs` (jangan edit `office.sql` manual). Semua data **fiktif**; email pendaftar contoh memakai domain `@contoh.satualur.id`.
 
 | Tabel | Baris | Isi |
 |-------|------:|-----|
 | `site_content` | 5 | `landing` (hero + FAQ, sama dengan teks bawaan `src/landing/content.js`, FAQ paket diperbarui ke Free/Lite/Pro) dan draf `about`, `privacy`, `terms`, `cookies` (ditandai "Draf contoh", perlu ditinjau penasihat hukum). |
-| `subscription_plans` | 3 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi). Kuota AI yang berlaku di `quota_json` (Free = kuota coba: 10 per fitur, Penasihat AI 5; Pro tanpa batas kecuali prospek 100 dan penasihat 500); teks kartu di `limits_json`. Setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
+| `subscription_plans` | 3 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi). Kuota AI yang berlaku di `quota_json` (Free = kuota coba: 10 per fitur termasuk Optimasi pendapatan, Penasihat AI 5; Lite optimasi 30; Pro tanpa batas kecuali prospek 100 dan penasihat 500); teks kartu di `limits_json`. Setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
 | `payment_settings` | 1 | Penyedia `none`, mode sandbox, **tanpa kunci**. Gateway tetap mati sampai staf mengisi kunci asli di halaman Payment gateway. |
 | `users` | 13 | 9 akun demo (`INSERT OR IGNORE`, tidak mengubah baris yang sudah ada) + 4 pendaftar contoh. |
 | `customer_accounts` | 12 | Paket dan status campuran: aktif, uji coba, tertunggak, berhenti. Pendaftar ke-13 sengaja "Belum diatur". |

@@ -19,7 +19,7 @@ import { getSite } from '../site/api.js'
 import { getPlans } from '../business/api.js'
 import { renderPlanCard } from '../business/plan-card.js'
 import { renderHero } from '../site/hero.js'
-import { NAV, HERO_POINTS, STAGES, TICKER, FEATURES, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
+import { NAV, HERO, HERO_POINTS, STAGES, TICKER, FEATURES, INCOME, GROWTH, INTEGRATION, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
@@ -109,9 +109,9 @@ function heroHTML(user) {
     <div class="lp-hero-glow" aria-hidden="true"></div>
     <div class="lp-container lp-hero-grid">
       <div class="lp-hero-copy">
-        <p class="lp-hero-badge reveal"><span class="pulse-dot" aria-hidden="true"></span>Untuk bisnis jasa di Indonesia · ditenagai AI</p>
-        <h1 class="display lp-hero-title reveal" style="--d: 80ms" id="lp-hero-title">Bisnis jasa Anda, <em>tumbuh</em> dalam satu&nbsp;alur.</h1>
-        <p class="lp-hero-sub reveal" style="--d: 160ms">Satu Alur menyatukan permintaan pelanggan, penawaran, penugasan, pembukuan, dan laporan dalam satu alur kerja. AI mengerjakan yang berulang; Anda fokus melayani dan bertumbuh.</p>
+        <p class="lp-hero-badge reveal"><span class="pulse-dot" aria-hidden="true"></span>${esc(HERO.badge)}</p>
+        <h1 class="display lp-hero-title reveal" style="--d: 80ms" id="lp-hero-title">${emHTML(HERO.title)}</h1>
+        <p class="lp-hero-sub reveal" style="--d: 160ms">${esc(HERO.subtitle)}</p>
         <div class="lp-hero-ctas reveal" style="--d: 240ms">
           ${primaryCta(user, { size: 'btn-lg' })}
           <a class="btn btn-lg btn-ghost lp-btn-quiet" href="#alur" data-scroll="alur">Lihat alur kerja ${iconHTML('chevronDown', { size: 18 })}</a>
@@ -178,11 +178,11 @@ function flowHTML() {
       <header class="lp-head lp-head-center">
         <p class="eyebrow reveal">Alur kerja</p>
         <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-alur-title">Enam tahap, <em>satu</em> benang merah.</h2>
-        <p class="lp-lede reveal" style="--d: 120ms">Bisnis jasa sering mengelola pekerjaan lewat chat dan spreadsheet yang terpisah. Satu Alur merangkai semuanya: data yang masuk di tahap pertama mengalir utuh sampai laporan.</p>
+        <p class="lp-lede reveal" style="--d: 120ms">Bisnis jasa sering mengelola pekerjaan lewat chat dan spreadsheet yang terpisah. Satu Alur merangkai semuanya: data yang masuk di tahap pertama mengalir utuh sampai laporan. Sesudah enam tahap, dua grup menu memakai data itu untuk menambah pendapatan dan mencari pertumbuhan.</p>
         <dl class="lp-facts reveal" style="--d: 180ms">
           <div><dt>Tahap kerja</dt><dd class="tnum" data-count="6">6</dd></div>
-          <div><dt>Agen AI</dt><dd class="tnum" data-count="2">2</dd></div>
-          <div><dt>Alur data</dt><dd class="tnum" data-count="1">1</dd></div>
+          <div><dt>Tim AI</dt><dd class="tnum" data-count="5">5</dd></div>
+          <div><dt>Grup tambahan</dt><dd class="tnum" data-count="2">2</dd></div>
         </dl>
       </header>
       <div class="lp-flow" data-flow>
@@ -233,6 +233,202 @@ function featuresHTML() {
           <figcaption class="lp-chat-cap">${iconHTML('info', { size: 14 })}Ilustrasi keluaran agen penawaran — bukan data pelanggan.</figcaption>
         </figure>
       </div>
+    </div>
+  </section>`
+}
+
+/* ------------------------------------------------------------------ */
+/* Pendapatan: the two money engines + the shared five-team room       */
+/* ------------------------------------------------------------------ */
+
+/** Escaped text with "*word*" turned into <em>word</em> (same convention as the hero). */
+const emHTML = (s) => esc(s).replace(/\*([^*]+)\*/g, '<em>$1</em>')
+
+function vasPreview(p) {
+  const rows = p.rows.map((r) => {
+    const rate = Math.min(100, Math.max(0, r.rate))
+    return `
+    <li>
+      <span class="lp-vas-name"><span>${esc(r.name)}</span><em class="tnum">${esc(r.price)}</em></span>
+      <span class="lp-vas-bar" aria-hidden="true"><i style="width: ${rate}%"></i></span>
+      <b class="tnum">${rate}%</b>
+    </li>`
+  }).join('')
+  const sr = `Contoh katalog add-on. ${p.rows.map((r) => `${r.name} ${r.price}, serapan ${r.rate} persen`).join('; ')}. ${p.footer.label}: ${p.footer.value}.`
+  return `
+  <div class="lp-inc-preview lp-vas" role="img" aria-label="${esc(sr)}">
+    <div class="lp-inc-pv-head"><p>${esc(p.title)}</p><span class="tag tag-accent">Contoh</span></div>
+    <ul class="lp-vas-rows">${rows}</ul>
+    <p class="lp-inc-pv-foot"><span>${esc(p.footer.label)}</span><strong class="tnum">${esc(p.footer.value)}</strong></p>
+  </div>`
+}
+
+function wastePreview(p) {
+  const pct = Math.min(100, Math.max(0, p.percent))
+  const rows = p.rows.map((r) => `<li><span>${esc(r.label)}</span><b class="tnum">${esc(r.value)}</b></li>`).join('')
+  const sr = `Contoh kebocoran bulan ini, ${p.percent} persen bebas limbah. ${p.rows.map((r) => `${r.label} ${r.value}`).join('; ')}. ${p.footer.label}: ${p.footer.value}.`
+  return `
+  <div class="lp-inc-preview lp-zw" role="img" aria-label="${esc(sr)}">
+    <div class="lp-inc-pv-head"><p>${esc(p.title)}</p><span class="tag tag-accent">Contoh</span></div>
+    <div class="lp-zw-body">
+      <div class="lp-zw-meter">
+        <div class="lp-zw-ring" style="--p: ${pct}"><span class="tnum">${pct}%</span></div>
+        <small>bebas limbah</small>
+      </div>
+      <ul class="lp-zw-rows">${rows}</ul>
+    </div>
+    <p class="lp-inc-pv-foot"><span>${esc(p.footer.label)}</span><strong class="tnum">${esc(p.footer.value)}</strong></p>
+  </div>`
+}
+
+function incomeHTML() {
+  const engines = INCOME.engines.map((e, i) => `
+    <article class="lp-inc-engine reveal" style="--d: ${i * 90}ms">
+      <header class="lp-inc-head">
+        <span class="lp-inc-icon">${iconHTML(e.icon, { size: 20, stroke: 1.9 })}</span>
+        <div>
+          <p class="lp-inc-kicker">${esc(e.kicker)}</p>
+          <h3 class="lp-inc-title">${esc(e.title)}</h3>
+        </div>
+      </header>
+      <p class="lp-inc-desc">${esc(e.desc)}</p>
+      <ul class="lp-inc-points">
+        ${e.points.map((p) => `<li><span class="lp-tick">${iconHTML('check', { size: 12, stroke: 3 })}</span>${esc(p)}</li>`).join('')}
+      </ul>
+      ${e.id === 'vas' ? vasPreview(e.preview) : wastePreview(e.preview)}
+    </article>`).join('')
+  const teams = INCOME.room.teams.map((t, i) => `<li style="--i: ${i}">${esc(t)}</li>`).join('')
+  const briefs = INCOME.room.briefs.map((b) => `<li>${esc(b)}</li>`).join('')
+  return `
+  <section class="lp-section lp-income" id="pendapatan" aria-labelledby="lp-income-title">
+    <div class="lp-container">
+      <header class="lp-head lp-head-center">
+        <p class="eyebrow reveal">${esc(INCOME.eyebrow)}</p>
+        <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-income-title">${emHTML(INCOME.title)}</h2>
+        <p class="lp-lede reveal" style="--d: 120ms">${esc(INCOME.lede)}</p>
+      </header>
+      <div class="lp-inc-grid">${engines}</div>
+      <aside class="lp-inc-room reveal" aria-labelledby="lp-inc-room-title">
+        <div class="lp-inc-room-copy">
+          <p class="lp-inc-kicker">${iconHTML(INCOME.room.icon, { size: 16, stroke: 1.9 })}${esc(INCOME.room.kicker)}</p>
+          <h3 class="lp-inc-room-title" id="lp-inc-room-title">${esc(INCOME.room.title)}</h3>
+          <p class="lp-inc-room-desc">${esc(INCOME.room.desc)}</p>
+          <ul class="lp-inc-briefs">${briefs}</ul>
+        </div>
+        <div class="lp-inc-room-visual" aria-hidden="true">
+          <ul class="lp-inc-teams">${teams}</ul>
+          <span class="lp-inc-link"></span>
+          <div class="lp-inc-lead">${iconHTML('sparkles', { size: 15, stroke: 1.9 })}<span>${esc(INCOME.room.lead)}</span></div>
+        </div>
+      </aside>
+    </div>
+  </section>`
+}
+
+/* ------------------------------------------------------------------ */
+/* Pertumbuhan: five menus that turn flow data into new work           */
+/* ------------------------------------------------------------------ */
+
+function growVisual(c) {
+  if (c.chips) {
+    return `<ul class="lp-grow-chips">${c.chips.map((ch) => `<li>${iconHTML(ch.icon, { size: 14, stroke: 1.9 })}${esc(ch.label)}</li>`).join('')}</ul>`
+  }
+  if (c.stat) {
+    return `
+    <div class="lp-grow-stat">
+      <p class="lp-grow-score"><span class="tnum">${c.stat.score}</span><small>${esc(c.stat.label)}</small></p>
+      <dl class="lp-grow-dl">
+        ${c.stat.rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd class="tnum">${esc(v)}</dd></div>`).join('')}
+      </dl>
+    </div>`
+  }
+  if (c.leads) {
+    return `
+    <ul class="lp-grow-leads">
+      ${c.leads.map((l) => `
+      <li>
+        <span class="lp-grow-lead-name">${esc(l.name)}</span>
+        <span class="lp-grow-lead-score tnum">${l.score}</span>
+        <span class="lp-grow-lead-val tnum">${esc(l.value)}</span>
+      </li>`).join('')}
+    </ul>`
+  }
+  if (c.post) {
+    return `
+    <div class="lp-grow-post">
+      <span class="lp-grow-post-thumb" aria-hidden="true">${iconHTML('megaphone', { size: 16, stroke: 1.8 })}</span>
+      <div>
+        <p>${esc(c.post.caption)}</p>
+        <span>${esc(c.post.meta)}</span>
+      </div>
+    </div>`
+  }
+  return ''
+}
+
+function growthHTML() {
+  const cards = GROWTH.cards.map((c, i) => `
+    <article class="lp-grow-card reveal" style="--d: ${i * 70}ms">
+      <header class="lp-grow-head">
+        <span class="lp-grow-icon">${iconHTML(c.icon, { size: 19, stroke: 1.9 })}</span>
+        <h3 class="lp-grow-title">${esc(c.title)}</h3>
+        ${c.stat || c.leads || c.post ? '<span class="tag tag-accent">Contoh</span>' : ''}
+      </header>
+      <p class="lp-grow-desc">${esc(c.desc)}</p>
+      ${growVisual(c)}
+    </article>`).join('')
+  const assistants = GROWTH.assistants.map((a, i) => `
+    <article class="lp-grow-assist reveal" style="--d: ${i * 90}ms">
+      <header class="lp-grow-head">
+        <span class="lp-grow-icon">${iconHTML(a.icon, { size: 19, stroke: 1.9 })}</span>
+        <h3 class="lp-grow-title">${esc(a.title)}</h3>
+      </header>
+      <p class="lp-grow-desc">${esc(a.desc)}</p>
+      ${a.sample ? `<p class="lp-grow-quote">${iconHTML('bot', { size: 14, stroke: 1.9 })}<span><span class="tag tag-accent">Contoh</span> ${esc(a.sample)}</span></p>` : ''}
+      ${a.tools ? `<ul class="lp-grow-tools">${a.tools.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}
+    </article>`).join('')
+  return `
+  <section class="lp-section lp-growth-sec" id="pertumbuhan" aria-labelledby="lp-growth-title">
+    <div class="lp-container">
+      <header class="lp-head lp-head-center">
+        <p class="eyebrow reveal">${esc(GROWTH.eyebrow)}</p>
+        <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-growth-title">${emHTML(GROWTH.title)}</h2>
+        <p class="lp-lede reveal" style="--d: 120ms">${esc(GROWTH.lede)}</p>
+      </header>
+      <div class="lp-grow-grid">${cards}</div>
+      <div class="lp-grow-assists">${assistants}</div>
+      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}${esc(GROWTH.note)}</p>
+    </div>
+  </section>`
+}
+
+function integrationHTML() {
+  const cards = INTEGRATION.cards.map((c, i) => `
+    <article class="lp-int-card reveal" style="--d: ${i * 70}ms">
+      <span class="lp-int-icon">${iconHTML(c.icon, { size: 20, stroke: 1.9 })}</span>
+      <h3 class="lp-int-title">${esc(c.title)}</h3>
+      <p class="lp-int-desc">${esc(c.desc)}</p>
+    </article>`).join('')
+  const steps = INTEGRATION.steps.map((s, i) => `
+    <li class="lp-int-step reveal" style="--d: ${i * 80}ms">
+      <span class="lp-int-step-no" aria-hidden="true">${esc(s.no)}</span>
+      <div class="lp-int-step-body">
+        <h4 class="lp-int-step-title">${esc(s.title)}</h4>
+        <p class="lp-int-step-desc">${esc(s.desc)}</p>
+      </div>
+    </li>`).join('')
+  return `
+  <section class="lp-section lp-int-sec" id="integrasi" aria-labelledby="lp-int-title">
+    <div class="lp-container">
+      <header class="lp-head lp-head-center">
+        <p class="eyebrow reveal">${esc(INTEGRATION.eyebrow)}</p>
+        <h2 class="display lp-h2 reveal" style="--d: 60ms" id="lp-int-title">${emHTML(INTEGRATION.title)}</h2>
+        <p class="lp-lede reveal" style="--d: 120ms">${esc(INTEGRATION.lede)}</p>
+        <p class="lp-int-badge reveal" style="--d: 160ms">${iconHTML('lock', { size: 12, stroke: 2 })}${esc(INTEGRATION.badge)}</p>
+      </header>
+      <div class="lp-int-grid">${cards}</div>
+      <ol class="lp-int-steps">${steps}</ol>
+      <p class="lp-note lp-note-center reveal">${iconHTML('info', { size: 14 })}${esc(INTEGRATION.note)}</p>
     </div>
   </section>`
 }
@@ -391,6 +587,9 @@ function footerHTML() {
         <div class="lp-foot-cols">
           ${col('Produk', [
             ['Alur kerja', 'href="#alur" data-scroll="alur"'],
+            ['Pendapatan', 'href="#pendapatan" data-scroll="pendapatan"'],
+            ['Pertumbuhan', 'href="#pertumbuhan" data-scroll="pertumbuhan"'],
+            ['Integrasi ERP', 'href="#integrasi" data-scroll="integrasi"'],
             ['Fitur AI', 'href="#fitur-ai" data-scroll="fitur-ai"'],
             ['Harga', 'href="#harga" data-scroll="harga"'],
             ['FAQ', 'href="#faq" data-scroll="faq"'],
@@ -540,6 +739,9 @@ export function renderLanding(root, ctx = {}) {
       ${heroHTML(user)}
       ${tickerHTML()}
       ${flowHTML()}
+      ${incomeHTML()}
+      ${growthHTML()}
+      ${integrationHTML()}
       ${featuresHTML()}
       ${visionHTML()}
       ${pricingHTML()}

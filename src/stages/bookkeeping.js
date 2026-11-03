@@ -15,6 +15,26 @@ export async function render(container, ctx = {}) {
   const ctxBox = el('div', {})
   const category = C.select({ label: 'Kategori', name: 'category', required: true, options: [{ value: '', label: 'Pilih kategori' }, ...LEDGER_CATEGORIES] })
   const amount = C.field({ label: 'Jumlah (Rp)', name: 'amount', type: 'number', required: true, placeholder: '1500000', attrs: { min: '1', step: '1', inputmode: 'numeric' } })
+  // Optional link to a VAS catalog item: this is what makes "Porsi VAS" measurable
+  // instead of a guess. Only revenue entries can carry it.
+  const vasSel = C.select({
+    label: 'Layanan tambahan (opsional)', name: 'vas_item_id',
+    hint: 'Tandai bila pendapatan ini berasal dari item di menu Layanan tambahan.',
+    options: [{ value: '', label: 'Bukan layanan tambahan' }],
+  })
+  vasSel.wrap.hidden = true
+  let vasItems = null
+  async function ensureVasOptions() {
+    if (vasItems) return
+    const { data, error } = await getCloud().database.from('vas_items').select('id,name,status')
+    if (error) { msg.show('danger', `Gagal memuat layanan tambahan: ${error.message}`); return }
+    if (ctx.signal?.aborted) return
+    vasItems = (data || []).filter((v) => v.status === 'active')
+    C.setOptions(vasSel.input, [
+      { value: '', label: 'Bukan layanan tambahan' },
+      ...vasItems.map((v) => ({ value: v.id, label: v.name })),
+    ], vasSel.input.value)
+  }
   const fillBtn = el('button', { type: 'button', className: 'link-btn', hidden: true }, '')
   amount.wrap.appendChild(fillBtn)
   const reviewBox = el('div', { className: 'proposal' })
@@ -48,7 +68,7 @@ export async function render(container, ctx = {}) {
         key: 'entry',
         title: 'Jurnal',
         description: 'Pendapatan atau biaya, beserta jumlahnya.',
-        content: [ctxBox, category.wrap, amount.wrap],
+        content: [ctxBox, category.wrap, vasSel.wrap, amount.wrap],
         validate: () => {
           const errs = []
           if (!category.input.value) errs.push({ text: 'Pilih kategori.', input: category.input })
@@ -122,7 +142,11 @@ export async function render(container, ctx = {}) {
   complSel.input.addEventListener('change', () => { msg.hide(); syncFill(); showPreview() })
   category.input.addEventListener('change', () => {
     syncFill()
-    if (category.input.value === 'pendapatan' && !amount.input.value) {
+    const revenue = category.input.value === 'pendapatan'
+    vasSel.wrap.hidden = !revenue
+    if (revenue) ensureVasOptions()
+    else vasSel.input.value = ''
+    if (revenue && !amount.input.value) {
       const c = selected()
       if (c && offerPrice(c)) amount.input.value = String(offerPrice(c))
     }
@@ -188,6 +212,7 @@ export async function render(container, ctx = {}) {
     try {
       const { error } = await getCloud().database.from('ledger_entries').insert({
         completion_id: Number(c.id),
+        vas_item_id: category.input.value === 'pendapatan' && vasSel.input.value ? Number(vasSel.input.value) : null,
         amount: Math.round(amt),
         category: category.input.value,
         status: 'posted',

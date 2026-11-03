@@ -6,8 +6,9 @@
 
 export const NAV = [
   { id: 'alur', label: 'Alur kerja' },
+  { id: 'pendapatan', label: 'Pendapatan' },
+  { id: 'pertumbuhan', label: 'Pertumbuhan' },
   { id: 'fitur-ai', label: 'Fitur AI' },
-  { id: 'ide-besar', label: 'Roadmap' },
   { id: 'harga', label: 'Harga' },
   { id: 'faq', label: 'FAQ' },
 ]
@@ -16,13 +17,14 @@ export const NAV = [
 export const HERO = {
   badge: 'Untuk bisnis jasa di Indonesia · ditenagai AI',
   title: 'Bisnis jasa Anda, *tumbuh* dalam satu alur.',
-  subtitle: 'Satu Alur menyatukan permintaan pelanggan, penawaran, penugasan, pembukuan, dan laporan dalam satu alur kerja. AI mengerjakan yang berulang; Anda fokus melayani dan bertumbuh.',
+  subtitle: 'Satu Alur menyatukan permintaan, penawaran, penugasan, pembukuan, dan laporan dalam satu alur kerja. Setelah rapi, dua mesin menyusul: pendapatan dari layanan tambahan, dan pertumbuhan dari data Anda sendiri.',
 }
 
 /** Honest, verifiable facts shown under the hero CTAs. */
 export const HERO_POINTS = [
   'Masuk cukup dengan email (OTP)',
   'Penawaran AI selalu divalidasi',
+  'Pendapatan & pertumbuhan sudah aktif',
   'Data aman di cloud',
 ]
 
@@ -68,10 +70,15 @@ export const TICKER = [
   { icon: 'checkCircle', label: 'Catatan penyelesaian' },
   { icon: 'ledger', label: 'Jurnal & laba/rugi' },
   { icon: 'chart', label: 'Laporan dijelaskan AI' },
+  { icon: 'layers', label: 'Katalog layanan tambahan' },
+  { icon: 'sprout', label: 'Lima aliran pemborosan' },
+  { icon: 'bot', label: 'Ruang optimasi lima tim' },
+  { icon: 'radar', label: 'Radar peluang' },
+  { icon: 'mapPin', label: 'Pencari prospek' },
+  { icon: 'megaphone', label: 'Konten & jadwal media sosial' },
   { icon: 'zap', label: 'Jawaban AI langsung mengalir' },
-  { icon: 'bot', label: 'Agent Skill Editor' },
   { icon: 'mail', label: 'Login email OTP' },
-  { icon: 'layers', label: 'Data aman di cloud' },
+  { icon: 'lock', label: 'Data aman di cloud' },
 ]
 
 export const FEATURES = [
@@ -88,6 +95,12 @@ export const FEATURES = [
     tag: null,
   },
   {
+    icon: 'users',
+    title: 'Ruang optimasi lima tim AI',
+    desc: 'Kreatif, pemasaran, keuangan, operasional, dan riset bekerja paralel atas angka bisnis Anda, lalu satu pemimpin menyimpulkan. Cocok untuk keputusan yang tidak muat di satu kepala.',
+    tag: null,
+  },
+  {
     icon: 'bot',
     title: 'Agent Skill Editor',
     desc: 'Ubah prompt agen, temperature, dan batas token sesuai gaya bisnis Anda. AI mengikuti cara Anda bekerja, bukan sebaliknya.',
@@ -100,6 +113,169 @@ export const FEATURES = [
     tag: 'Roadmap',
   },
 ]
+
+/**
+ * Pendapatan — the two money engines plus the shared five-team room.
+ * Preview numbers are illustrative and labelled "Contoh" in the markup; the
+ * counts (5 streams, 5 teams, 6 categories) are the real product constants.
+ */
+export const INCOME = {
+  eyebrow: 'Pendapatan',
+  title: 'Pekerjaan yang sama, nilai yang *lebih*.',
+  lede: 'Dua menu untuk menambah nilai pekerjaan: temukan peluang add-on dari data operasi, kelola katalognya, lalu catat pemborosan dan penghematan yang sudah Anda capai.',
+  engines: [
+    {
+      id: 'vas',
+      icon: 'wallet',
+      kicker: 'Layanan tambahan',
+      title: 'Jual add-on tanpa menebak',
+      desc: 'Satu Alur membaca jenis jasa yang paling sering Anda kerjakan, lalu menunjukkan add-on yang masuk akal untuk ditawarkan — dengan harga, biaya langsung, dan perkiraan serapan.',
+      points: [
+        'Katalog add-on dalam enam kategori',
+        'Atur perkiraan serapan untuk setiap item',
+        'Porsi add-on terukur di jurnal, bukan dikira-kira',
+      ],
+      preview: {
+        title: 'Katalog add-on',
+        rows: [
+          { name: 'Cuci karpet', price: 'Rp75 rb', rate: 46 },
+          { name: 'Isi freon', price: 'Rp180 rb', rate: 32 },
+          { name: 'Kontrak perawatan', price: 'Rp450 rb', rate: 18 },
+        ],
+        footer: { label: 'Potensi per bulan', value: '+Rp1,8 jt' },
+      },
+    },
+    {
+      id: 'limbah',
+      icon: 'sprout',
+      kicker: 'Tanpa limbah',
+      title: 'Hentikan kebocoran, satu per satu',
+      desc: 'Waktu menganggur, perjalanan, bahan terbuang, pekerjaan ulang, serta air dan kimia dihitung dalam Rupiah. Angka bebas limbah menunjukkan kemajuan nyata, bukan perasaan.',
+      points: [
+        'Lima aliran pemborosan, semuanya dalam Rupiah',
+        'Rencana penutupan diurutkan dari kebocoran terbesar',
+        'Tandai selesai setelah penghematan terkonfirmasi',
+      ],
+      preview: {
+        title: 'Kebocoran bulan ini',
+        percent: 62,
+        rows: [
+          { label: 'Waktu tunggu', value: 'Rp1,4 jt' },
+          { label: 'Perjalanan', value: 'Rp980 rb' },
+          { label: 'Bahan terbuang', value: 'Rp620 rb' },
+        ],
+        footer: { label: 'Bebas limbah', value: '62%' },
+      },
+    },
+  ],
+  room: {
+    icon: 'bot',
+    kicker: 'Ruang optimasi',
+    title: 'Lima tim AI, satu kesimpulan',
+    desc: 'Setiap menu Pendapatan punya ruang kerja yang sama: lima tim AI membaca angka Anda secara paralel, lalu satu pemimpin menyimpulkan langkah berikutnya. Anda memilih salah satu dari tiga ringkasan singkat — tanpa menulis prompt.',
+    teams: ['Kreatif', 'Pemasaran', 'Keuangan', 'Operasional', 'Riset'],
+    lead: 'Pimpinan optimasi',
+    briefs: ['Naikkan serapan add-on', 'Tutup kebocoran terbesar', 'Bundel untuk pelanggan tetap'],
+  },
+}
+
+/**
+ * Pertumbuhan — tools for finding new work, with labelled demo predictions.
+ * The scores and Rupiah figures in the previews are illustrative.
+ */
+export const GROWTH = {
+  eyebrow: 'Pertumbuhan',
+  title: 'Setelah rapi, giliran *bertumbuh*.',
+  lede: 'Radar dan penasihat membaca data alur Anda. Pencari prospek membantu menemukan calon pelanggan, Media Sosial mengelola konten, dan contoh rekomendasi menunjukkan cara menilai peluang.',
+  cards: [
+    {
+      id: 'radar',
+      icon: 'radar',
+      title: 'Radar peluang',
+      desc: 'Layanan rutin yang jatuh tempo, pelanggan yang menghilang, penawaran yang tertahan, dan musim ramai — ditemukan dari transaksi Anda sendiri, bukan dari daftar beli.',
+      chips: [
+        { icon: 'clock', label: 'Servis rutin jatuh tempo' },
+        { icon: 'users', label: 'Pelanggan belum kembali' },
+        { icon: 'file', label: 'Penawaran tertahan' },
+      ],
+    },
+    {
+      id: 'prediksi',
+      icon: 'target',
+      title: 'Rekomendasi & prediksi',
+      desc: 'Jelajahi contoh skor peluang, estimasi nilai, dan probabilitas berhasil. Bagian ini memakai data demonstrasi untuk memperlihatkan cara membaca rekomendasi.',
+      stat: { score: 92, label: 'Skor peluang', rows: [['Estimasi nilai', 'Rp54 jt/bln'], ['Peluang berhasil', '78%']] },
+    },
+    {
+      id: 'prospek',
+      icon: 'mapPin',
+      title: 'Pencari prospek',
+      desc: 'Pilih titik dan radius di peta, tentukan jenis usaha. AI menilai kecocokan dan menyiapkan penawarannya. Tidak ada pesan yang terkirim otomatis.',
+      leads: [
+        { name: 'Kafe · Kemang', score: 86, value: 'Rp4,2 jt' },
+        { name: 'Klinik · Tebet', score: 74, value: 'Rp2,8 jt' },
+      ],
+    },
+    {
+      id: 'sosial',
+      icon: 'megaphone',
+      title: 'Media Sosial',
+      desc: 'Tulis konten dengan AI, jadwalkan tayang ke Facebook, Instagram, atau Threads yang sudah terhubung, lalu ajukan iklan atau kolaborasi ke tim Satu Alur.',
+      post: { caption: 'Servis AC sebelum musim hujan — slot minggu ini masih ada.', meta: 'Instagram · dijadwalkan' },
+    },
+  ],
+  assistants: [
+    {
+      icon: 'lightbulb',
+      title: 'Penasihat AI',
+      desc: 'Tanya "kenapa laba turun bulan ini?" dan jawabannya memakai angka dari alur Anda, bukan tebakan umum. Percakapan tersimpan di perangkat Anda.',
+      sample: 'Laba turun 12% karena dua biaya perjalanan naik dan satu pekerjaan belum ditagih.',
+    },
+    {
+      icon: 'zap',
+      title: 'AI Superpowers',
+      desc: 'Asisten dengan alat hitung, data bisnis, dan format Rupiah — untuk pekerjaan yang tidak muat di satu formulir.',
+      tools: ['Kalkulator', 'Data bisnis', 'Format Rupiah'],
+    },
+  ],
+  note: 'Hubungkan platform yang ingin dipakai: Halaman Facebook, Instagram Bisnis yang tertaut ke Halaman Facebook, atau akun Threads.',
+}
+
+/**
+ * Integrasi — the platform sits next to the systems a company already runs.
+ * Only the connector kinds the Worker actually implements are listed: REST,
+ * file import and inbound webhook. Direct database access needs a bridge agent
+ * that does not exist yet, so it is deliberately absent here.
+ */
+export const INTEGRATION = {
+  eyebrow: 'Bukan mulai dari nol',
+  title: 'Satu Alur *melengkapi* sistem yang sudah berjalan.',
+  lede: 'Anda tidak perlu membuang ERP, aplikasi kasir, atau spreadsheet yang sudah dipakai bertahun-tahun. Hubungkan sumbernya, petakan kolomnya, lalu pindahkan data bertahap — sementara dua sistem tetap berjalan berdampingan.',
+  badge: 'Enterprise',
+  cards: [
+    {
+      icon: 'plug',
+      title: 'REST API',
+      desc: 'Hubungkan Odoo, SAP Business One, NetSuite, atau aplikasi internal lewat endpoint yang sudah ada. Kredensial disimpan terenkripsi.',
+    },
+    {
+      icon: 'fileText',
+      title: 'Impor file',
+      desc: 'Ekspor CSV atau JSON dari sistem lama (Excel dapat diekspor sebagai CSV), petakan kolomnya, lalu periksa pratinjau sebelum satu baris pun ditulis.',
+    },
+    {
+      icon: 'rotateCcw',
+      title: 'Webhook masuk',
+      desc: 'Sistem lama mengirim peristiwa saat ada perubahan. Setiap kiriman diverifikasi tanda tangannya sebelum diterima.',
+    },
+  ],
+  steps: [
+    { no: '1', title: 'Hubungkan', desc: 'Uji koneksi lebih dulu. Tidak ada data yang berpindah sebelum Anda setuju.' },
+    { no: '2', title: 'Petakan', desc: 'Cocokkan kolom sumber dengan kolom Satu Alur, termasuk format Rupiah dan tanggal Indonesia.' },
+    { no: '3', title: 'Pindahkan bertahap', desc: 'Tenaga kerja dan katalog, lalu permintaan. Rollback mempertahankan baris yang sudah diedit atau dipakai.' },
+  ],
+  note: 'Integrasi ERP dan migrasi data tersedia untuk akun skala Enterprise. Pendekatan parallel running membuat dua sistem bisa dipakai bersamaan selama masa peralihan.',
+}
 
 export const ROADMAP = [
   {
@@ -125,8 +301,20 @@ export const FAQS = [
     a: 'Data disimpan di cloud yang aman. Setiap data terikat ke akun Anda, sehingga terpisah dari pengguna lain.',
   },
   {
+    q: 'Apa itu Layanan tambahan dan Tanpa limbah?',
+    a: 'Dua menu di grup Pendapatan. Layanan tambahan mengelola katalog add-on yang dijual bersama pekerjaan yang sudah ada, lengkap dengan harga, biaya, dan perkiraan serapan. Tanpa limbah mencatat pemborosan di lima aliran — waktu, perjalanan, bahan, pekerjaan ulang, air dan kimia — dalam Rupiah, lalu mengurutkan mana yang paling besar untuk ditutup lebih dulu.',
+  },
+  {
+    q: 'Apakah fitur Pertumbuhan memakai data pelanggan saya?',
+    a: 'Ya, dan hanya data milik akun Anda. Radar peluang membaca transaksi Anda sendiri untuk menemukan layanan rutin yang jatuh tempo atau pelanggan yang belum kembali. Pencari prospek memakai titik dan radius yang Anda tentukan, dan tidak mengirim pesan apa pun secara otomatis.',
+  },
+  {
     q: 'Bagaimana cara masuk ke Satu Alur?',
     a: 'Cukup dengan email. Kami mengirim kode sekali pakai (OTP) ke alamat Anda, jadi tidak ada kata sandi yang perlu diingat atau dibagikan.',
+  },
+  {
+    q: 'Bagaimana kalau saya butuh bantuan?',
+    a: 'Di dalam aplikasi ada menu Bantuan: kirim tiket berisi pertanyaan atau kendala, dan tim Satu Alur menjawab di thread yang sama. Status tiket terlihat jelas — Terbuka, Diproses, atau Selesai.',
   },
   {
     q: 'AI apa yang dipakai, dan apakah hasilnya bisa dipercaya?',

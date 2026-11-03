@@ -78,5 +78,5 @@ test('worker, mock and UI agree on ledger categories', async () => {
   const list = (src, re) => [...src.match(re)[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort()
   assert.deepEqual(list(worker, /LEDGER_CATEGORY_SET = new Set\(\[([^\]]+)\]/), ui)
   assert.deepEqual(list(mock, /const LEDGER_CATEGORIES = \[([^\]]+)\]/), ui)
-  assert.match(worker, /await assertFlowRules\(env, table, rows, uid\)/)
+  assert.match(worker, /await assertFlowRules\(env, table, rows, uid, \{ action: 'insert' \}\)/)
 })

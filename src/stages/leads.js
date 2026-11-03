@@ -461,7 +461,8 @@ export async function render(container, ctx = {}) {
     if (signal?.aborted) return
     const view = state.point ? { ...state.point, zoom: 13 } : DEFAULT_VIEW
     const anim = !reducedMotion()
-    map = L.map(mapEl, { zoomControl: true, attributionControl: true, zoomAnimation: anim, fadeAnimation: anim, markerZoomAnimation: anim, scrollWheelZoom: true })
+    // Leaflet's delayed zoom transition can outlive this SPA view's teardown.
+    map = L.map(mapEl, { zoomControl: true, attributionControl: true, zoomAnimation: false, fadeAnimation: anim, markerZoomAnimation: false, scrollWheelZoom: true })
       .setView([view.lat, view.lon], view.zoom)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,

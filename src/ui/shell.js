@@ -24,6 +24,8 @@ import * as StageLeads from '../stages/leads.js'
 import * as StageAIAssistant from '../stages/ai-assistant.js'
 import * as StageSocialMedia from '../stages/social-media.js'
 import * as StagePertumbuhan from '../stages/pertumbuhan.js'
+import * as StageVas from '../stages/vas.js'
+import * as StageZeroWaste from '../stages/zero-waste.js'
 import * as Office from '../stages/office/index.js'
 import * as StageSupport from '../support/page.js'
 import * as StagePlan from '../quota/page.js'
@@ -51,6 +53,14 @@ export const STAGES = [
   { key: 'report', num: '06', label: 'Laporan', icon: 'chart',
     hint: 'Angka periode terpilih dari buku besar, plus penjelasan AI.', module: StageReport,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
+  { key: 'vas', group: 'income', label: 'Layanan tambahan', sub: 'VAS & katalog', icon: 'layers',
+    hint: 'Dua cara menambah pendapatan: jual layanan tambahan ke pekerjaan yang sudah ada, dan hentikan kebocoran biaya. Di sini Anda menemukan peluang VAS, mengelola katalognya, lalu membahas rencananya bersama lima tim AI.',
+    module: StageVas,
+    action: { label: 'Cek kebocoran', iconRight: 'arrowRight', to: 'zero-waste' } },
+  { key: 'zero-waste', group: 'income', label: 'Tanpa limbah', sub: 'Lima sumber pemborosan', icon: 'sprout',
+    hint: 'Ukur waktu menganggur, perjalanan, bahan, pekerjaan ulang, serta air dan kimia dalam Rupiah. Catat temuan, jalankan tindakannya, dan lihat seberapa dekat Anda ke nol kerugian.',
+    module: StageZeroWaste,
+    action: { label: 'Tambah pendapatan', iconRight: 'arrowRight', to: 'vas' } },
   { key: 'radar', group: 'growth', label: 'Radar peluang', sub: 'Peluang dari transaksi', icon: 'radar',
     hint: 'Peluang dari transaksi Anda sendiri: layanan rutin jatuh tempo, pelanggan yang menghilang, penawaran tertahan, dan musim ramai.', module: StageRadar,
     action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
@@ -167,6 +177,7 @@ export function renderShell(root, ctx) {
 
   const [dash, ...rest] = stages
   const flow = rest.filter((s) => !s.group)
+  const income = rest.filter((s) => s.group === 'income')
   const growth = rest.filter((s) => s.group === 'growth')
   const help = rest.filter((s) => s.group === 'help')
   const navLists = staff
@@ -177,6 +188,8 @@ export function renderShell(root, ctx) {
       el('ol', { className: 'flow-list flow-list-top' }, navItem(dash)),
       el('div', { className: 'side-label' }, el('span', {}, 'Alur kerja'), el('span', { className: 'side-label-count tnum' }, '6 tahap')),
       el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
+      el('div', { className: 'side-label' }, el('span', {}, 'Pendapatan'), el('span', { className: 'side-label-count tnum' }, '2 cara')),
+      el('ol', { className: 'flow-list flow-list-income' }, income.map(navItem)),
       el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
       el('ol', { className: 'flow-list flow-list-growth' }, growth.map(navItem)),
       el('ol', { className: 'flow-list flow-list-help' }, help.map(navItem))]
@@ -375,7 +388,8 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' || stage.group === 'help' ? 'Satu Alur' : stage.group ? 'Pertumbuhan' : `Tahap ${stage.num}`
+    const groupLabel = { income: 'Pendapatan', growth: 'Pertumbuhan', help: 'Satu Alur' }[stage.group]
+    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' ? 'Satu Alur' : groupLabel || `Tahap ${stage.num}`
     crumbTitle.textContent = stage.label
     crumbTip.replaceChildren(stage.hint ? infoTip(stage.hint, { label: `Tentang ${stage.label}` }) : '')
     const a = stage.action

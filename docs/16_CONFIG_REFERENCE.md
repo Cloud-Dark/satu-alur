@@ -180,3 +180,9 @@ Akun disimpan di tabel D1 `staff_accounts` (hanya hash PBKDF2-SHA256 + salt, buk
 | `npm run staff -- list --remote` | Daftar akun, status, kunci, dan login terakhir. |
 
 Tanpa `--remote` perintah memakai D1 lokal. Username: 3–32 karakter huruf kecil, angka, `.`, `_`, `-`. Setelah 5 kali salah password, akun terkunci 15 menit. Jalankan migrasi 0007 sebelum membuat akun pertama.
+
+## Integrasi ERP Enterprise
+
+Secret `MCP_ENCRYPTION_KEY` mengenkripsi kredensial konektor dengan AES-GCM. Setel melalui `npx wrangler secret put MCP_ENCRYPTION_KEY`; gunakan nilai acak kuat minimal 16 karakter. Untuk lokal, simpan di `.dev.vars` yang tidak di-commit. Tanpa kunci, operasi yang menyimpan/membuka kredensial ditolak `503`; konektor file tetap berfungsi.
+
+Terapkan seluruh migrasi D1 (`0009`, `0010`, `0011`) sebelum deploy. Plan pengguna berada di `user_flags.plan`; hanya `enterprise` membuka integrasi. Tidak ada scheduler ERP otomatis atau bridge database dalam rilis ini. Lihat [kontrak API](API.md#mcp-konektor-erp-dan-migrasi).

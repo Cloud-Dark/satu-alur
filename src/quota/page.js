@@ -10,6 +10,7 @@ import { getMyPlan, redeemVoucher } from './api.js'
 import { getPlans } from '../business/api.js'
 import { renderPlanCard } from '../business/plan-card.js'
 import { rupiah, FEATURES } from './rules.js'
+import { planLabel, canUse } from '../business/plan-access.js'
 
 const { el } = C
 
@@ -57,6 +58,10 @@ export async function render(container, ctx) {
           el('p', { className: 'qt-plan-name' }, s.plan.name || 'Free', s.demo ? C.tag('Akun demo', 'accent') : ''),
           el('p', { className: 'muted small' }, [until, `kuota diperbarui ${C.formatDate(s.resets_on)}`].filter(Boolean).join(' · '))),
         el('div', { className: 'qt-credit' }, el('span', { className: 'muted small' }, 'Saldo AI'), el('strong', { className: 'tnum' }, rupiah(s.credit_idr)))),
+      // Business scale (sole/ukm/enterprise) gates features; it is not the Free/Lite/Pro paket above.
+      ctx.user?.plan ? el('p', { className: 'muted small qt-tier' }, `Skala akun: ${planLabel(ctx.user.plan)}. `,
+        canUse(ctx.user.plan, 'erpIntegration') ? 'Integrasi ERP terbuka.' : 'Integrasi ERP terbuka untuk akun skala Enterprise.',
+        ' Skala akun tidak mengubah kuota AI.') : '',
       s.lapsed ? el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' }, el('p', {}, 'Masa paket Anda sudah berakhir, jadi kuota kembali ke paket Free.'))) : '',
       s.demo ? el('p', { className: 'muted small' }, 'Akun demo memakai AI tanpa batas untuk presentasi; pemakaian tetap tercatat.') : '',
       el('ul', { className: 'qt-rows' }, ...s.usage.map(usageBar)))

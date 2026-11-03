@@ -13,8 +13,12 @@
 
 ## Model
 
+- **Two kinds of "plan" (keep them apart):**
+  - *Skala akun* (tier): `user_flags.plan` = sole/ukm/enterprise, from Zulfikar's migration 0010 and `src/business/plan-access.js`. It opens or locks features (today only Integrasi ERP, Enterprise). It never changes AI quotas.
+  - *Paket* (subscription): Free/Lite/Pro in `customer_accounts.plan_id` → `subscription_plans`. It sets the monthly AI quotas below and is what vouchers grant.
+  - UI copy says "skala akun" for the first and "paket" for the second; the "Paket & kuota" page shows both lines.
 - **Numbers live in one place:** `src/quota/rules.js` holds feature keys, prices, the Free fallback and all validators. The Worker (`worker/quota.js`) and the demo-mode client (`src/quota/api.js`) share it.
-- **Plan quota:** `subscription_plans.quota_json` (new column in migration 0008) maps feature to monthly limit.
+- **Plan quota:** `subscription_plans.quota_json` (new column in migration 0012) maps feature to monthly limit.
   - `null` or `-1` means unlimited. A missing key falls back to `FREE_QUOTA`.
   - Staff edit it in Kantor › Paket langganan › "Kuota AI per bulan".
   - `limits_json` stays the display text on the pricing cards.
@@ -37,12 +41,15 @@
 | `radar` | Radar peluang explanation | Rp500 |
 | `advisor` | Penasihat AI messages, Superpowers general/analyst chats, Pertumbuhan | Rp300 |
 | `social` | Media sosial AI content | Rp500 |
+| `income` | Layanan tambahan & Tanpa limbah optimisation (one run = 5 team calls + 1 lead call, each counted) | Rp500 |
 
-| Plan | offer | report | leads | radar | advisor | social |
-|---|---:|---:|---:|---:|---:|---:|
-| Free (trial) | 10 | 10 | 10 | 10 | 5 | 10 |
-| Lite | 50 | 20 | 20 | 30 | 100 | 60 |
-| Pro | ∞ | ∞ | 100 | ∞ | 500 | ∞ |
+| Plan | offer | report | leads | radar | advisor | social | income |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Free (trial) | 10 | 10 | 10 | 10 | 5 | 10 | 10 |
+| Lite | 50 | 20 | 20 | 30 | 100 | 60 | 30 |
+| Pro | ∞ | ∞ | 100 | ∞ | 500 | ∞ | ∞ |
+
+`income` counts AI calls, not runs: Free 10 ≈ 1 full optimisation run, Lite 30 = 5 runs.
 
 ## Enforcement (`POST /api/llm/chat`)
 
@@ -54,7 +61,7 @@
 3. **Refund:** if the model never starts (AI.run throws), the call is given back (count −1, or credit + refund entry).
 4. **Demo accounts** (`DEMO_EMAILS`) are never refused, for the competition demo, but their usage is still counted (1 write) and shown as "tanpa batas".
 5. **Guest quota:** there is no unauthenticated AI path, so `GUEST_TRIES = 3` is defined but unused.
-6. **Before migration 0008:** if `quota_json` or the tables are missing, `meter()` logs and lets the call through unmetered instead of breaking AI.
+6. **Before migration 0012:** if `quota_json` or the tables are missing, `meter()` logs and lets the call through unmetered instead of breaking AI.
 
 **Client side:**
 - On a 402, `src/http-cloud.js` throws `QuotaError` and fires `satualur:quota`.
@@ -87,7 +94,7 @@
 
 ## Rollout (production D1 is on the free tier: 100k rows written/day)
 
-1. Merge, then `npm run db:migrate:remote`. This applies `0003_workers.sql`, `0007_social_meta.sql` and `0008_quota_vouchers.sql`; production currently stops at 0006.
+1. Merge, then `npm run db:migrate:remote`. This applies `0003_workers.sql`, `0007_social_meta.sql` and Zulfikar's `0008`–`0011`, then `0012_quota_vouchers.sql`; production currently stops at 0006.
 2. **Either** apply `seeds/office.sql` remotely (≈310 writes, sample customers included) **or** create the three plans in Kantor › Paket langganan and fill in "Kuota AI per bulan". Without a `free` plan row, everyone gets the built-in `FREE_QUOTA`.
 3. `npm run staff -- add <username> --remote`, then create real vouchers in Kantor › Voucher.
 4. Deploy. Until step 1 runs, AI keeps working unmetered (logged).

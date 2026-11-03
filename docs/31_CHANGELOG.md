@@ -1,12 +1,93 @@
 # Changelog
 
 > Status: Draft
-> Terakhir diperbarui: 2026-10-29
+> Terakhir diperbarui: 2026-11-02
 > Pemilik: _TBD_
 
 Format mengikuti [Keep a Changelog](https://keepachangelog.com/id-ID/1.1.0/). Versi mengikuti `package.json` (saat ini `0.1.0`); penetapan nomor versi rilis: _TBD_.
 
 ## [Unreleased]
+
+### 2026-11-02 - Integrasi ERP Enterprise
+
+- Konektor REST, CSV/JSON, dan webhook masuk; pemetaan, pratinjau, sinkronisasi upsert, log, dan dead letter.
+- Migrasi data master (`workers`, `vas_items`) dan permintaan (`requests`). Impor relasional/historis, database bridge, XLSX/XML, sinkronisasi keluar, dan cron ERP otomatis belum tersedia.
+- Pemeriksaan Enterprise di UI dan Worker; webhook memeriksa entitlement dan suspensi pemilik saat event diterima.
+- Kredensial wajib terenkripsi AES-GCM. Kunci hilang, kunci salah, atau format plaintext lama menghasilkan `503`; tidak ada fallback plaintext.
+- Payload konfigurasi klien dinormalisasi tanpa mengekspos rahasia. Basic/bearer token dan PATCH tanpa `enabled` bekerja sesuai kontrak.
+- ID eksternal dari pemetaan tersimpan digunakan saat upsert agar impor ulang tidak menduplikasi data.
+- Dry run tidak mengubah progres atau data. INSERT domain, referensi, dan jurnal migrasi ditulis dalam satu batch transaksional.
+- Rollback memakai jurnal per migrasi dan mempertahankan baris yang berubah/dipakai serta baris dari run lain. Update pada data lama tidak dibatalkan.
+- Wizard migrasi, callback select, unggah sumber, dan alur pratinjau diperbaiki; regresi browser mencakup alur ini.
+- Styling halaman kontak diperbaiki; landing menjelaskan integrasi Enterprise. Dokumen arsitektur, integrasi, UAT, dan video story pack ditambahkan.
+- CI menjalankan unit/API tests, regresi workerd/D1 lokal, build, dan pemeriksaan whitespace PR.
+
+**Rollout:** terapkan `0009_mcp.sql`, `0010_user_plan.sql`, dan `0011_mcp_migration_safety.sql` sebelum deploy, lalu setel `MCP_ENCRYPTION_KEY`. Kontrak dan batas implementasi ada di [API.md](API.md#mcp-konektor-erp-dan-migrasi).
+
+### 2026-10-31 - Landing menampilkan Pendapatan dan Pertumbuhan
+
+Landing sebelumnya hanya bercerita tentang enam tahap alur. Dua grup menu terbaru — sumber nilai jual yang paling mudah dijelaskan ke calon pelanggan — tidak terlihat sama sekali. Sekarang keduanya punya bagian sendiri.
+
+#### Ditambahkan
+- Bagian **Pendapatan** (`#pendapatan`): dua kartu mesin pendapatan — **Layanan tambahan** (katalog add-on dengan batang serapan per item) dan **Tanpa limbah** (cincin persentase bebas limbah plus tiga kebocoran terbesar) — lalu strip **Ruang optimasi** dengan lima chip tim AI dan pil "Pimpinan optimasi". Semua angka pratinjau diberi label "Contoh".
+- Bagian **Pertumbuhan** (`#pertumbuhan`): empat kartu menu (Radar peluang, Rekomendasi & prediksi, Pencari prospek, Media Sosial) dan dua kartu pendamping (Penasihat AI, AI Superpowers), ditutup catatan bahwa Media Sosial memerlukan Halaman Facebook dan Instagram Bisnis.
+- Navigasi header dan menu seluler bertambah "Pendapatan" dan "Pertumbuhan"; "Roadmap" tetap ada di halaman dan footer tetapi keluar dari navigasi utama agar tetap enam tautan.
+- Ticker kemampuan diperluas dari 11 menjadi 16 pil (katalog add-on, lima aliran pemborosan, ruang optimasi lima tim, radar peluang, pencari prospek, media sosial).
+- FAQ baru: "Apa itu Layanan tambahan dan Tanpa limbah?" dan "Apakah fitur Pertumbuhan memakai data pelanggan saya?".
+
+#### Diubah
+- Statistik di bagian Alur kerja menjadi **6 tahap kerja · 5 tim AI · 2 grup tambahan**, dan paragrafnya menyebut bahwa dua grup menu memakai data alur untuk menambah pendapatan dan mencari pertumbuhan.
+- Hero: subjudul menyebut kedua mesin baru; poin di bawah CTA menambahkan "Pendapatan & pertumbuhan sudah aktif".
+- Kolom footer "Produk" menautkan kedua bagian baru.
+- Hero memakai sumber default yang sama dengan editor, sehingga subjudul baru benar-benar tampil. Klaim serapan VAS diperjelas sebagai perkiraan yang diatur pengguna; prediksi diberi keterangan data demonstrasi.
+- Angka dan jawaban ilustratif Pertumbuhan diberi label "Contoh"; persyaratan akun sosial menjelaskan Facebook, Instagram, dan Threads secara terpisah.
+
+#### Pengujian
+- `tests/e2e/landing.spec.cjs`: 81 pemeriksaan (dari 38), termasuk keberadaan kedua bagian, jumlah kartu, lima chip tim, baris pratinjau, dan navigasi anchor ke `#pendapatan`.
+- Kasus UAT TC-LND-11 dan TC-LND-12 ditambahkan; TC-LND-01 diperbarui.
+- Total 368 tes Node dan 122 pemeriksaan browser landing/site lulus. Chromium menguji 1440, 1024, 960, 959, 390, dan 320 px pada tema terang/gelap, termasuk reduced motion, overflow, dan benturan navigasi. Build produksi berhasil dengan peringatan ukuran bundel.
+
+### 2026-10-31 - Halaman kontak didesain ulang
+
+Halaman publik `#/kontak` sebelumnya memakai komponen formulir yang bergantung pada `.app-shell` — padahal halaman publik tidak memuat shell aplikasi. Akibatnya seluruh input, label, dan tombol tampil dengan gaya browser bawaan: tanpa border, tanpa fokus ring, dan tanpa layout card.
+
+#### Diperbaiki
+- Desain ulang layout menjadi **dua kolom pada desktop** (intro di kiri, kartu formulir di kanan) dan **tumpuk pada seluler**.
+- Tambah stylesheet `.contact-page` penuh di `landing.css`: field label dengan badge "WAJIB", input dengan border, hover, dan fokus ring; textarea memenuhi lebar; tombol primer penuh lebar; pesan sukses dengan ikon cek hijau dan latar hijau muda.
+- Semua style tidak bergantung `.app-shell`, menggunakan token desain yang sama dengan halaman publik lainnya, dan mendukung tema gelap lewat `prefers-color-scheme`.
+
+#### Ditambahkan
+- Dua kolom grid pada lebar ≥840 px; form 2-kolom pada ≥560 px dengan `Pesan` dan tombol melebar penuh lewat `.field-full`.
+
+### 2026-10-31 - Persistensi dan validasi produksi Pendapatan
+
+Dua menu Pendapatan (**Layanan Tambahan** dan **Tanpa Limbah**) sebelumnya hanya UI di atas mock tanpa tabel D1, tanpa validasi server, dan tanpa pencarian. Perubahan ini menambahkan penyimpanan D1 dan validasi server untuk keduanya.
+
+#### Ditambahkan
+- Migrasi `0008_pendapatan.sql`: tabel `vas_items` dan `waste_entries` dengan CHECK constraint yang mencerminkan aturan aplikasi (`saved <= monthly_loss`, enum kategori/aliran/status, batas uang), indeks `(owner_id, created_at)` dan `(owner_id, stream)`, serta kolom `ledger_entries.vas_item_id`.
+- `src/pendapatan/rules.js`: satu sumber aturan untuk formulir, Worker, dan mock — enum, batas panjang, batas uang, `validateVasItem`, `validateWasteEntry`, `assertWasteInvariants`, `withWasteCompletion`, `splitDuplicates`, `assertImportSize`. Galat membawa `validation: true` sehingga Worker memetakannya ke 400, bukan 500.
+- Worker `/api/db`: `vas_items` dan `waste_entries` masuk whitelist; insert **dan** update divalidasi (update terhadap baris hasil gabungan), kuota 500 item katalog dan 2000 temuan per pemilik, `updated_at` diisi server. `assertFlowRules` diekspor untuk pengujian kontrak.
+- Pencarian (dengan debounce), filter status/aliran, paginasi, dan ekspor CSV di tab Katalog (VAS) dan Tindakan (Tanpa Limbah).
+- Impor massal sadar duplikat: kotak "Lewati item yang sudah ada" dengan pratinjau `N item baru · M sudah ada dan dilewati`; baris duplikat dilewati, bukan digandakan.
+- Tombol "Coba lagi" pada keadaan galat di kedua tahap; data yang gagal dimuat tidak lagi menjadi layar kosong.
+- Pembukuan: pemilih add-on opsional (`vas_item_id`) untuk baris pendapatan, sehingga "Porsi VAS" di dasbor diukur dari data, bukan diasumsikan.
+
+#### Diperbaiki
+- `C.button` mendapat opsi `dismiss`, dan `C.modal` menutup dialog ketika tombol "Batal" diklik. Sebelumnya tombol dirender `type="button"` di dalam form `method="dialog"` sehingga batal tidak melakukan apa pun. Handler tingkat dialog yang memanggil `preventDefault()` (konfirmasi form kotor) tetap menang.
+- `percentInt` mengembalikan `NaN` untuk teks non-numerik, sehingga `"abc"` ditolak alih-alih diam-diam menjadi 0.
+- Kolom UPDATE SQL disusun sesudah normalisasi menambahkan `saved`/`updated_at`, agar jumlah parameter tetap sesuai. Update temuan dibatasi ke satu `id`; constraint database juga menjaga temuan selesai selalu terhenti penuh.
+- Format uang negatif tidak lagi diubah menjadi positif; CSV melindungi teks yang bisa dibaca sebagai formula spreadsheet.
+- Riwayat dan proses optimasi dipisahkan per pengguna; riwayat lama tanpa pemilik tidak ditampilkan.
+
+#### Pengujian
+- Total 368 tes Node lulus, termasuk pengujian Worker melalui HTTP dengan SQLite asli setelah seluruh migrasi: UPDATE, isolasi pemilik, referensi VAS, dan invarian penghematan. Pengujian SQLite membutuhkan Node 22.13+; versi lama melewatinya.
+- Seluruh 44 pemeriksaan browser `pendapatan` lulus pada server Vite dengan backend mock, termasuk pemisahan riwayat akun dan pemilih VAS pembukuan. Build produksi berhasil dengan peringatan ukuran bundel. Seluruh sembilan migrasi berhasil pada D1 lokal terisolasi.
+- Dua kegagalan `flow` pada tahap Penugasan muncul identik pada commit PR sebelumnya (`1773d9f`) dan perubahan ini; kegagalan tersebut mendahului perubahan ini. Suite browser lengkap tidak dijalankan ulang.
+
+#### Catatan
+- Tabel baru butuh `npm run db:migrate:local` / `db:migrate:remote`; tanpa itu `/api/db` mengembalikan galat SQL untuk kedua tabel.
+- Jalankan migrasi remote sebelum men-deploy Worker/frontend; database produksi dan layanan AI langsung belum diuji dalam pemeriksaan ini.
+- Batas 100 baris per `insert` tetap berlaku; tempelan lebih besar ditolak dan perlu dibagi menjadi beberapa impor.
 
 ### 2026-10-29 - Publikasi Meta dan Kantor Satu Alur
 

@@ -13,7 +13,7 @@ import {
 import { requireAdmin } from './office.js';
 
 const nowIso = () => new Date().toISOString();
-// Before migration 0008 is applied these tables/columns don't exist; AI keeps working (logged) instead of breaking.
+// Before migration 0012 is applied these tables/columns don't exist; AI keeps working (logged) instead of breaking.
 const missingSchema = (err) => /no such (table|column)/i.test(String(err?.message));
 
 function validated(HttpError, fn) {

@@ -9,7 +9,7 @@
  * (tanpa kunci), akun pelanggan, pesan kontak, tiket bantuan, influencer, permintaan layanan,
  * kampanye, kuota AI per paket, voucher (paket / saldo AI / gabungan) beserta contoh penukaran.
  * Aman dijalankan ulang: setiap baris memakai id/kunci tetap dan upsert.
- * Butuh migrasi 0007_social_meta.sql dan 0008_quota_vouchers.sql. Lihat seeds/README.md.
+ * Butuh migrasi 0007_social_meta.sql dan 0012_quota_vouchers.sql. Lihat seeds/README.md.
  */
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -150,7 +150,7 @@ const PLANS = [
       { label: 'Penasihat AI', value: '5 pesan per bulan' },
     ],
     // Trial quota (src/quota/rules.js FREE_QUOTA): try every AI feature; the advisor costs most, so fewer messages.
-    quota: { offer: 10, report: 10, leads: 10, radar: 10, advisor: 5, social: 10 },
+    quota: { offer: 10, report: 10, leads: 10, radar: 10, advisor: 5, social: 10, income: 10 },
     features: ['Alur kerja 6 tahap lengkap', 'Radar peluang (ringkasan)', 'Media sosial: tulis konten manual', 'Data aman di cloud', 'Tidak termasuk saldo AI'],
     cta_label: 'Mulai gratis', cta_kind: 'signup', sort: 1,
   },
@@ -165,7 +165,7 @@ const PLANS = [
       { label: 'Pencari prospek', value: '20 pencarian per bulan' },
       { label: 'Penasihat AI', value: '100 pesan per bulan' },
     ],
-    quota: { offer: 50, report: 20, leads: 20, radar: 30, advisor: 100, social: 60 },
+    quota: { offer: 50, report: 20, leads: 20, radar: 30, advisor: 100, social: 60, income: 30 },
     features: ['Semua fitur Free', 'Radar peluang lengkap', 'Jadwal konten media sosial', 'Kelola petugas lapangan', 'Ekspor laporan', 'Tidak termasuk saldo AI'],
     cta_label: 'Pilih Lite', cta_kind: 'signup', sort: 2,
   },
@@ -181,7 +181,7 @@ const PLANS = [
       { label: 'Penasihat AI', value: '500 pesan per bulan' },
     ],
     // null = unlimited; the two most expensive features keep a ceiling.
-    quota: { offer: null, report: null, leads: 100, radar: null, advisor: 500, social: null },
+    quota: { offer: null, report: null, leads: 100, radar: null, advisor: 500, social: null, income: null },
     features: ['Semua fitur Lite', 'Publikasi ke Facebook, Instagram, dan Threads', 'Permintaan kolaborasi influencer', 'Permintaan iklan Meta', 'Prioritas bantuan', 'Tidak termasuk saldo AI'],
     cta_label: 'Pilih Pro', cta_kind: 'signup', sort: 3,
   },
@@ -422,7 +422,7 @@ const header = `-- =============================================================
 -- Satu Alur: DATA CONTOH (DUMMY) untuk Kantor Satu Alur. Semua nama, email, telepon, dan angka FIKTIF.
 -- Dibuat oleh scripts/seed-office.mjs. Jangan edit manual; ubah skripnya lalu jalankan ulang.
 -- ${rowCount} baris; perkiraan D1 rows written <= ${estimate} (termasuk entri indeks).
--- Butuh migrasi 0007_social_meta.sql dan 0008_quota_vouchers.sql. Aman dijalankan ulang (upsert dengan id/kunci tetap).
+-- Butuh migrasi 0007_social_meta.sql dan 0012_quota_vouchers.sql. Aman dijalankan ulang (upsert dengan id/kunci tetap).
 -- Tidak berisi akun staf atau kunci pembayaran. Buat staf dengan: npm run staff -- add <username>
 -- =====================================================================
 `

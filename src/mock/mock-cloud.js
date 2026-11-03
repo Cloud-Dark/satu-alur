@@ -4,9 +4,30 @@
  * (VITE_USE_MOCK=true); production talks to the Worker + D1.
  */
 import { isBlocked, isStaffEmail, SUSPENDED_MESSAGE, AUTH_NOTICE_KEY } from '../customers/rules.js'
+import {
+  validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS,
+} from '../pendapatan/rules.js'
+import { demoAccount } from '../auth/demo-accounts.js'
+import { normalizePlan } from '../business/plan-access.js'
 
 const STORAGE_KEY = 'satualur_mock_v1'
 const OTP_STORE = 'satualur_mock_otp'
+const MOCK_PLAN_KEY = 'satualur_plan'
+
+/**
+ * Tier for a mock session. Demo accounts follow their seeded scale, any other
+ * dev/e2e account is Enterprise so the whole product is reviewable without a
+ * backend, and `localStorage.satualur_plan` overrides both — that is how the
+ * e2e suite exercises the locked state.
+ */
+function mockPlanFor(user) {
+  try {
+    const forced = localStorage.getItem(MOCK_PLAN_KEY)
+    if (forced) return normalizePlan(forced)
+  } catch { /* storage unavailable */ }
+  const account = demoAccount(user?.email)
+  return account ? normalizePlan(account.scale) : 'enterprise'
+}
 
 function loadState() {
   try {
@@ -25,6 +46,21 @@ function ensureTable(name) {
 // Mirrors assertFlowRules in worker/index.js so tests catch the same mistakes.
 const LEDGER_CATEGORIES = ['pendapatan', 'biaya_tenaga', 'biaya_bahan', 'biaya_transport', 'biaya_lain']
 function flowRuleError(table, rows) {
+  // Pendapatan tables: same validators the Worker runs (src/pendapatan/rules.js),
+  // plus the per-owner ceiling. Returns the message instead of throwing.
+  if (table === 'vas_items' || table === 'waste_entries') {
+    try {
+      const existing = ensureTable(table).length
+      const cap = table === 'vas_items' ? LIMITS.items : LIMITS.findings
+      if (existing + rows.length > cap) return `Batas ${cap} ${table === 'vas_items' ? 'item katalog' : 'temuan'} tercapai (${existing} tersimpan). Hapus yang tidak terpakai lebih dulu.`
+      for (const r of rows) {
+        const clean = table === 'vas_items' ? validateVasItem(r) : withWasteCompletion(validateWasteEntry(r))
+        if (table === 'waste_entries') assertWasteInvariants(clean)
+        Object.assign(r, clean)
+      }
+      return null
+    } catch (err) { return err.message }
+  }
   if (table === 'ledger_entries') {
     const revenueFor = new Set()
     for (const r of rows) {
@@ -110,7 +146,7 @@ const mockAuth = {
     }
     refuseSuspended(user)
     startSession(user)
-    return { data: { user }, error: null }
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
   async demoLogin({ email }) {
@@ -123,7 +159,7 @@ const mockAuth = {
     }
     refuseSuspended(user)
     startSession(user)
-    return { data: { user }, error: null }
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
   /**
@@ -143,7 +179,7 @@ const mockAuth = {
       persist()
     }
     startSession(user, { is_staff: true })
-    return { data: { user }, error: null }
+    return { data: { user: { ...user, plan: mockPlanFor(user) } }, error: null }
   },
 
   async getSession() {
@@ -162,7 +198,8 @@ const mockAuth = {
     // Same rule as the Worker: only a staff-login session is an admin.
     if (_session) {
       const { is_staff, ...pub } = _session
-      return { data: { ...pub, is_admin: is_staff === true }, error: null }
+      const user = { ...pub.user, plan: mockPlanFor(pub.user) }
+      return { data: { ...pub, user, is_admin: is_staff === true }, error: null }
     }
     return { data: null, error: { message: 'Belum masuk.' } }
   },
@@ -286,6 +323,8 @@ const mockDatabase = {
           id: Date.now() + Math.floor(Math.random() * 100000),
           owner_id: _session?.user?.id ?? 'anon',
           created_at: new Date().toISOString(),
+          // D1 fills this from the column default; the mock has to do it here.
+          ...(table === 'vas_items' || table === 'waste_entries' ? { updated_at: new Date().toISOString() } : {}),
           ...item,
         }))
         ensureTable(table).push(...created)
@@ -298,18 +337,33 @@ const mockDatabase = {
       if (builder._update) {
         const bad = ['id', 'owner_id'].find((c) => c in builder._update)
         if (bad) return resolve({ data: null, error: { message: `Kolom tidak boleh diubah: ${bad}` } })
+        const matches = (row) => filters.every(f => (f.op === 'eq' ? row[f.col] == f.val : true))
+        const targets = ensureTable(table).filter(matches)
+        let patch = builder._update
+        if (table === 'vas_items' || table === 'waste_entries') {
+          try {
+            patch = {
+              ...patch,
+              ...(table === 'vas_items' ? validateVasItem(patch, { partial: true }) : validateWasteEntry(patch, { partial: true })),
+              updated_at: new Date().toISOString(),
+            }
+            if (table === 'waste_entries') {
+              if (!filters.some((f) => f.op === 'eq' && f.col === 'id' && Number.isSafeInteger(Number(f.val)) && Number(f.val) > 0)) {
+                throw new Error('Update temuan memerlukan filter id tunggal.')
+              }
+              for (const row of targets) {
+                const merged = 'status' in patch || 'monthly_loss' in patch
+                  ? withWasteCompletion({ ...row, ...patch }) : { ...row, ...patch }
+                assertWasteInvariants(merged)
+                if ('status' in patch || 'monthly_loss' in patch) patch.saved = merged.saved
+              }
+            }
+          } catch (err) { return resolve({ data: null, error: { message: err.message } }) }
+        }
         let affected = 0
-        ensureTable(table).forEach((row, i) => {
-          if (filters.every(f => {
-            if (f.op === 'eq') return row[f.col] == f.val
-            return true
-          })) {
-            Object.assign(row, builder._update)
-            affected++
-          }
-        })
+        for (const row of targets) { Object.assign(row, patch); affected++ }
         persist()
-        return resolve({ data: affected > 0 ? [builder._update] : [], error: null })
+        return resolve({ data: affected > 0 ? [patch] : [], error: null })
       }
       if (builder._delete) {
         const before = ensureTable(table).length
@@ -955,6 +1009,134 @@ function schemaJson(responseFormat) {
 
 const lastUserText = (messages) => [...messages].reverse().find(m => m.role === 'user')?.content || ''
 
+/* --- Ruang optimasi: five teams + lead, grounded in the injected numbers --- */
+
+function briefFacts(ctx) {
+  const grab = (label) => (ctx.match(new RegExp(`${label}:\\s*([^\\n]+)`))?.[1] || '').trim()
+  const money = (label) => {
+    const raw = grab(label)
+    const n = raw.match(/Rp\s?([\d.]+)/)?.[1]
+    return n ? `Rp${n}` : (raw || '—')
+  }
+  return {
+    scope: (/Cakupan:\s*([^\n]+)/.exec(ctx)?.[1] || 'pendapatan').trim(),
+    revenue: money('Pendapatan tercatat') !== '—' ? money('Pendapatan tercatat') : money('Pendapatan'),
+    avgJob: money('Rata-rata nilai pekerjaan') !== '—' ? money('Rata-rata nilai pekerjaan') : money('Rata-rata pekerjaan'),
+    loss: money('Kerugian tercatat'),
+    remaining: money('Sisa kerugian'),
+    active: grab('Item VAS aktif') || '—',
+    catalog: money('Potensi katalog') !== '—' ? money('Potensi katalog') : money('Potensi margin katalog'),
+    opps: grab('Peluang terdeteksi') || '—',
+    open: grab('Temuan terbuka') || '—',
+    freed: grab('Sudah terhenti') || '—',
+    biggest: grab('Sumber terbesar') || '—',    problem: (/Masalah yang ingin dipecahkan:\s*([^\n]+)/.exec(ctx)?.[1] || '').trim(),
+    target: (/Target tambahan pendapatan:\s*([^\n]+)/.exec(ctx)?.[1] || '').trim(),
+  }
+}
+
+function teamMockAnswer(team, ctx) {
+  const f = briefFacts(ctx)
+  const vas = /VAS/i.test(f.scope)
+  const head = f.problem ? `Brief Anda: "${f.problem.slice(0, 110)}".` : 'Brief ini saya baca dari angka yang tersedia.'
+
+  const bodies = {
+    kreatif: [
+      `${head} Tawaran Anda perlu satu nama yang bisa diucapkan pelanggan di telepon.`,
+      vas
+        ? '1. Beri nama paket dari hasilnya, bukan dari prosesnya: "AC Dingin Sepanjang Tahun", bukan "Perawatan Berkala". Paket ini menempel pada pekerjaan yang sudah ada, jadi tidak perlu kunjungan baru.'
+        : '1. Beri nama program dari hasil yang dirasakan: "Nol Kerja Ulang", bukan "Perbaikan SOP". Tim lapangan lebih patuh pada janji yang bisa dijelaskan ke pelanggan.',
+      vas
+        ? `2. Isi paket: tiga kunjungan ringan plus satu pemeriksaan darurat, dijual sebagai satu harga bulanan. Dengan rata-rata pekerjaan ${f.avgJob}, harga bulanan sepertiga dari nilai itu terasa ringan.`
+        : `2. Bungkus setiap temuan menjadi satu kartu kerja: sumber, kerugian per bulan, dan satu tindakan. Dengan sisa ${f.remaining} per bulan, satu kartu per minggu cukup untuk menutup sebagian besar kebocoran.`,
+      '3. Hapus satu hal: daftar harga bertingkat yang membuat pelanggan bertanya. Satu paket, satu harga, satu alasan.',
+      '**Risiko** Nama yang terlalu pintar justru menambah penjelasan; uji dulu pada lima pelanggan lama.',
+    ],
+    pemasaran: [
+      `${head} Permintaan tambahan paling murah datang dari pelanggan yang sudah membayar Anda bulan ini.`,
+      vas
+        ? `1. Tawarkan pada momen terbaik: 10 menit sebelum pekerjaan selesai, saat pelanggan melihat hasilnya. Tingkat pasang di momen ini biasanya dua kali lipat dibanding pesan sehari kemudian.`
+        : `1. Jadikan penghematan sebagai pesan ke pelanggan, bukan rahasia internal: "kami tidak menaikkan harga karena pemborosan kami turun". Ini alasan retensi yang jujur.`,
+      vas
+        ? `2. Dari ${f.opps} peluang yang terdeteksi, hubungi yang pelanggannya berulang lebih dulu lewat WhatsApp. Satu pesan, satu tawaran, tanpa lampiran.`
+        : `2. Minta setiap pelanggan menilai kebersihan dan ketepatan waktu setelah pekerjaan. Ulasan yang menyebut "tidak ada kunjungan ulang" adalah bukti yang menjual.`,
+      vas
+        ? `3. Anggarkan biaya per pesan mendekati nol: WhatsApp tanpa iklan. Bila target ${f.target || 'belum ditetapkan'} ingin dikejar, tambahan berbayar baru masuk setelah 20 percakapan pertama terbukti.`
+        : `3. Kanal termurah adalah jadwal: kirim pengingat servis ke pelanggan yang belum kembali, karena biaya akuisisinya nol.`,
+      '**Risiko** Menawarkan tambahan ke pelanggan yang baru komplain akan terasa memeras; saring daftar dulu.',
+    ],
+    keuangan: [
+      `${head} Saya hitung dari angka yang ada: pendapatan ${f.revenue}, rata-rata pekerjaan ${f.avgJob}.`,
+      vas
+        ? `1. Harga minimum sehat adalah biaya langsung ditambah 60%. Item dengan margin di bawah 25% sebaiknya dinaikkan atau dihentikan, karena menambah volume hanya menambah kerja.`
+        : `1. Sisa kerugian ${f.remaining} per bulan sama dengan pendapatan yang harus dicari lewat pekerjaan baru. Menutup kebocoran selalu lebih murah daripada menambah pesanan.`,
+      vas
+        ? `2. Untuk mencapai ${f.target || 'target yang Anda tulis'}, Anda perlu sekitar ${f.catalog !== '—' ? f.catalog : 'margin katalog'} margin tambahan per bulan, yaitu beberapa item terpasang pada pekerjaan yang sudah dijadwalkan.`
+        : `2. Bila separuh sisa kebocoran ditutup, laba naik tanpa satu pun pelanggan baru. Itu setara dengan menambah pendapatan sebesar angka yang sama pada margin tipikal usaha jasa.`,
+      vas
+        ? '3. Jangan beri diskon untuk mendorong pemasangan; beri bonus jangka waktu. Diskon memotong margin, bonus hanya menambah biaya satu kali.'
+        : '3. Setiap temuan harus punya angka kerugian yang bisa dipertanggungjawabkan. Temuan tanpa angka tidak masuk perhitungan target.',
+      '**Risiko** Angka kerugian yang terlalu optimistis membuat target 100% terlihat mustahil; pakai perkiraan bawah.',
+    ],
+    operasional: [
+      `${head} Saya lihat kapasitas, bukan hanya uang.`,
+      vas
+        ? `1. Tambahan ini menempel pada kunjungan yang sudah ada, jadi tidak menambah perjalanan. Perkiraan tambahan waktu 20–30 menit per pekerjaan; dengan dua teknisi, itu masih di dalam jam kerja normal.`
+        : `1. Tiga kebocoran terbesar biasanya berasal dari penyiapan bahan dan urutan rute. Keduanya bisa diperbaiki tanpa menambah orang: stok harian per tim dan pengurutan per zona.`,
+      vas
+        ? '2. Ubah SOP penutupan pekerjaan: sebelum pamit, teknisi menawarkan satu item dan mencatat jawabannya. Tanpa langkah ini, katalog tidak akan pernah terpasang.'
+        : '2. Wajibkan checklist digital dengan foto sebelum menutup pekerjaan. Ini menutup kebocoran kerja ulang hampir seluruhnya, karena masalah ketahuan di lokasi.',
+      vas
+        ? '3. Batasi katalog pada lima item teratas. Terlalu banyak pilihan membuat teknisi ragu dan pelanggan menunda.'
+        : `3. Untuk sumber terbesar (${f.biggest}), tetapkan satu ukuran mingguan: menit menunggu per pekerjaan. Angka tunggal lebih mudah dijaga daripada daftar panjang.`,
+      '**Risiko** Bila tim sedang penuh, tambahan ini akan dikerjakan tergesa-gesa dan memicu kerja ulang; mulai dari separuh kapasitas.',
+    ],
+    riset: [
+      `${head} Saya pisahkan yang diketahui dari yang diasumsikan.`,
+      `1. Fakta: pendapatan tercatat ${f.revenue}, rata-rata pekerjaan ${f.avgJob}${vas ? `, item aktif ${f.active}` : `, kerugian tercatat ${f.loss}, sudah terhenti ${f.freed}`}. Selebihnya masih asumsi, termasuk tingkat pasang dan biaya tambahan.`,
+      vas
+        ? '2. Ukur dulu satu hal minggu ini: dari 20 penawaran terakhir, berapa yang pelanggannya bertanya tentang layanan tambahan. Angka itu lebih berguna daripada proyeksi pasar.'
+        : `2. Ukur dulu satu hal minggu ini: waktu tunggu bahan per pekerjaan selama lima hari. Bila angkanya di bawah perkiraan, sumber terbesar (${f.biggest}) bukan prioritas.`,
+      `3. Angka paling rapuh adalah perkiraan kerugian bulanan, karena diisi dari ingatan. Satu minggu pencatatan nyata bisa mengubah urutan prioritas sepenuhnya.`,
+      '**Risiko** Bila pengukuran minggu pertama tidak dilakukan, seluruh rencana ini hanya dugaan yang dirapikan.',
+    ],
+  }
+
+  return (bodies[team] || bodies.kreatif).join('\n')
+}
+
+function leadMockAnswer(ctx) {
+  const f = briefFacts(ctx)
+  const vas = /VAS/i.test(f.scope)
+  const target = f.target && f.target !== 'belum ditentukan' ? f.target : (vas ? 'margin katalog tambahan' : f.remaining)
+  return [
+    '**Keputusan**',
+    vas
+      ? `Fokus pada satu paket tambahan yang menempel di pekerjaan yang sudah dijadwalkan, bukan menambah jenis layanan baru. Dengan rata-rata pekerjaan ${f.avgJob}, satu item bermargin sehat sudah cukup untuk menggerakkan target ${target}.`
+      : `Fokus pada ${['Tidak ada', '—'].includes(f.biggest) ? 'penyiapan bahan dan urutan rute' : f.biggest} lebih dulu, karena di situ kebocoran terbesar dan perbaikannya tidak butuh biaya. Target ${target} dicapai dengan menutup kebocoran, bukan mencari pelanggan baru.`,
+    '',
+    '**Rencana 3 langkah**',
+    vas
+      ? `1. **Tim Kreatif** menyelesaikan nama dan isi satu paket, disetujui **Tim Keuangan** pada batas margin 60%. Tenggat 3 hari. Dampak: satu tawaran yang bisa diucapkan teknisi tanpa membaca brosur.`
+      : `1. **Tim Operasional** memasang checklist penutupan pekerjaan dengan foto. Tenggat 5 hari. Dampak: menutup kebocoran kerja ulang yang tercatat ${f.remaining ? 'sebagian besar dari ' + f.remaining : 'paling besar'}.`,
+    vas
+      ? `2. **Tim Marketing** menguji tawaran itu pada 20 pelanggan berulang lewat WhatsApp. Tenggat 7 hari. Dampak: angka tingkat pasang nyata menggantikan asumsi.`
+      : `2. **Tim Operasional** mengurutkan jadwal per zona selama seminggu penuh. Tenggat 7 hari. Dampak: biaya perjalanan turun tanpa menambah jam kerja.`,
+    vas
+      ? `3. **Tim Keuangan** meninjau margin setelah 20 percobaan dan menghentikan item yang tidak terpasang. Tenggat 14 hari. Dampak: katalog bersih, potensi ${f.catalog} per bulan menjadi realistis.`
+      : `3. **Tim Keuangan** menetapkan satu angka mingguan yang dipantau: sisa kerugian per bulan. Tenggat 14 hari. Dampak: target 100% punya pengukur, bukan hanya niat.`,
+    '',
+    '**Yang saya tolak**',
+    vas
+      ? '- Menambah diskon untuk mendorong pemasangan: memotong margin pada item yang justru baru diuji.'
+      : '- Menambah teknisi sebelum kebocoran waktu ditutup: kapasitas baru akan menyerap pemborosan yang sama.',
+    '',
+    '**Ukuran keberhasilan**',
+    vas
+      ? `Persentase penawaran yang memuat minimal satu item tambahan, dipantau mingguan. Naik dari basis sekarang menuju 30% dalam sebulan.`
+      : `Rupiah sisa kerugian per bulan, dipantau mingguan. Turun konsisten setiap minggu menuju nol.`,
+  ].join('\n')
+}
+
 const mockLLM = {
   models: {
     async list() {
@@ -996,6 +1178,8 @@ function mockAnswer({ messages, response_format }) {
   }
   const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
   if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
+  if (agent?.startsWith('tim-')) return streamText(teamMockAnswer(agent.slice(4), system))
+  if (agent === 'pimpinan-optimasi') return streamText(leadMockAnswer(system))
   if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
   // Untagged prompts from Media Sosial, AI Superpowers and Pertumbuhan (src/ai/superpowers.js)
   if (system.includes('analis laporan') || userMsg.includes('Data laporan')) return mockStreamExplain(parseReport(userMsg))
@@ -1016,6 +1200,47 @@ const SEED_WORKERS = [
 ]
 // [assignment_id, worker_id]; inactive 6004 only on an old completed job.
 const SEED_LINKS = [[3001, 6001], [3001, 6003], [3002, 6002], [3003, 6005], [3004, 6004], [3005, 6006], [3006, 6005]]
+
+/* --- Pendapatan: VAS catalog and zero-waste findings --- */
+
+const SEED_VAS = [
+  { name: 'Perawatan AC 3 bulan', category: 'perawatan', price: 450000, cost: 120000, attach_to: 'Pembersihan AC', attach_rate: 30, description: 'Kunjungan ringan setiap tiga bulan: cuci filter, cek freon, dan bersihkan evaporator.', status: 'active', age: 40 },
+  { name: 'Cuci karpet express 6 jam', category: 'kecepatan', price: 250000, cost: 60000, attach_to: 'Cuci Sofa & Karpet', attach_rate: 20, description: 'Karpet selesai dan kering dalam enam jam, dikerjakan lebih dulu dari antrean.', status: 'active', age: 38 },
+  { name: 'Perpanjangan garansi 6 bulan', category: 'perlindungan', price: 350000, cost: 40000, attach_to: null, attach_rate: 35, description: 'Garansi hasil kerja diperpanjang menjadi enam bulan, termasuk satu kunjungan pemeriksaan.', status: 'active', age: 35 },
+  { name: 'Anti-bakteri coating sofa', category: 'peningkatan', price: 300000, cost: 90000, attach_to: 'Cuci Sofa & Karpet', attach_rate: 25, description: 'Lapisan pelindung setelah cuci, mengurangi noda dan bau sampai tiga bulan.', status: 'active', age: 30 },
+  { name: 'Kontrak kolam bulanan plus', category: 'paket', price: 1200000, cost: 450000, attach_to: 'Pembersihan Kolam Renang', attach_rate: 40, description: 'Empat kunjungan sebulan, pengecekan pH, backwash, dan laporan foto mingguan.', status: 'active', age: 28 },
+  { name: 'Inspeksi ducting tahunan', category: 'perawatan', price: 900000, cost: 250000, attach_to: 'Ducting & Exhaust Cleaning', attach_rate: 30, description: 'Pemeriksaan tahunan plus laporan kondisi untuk syarat kebersihan dapur.', status: 'active', age: 20 },
+  { name: 'Poles marmer per meter', category: 'peningkatan', price: 85000, cost: 70000, attach_to: null, attach_rate: 15, description: 'Poles ringan untuk marmer dan granit setelah deep cleaning.', status: 'draft', age: 12 },
+]
+
+const SEED_WASTE = [
+  { stream: 'pengerjaan_ulang', title: 'Kunjungan ulang karena noda tidak hilang', detail: 'Sekitar 3 dari 20 pekerjaan cuci sofa mendapat keluhan dan harus dikerjakan dua kali.', monthly_loss: 600000, saved: 240000, action: 'Checklist noda sebelum meninggalkan lokasi, plus foto hasil.', owner: 'Tim Operasional', status: 'progress', age: 45 },
+  { stream: 'waktu', title: 'Teknisi menunggu bahan di gudang', detail: 'Rata-rata 45 menit per pekerjaan karena bahan baru disiapkan pagi hari.', monthly_loss: 480000, saved: 120000, action: 'Setiap tim membawa stok harian sendiri, disiapkan sehari sebelumnya.', owner: 'Tim Operasional', status: 'progress', age: 42 },
+  { stream: 'perjalanan', title: 'Rute tidak diurutkan antar kecamatan', detail: 'Jadwal disusun per pesanan masuk, bukan per zona, sehingga tim bolak-balik.', monthly_loss: 360000, saved: 0, action: 'Urutkan kunjungan per zona dan tugaskan petugas terdekat.', owner: 'Tim Operasional', status: 'open', age: 40 },
+  { stream: 'waktu', title: 'Jadwal menumpuk pagi, kosong sore', detail: 'Enam dari sepuluh pekerjaan dijadwalkan sebelum pukul 11, menyisakan sore tanpa pendapatan.', monthly_loss: 320000, saved: 80000, action: 'Slot dua jam dengan kuota pagi dan sore yang seimbang.', owner: 'Tim Operasional', status: 'progress', age: 36 },
+  { stream: 'pengerjaan_ulang', title: 'Checklist tidak dipakai sebelum meninggalkan lokasi', detail: 'Tidak ada pemeriksaan akhir, sehingga masalah kecil baru ketahuan dari keluhan.', monthly_loss: 240000, saved: 240000, action: 'Checklist digital wajib dicentang dan difoto sebelum tutup pekerjaan.', owner: 'Tim Operasional', status: 'done', age: 34 },
+  { stream: 'bahan', title: 'Dosis kimia berlebih pada kolam kecil', detail: 'Takaran disamakan untuk semua ukuran kolam, sehingga kolam kecil memakai dua kali lipat.', monthly_loss: 180000, saved: 60000, action: 'Tabel dosis per volume kolam ditempel di kotak alat.', owner: 'Tim Operasional', status: 'progress', age: 30 },
+  { stream: 'perjalanan', title: 'Bensin dibeli eceran tanpa catatan', detail: 'Pembelian bensin harian tanpa nota, sehingga biaya tidak bisa dibandingkan dengan jarak tempuh.', monthly_loss: 140000, saved: 0, action: 'Satu kartu bahan bakar per tim dengan catatan kilometer.', owner: 'Tim Keuangan', status: 'open', age: 24 },
+  { stream: 'air_kimia', title: 'Pembilasan berlebih pada cuci karpet', detail: 'Pembilasan dilakukan tiga kali, padahal dua kali sudah cukup untuk semua jenis karpet.', monthly_loss: 120000, saved: 0, action: 'Patokan dua kali bilas, kecuali karpet putih tebal.', owner: 'Tim Operasional', status: 'open', age: 18 },
+]
+
+function addSeedVas(state, daysAgo) {
+  state.vas_items = SEED_VAS.map(({ age, ...v }, i) => ({
+    id: 8001 + i, owner_id: 'anon', ...v, created_at: daysAgo(age), updated_at: daysAgo(age),
+  }))
+  // Two past jobs already carried a VAS line, so the baseline share is not zero:
+  // 5004 cuci sofa + anti-bakteri coating, 5007 perawatan kolam + kontrak bulanan.
+  const carried = { 5004: 8004, 5007: 8005 }
+  for (const l of state.ledger_entries || []) {
+    if (carried[l.id] && l.category === 'pendapatan') l.vas_item_id = carried[l.id]
+  }
+}
+
+function addSeedWaste(state, daysAgo) {
+  state.waste_entries = SEED_WASTE.map(({ age, ...w }, i) => ({
+    id: 9001 + i, owner_id: 'anon', ...w, created_at: daysAgo(age), updated_at: daysAgo(age),
+  }))
+}
 
 function addSeedWorkers(state, daysAgo) {
   state.workers = SEED_WORKERS.map(({ age, ...w }) => ({ owner_id: 'anon', ...w, created_at: daysAgo(age) }))
@@ -1039,7 +1264,11 @@ export function seedDemoData() {
   if (state._seeded) {
     // Older seeded states have no workers, or legacy ones (string ids, old statuses).
     const legacy = !state.workers?.length || state.workers.some((w) => typeof w.id !== 'number' || !['active', 'inactive'].includes(w.status))
-    if (legacy) { addSeedWorkers(state, daysAgo); saveState(state) }
+    let changed = false
+    if (legacy) { addSeedWorkers(state, daysAgo); changed = true }
+    if (!state.vas_items?.length) { addSeedVas(state, daysAgo); changed = true }
+    if (!state.waste_entries?.length) { addSeedWaste(state, daysAgo); changed = true }
+    if (changed) saveState(state)
     return
   }
 
@@ -1101,11 +1330,13 @@ export function seedDemoData() {
   ]
 
   addSeedWorkers(state, daysAgo)
+  addSeedVas(state, daysAgo)
+  addSeedWaste(state, daysAgo)
 
   state.users = [{ id: 'demo-user', email: 'demo@satualur.id', name: 'Demo User', created_at: daysAgo(30) }]
   state._seeded = true
   saveState(state)
-  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries, 6 workers')
+  console.log('[Mock Cloud] Demo data seeded: 8 requests, 7 offers, 6 assignments, 4 completions, 12 ledger entries, 6 workers, 7 VAS items, 8 waste findings')
 }
 
 export function createMockWorkBuddyCloud() {

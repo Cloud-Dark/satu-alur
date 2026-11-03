@@ -25,7 +25,8 @@ module.exports = async function quota(t) {
   t.check(await goStage(p, 'plan'), 'sidebar has "Paket & kuota"')
   await p.waitForSelector('.qt-rows')
   const rows = (await p.locator('.qt-row').allTextContents()).map((x) => x.replace(/\s+/g, ' ').trim())
-  t.check(rows.length === 6 && rows.some((r) => /Penawaran AI.*0 \/ 10 draf/.test(r)) && rows.some((r) => /Penasihat AI.*0 \/ 5 pesan/.test(r)), 'Free trial quota: six features, 10 each, advisor 5', rows.join(' | '))
+  t.check(rows.length === 7 && rows.some((r) => /Penawaran AI.*0 \/ 10 draf/.test(r)) && rows.some((r) => /Penasihat AI.*0 \/ 5 pesan/.test(r)) && rows.some((r) => /Optimasi pendapatan.*0 \/ 10/.test(r)), 'Free trial quota: seven features, 10 each, advisor 5', rows.join(' | '))
+  t.check(/Skala akun: .*Skala akun tidak mengubah kuota AI/.test(await p.textContent('.qt-tier')), 'quota page separates the business scale from the paket')
   t.check(/Free/.test(await p.locator('.qt-plan-name').textContent()) && /Rp0/.test(await p.locator('.qt-credit').textContent()), 'starts on Free with Rp0 AI credit')
   t.check(await p.locator('.lp-tier').count() === 2, 'the active plans are listed on the page')
 

@@ -30,13 +30,22 @@ Indeks dokumentasi. Per 2026-10-28 aplikasi berjalan di Cloudflare (Worker + D1 
 
 | Dokumen | Isi |
 |---------|-----|
-| [05_ARCHITECTURE.md](05_ARCHITECTURE.md) | Arsitektur, diagram sistem/alur/OTP |
+| [05_ARCHITECTURE.md](05_ARCHITECTURE.md) | Arsitektur hari ini, diagram sistem/alur/OTP |
+| [06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md) | Tangga skala (6 tahap + pemicu angka), multi-tenancy, integrasi, observabilitas, rencana jangka panjang |
 | [16_CONFIG_REFERENCE.md](16_CONFIG_REFERENCE.md) | `wrangler.toml`, variabel, skrip |
 | [17_DEVELOPER_SETUP.md](17_DEVELOPER_SETUP.md) | Setup pengembangan lokal |
 | [18_INSTALLATION.md](18_INSTALLATION.md) | Instalasi dan deploy Cloudflare |
 | [20_DATABASE.md](20_DATABASE.md) | Skema D1 |
 | [21_BACKEND.md](21_BACKEND.md) | Worker: rute, auth, `/api/db`, keamanan |
 | [API.md](API.md) | Kontrak HTTP API |
+
+### Integrasi ERP (MCP)
+
+| Dokumen | Isi |
+|---------|-----|
+| [mcp/MCP_SPEC.md](mcp/MCP_SPEC.md) | Spesifikasi protokol: tipe konektor, pemetaan, migrasi, keamanan, endpoint |
+| [mcp/ERP_INTEGRATION_GUIDE.md](mcp/ERP_INTEGRATION_GUIDE.md) | Panduan per sistem: Odoo, SAP B1, NetSuite, Accurate, Mekari, database, webhook |
+| [mcp/MIGRATION_GUIDE.md](mcp/MIGRATION_GUIDE.md) | Strategi parallel running, checklist, validasi pasca-migrasi, rollback |
 
 ## Rilis dan Pengujian
 

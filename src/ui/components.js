@@ -177,10 +177,15 @@ export function skeletonRows(rows = 4) {
 /**
  * button({label, icon, variant: 'primary'|'accent'|'soft'|'ghost'|'danger'|'', size: 'sm'|'lg', ...attrs})
  */
-export function button({ label, icon: iconName, iconRight, variant = '', size = '', type = 'button', className = '', ...attrs } = {}) {
+export function button({ label, icon: iconName, iconRight, variant = '', size = '', type = 'button', className = '', dismiss = false, ...attrs } = {}) {
   if (label) CONTENT_GATE.buttonLabel(label)
   const cls = ['btn', variant && `btn-${variant}`, size && `btn-${size}`, className].filter(Boolean).join(' ')
-  const b = el('button', { type, className: cls, ...attrs },
+  const b = el('button', {
+    type,
+    className: cls,
+    ...(dismiss ? { 'data-dismiss': 'true' } : {}),
+    ...attrs,
+  },
     iconName ? icon(iconName) : null,
     label ? el('span', { className: 'btn-label' }, label) : null,
     iconRight ? icon(iconRight, { className: 'icon-trailing' }) : null,
@@ -246,10 +251,11 @@ export function textarea({ label, name, id, required = false, hint, placeholder,
 }
 
 /** options: [{value, label, disabled?}] */
-export function select({ label, name, id, required = false, hint, options = [], value, attrs = {} }) {
+export function select({ label, name, id, required = false, hint, options = [], value, attrs = {}, onChange }) {
   const fid = id || nextId(name || 'sel')
   const input = el('select', { id: fid, name: name || fid, required, className: 'input', ...attrs })
   setOptions(input, options, value)
+  if (onChange) input.addEventListener('change', (event) => onChange(event.target.value))
   const wrap = fieldWrap({ id: fid, label, required, hint, control: input, className: 'field-select' })
   enhanceSelect(input)
   return { wrap, input }
@@ -303,6 +309,14 @@ export function modal({ title, description, children = [], actions = [], opener,
     el('footer', { className: 'modal-actions' }, actions))
   dialog.append(form)
   dialog.addEventListener('close', () => { dialog.remove(); opener?.focus() })
+  // The form uses method="dialog", but C.button renders type="button", so a
+  // plain "Batal" never submitted. data-dismiss makes the intent explicit.
+  form.addEventListener('click', (e) => {
+    if (!e.target.closest('button[data-dismiss]')) return
+    if (e.defaultPrevented) return // a dialog-level handler already decided
+    e.preventDefault()
+    dialog.close()
+  })
   ;(document.querySelector('.app-shell') || document.body).append(dialog)
   dialog.showModal()
   return { dialog, form, close: () => dialog.close() }

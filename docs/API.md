@@ -90,7 +90,9 @@ Kesalahan: 401 "Username atau password salah." (username tidak ada, password sal
 
 ### GET /api/auth/session
 
-Respons 200: `{ "data": { "user": { ... } }, "error": null }`. 401 bila tidak valid.
+Respons 200: `{ "data": { "user": { ... }, "is_admin": false }, "error": null }`. 401 bila tidak valid.
+
+`user.plan` berisi tier langganan: `sole`, `ukm`, atau `enterprise`. Nilainya dibaca dari `user_flags.plan` dan dipakai untuk menutup fitur ([06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md) §4). Akun baru mendapat `sole`; akun demo mengikuti skala seed-nya dan diselaraskan setiap `demo-login`.
 
 ### POST /api/auth/signout
 
@@ -98,7 +100,7 @@ Respons 200: `{ "data": null, "error": null }`. Token tidak berlaku lagi.
 
 ## Database: POST /api/db
 
-Satu endpoint untuk semua tabel domain: `requests`, `offers`, `assignments`, `completions`, `ledger_entries`, `reports`. Baris selalu dibatasi ke pengguna login (`owner_id`); jangan mengirim `owner_id`.
+Satu endpoint untuk semua tabel domain: `requests`, `offers`, `assignments`, `workers`, `assignment_workers`, `completions`, `ledger_entries`, `vas_items`, `waste_entries`, `reports`, `social_contents`, `social_schedules`, `ai_messages`, `opportunity_states`, `leads`. Baris selalu dibatasi ke pengguna login (`owner_id`); jangan mengirim `owner_id`. `social_posts` hanya boleh dibaca; `social_accounts` dan `social_oauth_picks` tidak ada di whitelist.
 
 Field request:
 
@@ -165,6 +167,40 @@ Respons: array baris yang terdampak.
 
 Respons: `{ "data": null, "error": null, "count": 12 }`.
 
+### Aturan Tabel Pendapatan (`vas_items`, `waste_entries`)
+
+Kedua tabel divalidasi oleh `src/pendapatan/rules.js` — modul yang sama yang dipakai formulir dan mock cloud, sehingga UI tidak bisa menerima baris yang akan ditolak server, dan sebaliknya. Pelanggaran mengembalikan **400** dengan pesan berbahasa Indonesia yang siap ditampilkan.
+
+| Aturan | Berlaku pada | Pesan (400) |
+|--------|--------------|-------------|
+| `name` wajib, 2–80 karakter | `vas_items` insert/update | `Nama item wajib diisi.` · `Nama item minimal 2 karakter.` · `Nama item maksimal 80 karakter.` |
+| `category` dari enum | `vas_items` | `Kategori item tidak dikenal.` |
+| `price` > 0 dan ≤ Rp1.000.000.000 | `vas_items` | `Harga jual harus lebih dari nol.` · `Harga jual maksimal Rp1.000.000.000.` |
+| `cost` ≥ 0 dan ≤ Rp1.000.000.000 | `vas_items` | `Biaya langsung tidak boleh negatif.` |
+| `attach_rate` angka 0–100 | `vas_items` | `Tingkat pasang harus angka 0 sampai 100.` |
+| `status` dari enum | `vas_items` | `Status item tidak dikenal.` |
+| `title` wajib, 3–120 karakter | `waste_entries` | `Judul temuan wajib diisi.` · `Judul temuan minimal 3 karakter.` |
+| `stream` dari enum | `waste_entries` | `Sumber pemborosan tidak dikenal.` |
+| `monthly_loss` > 0 dan ≤ Rp1.000.000.000 | `waste_entries` | `Kerugian per bulan harus lebih dari nol.` |
+| `saved` ≥ 0 dan ≤ `monthly_loss` | `waste_entries` | `Nilai yang sudah dihentikan tidak boleh negatif.` · `Yang sudah dihentikan tidak boleh melebihi kerugian tercatat.` |
+| `status: 'done'` berarti `saved === monthly_loss` | `waste_entries` | `Temuan yang selesai harus dihitung terhenti penuh.` |
+| `status` dari enum | `waste_entries` | `Status temuan tidak dikenal.` |
+| Maks 500 item katalog per pemilik | `vas_items` insert | `Batas 500 item katalog tercapai (N tersimpan). Hapus yang tidak terpakai lebih dulu.` |
+| Maks 2000 temuan per pemilik | `waste_entries` insert | `Batas 2000 temuan tercapai (N tersimpan). Hapus yang tidak terpakai lebih dulu.` |
+
+Dua perilaku yang mudah disalahpahami:
+
+- **`attach_rate` di luar rentang dijepit, bukan ditolak** (`150` → `100`, `-5` → `0`). Nilai 0–1 dibaca sebagai pecahan (`0,25` = 25%), sesuai label kolom yang memakai persen. Hanya nilai yang bukan angka sama sekali yang gagal.
+- **Uang menerima format tempelan.** `moneyInt("Rp 450.000")` → `450000`; titik dibaca sebagai pemisah ribuan, bukan desimal.
+
+Catatan penting:
+
+- **Update divalidasi terhadap baris hasil gabungan.** `changes` hanya berisi kolom yang berubah, jadi invarian `saved <= monthly_loss` diperiksa pada baris tersimpan yang digabung dengan perubahan — bukan pada `changes` saja. Mengubah `monthly_loss` ke bawah `saved` ditolak; menandai `status: 'done'` otomatis menaikkan `saved` ke `monthly_loss`.
+- **Update `waste_entries` memerlukan filter `eq` pada satu `id`.** Setiap temuan memiliki kerugian berbeda; perubahan status harus memakai angka temuan itu sendiri. Update massal dengan filter aliran/status ditolak (400).
+- **`updated_at` diisi server.** Nilai dari klien diabaikan.
+- **`ledger_entries.vas_item_id`** opsional dan harus menunjuk `vas_items` milik pengguna yang sama (`Referensi vas_item_id tidak ditemukan.` bila bukan). `NULL` berarti pendapatan jasa biasa. Kolom ini yang membuat "Porsi VAS" di dasbor terukur, bukan perkiraan.
+- Batas 100 baris per `insert` tetap berlaku; UI menolak tempelan lebih dari 100 baris. Bagi berkas besar menjadi beberapa impor. Baris duplikat dapat dilewati (nama item untuk VAS, judul untuk temuan).
+
 ### Kesalahan Umum
 
 | Pesan | Penyebab |
@@ -175,6 +211,9 @@ Respons: `{ "data": null, "error": null, "count": 12 }`.
 | `Filter diperlukan untuk update/delete.` | Tidak ada filter |
 | `Kolom tidak boleh diubah: owner_id` | Mencoba mengubah `id`/`owner_id` |
 | `Referensi request_id tidak ditemukan.` | FK menunjuk baris yang bukan milik pengguna atau tidak ada |
+| `Batas 500 item katalog tercapai (…)` | Insert `vas_items` melebihi kuota per pemilik |
+| `Batas 2000 temuan tercapai (…)` | Insert `waste_entries` melebihi kuota per pemilik |
+| `Yang sudah dihentikan tidak boleh melebihi kerugian tercatat.` | `saved > monthly_loss` (insert maupun update) |
 | `Data tidak valid atau melanggar batasan.` | Constraint database (mis. kolom NOT NULL kosong) |
 
 ## LLM
@@ -260,6 +299,85 @@ Kode: `worker/office.js`. Rute `admin/*` hanya untuk sesi dari `POST /api/auth/s
 | `GET /api/office/admin/requests[?status=]` | Kotak masuk semua bisnis (`new`, `in_progress`, `done`), dengan nama dan email bisnis |
 | `PATCH /api/office/admin/requests/:id` | Ubah `status` dan/atau `admin_note` (maks. 2000 karakter); 404 bila tidak ada |
 
+## MCP: Konektor ERP dan Migrasi
+
+MCP adalah nama modul konektor internal, bukan implementasi standar Model Context Protocol. Implementasi: `worker/mcp.js`; aturan bersama: `src/mcp/rules.js`. [Panduan implementasi](mcp/MCP_SPEC.md) dan [skema D1](20_DATABASE.md).
+
+Authenticated routes memerlukan sesi Bearer, kepemilikan, dan paket Enterprise. Plan `sole`, `ukm`, atau tidak ada mendapat `403`. Webhook memakai HMAC serta memeriksa plan/suspensi pemilik saat event diterima. Tabel `mcp_*` tidak tersedia lewat `/api/db`.
+
+Respons memakai `{ data, error }`; create konektor/migrasi mengembalikan `201`, operasi lain `200`. Galat memakai `{ data: null, error: { message } }`.
+
+### Batas dan cakupan
+
+| Batas | Nilai |
+|-------|-------|
+| Body request | 256 KiB; `413` jika terlampaui |
+| Nama konektor | 2–80 karakter |
+| URL REST | Maks. 500 karakter, HTTPS hostname publik, tanpa userinfo atau fragmen; redirect ditolak |
+| Konektor per pemilik | 20 |
+| Pemetaan per pemilik | 60; pemetaan yang sudah ada tetap dapat diperbarui pada batas ini |
+| Bidang per pemetaan | 120 |
+| Baris per request | 500; input atau respons REST berlebih ditolak seluruhnya |
+| Dead letter per sync | Maks. 200 baris gagal disimpan, maks. 20.000 karakter per baris mentah |
+
+Entitas yang dapat ditulis adalah `requests`, `workers`, `vas_items`, dan `waste_entries`. Penawaran/jurnal dan entitas dengan referensi internal belum dapat diimpor. Hanya arah `inbound` didukung. Mode `upsert` memakai `externalIdField` atau natural key; `insert` selalu membuat baris baru. Tidak ada penjadwal ERP, pagination vendor, atau retensi log otomatis.
+
+### Konektor dan pemetaan
+
+| Rute | Kontrak |
+|------|---------|
+| `GET /api/mcp/schema` | `{ entities: [{ key, label, importable, columns: [{ name, type, required, values }] }], phases }` |
+| `GET /api/mcp/connectors` | Array konektor milik pemanggil, tanpa rahasia |
+| `POST /api/mcp/connectors` | `{ type, name, enabled?, config?, apiKey?, password?, token?, secret? }`; tipe `rest`, `database`, `file`, `webhook` → `201`. Bidang konfigurasi juga boleh flat; rahasia nested dalam `auth`/`connection` dipisahkan sebelum disimpan |
+| `GET /api/mcp/connectors/:id` | Satu konektor; `404` bila tidak dimiliki pemanggil |
+| `PATCH /api/mcp/connectors/:id` | Perubahan sebagian. `enabled`/rahasia yang tidak dikirim dipertahankan. Tipe tidak dapat diganti; buat konektor baru |
+| `DELETE /api/mcp/connectors/:id` | Hapus konektor, pemetaan, log, dead letter, dan referensi eksternal. Catatan migrasi dan jurnal tetap disimpan |
+| `POST /api/mcp/connectors/:id/test` | `{ ok, code, message, status, latencyMs }`. REST: HEAD, fallback GET untuk 405/501, timeout maks. 20 detik. Database: `code: "BRIDGE_REQUIRED"`. File/webhook: validasi konfigurasi |
+| `GET /api/mcp/connectors/:id/mappings` | Array pemetaan masuk |
+| `PUT /api/mcp/connectors/:id/mappings` | `{ entity, direction?, fields, externalIdField?, mode?, filters? }`. `fields`: `[{ source?, target, transform?, mapping?, constant? }]`. Kolom wajib harus dipetakan. Hanya `inbound` dan entitas importable diterima |
+| `DELETE /api/mcp/connectors/:id/mappings/:entity` | Hapus pemetaan milik pemanggil |
+
+REST memakai `config.endpoint.baseUrl`, `config.auth.type` (`apikey`, `basic`, `oauth2`), dan `config.auth.headerName` untuk API key. Basic membutuhkan `username` dan `password`; OAuth membutuhkan bearer `token` yang sudah diperoleh. Tidak ada token refresh otomatis. File hanya mendukung CSV/JSON; ekspor Excel sebagai CSV.
+
+### Sinkronisasi
+
+| Rute | Kontrak |
+|------|---------|
+| `POST /api/mcp/connectors/:id/sync` | `{ dryRun?, trigger?, entity?, rows? }`. Konektor harus aktif dan mempunyai pemetaan. `rows` untuk file; tanpa rows, REST menarik array JSON dari sumber. `dryRun` tidak menulis data atau log |
+| `GET /api/mcp/connectors/:id/sync` | 100 log terakhir milik konektor |
+| `GET /api/mcp/sync/:id` | Satu log sync milik pemanggil |
+| `GET /api/mcp/sync` | 100 log terakhir milik pemanggil |
+| `GET /api/mcp/errors?status=open` | Dead letter milik pemanggil; status `open`, `resolved`, `ignored` |
+| `PATCH /api/mcp/errors/:id` | `{ status }`; mengubah penandaan, bukan menjalankan replay otomatis |
+
+REST menerima array langsung, `{ data: [] }`, `{ records: [] }`, atau `{ rows: [] }`. Path tambahan dari `filters.path` atau `config.endpoint.entityPath`; query dari `filters.query`.
+
+Hasil sync: `{ syncId, dryRun, status, stats, errors, errorCount }`, dengan `stats: { processed, inserted, updated, skipped, failed, entities }`. Error per baris tidak membatalkan baris lain; INSERT domain dan referensi/jurnalnya tetap atomik. `errors` membatasi contoh 50 item.
+
+### Migrasi
+
+| Rute | Kontrak |
+|------|---------|
+| `GET /api/mcp/migrations` | 50 migrasi terakhir milik pemanggil |
+| `POST /api/mcp/migrations` | `{ connectorId?, name, strategy?, phases? }` → `201`. Fase tersedia `master` (`workers`, `vas_items`) dan `open_transactions` (`requests`). Strategi `parallel`, `phased`, `bigbang` adalah label operator; tidak menjalankan cutover otomatis |
+| `GET /api/mcp/migrations/:id` | Satu migrasi dan fase |
+| `POST /api/mcp/migrations/:id/run` | `{ phaseIndex?, dryRun?, rowsByEntity?: { entity: rows[] } }`. Memerlukan konektor aktif dan pemetaan masuk. File memerlukan baris sumber. Fase dijalankan sekali dan berurutan; duplikat/permintaan serentak `409`. Dry run mengembalikan pratinjau tanpa mengubah progres/data/log/lock tersimpan |
+| `POST /api/mcp/migrations/:id/rollback` | Hapus hanya baris baru milik run ini yang belum berubah dan belum dipakai. `{ rolledBack, removedRows, retainedRows }`. Update pada baris lama tidak dipulihkan; fase/statistik dipertahankan sebagai audit |
+
+Galat: `400` payload/sumber tidak valid atau konektor nonaktif, `404` tidak dimiliki, `409` migrasi sedang diproses atau fase sudah dijalankan. `mcp_migration_rows` dari migrasi `0011` adalah sumber jurnal rollback; baris run lama tanpa jurnal tidak dihapus.
+
+### Webhook masuk
+
+`POST /api/mcp/webhook/:id` menerima `{ entity, rows: [...] }`; `data` juga diterima untuk kompatibilitas. Header `X-MCP-Signature: sha256=<hex>` atau `X-Hub-Signature-256` berisi HMAC-SHA256 atas body mentah dengan `secret` konektor.
+
+Respons `{ received, written, failed }`. Gunakan upsert dengan ID stabil untuk kiriman berulang. Galat: `401` tanda tangan salah, `403` konektor nonaktif atau pemilik tidak lagi berhak/disuspensi, `404` bukan konektor webhook, `400` payload/pemetaan tidak didukung atau >500 baris, `413` body >256 KiB. Payload berlebih ditolak tanpa menulis sebagian.
+
+### Keamanan dan rollout
+
+Terapkan seluruh migrasi, termasuk `0009`, `0010`, dan `0011`, sebelum deploy kode. Setel `MCP_ENCRYPTION_KEY` sebagai Worker secret (minimal 16 karakter; gunakan nilai acak kuat). Tanpa kunci, simpan kredensial ditolak `503`; file tetap dapat dipakai. Rahasia disimpan AES-GCM dan tidak dikembalikan API. Kredensial lama berformat plaintext harus disimpan ulang. Kunci salah/berubah menghasilkan `503` hingga kredensial dipulihkan.
+
+Lock per migrasi dilepas pada penyelesaian atau error yang tertangkap. Setelah penghentian paksa, operator harus memastikan tidak ada request aktif sebelum mereset `mcp_migrations.locked = 0`. Baris yang telah ditulis tetap tercatat di jurnal untuk pemeriksaan/rollback.
+
 ## Pemakaian dari Klien
 
 Stage tidak memanggil `fetch` langsung; mereka memakai `getCloud()` (`src/cloud.js`) dengan antarmuka builder:
@@ -278,5 +396,7 @@ await cloud.database.from('assignments').update({ status: 'done' }).eq('id', 3)
 
 ## Batas dan Kuota
 
-- Rate limit API: belum ada selain pembatasan OTP per email.
-- Kuota Workers AI dan batas D1: mengikuti paket Cloudflare, _TBD_ ([10_RISK_REGISTER.md](10_RISK_REGISTER.md)).
+- `/api/db`: `MAX_LIMIT = 5000` baris per permintaan; kuota per pemilik 500 item katalog VAS dan 2.000 temuan tanpa limbah.
+- `/api/mcp/*`: lihat tabel batas di §MCP. Impor/sinkronisasi 500 baris per permintaan, batch tulis 100.
+- Rate limit API: belum ada selain pembatasan OTP per email. Ini termasuk `/api/llm/*` dan `/api/mcp/*/sync` — keduanya yang paling mahal. Penambahan rate limit ada di [08_ROADMAP.md](08_ROADMAP.md).
+- Kuota Workers AI dan batas D1: mengikuti paket Cloudflare, _TBD_ ([10_RISK_REGISTER.md](10_RISK_REGISTER.md)). Analisis kapan batas itu menggigit ada di [06_SCALABLE_ARCHITECTURE.md](06_SCALABLE_ARCHITECTURE.md) §1.1.

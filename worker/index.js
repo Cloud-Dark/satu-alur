@@ -38,6 +38,20 @@ import {
   handleAdminSupport, handleAdminSupportCounts, handleAdminSupportGet, handleAdminSupportReply, handleAdminSupportUpdate,
 } from './customers.js';
 import { SUSPENDED_MESSAGE, isStaffEmail } from '../src/customers/rules.js';
+import {
+  validateVasItem, validateWasteEntry, withWasteCompletion, assertWasteInvariants, LIMITS,
+} from '../src/pendapatan/rules.js';
+import {
+  handleConnectorList, handleConnectorCreate, handleConnectorGet, handleConnectorUpdate,
+  handleConnectorDelete, handleConnectorTest,
+  handleMappingList, handleMappingPut, handleMappingDelete, handleSchemaGet,
+  handleSyncRun, handleSyncList, handleSyncGet, handleSyncLogAll,
+  handleSyncErrorList, handleSyncErrorUpdate,
+  handleMigrationList, handleMigrationCreate, handleMigrationGet, handleMigrationRun,
+  handleMigrationRollback, handleWebhook,
+} from './mcp.js';
+import { canUse, planLockMessage, planForScale, normalizePlan } from '../src/business/plan-access.js';
+import { demoAccount } from '../src/auth/demo-accounts.js';
 
 // ---------------------------------------------------------------- constants
 
@@ -67,7 +81,8 @@ const JSON_HINT =
   'Respond with ONLY a single valid JSON object. No markdown code fences, no commentary, no text before or after the JSON.';
 
 // Whitelisted tables -> columns. `json` columns are stored as TEXT JSON.
-const TABLES = {
+// Exported so tests can assert the contract the client relies on.
+export const TABLES = {
   requests: {
     columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'created_at'],
   },
@@ -94,8 +109,18 @@ const TABLES = {
     fks: { assignment_id: 'assignments' },
   },
   ledger_entries: {
-    columns: ['id', 'owner_id', 'completion_id', 'amount', 'category', 'status', 'posted_at', 'created_at'],
-    fks: { completion_id: 'completions' },
+    columns: ['id', 'owner_id', 'completion_id', 'vas_item_id', 'amount', 'category', 'status', 'posted_at', 'created_at'],
+    fks: { completion_id: 'completions', vas_item_id: 'vas_items' },
+  },
+  // Pendapatan: add-on catalog. Validated by src/pendapatan/rules.js below and
+  // by CHECK constraints in migrations/0008_pendapatan.sql.
+  vas_items: {
+    columns: ['id', 'owner_id', 'name', 'category', 'price', 'cost', 'attach_to', 'attach_rate', 'description', 'status', 'created_at', 'updated_at'],
+  },
+  // Pendapatan: one row per recorded leak. saved <= monthly_loss is enforced
+  // on insert and on update (against the stored row).
+  waste_entries: {
+    columns: ['id', 'owner_id', 'stream', 'title', 'detail', 'monthly_loss', 'saved', 'action', 'owner', 'status', 'created_at', 'updated_at'],
   },
   reports: {
     columns: ['id', 'owner_id', 'period_start', 'period_end', 'summary_json', 'explanation_html', 'status', 'created_at'],
@@ -153,7 +178,7 @@ function json(body, status = 200) {
     },
   });
 }
-const ok = (data, extra) => json({ data, error: null, ...(extra || {}) });
+const ok = (data, extra) => json({ data, error: null, ...(typeof extra === 'object' ? extra : {}) }, typeof extra === 'number' ? extra : 200);
 const fail = (status, message) => json({ data: null, error: { message } }, status);
 
 async function readJson(request, maxBytes = MAX_BODY_BYTES) {
@@ -241,7 +266,8 @@ async function authenticate(request, env) {
   if (!m) throw new HttpError(401, 'Belum masuk.');
   const tokenHash = await sha256Hex(m[1]);
   const row = await env.DB.prepare(
-    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended
+    `SELECT u.id, u.email, u.name, u.created_at, s.is_staff, f.suspended,
+            COALESCE(f.plan, 'sole') AS plan
        FROM sessions s JOIN users u ON u.id = s.user_id
        LEFT JOIN user_flags f ON f.user_id = u.id
       WHERE s.token_hash = ? AND s.expires_at > ?`,
@@ -251,6 +277,7 @@ async function authenticate(request, env) {
   if (!row) throw new HttpError(401, 'Sesi tidak valid atau sudah berakhir.');
   const { suspended, ...user } = row;
   if (suspended === 1) throw new HttpError(403, SUSPENDED_MESSAGE);
+  user.plan = normalizePlan(user.plan);
   return { user, tokenHash };
 }
 
@@ -357,6 +384,16 @@ async function handleDemoLogin(request, env) {
   const user = await env.DB.prepare('SELECT id, email, name, created_at FROM users WHERE email = ?').bind(email).first();
   if (!user) throw new HttpError(404, 'Data akun demo belum dimuat.');
   await refuseSuspended(env, user.id);
+
+  // Each demo account stands for a business scale, and the scale is the tier:
+  // the enterprise demos keep access to ERP integration, the smaller ones do
+  // not. Re-aligning on every login keeps a stale row from granting access.
+  const account = demoAccount(email);
+  user.plan = planForScale(account?.scale);
+  await env.DB.prepare(
+    `INSERT INTO user_flags (user_id, updated_at, plan) VALUES (?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan, updated_at = excluded.updated_at`,
+  ).bind(user.id, nowIso(), user.plan).run();
 
   const accessToken = randomHex(32);
   await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)')
@@ -512,7 +549,69 @@ async function assertFkOwnership(env, spec, rows, userId) {
 // completion carries at most one revenue entry. Seeds write via SQL, not here.
 const LEDGER_CATEGORY_SET = new Set(['pendapatan', 'biaya_tenaga', 'biaya_bahan', 'biaya_transport', 'biaya_lain']);
 
-async function assertFlowRules(env, table, rows, userId) {
+/** Rules in src/pendapatan/rules.js throw `validation: true`; turn that into a 400. */
+function asBadRequest(err) {
+  if (err && err.validation === true) return new HttpError(400, err.message);
+  return err;
+}
+
+/** Per-owner ceiling, checked once per batch so a paste cannot exceed it silently. */
+async function assertCap(env, table, adding, userId, cap, label) {
+  const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE owner_id = ?`).bind(userId).first();
+  const used = Number(row?.n) || 0;
+  if (used + adding > cap) {
+    throw new HttpError(400, `Batas ${cap} ${label} tercapai (${used} tersimpan). Hapus yang tidak terpakai lebih dulu.`);
+  }
+}
+
+/**
+ * Validates VAS catalog rows and waste findings, writing the normalised values
+ * back into the row so what is stored matches what the form showed.
+ * Updates are validated against the *merged* row, which is the only way the
+ * saved <= monthly_loss invariant can survive a one-column change.
+ */
+async function assertPendapatanRules(env, table, rows, userId, { action, filters } = {}) {
+  const isUpdate = action === 'update';
+  try {
+    if (table === 'vas_items') {
+      for (const row of rows) Object.assign(row, validateVasItem(row, { partial: isUpdate }));
+      if (!isUpdate) await assertCap(env, 'vas_items', rows.length, userId, LIMITS.items, 'item katalog');
+      return;
+    }
+    if (table === 'waste_entries') {
+      for (const row of rows) Object.assign(row, validateWasteEntry(row, { partial: isUpdate }));
+      if (!isUpdate) {
+        for (const row of rows) Object.assign(row, withWasteCompletion(row));
+        for (const row of rows) assertWasteInvariants(row);
+        await assertCap(env, 'waste_entries', rows.length, userId, LIMITS.findings, 'temuan');
+        return;
+      }
+      if (!filters?.some((f) => f.op === 'eq' && f.col === 'id' && Number.isSafeInteger(Number(f.val)) && Number(f.val) > 0)) {
+        throw bad('Update temuan memerlukan filter id tunggal.');
+      }
+      const { sql, params } = buildWhere(TABLES.waste_entries, filters);
+      const current = await env.DB.prepare(
+        `SELECT * FROM waste_entries WHERE owner_id = ?${sql} LIMIT 1`,
+      ).bind(userId, ...params).first();
+      if (!current) return; // nothing matched: the UPDATE itself returns no rows
+      for (const row of rows) {
+        const merged = 'status' in row || 'monthly_loss' in row
+          ? withWasteCompletion({ ...current, ...row }) : { ...current, ...row };
+        assertWasteInvariants(merged);
+        if ('status' in row || 'monthly_loss' in row) row.saved = merged.saved;
+      }
+    }
+  } catch (err) {
+    throw asBadRequest(err);
+  }
+}
+
+// Exported for tests: the Worker runs these, but the rules live in src/.
+export async function assertFlowRules(env, table, rows, userId, ctx = {}) {
+  if (table === 'vas_items' || table === 'waste_entries') {
+    await assertPendapatanRules(env, table, rows, userId, ctx);
+    return;
+  }
   if (table === 'ledger_entries') {
     const revenueFor = new Set();
     for (const r of rows) {
@@ -567,7 +666,7 @@ async function handleDb(request, env) {
     if (values.length === 0 || values.length > MAX_INSERT_ROWS) throw bad('Values tidak valid.');
     const rows = values.map((v) => serializeRow(spec, v, { forWrite: 'insert' }));
     await assertFkOwnership(env, spec, rows, uid);
-    await assertFlowRules(env, table, rows, uid);
+    await assertFlowRules(env, table, rows, uid, { action: 'insert' });
     const stmts = rows.map((r) => {
       const cols = ['owner_id', ...Object.keys(r)];
       return env.DB.prepare(
@@ -591,15 +690,20 @@ async function handleDb(request, env) {
     if (action === 'update') {
       if (!body.changes || typeof body.changes !== 'object' || Array.isArray(body.changes)) throw bad('Changes tidak valid.');
       const ch = serializeRow(spec, body.changes, { forWrite: 'update' });
-      const keys = Object.keys(ch);
-      if (keys.length === 0) throw bad('Changes kosong.');
+      if (Object.keys(ch).length === 0) throw bad('Changes kosong.');
       await assertFkOwnership(env, spec, [ch], uid);
+      // Pendapatan rows are validated against the stored row they will produce.
+      if (table === 'vas_items' || table === 'waste_entries') {
+        await assertPendapatanRules(env, table, [ch], uid, { action: 'update', filters: body.filters });
+        // Stamped server-side so two devices cannot disagree about freshness.
+        ch.updated_at = new Date().toISOString();
+      }
       if (table === 'ledger_entries' && ('amount' in ch || 'category' in ch)) {
         if ('amount' in ch && !(Number(ch.amount) > 0)) throw bad('Jumlah jurnal harus lebih dari nol.');
         if ('category' in ch && !LEDGER_CATEGORY_SET.has(ch.category)) throw bad('Kategori jurnal tidak dikenal.');
       }
       stmt = env.DB.prepare(
-        `UPDATE ${table} SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE owner_id = ?${whereSql} RETURNING *`,
+        `UPDATE ${table} SET ${Object.keys(ch).map((k) => `${k} = ?`).join(', ')} WHERE owner_id = ?${whereSql} RETURNING *`,
       ).bind(...Object.values(ch), uid, ...params);
     } else {
       stmt = env.DB.prepare(`DELETE FROM ${table} WHERE owner_id = ?${whereSql} RETURNING *`).bind(uid, ...params);
@@ -882,7 +986,7 @@ function sseResponse(stream) {
 // ------------------------------------------------------------------- router
 
 // Helpers handed to the route modules ./leads.js and ./social.js (avoids a circular import).
-const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex };
+const ROUTE_DEPS = { authenticate, readJson, ok, HttpError, DEMO_EMAILS, sha256Hex, randomHex, canUse, planLockMessage };
 
 const ROUTES = {
   'POST /api/auth/send-otp': handleSendOtp,
@@ -968,6 +1072,32 @@ const ROUTES = {
   'PATCH /api/office/admin/vouchers/:id': (req, env, params) => handleAdminVoucherUpdate(req, env, ROUTE_DEPS, params),
   'GET /api/office/admin/customers/:userId/quota': (req, env, params) => handleAdminCustomerQuota(req, env, ROUTE_DEPS, params),
   'POST /api/office/admin/customers/:userId/credit': (req, env, params) => handleAdminCustomerCredit(req, env, ROUTE_DEPS, params),
+
+  // ------------------------------------------------------------ MCP / ERP
+  // Dedicated routes, never the generic /api/db: connector rows hold secrets.
+  'GET /api/mcp/schema': (req, env) => handleSchemaGet(req, env, ROUTE_DEPS),
+  'GET /api/mcp/connectors': (req, env) => handleConnectorList(req, env, ROUTE_DEPS),
+  'POST /api/mcp/connectors': (req, env) => handleConnectorCreate(req, env, ROUTE_DEPS),
+  'GET /api/mcp/connectors/:id': (req, env, params) => handleConnectorGet(req, env, ROUTE_DEPS, params),
+  'PATCH /api/mcp/connectors/:id': (req, env, params) => handleConnectorUpdate(req, env, ROUTE_DEPS, params),
+  'DELETE /api/mcp/connectors/:id': (req, env, params) => handleConnectorDelete(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/connectors/:id/test': (req, env, params) => handleConnectorTest(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/connectors/:id/sync': (req, env, params) => handleSyncRun(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/connectors/:id/sync': (req, env, params) => handleSyncList(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/connectors/:id/mappings': (req, env, params) => handleMappingList(req, env, ROUTE_DEPS, params),
+  'PUT /api/mcp/connectors/:id/mappings': (req, env, params) => handleMappingPut(req, env, ROUTE_DEPS, params),
+  'DELETE /api/mcp/connectors/:id/mappings/:entity': (req, env, params) => handleMappingDelete(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/sync': (req, env) => handleSyncLogAll(req, env, ROUTE_DEPS),
+  'GET /api/mcp/sync/:syncId': (req, env, params) => handleSyncGet(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/errors': (req, env) => handleSyncErrorList(req, env, ROUTE_DEPS),
+  'PATCH /api/mcp/errors/:id': (req, env, params) => handleSyncErrorUpdate(req, env, ROUTE_DEPS, params),
+  'GET /api/mcp/migrations': (req, env) => handleMigrationList(req, env, ROUTE_DEPS),
+  'POST /api/mcp/migrations': (req, env) => handleMigrationCreate(req, env, ROUTE_DEPS),
+  'GET /api/mcp/migrations/:id': (req, env, params) => handleMigrationGet(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/migrations/:id/run': (req, env, params) => handleMigrationRun(req, env, ROUTE_DEPS, params),
+  'POST /api/mcp/migrations/:id/rollback': (req, env, params) => handleMigrationRollback(req, env, ROUTE_DEPS, params),
+  // Public: the HMAC signature is the credential.
+  'POST /api/mcp/webhook/:id': (req, env, params) => handleWebhook(req, env, ROUTE_DEPS, params),
 };
 
 // Matches '/api/media/:key' against a path; returns the params or null.

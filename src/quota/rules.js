@@ -10,6 +10,8 @@ export const FEATURES = [
   { key: 'radar', label: 'Radar peluang', unit: 'analisis', price_idr: 500 },
   { key: 'advisor', label: 'Penasihat AI', unit: 'pesan', price_idr: 300 },
   { key: 'social', label: 'Konten media sosial', unit: 'konten', price_idr: 500 },
+  // Layanan tambahan & Tanpa limbah: one optimisation run = 5 team calls + 1 lead call, each metered.
+  { key: 'income', label: 'Optimasi pendapatan', unit: 'panggilan AI', price_idr: 500 },
 ]
 export const FEATURE_KEYS = FEATURES.map((f) => f.key)
 const BY_KEY = Object.fromEntries(FEATURES.map((f) => [f.key, f]))
@@ -17,7 +19,7 @@ export const featureOf = (key) => BY_KEY[key] || null
 
 // Trial quota = the Free plan's monthly limits. Used when no plan row says otherwise.
 // The advisor is the most expensive feature (long multi-agent prompts), so it gets fewer tries.
-export const FREE_QUOTA = { offer: 10, report: 10, leads: 10, radar: 10, advisor: 5, social: 10 }
+export const FREE_QUOTA = { offer: 10, report: 10, leads: 10, radar: 10, advisor: 5, social: 10, income: 10 }
 // Margareta's "3 tries before signing up". Every AI path needs a signed-in session today,
 // so nothing uses this yet; kept here so a future public demo has one number to read.
 export const GUEST_TRIES = 3

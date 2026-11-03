@@ -42,3 +42,6 @@ spec/
 # Cloudflare
 .wrangler/
 .dev.vars
+
+# Local review config (no AI binding, see file header)
+wrangler.dev.toml

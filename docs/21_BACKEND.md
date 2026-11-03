@@ -41,7 +41,9 @@ Body JSON: `table`, `action` (`select|insert|update|delete`), serta field per ak
 
 ### Tabel dan kolom (whitelist)
 
-Tabel: `requests`, `offers`, `assignments`, `completions`, `ledger_entries`, `reports`. Kolom per tabel sama dengan [20_DATABASE.md](20_DATABASE.md). Kolom JSON (`offers.ai_proposal_json`, `completions.photos_path`, `reports.summary_json`) di-serialize saat tulis dan di-parse saat baca; kolom ini tidak dapat dipakai pada filter atau order. Tabel/kolom di luar daftar: 400.
+Tabel: `requests`, `offers`, `assignments`, `workers`, `assignment_workers`, `completions`, `ledger_entries`, `vas_items`, `waste_entries`, `reports`, `social_contents`, `social_schedules`, `ai_messages`, `opportunity_states`, `leads`. Kolom per tabel sama dengan [20_DATABASE.md](20_DATABASE.md). Kolom JSON (`offers.ai_proposal_json`, `completions.photos_path`, `reports.summary_json`, `workers.skills`, `leads.meta_json`) di-serialize saat tulis dan di-parse saat baca; kolom ini tidak dapat dipakai pada filter atau order. Tabel/kolom di luar daftar: 400. Daftar ini diekspor sebagai `TABLES` dari `worker/index.js` dan diuji di `tests/pendapatan-worker.test.mjs`, sehingga tabel yang lupa didaftarkan langsung gagal di CI.
+
+`vas_items` dan `waste_entries` punya aturan tambahan di luar skema: divalidasi oleh `src/pendapatan/rules.js` pada insert **dan** update (update terhadap baris hasil gabungan), dengan kuota 500 item katalog dan 2000 temuan per pemilik. Pelanggaran mengembalikan 400 dengan pesan yang bisa langsung ditampilkan UI. Rincian di [API.md](API.md#aturan-tabel-pendapatan-vas_items-waste_entries).
 
 ### Semantik
 
@@ -74,7 +76,7 @@ Catatan perilaku:
 - Nama tabel/kolom divalidasi terhadap whitelist sebelum masuk SQL; semua nilai memakai parameter terikat.
 - Batas ukuran: nilai string 20.000 karakter (200.000 untuk hasil serialisasi), body 256 KB.
 - Pelanggaran constraint database dipetakan ke 400 "Data tidak valid atau melanggar batasan."
-- Tidak ada pembatasan aksi per tabel: pengguna dapat memperbarui/menghapus baris miliknya di semua tabel domain, termasuk `ledger_entries`. Tidak ada validasi status/transisi di sisi server (mis. `OfferTransitions` hanya di klien). Lihat catatan di bawah.
+- Tidak ada pembatasan aksi per tabel: pengguna dapat memperbarui/menghapus baris miliknya di semua tabel domain, termasuk `ledger_entries`. Pengecualiannya aturan yang disebut di atas (`ledger_entries` uang/alur, `vas_items`, `waste_entries`); transisi status tahap lain (mis. `OfferTransitions`) masih hanya di klien. Lihat catatan di bawah.
 
 ## LLM
 
