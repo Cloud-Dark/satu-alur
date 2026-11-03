@@ -45,3 +45,4 @@ spec/
 
 # Local review config (no AI binding, see file header)
 wrangler.dev.toml
+docs/lomba/submission.print.html
