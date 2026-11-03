@@ -39,7 +39,7 @@
 
 ```bash
 # Clone repository
-git clone https://github.com/username/satu-alur.git
+git clone https://github.com/maszulfikarsuweleh/satu-alur.git
 cd satu-alur
 
 # Install dependencies
@@ -49,7 +49,7 @@ npm install
 npm run dev
 ```
 
-Aplikasi akan berjalan di `http://localhost:5173`
+Aplikasi akan berjalan di `http://localhost:5173`. Panduan testing lokal untuk QA: [docs/TESTING_LOKAL.md](docs/TESTING_LOKAL.md).
 
 ### Mode Mock (Tanpa Backend)
 
