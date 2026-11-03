@@ -163,3 +163,14 @@ Estimasi ini adalah model, bukan meteran. Pada insiden produksi, model ini mengh
 ## Catatan pemuatan data
 
 Sejak commit "keyset paging", aplikasi memuat semua baris per tabel (halaman 5.000 baris). Batas 1.000 baris yang dulu memotong KPI Ringkasan sudah tidak berlaku.
+
+
+## Petugas contoh (`demo-workers.sql`)
+
+Petugas dan keahlian contoh untuk 9 akun demo (DATA FIKTIF; telepon 0812-0000-xxxx, alamat berlabel "(contoh)"), supaya Penugasan › Tim, Peta, dan form Tugaskan terisi.
+
+- Dibuat ulang: `node scripts/seed-demo-workers.mjs` (sumber: `src/demo/demo-workers.js`).
+- Isi: 75 baris (44 petugas, 31 keahlian). Estimasi tulis ≈ 180 (termasuk indeks).
+- Aman dijalankan ulang: petugas di-upsert per id (tidak dihapus, jadi tautan penugasan tetap utuh); keahlian hanya ditambah bila key/nama belum ada.
+- Butuh migrasi `0003_workers` dan `0017_worker_skills`.
+- Terapkan: `npx wrangler d1 execute satu-alur-db --local --file seeds/demo-workers.sql` (production: `--remote`, atas keputusan lead).

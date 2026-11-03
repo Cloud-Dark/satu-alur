@@ -26,6 +26,7 @@
  * Tanpa dependency (Node >= 18, ESM).
  */
 import { writeFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
+import { demoWorkersSql } from '../src/demo/demo-workers.js'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -2105,6 +2106,11 @@ function buildSql(results, args, ctx, note) {
     stmts += emitInserts(out, t, rows)
     out.push('')
   }
+  // Petugas & keahlian contoh (sama dengan seeds/demo-workers.sql), supaya tab Tim dan Tugaskan terisi.
+  const crew = demoWorkersSql(list.map((b) => b.k))
+  out.push(`-- petugas + keahlian contoh: ${crew.rows} baris`)
+  out.push(crew.sql)
+  counts.workers_and_skills = crew.rows
   return { sql: `${out.join('\n')}\n`, counts, stmts }
 }
 
