@@ -837,9 +837,9 @@
 }
 
 /* ---- Masuk dengan Google ---- */
-.auth-google-box { display: grid; gap: var(--s-3, 12px); margin-top: var(--s-4, 16px); }
+.auth-google-box { display: grid; gap: var(--s-3, 12px); margin: var(--s-4, 16px) 0 var(--s-5, 20px); }
 .auth-google-box[hidden] { display: none; }
-.auth-or { display: flex; align-items: center; gap: 12px; margin: 0; color: var(--text-muted); font-size: 0.8rem; }
+.auth-or { display: flex; align-items: center; gap: 12px; margin: var(--s-2, 8px) 0 0; color: var(--text-muted); font-size: 0.8rem; white-space: nowrap; }
 .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .auth-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; text-decoration: none; }
 .auth-google-mark { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #fff; }
@@ -849,4 +849,5 @@
 .auth-gis:empty { display: none; }
 .gis-mock-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; width: 100%; max-width: 400px; padding: 0 20px; border-radius: 999px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; font: 500 0.94rem/1 var(--font-sans, system-ui); cursor: pointer; }
 .gis-mock-btn[data-theme='filled_black'] { background: #131314; color: #e3e3e3; border-color: #8e918f; }
-.auth-form-code:not([hidden]) ~ .auth-google-box { display: none; }
+/* On the code step the email flow owns the card. */
+[data-step='code'] .auth-google-box { display: none; }

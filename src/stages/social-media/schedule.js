@@ -100,7 +100,7 @@ export async function render(host, ctx) {
     rows = [...rows].sort((a, b) => (b.scheduled_at < a.scheduled_at ? -1 : b.scheduled_at > a.scheduled_at ? 1 : b.id - a.id))
     const reload = C.button({ label: 'Muat ulang', icon: 'refresh', variant: 'ghost', size: 'sm' })
     reload.addEventListener('click', () => draw())
-    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : null, ...(rows.length ? rows.map((r) => {
+    body.replaceChildren(el('div', { className: 'form-actions' }, reload), replizReady(ctx) ? postsSection(ctx, () => draw()) : '', ...(rows.length ? rows.map((r) => {
       let action = null
       if (r.status === 'posted' && String(r.permalink || '').startsWith('https://')) action = el('a', { href: r.permalink, target: '_blank', rel: 'noopener' }, 'Lihat posting ↗')
       else if (r.status === 'scheduled') {

@@ -115,6 +115,7 @@ export function render(container) {
   if (!['mcp', 'integrations', 'erp', 'migration', 'logs', 'agent'].includes(currentTab)) currentTab = 'mcp'
   const tabs = C.segmented({
     label: 'Bagian pengaturan',
+    scroll: true,
     value: currentTab,
     options: [
       { value: 'mcp', label: 'Konektor' },
@@ -130,7 +131,6 @@ export function render(container) {
       draw()
     },
   })
-  tabs.classList.add('seg-block')
   const content = el('div', { className: 'set-content' })
   container.replaceChildren(tabs, content)
 
@@ -768,7 +768,7 @@ function renderErpTab(container) {
       const previewSlot = el('div', { className: 'mcp-preview-slot' })
 
       body.replaceChildren(
-        table,
+        el('div', { className: 'table-wrap' }, table),
         validation,
         el('div', { className: 'form-actions' },
           C.button({
@@ -1273,7 +1273,7 @@ function renderMigrationTab(container) {
           el('h4', {}, `Error (${report.errors.length})`),
           el('ul', {}, ...report.errors.slice(0, 50).map((e) => el('li', {}, `[${e.phase}] ${e.message}`))),
         )
-        : null,
+        : '',
       el('div', { className: 'form-actions' },
         C.button({
           label: 'Ekspor JSON', icon: 'download', size: 'sm', variant: 'ghost',
@@ -1353,13 +1353,13 @@ function renderLogsTab(container) {
         ),
         C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost', onClick: show }),
       ),
-      table,
+      el('div', { className: 'table-wrap' }, table),
       (errors || []).length
         ? el('div', { className: 'mcp-report-errors' },
           el('h4', {}, `${errors.length} baris gagal (dead letter)`),
           el('ul', {}, ...errors.slice(0, 20).map((e) => el('li', {}, `[${e.entity}] ${e.message}`))),
         )
-        : null,
+        : '',
     )
   }
 

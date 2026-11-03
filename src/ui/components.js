@@ -549,8 +549,14 @@ export function sanitizeHTML(html) {
 /* ------------------------------------------------------------ Segmented */
 
 /** Segmented control. options: [{value,label}] -> element with .value */
-export function segmented({ options, value, label, onChange }) {
-  const wrap = el('div', { className: 'seg', role: 'radiogroup', 'aria-label': label })
+/**
+ * Segmented control. With `scroll: true` it becomes a contained horizontal
+ * scroller for many options on small screens: the bar scrolls inside its own
+ * box (never the page), edges fade while more tabs are hidden, and the active
+ * tab is kept in view.
+ */
+export function segmented({ options, value, label, onChange, scroll = false }) {
+  const wrap = el('div', { className: `seg${scroll ? ' seg-scroll' : ''}`, role: 'radiogroup', 'aria-label': label })
   let current = value
   const buttons = options.map((o) => {
     const b = el('button', { type: 'button', role: 'radio', className: 'seg-btn', dataset: { value: o.value } }, o.label)
@@ -562,11 +568,32 @@ export function segmented({ options, value, label, onChange }) {
     })
     return b
   })
+  const fades = () => {
+    if (!scroll) return
+    const max = wrap.scrollWidth - wrap.clientWidth
+    wrap.classList.toggle('fade-start', wrap.scrollLeft > 2)
+    wrap.classList.toggle('fade-end', wrap.scrollLeft < max - 2)
+  }
+  const reveal = (smooth) => {
+    if (!scroll) return
+    const b = buttons.find((x) => x.dataset.value === current)
+    if (!b || wrap.scrollWidth <= wrap.clientWidth) return fades()
+    const left = b.offsetLeft - (wrap.clientWidth - b.offsetWidth) / 2
+    wrap.scrollTo({ left: Math.max(0, left), behavior: smooth ? 'smooth' : 'auto' })
+    fades()
+  }
   const sync = () => buttons.forEach((b) => {
     const on = b.dataset.value === current
     b.setAttribute('aria-checked', on ? 'true' : 'false')
     b.tabIndex = on ? 0 : -1
   })
+  if (scroll) {
+    wrap.addEventListener('scroll', fades, { passive: true })
+    wrap.addEventListener('click', () => requestAnimationFrame(() => reveal(true)))
+    // Measure once the bar is in the document and laid out.
+    requestAnimationFrame(() => requestAnimationFrame(() => reveal(false)))
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => fades()).observe(wrap)
+  }
   wrap.addEventListener('keydown', (e) => {
     if (!['ArrowLeft', 'ArrowRight'].includes(e.key)) return
     const i = options.findIndex((o) => o.value === current)
