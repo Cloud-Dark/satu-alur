@@ -1,0 +1,141 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+@page{size:A4 landscape;margin:0}
+:root{--bg:#f7f4ee;--bg2:#efeae1;--surface:#fff;--text:#16241f;--text-2:#33433c;--muted:#5f6d66;--faint:#8e9a94;--brand:#134235;--b600:#1b5a48;--b500:#2b7560;--b300:#8fbfab;--b100:#dcebe3;--b50:#edf5f0;--accent:#e7a13a;--a100:#fbeacb;--a50:#fdf5e6;--line:#e4ded3;--cream:#f7f4ee}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:297mm;height:210mm;background:var(--bg)}
+body{font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.page{position:relative;width:297mm;height:210mm;overflow:hidden}
+.glow{position:absolute;border-radius:50%}
+.g1{width:220mm;height:220mm;left:-95mm;top:-90mm;background:radial-gradient(circle,rgba(143,191,171,.42),rgba(143,191,171,0) 62%)}
+.g2{width:200mm;height:200mm;right:-50mm;top:-60mm;background:radial-gradient(circle,rgba(251,234,203,.95),rgba(251,234,203,0) 62%)}
+header{position:absolute;left:18mm;right:18mm;top:12mm;display:flex;justify-content:space-between;align-items:center}
+.brand{display:flex;align-items:center;gap:2.6mm}
+.word{font-weight:700;font-size:14pt;letter-spacing:-.03em}
+.word span{font-weight:500;color:var(--b500);margin-left:.2em}
+.nav{display:flex;gap:2mm;align-items:center;font-size:8pt;color:var(--text-2);font-weight:500}
+.nav span{padding:1.6mm 3.4mm;border-radius:99px}
+.nav .on{background:var(--b50);color:var(--brand)}
+.nav .cta{background:var(--brand);color:var(--cream);font-weight:600;margin-left:2mm;display:inline-flex;gap:1.6mm;align-items:center}
+.copy{position:absolute;left:18mm;top:34mm;width:142mm}
+.badge{display:inline-flex;align-items:center;gap:2.2mm;padding:1.8mm 4.2mm 1.8mm 3mm;border-radius:99px;background:rgba(255,255,255,.85);border:1px solid var(--line);box-shadow:0 1px 2px rgba(19,66,53,.06);font-size:8.5pt;font-weight:500;color:var(--text-2)}
+.pd{width:3.4mm;height:3.4mm;border-radius:50%;background:var(--b100);display:grid;place-items:center}.pd i{width:1.7mm;height:1.7mm;border-radius:50%;background:var(--b500)}
+h1{margin-top:6mm;font-family:'Instrument Serif',serif;font-weight:400;font-size:58pt;line-height:.98;letter-spacing:-.02em}
+h1 em{position:relative;color:var(--b500);white-space:nowrap}
+h1 em svg{position:absolute;left:0;bottom:2mm;width:100%;height:4mm}
+.lead{margin-top:6mm;width:128mm;font-size:10.5pt;line-height:1.6;color:var(--muted)}
+.points{margin-top:6mm;display:grid;grid-template-columns:auto auto;gap:2.4mm 7mm;list-style:none;font-size:8.5pt;color:var(--text-2);width:max-content}
+.points li{display:flex;align-items:center;gap:2mm}
+.tick{width:4.4mm;height:4.4mm;border-radius:50%;background:var(--b50);border:1px solid var(--b100);display:grid;place-items:center}
+.visual{position:absolute;right:14mm;top:28mm;width:128mm;height:112mm}
+.stage3d{position:absolute;left:22mm;top:-4mm;width:108mm}
+.chip{position:absolute;left:-2mm;top:8mm;display:flex;align-items:center;gap:2.6mm;background:#fff;border:1px solid var(--line);border-radius:99px;padding:2.2mm 5mm 2.2mm 2.4mm;box-shadow:0 2px 4px rgba(19,66,53,.05),0 12px 32px -12px rgba(19,66,53,.25)}
+.chip .ic{width:7mm;height:7mm;border-radius:50%;background:var(--b50);display:grid;place-items:center}
+.chip b{display:block;font-size:8.5pt}.chip small{font-size:7pt;color:var(--muted)}
+.card{position:absolute;left:-5mm;top:53mm;width:62mm;background:#fff;border:1px solid var(--line);border-radius:5mm;padding:4.2mm;box-shadow:0 4px 8px rgba(19,66,53,.05),0 28px 64px -24px rgba(19,66,53,.32)}
+.ch{display:flex;justify-content:space-between;align-items:flex-start}
+.ch b{font-size:8pt;display:block}.ch small{font-size:6.5pt;color:var(--muted)}
+.tag{font-size:6.5pt;font-weight:600;padding:.8mm 2.4mm;border-radius:99px;background:var(--a50);border:1px solid var(--a100);color:#a76a12}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:2mm;margin-top:3mm}
+.kpis div{border:1px solid var(--line);border-radius:2.6mm;padding:2mm 2.4mm}
+.kpis span{font-size:5.8pt;color:var(--muted);display:block}
+.kpis strong{font-family:'Instrument Serif',serif;font-weight:400;font-size:15pt;line-height:1.1}
+.kpis div+div strong{color:var(--b500)}
+.mini{display:block;width:100%;height:16mm;margin-top:2mm}
+.rows{list-style:none;border-top:1px solid var(--line);margin-top:1.4mm;padding-top:2mm;display:grid;gap:1.8mm}
+.rows li{display:flex;align-items:center;gap:2mm;font-size:6.8pt}
+.rows .ri{width:5mm;height:5mm;border-radius:1.4mm;background:var(--b50);display:grid;place-items:center}
+.rows .st{margin-left:auto;font-size:6pt;padding:.6mm 2.2mm;border-radius:99px;background:var(--bg2);color:var(--muted)}
+.rows .st.ai{background:var(--a50);color:#a76a12}
+.band{position:absolute;left:12mm;right:12mm;bottom:10mm;height:46mm;border-radius:7mm;background:linear-gradient(115deg,#134235 0%,#123a2f 55%,#2c4a2a 85%,#4a5130 100%);overflow:hidden;color:var(--cream);box-shadow:0 24px 50px -24px rgba(19,66,53,.55)}
+.band .lines{position:absolute;inset:0;width:100%;height:100%}
+.bhead{position:absolute;left:10mm;top:6mm;right:10mm;display:flex;justify-content:space-between;align-items:baseline}
+.eyebrow{font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:var(--b300);font-weight:600}
+.bh{font-family:'Instrument Serif',serif;font-size:17pt;font-weight:400}
+.bh em{color:var(--accent)}
+.meta{font-size:7pt;color:rgba(247,244,238,.7);text-align:right;line-height:1.5}
+.meta b{color:var(--cream);font-weight:600}
+.steps{position:absolute;left:8mm;right:8mm;top:19mm;display:grid;grid-template-columns:repeat(6,1fr)}
+.step{text-align:center;position:relative}
+.node{margin:0 auto;width:10mm;height:10mm;border-radius:50%;background:rgba(247,244,238,.08);border:1px solid rgba(247,244,238,.22);display:grid;place-items:center;color:var(--cream)}
+.step.first .node{background:var(--cream);color:var(--brand);border-color:var(--cream)}
+.step.ai .node{background:var(--accent);border-color:var(--accent);color:#2b1c05}
+.step small{display:block;margin-top:2.2mm;font-size:6.5pt;color:rgba(247,244,238,.6);letter-spacing:.04em}
+.step b{display:block;font-size:8.5pt;font-weight:600;margin-top:.5mm}
+.aitag{display:inline-block;margin-left:1mm;font-size:5.8pt;font-weight:700;padding:0 1.4mm;border-radius:99px;background:var(--accent);color:#2b1c05;vertical-align:1px}
+</style></head><body><div class="page">
+<div class="glow g1"></div><div class="glow g2"></div>
+
+<header>
+ <div class="brand"><svg width="34" height="34" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="9" fill="#134235"/><path d="M7.5 23.5h5.5v-5h5.5v-5h4" stroke="#f7f4ee" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23.5" cy="9.5" r="3" fill="#e7a13a"/></svg><div class="word">Satu<span>Alur</span></div></div>
+ <div class="nav"><span class="on">Dokumentasi</span><span>Produk</span><span>Teknis</span><span>API</span><span class="cta">v0.1.0 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#f7f4ee" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg></span></div>
+</header>
+
+<section class="copy">
+ <div class="badge"><span class="pd"><i></i></span>Dokumentasi resmi · Untuk bisnis jasa di Indonesia</div>
+ <h1>Panduan lengkap<br><em>satu alur<svg viewBox="0 0 200 14" preserveAspectRatio="none"><path d="M3 10 C 48 3, 118 2, 197 6" stroke="#e7a13a" stroke-width="5" fill="none" stroke-linecap="round"/></svg></em> kerja.</h1>
+ <p class="lead">Dari permintaan pelanggan sampai laporan keuangan: produk, arsitektur, database, API, dan panduan pemasangan Satu Alur dalam satu dokumen.</p>
+ <ul class="points">
+  <li><span class="tick"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Penawaran AI selalu divalidasi</li>
+  <li><span class="tick"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Masuk cukup dengan email (OTP)</li>
+  <li><span class="tick"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Cloudflare Worker · D1 · Workers AI</li>
+  <li><span class="tick"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>Bahasa Indonesia · November 2026</li>
+ </ul>
+</section>
+
+<div class="visual">
+ <svg class="stage3d" viewBox="0 0 400 300" fill="none">
+  <defs>
+   <radialGradient id="base" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f2eee6"/></radialGradient>
+   <linearGradient id="ball" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6c46a"/><stop offset="1" stop-color="#c9821c"/></linearGradient>
+  </defs>
+  <ellipse cx="225" cy="248" rx="172" ry="34" fill="url(#base)" stroke="#e4ded3"/>
+  <!-- bars: side (darker) + front + top cap -->
+  <g>
+   <rect x="102" y="200" width="34" height="46" rx="8" fill="#a9cdbd"/><ellipse cx="119" cy="200" rx="17" ry="6" fill="#dcebe3"/>
+   <rect x="148" y="176" width="34" height="72" rx="8" fill="#8fbfab"/><ellipse cx="165" cy="176" rx="17" ry="6" fill="#cfe4da"/>
+   <rect x="194" y="150" width="34" height="100" rx="8" fill="#6aa58d"/><ellipse cx="211" cy="150" rx="17" ry="6" fill="#bcd9cb"/>
+   <rect x="240" y="122" width="34" height="128" rx="8" fill="#2b7560" opacity=".9"/><ellipse cx="257" cy="122" rx="17" ry="6" fill="#a9cdbd"/>
+   <rect x="286" y="92" width="34" height="158" rx="8" fill="#1b5a48"/><ellipse cx="303" cy="92" rx="17" ry="6" fill="#8fbfab"/>
+   <rect x="332" y="60" width="34" height="190" rx="8" fill="#134235"/><ellipse cx="349" cy="60" rx="17" ry="6" fill="#6aa58d"/>
+  </g>
+  <path d="M84 214 L119 196 L165 172 L211 146 L257 118 L303 88 L349 56 L382 34" stroke="#2b7560" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="119" cy="186" r="11" fill="url(#ball)"/><ellipse cx="115" cy="182" rx="3.5" ry="2.4" fill="#fff" opacity=".55"/>
+  <circle cx="330" cy="22" r="5" fill="#fff" stroke="#e4ded3"/><circle cx="388" cy="140" r="4" fill="#fff" stroke="#e4ded3"/><circle cx="178" cy="40" r="6" fill="#fff" stroke="#e4ded3"/>
+ </svg>
+ <div class="chip"><span class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></span><span><b>Penawaran tervalidasi</b><small>3 aturan domain lolos</small></span></div>
+ <div class="card">
+  <div class="ch"><div><b>Ringkasan bulan ini</b><small>Laba/rugi · diperbarui otomatis</small></div><span class="tag">Contoh</span></div>
+  <div class="kpis"><div><span>Pendapatan</span><strong>Rp24,6 jt</strong></div><div><span>Laba sebelum pajak</span><strong>Rp8,2 jt</strong></div></div>
+  <svg class="mini" viewBox="0 0 300 92" preserveAspectRatio="none"><defs><linearGradient id="pf" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2b7560" stop-opacity=".22"/><stop offset="1" stop-color="#2b7560" stop-opacity="0"/></linearGradient></defs>
+   <path d="M0 30.5H300M0 61.5H300" stroke="#e4ded3" stroke-dasharray="4 4"/>
+   <path d="M0 74 C 30 70, 46 58, 75 60 S 120 70, 150 50 S 200 44, 225 34 S 270 18, 292 14 V92 H0Z" fill="url(#pf)"/>
+   <path d="M0 74 C 30 70, 46 58, 75 60 S 120 70, 150 50 S 200 44, 225 34 S 270 18, 292 14" stroke="#2b7560" stroke-width="3" fill="none"/>
+   <circle cx="292" cy="14" r="7" fill="#e7a13a" stroke="#fff" stroke-width="3"/></svg>
+  <ul class="rows">
+   <li><span class="ri"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="2"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>Servis AC · 2 unit<span class="st ai">Penawaran AI</span></li>
+   <li><span class="ri"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#2b7560" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Instalasi CCTV<span class="st">Penugasan</span></li>
+  </ul>
+ </div>
+</div>
+
+<section class="band">
+ <svg class="lines" viewBox="0 0 1000 160" preserveAspectRatio="none" fill="none">
+  <path d="M-20 140 C 200 60, 420 170, 620 90 S 900 20, 1040 70" stroke="#8fbfab" stroke-opacity=".28" stroke-width="1.4" stroke-dasharray="2 7" stroke-linecap="round"/>
+  <path d="M-20 150 C 200 120, 420 175, 640 135 S 900 95, 1040 105" stroke="#e7a13a" stroke-opacity=".4" stroke-width="1.6"/>
+ </svg>
+ <div class="bhead">
+  <div><div class="eyebrow">Alur kerja</div><div class="bh">Enam tahap, <em>satu</em> benang merah.</div></div>
+  <div class="meta"><b>Satu Alur</b> · Dokumentasi Produk &amp; Teknis<br>Versi 0.1.0 · November 2026</div>
+ </div>
+ <div class="steps">
+  <div class="step first"><div class="node"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></div><small>TAHAP 01</small><b>Permintaan</b></div>
+  <div class="step ai"><div class="node"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></div><small>TAHAP 02</small><b>Penawaran<span class="aitag">AI</span></b></div>
+  <div class="step"><div class="node"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><small>TAHAP 03</small><b>Penugasan</b></div>
+  <div class="step"><div class="node"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg></div><small>TAHAP 04</small><b>Penyelesaian</b></div>
+  <div class="step"><div class="node"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></div><small>TAHAP 05</small><b>Pembukuan</b></div>
+  <div class="step ai"><div class="node"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></div><small>TAHAP 06</small><b>Laporan<span class="aitag">AI</span></b></div>
+ </div>
+</section>
+</div></body></html>
