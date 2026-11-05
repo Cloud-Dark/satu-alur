@@ -7,6 +7,9 @@ import { staggerChildren } from '../ui/animations.js'
 import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from './data.js'
 import { progressOf, progressLabel } from '../domain/progress.js'
 
+/** Funnel step -> Alur kerja filter (posisi). */
+const FUNNEL_FILTER = { request: 'all', offer: 'offer', assign: 'assign', complete: 'work', bookkeeping: 'book' }
+
 const { el, icon } = C
 const DAY = 86400000
 
@@ -195,7 +198,7 @@ function renderPipeline(m, navigate) {
 
   const list = el('ol', { className: 'funnel' }, cells.map((c, i) => {
     const pct = reqTotal ? Math.round((c.reach / reqTotal) * 100) : 0
-    const b = el('button', { type: 'button', className: 'funnel-row', 'aria-label': `${c.num} ${c.label}: ${c.count}. ${pct}% permintaan mencapai tahap ini. Buka tahap.` },
+    const b = el('button', { type: 'button', className: 'funnel-row', 'aria-label': `${c.num} ${c.label}: ${c.count}. ${pct}% permintaan mencapai tahap ini. Buka di Alur kerja.` },
       el('span', { className: 'funnel-top' },
         el('span', { className: 'funnel-num tnum' }, c.num),
         el('span', { className: 'funnel-label' }, c.label),
@@ -208,7 +211,8 @@ function renderPipeline(m, navigate) {
         el('span', { className: 'funnel-pct tnum' }, `${pct}%`),
       ),
     )
-    b.addEventListener('click', () => navigate(c.key))
+    // Each row opens Alur kerja filtered to the jobs at that step (the one list of jobs).
+    b.addEventListener('click', () => navigate('workflow', { filter: FUNNEL_FILTER[c.key] }))
     return el('li', {}, b)
   }))
 

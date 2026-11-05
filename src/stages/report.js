@@ -182,8 +182,8 @@ export async function render(container, ctx = {}) {
   function emptyForPeriod() {
     const box = C.emptyState({ kicker: 'Periode kosong', title: 'Tidak ada jurnal di periode ini.', body: flow.ledger.length ? 'Coba periode lain, atau posting jurnal baru.' : 'Posting jurnal di tahap 05 agar laporan terisi.' })
     if (!flow.ledger.length) {
-      const go = C.button({ label: 'Ke pembukuan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
-      go.addEventListener('click', () => navigate('bookkeeping'))
+      const go = C.button({ label: 'Pekerjaan siap dibukukan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+      go.addEventListener('click', () => navigate('workflow', { filter: 'book' }))
       box.appendChild(go)
     }
     return box

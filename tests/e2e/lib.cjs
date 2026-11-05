@@ -93,19 +93,36 @@ async function waitDashboard(page) {
 
 const isMobile = (page) => (page.viewportSize()?.width || 1440) < 1024
 
-/** Opens a stage from the sidebar (opens the drawer menu first on small screens). */
-// Stage pages opened from the "Alur kerja" table, not from the sidebar.
+// Stage pages that show one job: opened from the "Alur kerja" table, not from the sidebar.
 const WORKFLOW_STAGES = new Set(['request', 'offer', 'assign', 'complete', 'bookkeeping'])
 
-async function goStage(page, key) {
+/** The app's own route table (src/ui/routes.js, an ES module). */
+async function routes() {
+  const { pathToFileURL } = require('url')
+  return import(pathToFileURL(path.resolve(__dirname, '../../src/ui/routes.js')).href)
+}
+
+/** '#/app/…' URL of a stage (params as the shell gets them, e.g. { offerId: 3 }). */
+async function stageHash(key, params = {}) {
+  return (await routes()).formatAppRoute({ stage: key, params })
+}
+
+/** Opens a page by its URL, as a link or the address bar would. */
+async function goHash(page, hash, wait = 700) {
+  await page.evaluate((h) => { location.hash = h }, hash)
+  await page.waitForTimeout(wait)
+}
+
+/**
+ * Opens a stage: from the sidebar (opening the drawer menu first on small screens), or for the
+ * one-job stage pages by URL (#/app/penawaran/baru, #/app/penugasan?penawaran=3, …).
+ */
+async function goStage(page, key, params = {}) {
   if (WORKFLOW_STAGES.has(key)) {
-    if (!(await goStage(page, 'workflow'))) return false
-    const link = page.locator(`.wf-stage-link[data-stage="${key}"]`)
-    await link.waitFor({ timeout: 8000 }).catch(() => {})
-    if (!(await link.count())) return false
-    await link.click()
+    await goHash(page, await stageHash(key, params), 0)
+    await page.waitForFunction((k) => document.querySelector('.stage-host .view')?.classList.contains(`view-${k}`), key, { timeout: 8000 }).catch(() => {})
     await page.waitForTimeout(600)
-    return true
+    return page.evaluate((k) => Boolean(document.querySelector(`.stage-host .view-${k}`)), key)
   }
   const item = page.locator(`.flow-item[data-stage="${key}"]`)
   if (!(await item.count())) return false
@@ -135,4 +152,4 @@ async function kpiValue(page, label, scope = '.view') {
 
 const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
 
-module.exports = { makeContext, loginLive, waitDashboard, goStage, WORKFLOW_STAGES, kpiValue, isMobile, norm, STAGE_LABELS }
+module.exports = { makeContext, loginLive, waitDashboard, goStage, goHash, stageHash, routes, WORKFLOW_STAGES, kpiValue, isMobile, norm, STAGE_LABELS }

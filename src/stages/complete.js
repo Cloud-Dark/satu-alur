@@ -1,14 +1,23 @@
-/** 04 — Penyelesaian: close an active assignment with result notes. */
+/**
+ * 04 — Penyelesaian: close one job's active assignment with result notes
+ * (#/app/penyelesaian?penugasan=<id>). Every job is listed in Alur kerja.
+ */
 import { getCloud } from '../cloud.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
+import { jobHeader, solo, pickFromWorkflow, workflowLink } from './job.js'
 
 const { el } = C
 
 export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
   const params = ctx.params || {}
+  if (params.assignmentId == null) {
+    container.replaceChildren(C.pageHeader({ title: 'Penyelesaian pekerjaan' }),
+      pickFromWorkflow(navigate, { filter: 'work', body: 'Buka Alur kerja, lalu tekan "Tandai selesai" pada pekerjaan yang sedang dikerjakan.' }))
+    return
+  }
 
   const assignSel = C.select({ label: 'Penugasan aktif', name: 'assignment_id', required: true, options: [{ value: '', label: 'Memuat…' }] })
   const preview = el('div', { hidden: true })
@@ -43,13 +52,11 @@ export async function render(container, ctx = {}) {
   })
   const msg = wiz.msg
 
-  const listBody = el('div', {}, C.skeletonRows(5))
-  const listPanel = C.panel({ title: 'Riwayat penyelesaian', meta: 'memuat…', className: 'list-panel' }, listBody)
-  const pg = C.pager({ key: 'completions', label: 'riwayat penyelesaian', onChange: () => drawList(), scrollTarget: listPanel })
-
+  const headSlot = el('div', {}, C.skeletonRows(1))
+  const doneSlot = el('div', {})
   container.replaceChildren(
     C.pageHeader({ title: 'Penyelesaian pekerjaan' }),
-    el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
+    solo(headSlot, doneSlot, wiz.root, workflowLink(navigate)),
   )
 
   const assignmentPreview = (a) => {
@@ -68,7 +75,8 @@ export async function render(container, ctx = {}) {
 
   let firstFill = true
   function fillAssignments() {
-    const active = flow.activeAssignments()
+    // Only this job's assignment, while it is still open.
+    const active = flow.activeAssignments().filter((a) => String(a.id) === String(params.assignmentId))
     const opts = [{ value: '', label: active.length ? 'Pilih penugasan' : 'Tidak ada penugasan aktif' }]
     active.forEach((a) => {
       const r = flow.requestOfAssignment(a)
@@ -78,11 +86,9 @@ export async function render(container, ctx = {}) {
     const keep = [assignSel.input.value, wanted].find((v) => v && active.some((a) => String(a.id) === v)) || ''
     C.setOptions(assignSel.input, opts, keep)
     if (!active.length && wiz.index === 0 && !wiz.done) {
-      msg.show('info', flow.assignments.length
-        ? 'Semua penugasan sudah selesai. Buat penugasan baru di tahap 03.'
-        : 'Belum ada penugasan. Tugaskan pekerja di tahap 03 terlebih dahulu.')
-      const go = C.button({ label: 'Ke penugasan', iconRight: 'arrowRight', size: 'sm' })
-      go.addEventListener('click', () => navigate('assign'))
+      msg.show('info', 'Penugasan ini tidak ditemukan atau sudah ditutup.')
+      const go = C.button({ label: 'Ke alur kerja', iconRight: 'arrowRight', size: 'sm' })
+      go.addEventListener('click', () => navigate('workflow'))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
     }
     showPreview()
@@ -127,14 +133,8 @@ export async function render(container, ctx = {}) {
       next.addEventListener('click', () => navigate('bookkeeping', { completionId: row?.id }))
       const bill = C.button({ label: 'Buat invoice', icon: 'receipt', size: 'sm', variant: 'soft' })
       bill.addEventListener('click', () => navigate('invoice', { completionId: row?.id }))
-      const again = C.button({ label: 'Selesaikan lainnya', icon: 'plus', size: 'sm', variant: 'soft' })
-      again.addEventListener('click', () => {
-        notes.input.value = ''
-        assignSel.input.value = ''
-        assignSel.input.dispatchEvent(new Event('change'))
-        wiz.reset()
-        fillAssignments()
-      })
+      const again = C.button({ label: 'Pekerjaan lain', icon: 'activity', size: 'sm', variant: 'ghost' })
+      again.addEventListener('click', () => navigate('workflow', { filter: 'work' }))
       wiz.complete({ text: `Pekerjaan untuk ${customerLabel(flow.requestOfAssignment(a))} ditandai selesai. Siap dibukukan dan ditagih.`, actions: [next, bill, again] })
       showToast('Pekerjaan ditandai selesai.', 'success')
       notifyDataChanged()
@@ -149,43 +149,29 @@ export async function render(container, ctx = {}) {
     try {
       flow = await loadFlow()
     } catch (err) {
-      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      headSlot.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
       return
     }
     if (ctx.signal?.aborted) return
-    fillAssignments()
-    drawList()
+    drawJob()
+    if (!wiz.done) fillAssignments()
   }
 
-  function drawList() {
-    const unbooked = flow.completionsWithoutLedger().length
-    listPanel.querySelector('.panel-meta').textContent = `${flow.completions.length} baris · ${unbooked} belum dibukukan`
-    if (!flow.completions.length) {
-      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada pekerjaan selesai.', body: 'Pekerjaan yang ditandai selesai akan muncul di sini.' }))
-      return
-    }
-    const rows = [...flow.completions].sort((x, y) => (C.toDate(y.completed_at || y.created_at) || 0) - (C.toDate(x.completed_at || x.created_at) || 0))
-    listBody.replaceChildren(C.dataTable({
-      caption: 'Riwayat penyelesaian',
-      rows: pg.slice(rows),
-      columns: [
-        { label: 'Pelanggan', render: (c) => { const r = flow.requestOfCompletion(c); const a = flow.assignmentOfCompletion(c); return C.cellStack(customerLabel(r), a?.worker_name) } },
-        { label: 'Catatan', className: 'col-wide', render: (c) => el('span', { className: 'cell-note', title: c.notes || '' }, c.notes || '—') },
-        { label: 'Selesai', className: 'col-date', render: (c) => el('time', { className: 'tnum', datetime: c.completed_at || '', title: C.formatDateTime(c.completed_at) }, C.formatDate(c.completed_at || c.created_at)) },
-        {
-          label: 'Pembukuan',
-          className: 'col-action',
-          render: (c) => {
-            const bill = C.button({ label: 'Invoice', icon: 'receipt', size: 'sm', variant: 'ghost', title: 'Buat atau buka invoice pekerjaan ini' })
-            bill.addEventListener('click', () => navigate('invoice', { completionId: c.id }))
-            if (flow.ledgerOf(c.id).length) return el('div', { className: 'cell-actions' }, C.tag('Terbukukan', 'ok'), bill)
-            const b = C.button({ label: 'Posting', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
-            b.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
-            return el('div', { className: 'cell-actions' }, b, bill)
-          },
-        },
-      ],
-    }), pg.root)
+  // The job header; an assignment that is already closed shows its result instead of the form.
+  function drawJob() {
+    const a = flow.assignment(params.assignmentId)
+    const r = a ? flow.requestOfAssignment(a) : null
+    const c = a ? flow.completionsOf(a.id)[0] : null
+    headSlot.replaceChildren(r ? jobHeader(r, { tag: c ? C.tag('Selesai', 'ok') : C.tag('Dikerjakan', 'warn'), note: `${a.worker_name || 'Tanpa petugas'} · ${C.formatDateTime(a.scheduled_at)}` }) : '')
+    if (!c || wiz.done) { doneSlot.replaceChildren(); return }
+    wiz.root.hidden = true
+    const next = C.button({ label: flow.ledgerOf(c.id).length ? 'Lihat pembukuan' : 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+    next.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
+    const bill = C.button({ label: 'Invoice', icon: 'receipt', size: 'sm', variant: 'soft' })
+    bill.addEventListener('click', () => navigate('invoice', { completionId: c.id }))
+    doneSlot.replaceChildren(C.panel({ title: 'Pekerjaan selesai', meta: C.formatDate(c.completed_at || c.created_at), raised: true },
+      C.defList([['Catatan hasil', c.notes || '—'], ['Selesai', C.formatDateTime(c.completed_at || c.created_at)]]),
+      el('div', { className: 'job-actions' }, next, bill)))
   }
 
   await loadList()

@@ -176,8 +176,8 @@ export async function render(container, ctx) {
   ctx.signal.addEventListener('abort', () => window.removeEventListener('beforeunload', onUnload))
 
   // A deep link opens that ticket once; drop the query so a reload shows the list.
-  const deep = new URLSearchParams(location.hash.split('?')[1] || '').get('tiket')
-  if (deep !== null) history.replaceState(null, '', '#/app')
+  const deep = ctx.params?.tiket != null ? String(ctx.params.tiket) : new URLSearchParams(location.hash.split('?')[1] || '').get('tiket')
+  if (deep !== null) { if (ctx.setRoute) ctx.setRoute({}); else history.replaceState(null, '', '#/app/bantuan') }
   if (deep) showThread(deep)
   else showList()
 }

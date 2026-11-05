@@ -23,16 +23,32 @@ module.exports = async function opsInvoice(t) {
   t.check(!/Belum ada petugas aktif/.test(teamText) && await p.locator('.workspace-entry').count() >= 3, 'demo: Tim lists petugas', String(await p.locator('.workspace-entry').count()))
   await p.locator('.seg-btn[data-value="assign"]').click()
   await p.waitForTimeout(600)
-  t.check(!/Belum ada petugas aktif/.test(await p.evaluate(() => document.querySelector('.view').innerText)), 'demo: assign form has petugas to pick')
+  t.check(/Pilih pekerjaan dari Alur kerja/.test(await p.evaluate(() => document.querySelector('.view').innerText)), 'assign tab without a job points to Alur kerja')
 
-  // ---- picker only lists approved offers without a penugasan
-  const pick = await p.evaluate(() => {
+  // ---- one job per page: an approved offer without a team gets the form, for that offer only
+  // A draft offer: its page approves it, then "Tugaskan" opens the form for that offer only.
+  const draft = await p.evaluate(() => {
     const s = JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}')
     const assigned = new Set((s.assignments || []).map((a) => String(a.offer_id)))
-    const opts = [...document.querySelectorAll('select[name="offer_id"] option')].filter((o) => o.value)
-    return { n: opts.length, bad: opts.filter((o) => assigned.has(o.value) || /sudah ditugaskan/.test(o.textContent)).map((o) => o.textContent) }
+    return (s.offers || []).find((o) => o.status === 'draft' && !assigned.has(String(o.id)))?.id ?? null
   })
-  t.check(pick.bad.length === 0, 'assign picker: no offer that already has a penugasan', pick.bad.join(' | '))
+  await goStage(p, 'offer', { offerId: draft })
+  await p.getByRole('button', { name: 'Setujui' }).click()
+  await p.getByRole('button', { name: 'Tugaskan', exact: true }).waitFor({ timeout: 8000 })
+  await p.getByRole('button', { name: 'Tugaskan', exact: true }).click()
+  await p.waitForSelector('select[name="offer_id"]', { state: 'attached', timeout: 8000 })
+  t.check(await p.evaluate(() => location.hash) === `#/app/penugasan?penawaran=${draft}`, 'approved offer: "Tugaskan" opens #/app/penugasan?penawaran=<id>')
+  t.check(!/Belum ada petugas aktif/.test(await p.evaluate(() => document.querySelector('.view').innerText)), 'demo: assign form has petugas to pick')
+  const pick = await p.evaluate(() => [...document.querySelectorAll('select[name="offer_id"] option')].filter((o) => o.value).map((o) => o.value))
+  t.check(pick.length === 1 && pick[0] === String(draft), 'assign picker: only this job\'s offer', pick.join())
+
+  // ---- a job that has a team: its page shows the team and its progress
+  const busy = await p.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}')
+    const done = new Set((s.completions || []).map((c) => String(c.assignment_id)))
+    return (s.assignments || []).find((a) => !done.has(String(a.id)))?.offer_id ?? null
+  })
+  await goStage(p, 'assign', { offerId: busy })
 
   // ---- progress: Belum → Sedang dikerjakan → Ditunda → Selesai
   const chip = p.locator('.progress-chip').first()

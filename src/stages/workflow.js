@@ -2,12 +2,17 @@
  * Alur kerja — one table, one row per job (permintaan), from request to
  * bookkeeping. The status column says how far each job has gone; the action
  * button opens the stage page that does the next step, already pointed at it.
+ * This table is the only list of jobs: the stage pages each show one job.
+ *
+ * URL: #/app/alur-kerja?posisi=<filter>&q=<search>; #/app/alur-kerja/<id> opens the job detail.
  */
 import * as C from '../ui/components.js'
 import { loadFlow } from './data.js'
 import { loadInvoices } from '../invoice/api.js'
 import { statusLabel as invoiceStatusLabel, STATUSES as INVOICE_STATUSES } from '../invoice/rules.js'
 import '../styles/workflow.css'
+import { openWaDialog } from '../ui/wa-dialog.js'
+import { followUpMessage } from '../wa/rules.js'
 import { STEPS, FILTERS, workflowRows, filterCounts, matchesQuery, timeline } from '../domain/workflow.js'
 
 const { el } = C
@@ -53,20 +58,15 @@ function stepper(row) {
 export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
   let rows = []
-  let filter = FILTERS.some((f) => f.value === session.get(FILTER_KEY)) ? session.get(FILTER_KEY) : 'all'
+  const params = ctx.params || {}
+  const validFilter = (v) => FILTERS.some((f) => f.value === v)
+  // The URL wins (deep link, Back); otherwise the filter last used in this tab.
+  let filter = validFilter(params.filter) ? params.filter : validFilter(session.get(FILTER_KEY)) ? session.get(FILTER_KEY) : 'all'
+  if (validFilter(params.filter)) session.set(FILTER_KEY, filter)
 
   const intro = el('p', { className: 'wf-intro muted' },
     'Satu baris = satu pekerjaan pelanggan, dari permintaan sampai pembukuan. Lihat kolom ',
     el('b', {}, 'Posisi'), ' untuk tahu sudah sampai mana, lalu tekan tombol di kolom ', el('b', {}, 'Langkah berikutnya'), '.')
-
-  // The per-stage pages (full lists of every offer, assignment, …) stay one click away.
-  const stageLinks = el('nav', { className: 'wf-stage-links', 'aria-label': 'Buka halaman per tahap' },
-    el('span', { className: 'wf-stage-links-label' }, 'Buka per tahap:'),
-    STEPS.map((s, i) => {
-      const a = el('button', { type: 'button', className: 'wf-stage-link', dataset: { stage: s.stage } }, el('span', { className: 'tnum' }, `${i + 1}`), s.label)
-      a.addEventListener('click', () => navigate(s.stage))
-      return a
-    }))
 
   const filterBar = el('div', { className: 'wf-filters', role: 'group', 'aria-label': 'Saring menurut posisi alur' })
   const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan, layanan, petugas, #nomor', 'aria-label': 'Cari pekerjaan' })
@@ -79,7 +79,6 @@ export async function render(container, ctx = {}) {
     C.pageHeader({ title: 'Alur kerja' }),
     intro,
     filterBar,
-    stageLinks,
     listPanel,
   )
 
@@ -101,6 +100,7 @@ export async function render(container, ctx = {}) {
       b.addEventListener('click', () => {
         filter = on && f.value !== 'all' ? 'all' : f.value
         session.set(FILTER_KEY, filter)
+        syncRoute()
         drawFilters()
         drawList()
       })
@@ -173,12 +173,16 @@ export async function render(container, ctx = {}) {
     }), pg.root)
   }
 
+  const routeParams = () => ({ filter: filter === 'all' ? undefined : filter, q: search.value.trim() || undefined })
+  const syncRoute = () => ctx.setRoute?.(routeParams())
+
   function openDetail(row, opener) {
     const { items, invoice } = timeline(row)
     let dlg = null
     const list = el('ol', { className: 'wf-timeline' }, items.map((it) => {
-      const go = C.button({ label: `Buka ${it.label.toLowerCase()}`, size: 'sm', variant: 'ghost', iconRight: 'arrowRight' })
-      go.addEventListener('click', () => { dlg?.close(); navigate(it.stage, it.params) })
+      // Every stage page shows this one job; the request itself is summed up right here.
+      const go = it.stage === 'request' ? null : C.button({ label: `Buka ${it.label.toLowerCase()}`, size: 'sm', variant: 'ghost', iconRight: 'arrowRight' })
+      go?.addEventListener('click', () => { dlg?.close(); navigate(it.stage, it.params) })
       return el('li', { className: `wf-tl is-${it.state}` },
         el('span', { className: 'wf-tl-dot', 'aria-hidden': 'true' }, it.state === 'done' ? C.icon('check', { size: 12 }) : null),
         el('div', { className: 'wf-tl-body' },
@@ -189,7 +193,7 @@ export async function render(container, ctx = {}) {
           el('p', { className: 'wf-tl-note' }, it.note,
             it.money != null ? ` · ${C.rupiah(it.money)}` : '',
             it.revenue != null ? ` · Pendapatan ${C.rupiah(it.revenue)}, biaya ${C.rupiah(it.cost)}` : ''),
-          it.state !== 'todo' ? go : null))
+          it.state !== 'todo' && Object.keys(it.params || {}).length ? go : null))
     }))
     const facts = C.defList([
       ['Layanan', row.service || '—'],
@@ -203,6 +207,19 @@ export async function render(container, ctx = {}) {
     ])
     const close = C.button({ label: 'Tutup', variant: 'ghost', dismiss: true })
     const actions = [close]
+    // Follow up with the customer on WhatsApp (needs their phone).
+    if (row.request.phone) {
+      const wa = C.button({ label: 'WhatsApp', icon: 'send', variant: 'ghost' })
+      wa.setAttribute('aria-label', `Kirim pesan ke ${row.customer} via WhatsApp`)
+      wa.addEventListener('click', () => {
+        dlg?.close()
+        openWaDialog({
+          requestId: row.id, customer: row.customer, phone: row.request.phone, kind: 'followup', opener, openSettings: ctx.openSettings,
+          text: followUpMessage({ customer: row.request.customer_name, service: row.request.service_type, business: ctx.user?.name }),
+        })
+      })
+      actions.push(wa)
+    }
     if (row.next) actions.push(actionButton(row, { variant: 'primary', onBefore: () => dlg?.close() }))
     dlg = C.modal({
       title: `#${row.id} · ${row.customer}`,
@@ -212,11 +229,16 @@ export async function render(container, ctx = {}) {
       opener,
       wide: true,
     })
+    dlg.dialog.classList.add('wf-detail')
+    dlg.dialog.dataset.id = String(row.id)
+    ctx.routeDialog?.(dlg.dialog, { ...routeParams(), id: row.id })
   }
 
-  search.addEventListener('input', () => drawList())
+  search.addEventListener('input', () => { syncRoute(); drawList() })
   // Opened with a search (e.g. from Waguri's "Buka di Alur kerja"): show that customer's rows.
-  if (ctx.params?.q) { search.value = String(ctx.params.q); filter = 'all' }
+  if (params.q) { search.value = String(params.q); if (!validFilter(params.filter)) filter = 'all' }
+  syncRoute()
+  let detailPending = params.id != null ? String(params.id) : null
 
   async function load() {
     try {
@@ -231,6 +253,12 @@ export async function render(container, ctx = {}) {
     }
     drawFilters()
     drawList()
+    // #/app/alur-kerja/<id>: open that job's detail once the rows are there.
+    if (detailPending) {
+      const row = rows.find((r) => String(r.id) === detailPending)
+      detailPending = null
+      if (row) openDetail(row, null)
+    }
   }
   window.addEventListener('satualur:data-changed', load, { signal: ctx.signal })
   await load()

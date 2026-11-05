@@ -1,17 +1,23 @@
 // E2E: the business's own integrations on the mock cloud — WhatsApp (keys in Pengaturan, "Kirim via WhatsApp" from
 // Permintaan with the confirm dialog, provider choice) and Repliz (keys in Media Sosial › Akun, connect an account,
 // post from Jadwal, status in Laporan tayang). Everything is simulated in demo mode; no key reaches the browser storage.
-const { loginLive, goStage } = require('./lib.cjs')
+const { loginLive, goStage, goHash } = require('./lib.cjs')
 
 module.exports = async function integrations(t) {
   const p = await t.page()
   await loginLive(p, t.base)
 
   /* ---------------------------------------------------------------- WhatsApp */
-  t.check(await goStage(p, 'request'), 'Alur kerja opens "Permintaan"')
-  await p.waitForSelector('.view table', { timeout: 10000 })
+  // The job detail in Alur kerja (#/app/alur-kerja/<id>) offers a WhatsApp follow-up.
+  const withPhone = await p.evaluate(() => (JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}').requests || []).find((r) => r.phone)?.id)
+  const openJob = async () => {
+    await goHash(p, `#/app/alur-kerja/${withPhone}`)
+    await p.waitForSelector('dialog.wf-detail[open]', { timeout: 10000 })
+  }
+  t.check(await goStage(p, 'workflow'), 'sidebar has "Alur kerja"')
+  await openJob()
   const waBtn = p.getByRole('button', { name: /via WhatsApp$/ }).first()
-  t.check(await waBtn.count() === 1, 'request list offers "WhatsApp" for a customer with a phone')
+  t.check(await waBtn.count() === 1, 'job detail offers "WhatsApp" for a customer with a phone')
   await waBtn.click()
   await p.waitForSelector('dialog.modal[open]')
   await p.locator('dialog.modal .note', { hasText: 'Hubungkan akun WAPilot' }).waitFor({ timeout: 6000 }).catch(() => {})
@@ -41,6 +47,7 @@ module.exports = async function integrations(t) {
   await p.keyboard.press('Escape')
   await p.waitForTimeout(400)
 
+  await openJob()
   await p.getByRole('button', { name: /via WhatsApp$/ }).first().click()
   await p.waitForSelector('dialog.modal[open]')
   await p.locator('dialog.modal .note', { hasText: 'Dikirim lewat WAConsole' }).waitFor({ timeout: 6000 }).catch(() => {})

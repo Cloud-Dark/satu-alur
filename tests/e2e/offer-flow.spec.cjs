@@ -145,8 +145,10 @@ module.exports = async function offerFlow(t) {
   await p.waitForTimeout(150)
   await primary()
   await p.waitForSelector('.wiz-done:not([hidden])', { timeout: 10000 })
-  const row = await p.$$eval('.list-panel tbody tr', (r, s) => r.filter((x) => x.textContent.includes(s)).map((x) => x.textContent.replace(/\s+/g, ' ')), CUSTOMER)
-  t.check(row.length === 1 && /8\.500\.000/.test(row[0]) && /150 tamu/.test(row[0]), 'saved offer has the edited price and scope', row[0])
+  await p.getByRole('button', { name: 'Lihat penawaran' }).click()
+  await p.waitForSelector('.view .offer-detail', { timeout: 8000 })
+  const row = await p.textContent('.view .offer-detail').then((x) => x.replace(/\s+/g, ' '))
+  t.check(/8\.500\.000/.test(row) && /150 tamu/.test(row) && (await p.textContent('.view .job-head-name')).trim() === CUSTOMER, 'saved offer page has the edited price and scope', row.slice(0, 200))
   const saved = await p.evaluate((name) => {
     const st = JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}')
     const req = (st.requests || []).find((r) => r.customer_name === name)
