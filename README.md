@@ -1,7 +1,7 @@
 # Satu Alur
 
 <p align="center">
-  <img src="public/assets/logo-satu-alur.png" alt="Satu Alur" width="400">
+  <img src="docs/cover/cover-landscape.png" alt="Satu Alur — Panduan lengkap satu alur kerja" width="100%">
 </p>
 
 **Satu Alur** — Satu alur lengkap untuk otomasi operasi jasa dengan kecerdasan buatan. Dirancang untuk perusahaan layanan jasa/on-demand di Indonesia.
