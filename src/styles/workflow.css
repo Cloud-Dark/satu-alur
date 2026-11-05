@@ -80,6 +80,13 @@
 }
 @media (max-width: 720px) {
   .wf-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* "Semua" on its own row, the six positions in three even rows under it. */
+  .wf-filter[data-filter='all'] { grid-column: 1 / -1; }
+  .wf-filter-top { margin-bottom: 0; }
+  /* Record cards lead with the customer, left-aligned and unlabeled, like a card title. */
+  .wf-panel .data-table td:first-child { display: block; padding-bottom: var(--s-2); text-align: left; }
+  .wf-panel .data-table td:first-child::before { display: none; }
+  .wf-panel .data-table td:first-child .cell-stack { align-items: flex-start; text-align: left; }
   .wf-filter { padding: var(--s-2) var(--s-3); }
   .wf-filter-ico, .wf-filter-hint { display: none; }
   .wf-pos { min-width: 0; }

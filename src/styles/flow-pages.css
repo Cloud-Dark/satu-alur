@@ -1,0 +1,55 @@
+/*
+ * One-job stage pages (Permintaan, Penawaran, Penugasan, Penyelesaian, Pembukuan), opened from
+ * Alur kerja (src/stages/job.js). One content column, left-aligned with the page (breadcrumb,
+ * tabs, notes), so the job header, notes and cards all share the same edges.
+ */
+.stage-solo { display: grid; gap: var(--s-5); width: 100%; max-width: 780px; align-content: start; }
+.stage-solo > * { min-width: 0; }
+/* Empty slots (a job header still loading, no note to show) take no row and add no gap. */
+.stage-solo > div:empty { display: none; }
+.job-pick { width: 100%; max-width: 780px; }
+
+.job-head { display: grid; gap: 2px; }
+.job-head-main { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); min-width: 0; }
+.job-head-id { font-size: 0.82rem; font-weight: 600; color: var(--text-muted); }
+.job-head-name { margin: 0; min-width: 0; font-size: 1.15rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.job-head-sub { margin: 0; overflow-wrap: anywhere; }
+
+/* Buttons that close a panel (offer actions, "Pekerjaan selesai"): their own row under a hairline. */
+.job-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.panel-body > .deflist + .job-actions {
+  margin-top: var(--s-5); padding-top: var(--s-4); border-top: 1px solid var(--line);
+}
+/* Under a table in a list panel: padded like the table cells, never hanging on the card edge. */
+.list-panel .panel-foot-actions { padding: var(--s-4) var(--s-6); border-top: 1px solid var(--line); }
+
+/* "Lihat semua di Alur kerja": a quiet link closing the column, its text flush with the column
+   edge (the ghost button's own padding pulled out); a full-width footer button on phones, where
+   the topbar back button is icon-only. */
+.job-all { justify-self: start; margin: calc(var(--s-2) * -1) 0 0 -14px; }
+@media (max-width: 720px) {
+  .job-all { margin: 0; justify-self: stretch; justify-content: center; border: 1px solid var(--line); background: var(--surface); }
+  .list-panel .panel-foot-actions { padding: var(--s-3) var(--s-4) var(--s-4); }
+  .list-panel .panel-foot-actions .btn { flex: 1 1 auto; justify-content: center; }
+  /* Record cards (the job's team, Laporan categories): the first cell leads each card as its title. */
+  .view-assign .list-panel .data-table td:first-child,
+  .view-report .data-table td:first-child { display: block; padding-bottom: var(--s-2); text-align: left; font-weight: 600; }
+  .view-assign .list-panel .data-table td:first-child::before,
+  .view-report .data-table td:first-child::before { display: none; }
+  .view-assign .list-panel .data-table td:first-child .cell-stack { align-items: flex-start; text-align: left; }
+  /* Peringkat petugas: the rank reads "#1" above the worker instead of its own labelled row. */
+  .view-assign .data-table td[data-label='#'] { display: block; padding-bottom: 0; text-align: left; font-size: 0.76rem; font-weight: 600; color: var(--text-muted); }
+  .view-assign .data-table td[data-label='#']::before { content: '#'; padding: 0; font-size: inherit; }
+}
+
+/* ---- Penugasan: tabs, then one block per tab ---- */
+.view-assign .workspace-tabs { margin-bottom: 0; }
+.assign-tab { display: grid; gap: var(--s-5); align-content: start; min-width: 0; }
+.assign-tab > * { min-width: 0; }
+.assign-tab > .form-actions { margin: 0; }
+.progress-stat { min-width: 0; }
+.worker-pick .check-row input[type='checkbox'] { margin-top: 4px; }
+@media (max-width: 480px) {
+  .assign-tab .progress-summary { grid-template-columns: minmax(0, 1fr); gap: var(--s-2); }
+  .assign-tab .progress-stat { padding: var(--s-2) var(--s-3); }
+}

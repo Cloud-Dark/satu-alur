@@ -44,7 +44,7 @@ export async function render(container, ctx = {}) {
   const params = ctx.params || {}
 
   const status = C.message()
-  const host = el('div')
+  const host = el('div', { className: 'assign-tab' })
   const tabs = C.segmented({ options: TABS, value: currentTab, label: 'Penugasan', onChange: (value) => {
     currentTab = value
     status.hide()
@@ -82,6 +82,7 @@ export async function render(container, ctx = {}) {
   function draw() {
     cleanupTab?.()
     cleanupTab = null
+    tabs.after(status) // the Tugaskan tab moves it into the job's column
     host.replaceChildren()
     if (!flow) return
     switch (currentTab) {
@@ -157,8 +158,10 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
     pending.append(el('div', { className: 'note note-info' }, C.icon('info'),
       el('div', { className: 'note-body' }, el('p', {}, 'Penawaran pekerjaan ini belum disetujui. Setujui dulu, lalu tugaskan petugas.'), el('div', { className: 'note-actions' }, go))))
   }
+  // The page-level note (e.g. "… ditugaskan") sits in the job's column, under its header.
   target.appendChild(solo(
     head,
+    status,
     pending,
     hasTeam || notApproved ? null : C.panel({ title: 'Tugaskan petugas', meta: 'Rekomendasi otomatis', raised: true, className: 'form-panel' }, form),
     hasTeam ? listPanel : null,
@@ -631,6 +634,8 @@ function renderMap(target, { workers, assignments, links, flow }) {
     let L
     try { L = await loadLeaflet() } catch {
       mapEl.replaceWith(C.errorState('Peta gagal dimuat. Periksa koneksi lalu buka tab ini lagi.'))
+      meta.textContent = 'Peta tidak tersedia'
+      legend.remove()
       return
     }
     if (disposed) return
@@ -691,7 +696,7 @@ function renderPerformance(target, { workers, assignments, completions, links })
   const onJob = activeList.filter((w) => workerState(w, assignments, links) === 'on_job').length
   const ranked = [...workers].sort((a, b) => done.get(b.id) - done.get(a.id) || a.name.localeCompare(b.name, 'id'))
 
-  target.appendChild(el('div', { className: 'kpis' },
+  target.appendChild(el('div', { className: 'kpis kpis-3' },
     C.kpi({ label: 'Petugas aktif', value: String(activeList.length), iconName: 'users' }),
     C.kpi({ label: 'Job selesai', value: String(total), iconName: 'check' }),
     C.kpi({ label: 'Dalam tugas hari ini', value: String(onJob), iconName: 'clock' }),
