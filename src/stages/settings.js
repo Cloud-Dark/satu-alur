@@ -6,6 +6,7 @@
  * mappings and migrations live in D1 behind /api/mcp/*.
  */
 import { renderIntegrationsTab } from './settings-integrations.js'
+import { renderAiAccessTab } from './settings-ai-access.js'
 import * as C from '../ui/components.js'
 import * as WA from '../wa/api.js'
 import * as Integrations from '../integrations/connectors.js'
@@ -108,11 +109,25 @@ function getAgentSettings() {
 
 let currentTab = null
 
+const TAB_KEYS = ['mcp', 'integrations', 'ai-access', 'erp', 'migration', 'logs', 'agent']
+// #/app/pengaturan?bagian=… opens one tab. "mcp" means Akses AI (MCP) here; the Konektor tab's
+// internal key is 'mcp' for historical reasons, so its link is ?bagian=konektor.
+const BAGIAN = { konektor: 'mcp', 'email-ai': 'integrations', mcp: 'ai-access', 'akses-ai': 'ai-access', erp: 'erp', migrasi: 'migration', log: 'logs', agen: 'agent' }
+
+/** Tab asked for by the URL (?bagian=…), or null. */
+export function tabFromHash(hash) {
+  const q = String(hash || '').split('?')[1]
+  if (!q) return null
+  return BAGIAN[new URLSearchParams(q).get('bagian')] || null
+}
+
 export function render(container) {
+  const fromUrl = typeof location !== 'undefined' ? tabFromHash(location.hash) : null
+  if (fromUrl) currentTab = fromUrl
   if (!currentTab) {
     try { currentTab = localStorage.getItem(STORAGE_KEYS.tab) || 'mcp' } catch { currentTab = 'mcp' }
   }
-  if (!['mcp', 'integrations', 'erp', 'migration', 'logs', 'agent'].includes(currentTab)) currentTab = 'mcp'
+  if (!TAB_KEYS.includes(currentTab)) currentTab = 'mcp'
   const tabs = C.segmented({
     label: 'Bagian pengaturan',
     scroll: true,
@@ -120,6 +135,7 @@ export function render(container) {
     options: [
       { value: 'mcp', label: 'Konektor' },
       { value: 'integrations', label: 'Email & AI' },
+      { value: 'ai-access', label: 'Akses AI (MCP)' },
       { value: 'erp', label: 'ERP & Integrasi' },
       { value: 'migration', label: 'Migrasi' },
       { value: 'logs', label: 'Log' },
@@ -138,6 +154,7 @@ export function render(container) {
     content.replaceChildren()
     if (currentTab === 'agent') renderAgentTab(content, draw)
     else if (currentTab === 'integrations') renderIntegrationsTab(content)
+    else if (currentTab === 'ai-access') renderAiAccessTab(content)
     else if (currentTab === 'erp') withEnterpriseGate(content, () => renderErpTab(content, draw))
     else if (currentTab === 'migration') withEnterpriseGate(content, () => renderMigrationTab(content, draw))
     else if (currentTab === 'logs') withEnterpriseGate(content, () => renderLogsTab(content))

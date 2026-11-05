@@ -12,7 +12,7 @@
  *   #/app/penyelesaian?penugasan=5          close assignment 5
  *   #/app/pembukuan?penyelesaian=7          post the journal of completion 7
  *   #/app/invoice/9                         invoice 9 open in its editor
- *   #/app/pengaturan                        settings drawer (over the current page)
+ *   #/app/pengaturan                        settings drawer (over the current page); ?bagian=mcp opens Akses AI (MCP)
  *   #/app/kantor/<bagian>                   Kantor Satu Alur (staff office) section
  *
  * parseAppRoute(hash) -> { stage, params, settings, office, bare, unknown } | null (not an app URL)

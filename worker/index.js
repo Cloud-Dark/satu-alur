@@ -66,6 +66,7 @@ import { otpEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings } from './email.js';
 import { resolveAi, customChatStream, countByo, logAiFallback, platformProvider } from './ai-provider.js';
 import { handleWaguriPublic } from './waguri.js';
+import { handleMcp, handleMcpTokenList, handleMcpTokenCreate, handleMcpTokenRevoke } from './mcp-server.js';
 import {
   handleIntegrationsGet, handleIntegrationsEmailSave, handleIntegrationsAiSave, handleIntegrationsEmailTest,
   handleIntegrationsAiTest, handleIntegrationsAiModels, handleEmailSend,
@@ -1328,6 +1329,11 @@ const ROUTES = {
   'GET /api/office/admin/customers/:userId/quota': (req, env, params) => handleAdminCustomerQuota(req, env, ROUTE_DEPS, params),
   'POST /api/office/admin/customers/:userId/credit': (req, env, params) => handleAdminCustomerCredit(req, env, ROUTE_DEPS, params),
 
+  // Akses AI (MCP server at /mcp, worker/mcp-server.js): the owner's own access tokens. Session auth.
+  'GET /api/mcp-tokens': (req, env) => handleMcpTokenList(req, env, ROUTE_DEPS),
+  'POST /api/mcp-tokens': (req, env) => handleMcpTokenCreate(req, env, ROUTE_DEPS),
+  'DELETE /api/mcp-tokens/:id': (req, env, params) => handleMcpTokenRevoke(req, env, ROUTE_DEPS, params),
+
   // ------------------------------------------------------------ MCP / ERP
   // Dedicated routes, never the generic /api/db: connector rows hold secrets.
   'GET /api/mcp/schema': (req, env) => handleSchemaGet(req, env, ROUTE_DEPS),
@@ -1387,8 +1393,12 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
-    if (path === '/api' || path.startsWith('/api/')) {
+    const api = path === '/api' || path.startsWith('/api/');
+    // Remote MCP server (Akses AI): /mcp and /mcp/<token>. Needs run_worker_first in wrangler*.toml.
+    const mcp = path === '/mcp' || path.startsWith('/mcp/');
+    if (api || mcp) {
       try {
+        if (mcp) return await handleMcp(request, env, path, ROUTE_DEPS);
         return await handleApi(request, env, path);
       } catch (err) {
         if (err instanceof HttpError) return fail(err.status, err.message);

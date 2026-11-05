@@ -11,7 +11,7 @@ module.exports = async function settings(t) {
   t.check(await p.getAttribute('.drawer', 'role') === 'dialog' && await p.getAttribute('.drawer', 'aria-modal') === 'true', 'drawer is a modal dialog')
   t.check(await p.evaluate(() => document.activeElement?.getAttribute('aria-label')) === 'Tutup pengaturan', 'focus moves to the close button')
   const tabs = await p.$$eval('.drawer .seg-btn', (b) => b.map((x) => x.textContent.trim()))
-  t.check(tabs.join('|') === 'Konektor|Email & AI|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, Email & AI, ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
+  t.check(tabs.join('|') === 'Konektor|Email & AI|Akses AI (MCP)|ERP & Integrasi|Migrasi|Log|Agen AI', 'tabs Konektor, Email & AI, Akses AI (MCP), ERP & Integrasi, Migrasi, Log, Agen AI', tabs.join('|'))
 
   // Konektor: the business's own WAPilot key, saved and shown only as the last 4 characters
   await p.evaluate(() => localStorage.setItem('satualur_settings_mcp', JSON.stringify({ whatsapp: { apiKey: 'lama', wapilotEndpoint: 'x' } })))
@@ -64,7 +64,8 @@ module.exports = async function settings(t) {
   await p.waitForTimeout(300)
   t.check(/agen penawaran/i.test(await p.inputValue('#offer-prompt')), '"Kembalikan default" restores the default prompt')
 
-  t.check(!/Cloudflare|localStorage|JSON|MCP/.test(norm(await p.textContent('.drawer'))), 'drawer has no technical wording')
+  // The "Akses AI (MCP)" tab is named after the protocol on purpose (that is what Claude's settings call it).
+  t.check(!/Cloudflare|localStorage|JSON|MCP/.test(norm(await p.textContent('.drawer')).replace('Akses AI (MCP)', '')), 'drawer has no technical wording')
 
   // focus trap: Tab stays inside the drawer
   for (let i = 0; i < 15; i++) await p.keyboard.press('Tab')

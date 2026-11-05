@@ -394,7 +394,7 @@ export function renderShell(root, ctx) {
   function closeSettings({ fromUrl = false } = {}) {
     if (drawer.hidden) return
     // Closing goes back to the page's own URL (Back when opening it added the history entry).
-    if (!fromUrl && location.hash === formatAppRoute({ settings: true }) && stageHash) {
+    if (!fromUrl && parseAppRoute(location.hash)?.settings && stageHash) {
       if (settingsPushed) { lastHash = stageHash; history.back() } else writeHash(stageHash, { replace: true })
     }
     settingsPushed = false

@@ -440,6 +440,47 @@ const mockDatabase = {
   },
 }
 
+// Akses AI (MCP) tokens — same rules as worker/mcp-server.js (/api/mcp-tokens), kept in the mock
+// state. Simulated: a mock token cannot reach a real /mcp endpoint.
+const MCP_TOKEN_MAX = 10
+function mcpTokenOwner() {
+  if (!_session) throw new Error('Belum masuk.')
+  return _session.user
+}
+const publicMcpToken = (t) => ({ id: t.id, name: t.name, prefix: t.prefix, created_at: t.created_at, last_used_at: t.last_used_at || null })
+const mockMcpTokens = {
+  async list() {
+    const user = mcpTokenOwner()
+    if (isDemoEmail(user.email)) return { items: [], demo: true, max: MCP_TOKEN_MAX }
+    const items = ensureTable('_mcp_tokens').filter((t) => t.owner_id === user.id && !t.revoked_at)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id)
+    return { items: items.map(publicMcpToken), demo: false, max: MCP_TOKEN_MAX }
+  },
+  async create({ name } = {}) {
+    const user = mcpTokenOwner()
+    if (isDemoEmail(user.email)) throw new Error('Akun demo tidak bisa membuat token Akses AI. Masuk dengan akun usaha Anda sendiri untuk menghubungkan Claude.')
+    const rows = ensureTable('_mcp_tokens')
+    if (rows.filter((t) => t.owner_id === user.id && !t.revoked_at).length >= MCP_TOKEN_MAX) {
+      throw new Error(`Maksimal ${MCP_TOKEN_MAX} token aktif. Cabut token yang tidak dipakai lagi dulu.`)
+    }
+    const bytes = crypto.getRandomValues(new Uint8Array(32))
+    const token = 'sa_mcp_' + btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    const label = String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, 60) || 'Claude'
+    const row = { id: rows.reduce((m, t) => Math.max(m, t.id), 0) + 1, owner_id: user.id, name: label, prefix: token.slice(0, 11), created_at: new Date().toISOString(), last_used_at: null, revoked_at: null }
+    rows.push(row)
+    persist()
+    return { token, item: publicMcpToken(row) }
+  },
+  async revoke(id) {
+    const user = mcpTokenOwner()
+    const row = ensureTable('_mcp_tokens').find((t) => t.id === Number(id) && t.owner_id === user.id && !t.revoked_at)
+    if (!row) throw new Error('Token tidak ditemukan atau sudah dicabut.')
+    row.revoked_at = new Date().toISOString()
+    persist()
+    return { id: row.id, revoked: true }
+  },
+}
+
 const mockStorage = {
   userPath(uid, path) { return `users/${uid}/${path}` },
   sharedPath(uid, path) { return `shared/${uid}/${path}` },
@@ -651,5 +692,6 @@ export function createMockWorkBuddyCloud() {
     database: mockDatabase,
     storage: mockStorage,
     llm: mockLLM,
+    mcpTokens: mockMcpTokens,
   }
 }
