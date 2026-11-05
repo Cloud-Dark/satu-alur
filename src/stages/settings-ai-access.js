@@ -1,12 +1,17 @@
 /**
- * Pengaturan › Akses AI (MCP): tokens that let Claude (claude.ai, Claude Desktop, Claude Code) read this
- * business's data through the remote MCP server at /mcp (worker/mcp-server.js). A new token is shown
- * once, with ready-to-paste instructions; the list only shows its label and first characters.
+ * Pengaturan › Akses AI (MCP): connect Claude (claude.ai, Claude Desktop, Claude Code) to this
+ * business's data through the remote MCP server at /mcp (worker/mcp-server.js).
+ *
+ *   01 Hubungkan dengan login (primary): paste <origin>/mcp into Claude, sign in, click Izinkan
+ *      (OAuth 2.1, worker/oauth.js, consent page #/izin-ai). No token to copy.
+ *   02 Aplikasi terhubung: the OAuth grants, each with "Putuskan" (all its tokens stop at once).
+ *   Cara lain: token manual (lanjutan), collapsed: per-device "sa_mcp_" tokens, shown once with
+ *      ready-to-paste instructions; the list only shows the label and first characters.
  */
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
-import { listTokens, createToken, revokeToken } from '../ai-access/api.js'
-import { snippets } from '../ai-access/snippets.js'
+import { listTokens, createToken, revokeToken, listGrants, revokeGrant } from '../ai-access/api.js'
+import { snippets, serverUrl, claudeCodeLoginCommand } from '../ai-access/snippets.js'
 import { isUsingMockCloud } from '../cloud.js'
 import '../styles/ai-access.css'
 
@@ -105,10 +110,80 @@ function tokenRow(t, onRevoked) {
   return row
 }
 
+/** One connected app (OAuth grant) with an inline "Putuskan" confirm. */
+function grantRow(g, onRevoked) {
+  const actions = el('div', { className: 'aimcp-row-actions' })
+  const row = el('li', { className: 'aimcp-row aimcp-grant', 'data-grant': String(g.id) },
+    el('div', { className: 'aimcp-row-main' },
+      el('strong', { className: 'aimcp-row-name' }, g.client_name),
+      g.redirect_host ? el('span', { className: 'aimcp-host' }, g.redirect_host) : null,
+      el('p', { className: 'aimcp-row-meta' },
+        `Terhubung sejak ${C.formatDate(g.created_at)} · `,
+        g.last_used_at ? `Terakhir dipakai ${C.relativeTime(g.last_used_at)}` : 'Belum pernah dipakai',
+      ),
+    ),
+    actions,
+  )
+  function idle() {
+    const b = C.button({ label: 'Putuskan', icon: 'x', size: 'xs', variant: 'danger', 'aria-label': `Putuskan ${g.client_name}` })
+    b.addEventListener('click', ask)
+    actions.replaceChildren(b)
+  }
+  function ask() {
+    const yes = C.button({ label: 'Ya, putuskan', size: 'xs', variant: 'danger' })
+    const no = C.button({ label: 'Batal', size: 'xs', variant: 'ghost' })
+    no.addEventListener('click', () => { idle(); actions.querySelector('button')?.focus() })
+    yes.addEventListener('click', async () => {
+      const restore = C.setBusy(yes, 'Memutuskan…')
+      try {
+        await revokeGrant(g.id)
+        showToast(`${g.client_name} diputuskan.`, 'success')
+        onRevoked()
+      } catch (ex) {
+        restore()
+        showToast(ex.message, 'error', 4200)
+      }
+    })
+    actions.replaceChildren(el('span', { className: 'aimcp-confirm' }, `${g.client_name} langsung kehilangan akses.`), yes, no)
+    yes.focus()
+  }
+  idle()
+  return row
+}
+
+/** 01: the login flow. Nothing to copy but the server URL. */
+function loginSection(demo) {
+  const host = window.location.origin
+  return el('section', { className: 'set-section aimcp-login', 'aria-label': 'Hubungkan dengan login' },
+    el('div', { className: 'set-head' }, el('div', {},
+      el('span', { className: 'set-num' }, 'Akses AI · 01'),
+      el('h3', { className: 'set-title' }, 'Hubungkan dengan login'),
+      el('p', { className: 'set-desc' }, 'Tidak perlu menyalin token: cukup tempel alamat server, masuk ke Satu Alur, lalu klik Izinkan.'),
+    )),
+    demo ? demoNote() : null,
+    el('div', { className: 'aimcp-way' },
+      el('h4', {}, 'claude.ai dan Claude Desktop'),
+      el('ol', { className: 'aimcp-steps' },
+        el('li', {}, 'Buka Settings → Connectors, lalu klik Add custom connector.'),
+        el('li', {}, 'Beri nama "Satu Alur" dan tempel alamat di bawah ini, lalu Add.'),
+        el('li', {}, 'Klik Connect. Claude membuka halaman masuk Satu Alur: masuk seperti biasa, lalu klik Izinkan.'),
+      ),
+      codeBlock({ text: serverUrl(host), label: 'alamat server', kind: 'server-url' }),
+    ),
+    el('div', { className: 'aimcp-way' },
+      el('h4', {}, 'Claude Code'),
+      el('p', {}, 'Jalankan di terminal, lalu ketik /mcp di Claude Code, pilih satu-alur, dan pilih Authenticate:'),
+      codeBlock({ text: claudeCodeLoginCommand(host), label: 'perintah Claude Code', kind: 'claude-code-login' }),
+    ),
+    el('p', { className: 'aimcp-try' }, 'Lalu tanyakan, misalnya: "Pekerjaan PT Maju sudah sampai mana?", "Berapa laba bulan ini?", atau "Invoice mana yang belum lunas?"'),
+  )
+}
+
 export async function renderAiAccessTab(container) {
   container.replaceChildren(C.skeletonRows(3))
   let data
-  try { data = await listTokens() } catch (ex) {
+  let grants
+  try { [data, grants] = await Promise.all([listTokens(), listGrants()]) } catch (ex) {
     const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
     again.addEventListener('click', () => renderAiAccessTab(container))
     container.replaceChildren(C.errorState(ex.message), again)
@@ -118,15 +193,36 @@ export async function renderAiAccessTab(container) {
   const lead = el('p', { className: 'set-lead' },
     'Hubungkan Claude (claude.ai, Claude Desktop, atau Claude Code) ke akun ini lewat MCP. Claude bisa menjawab pertanyaan tentang pekerjaan, progres pelanggan, keuangan, dan invoice. ',
     'Aksesnya hanya baca: Claude tidak bisa mengubah atau menghapus data.')
-  const warn = C.message()
-  warn.show('warn', 'Token memberi akses baca ke seluruh data usaha Anda. Simpan seperti kata sandi, dan cabut token yang bocor atau tidak dipakai lagi.')
-  const parts = [lead, warn]
+  const parts = [lead]
   if (isUsingMockCloud()) {
     const note = C.message()
-    note.show('info', 'Mode demo lokal: token di sini hanya simulasi dan tidak bisa dipakai untuk menghubungkan Claude.')
+    note.show('info', 'Mode demo lokal: koneksi dan token di sini hanya simulasi dan tidak bisa dipakai untuk menghubungkan Claude.')
     parts.push(note)
   }
 
+  /* ---- 02 Aplikasi terhubung (OAuth grants) ---- */
+  const grantHost = el('div', {})
+  const grantSection = el('section', { className: 'set-section', 'aria-label': 'Aplikasi terhubung' },
+    el('div', { className: 'set-head' }, el('div', {},
+      el('span', { className: 'set-num' }, 'Akses AI · 02'),
+      el('h3', { className: 'set-title' }, 'Aplikasi terhubung'),
+      el('p', { className: 'set-desc' }, 'Claude yang sudah Anda izinkan lewat login. Putuskan yang tidak dipakai lagi.'),
+    )),
+    grantHost,
+  )
+  function drawGrants(items) {
+    grantHost.replaceChildren(items.length
+      ? el('ul', { className: 'aimcp-list aimcp-grants' }, ...items.map((g) => grantRow(g, refreshGrants)))
+      : el('p', { className: 'set-desc aimcp-grants-empty' }, 'Belum ada aplikasi terhubung. Ikuti langkah di atas untuk menghubungkan Claude.'))
+  }
+  async function refreshGrants() {
+    try { drawGrants((await listGrants()).items) } catch (ex) { grantHost.replaceChildren(C.errorState(ex.message)) }
+  }
+  drawGrants(grants.items)
+
+  /* ---- Cara lain: token manual (lanjutan), collapsed ---- */
+  const warn = C.message()
+  warn.show('warn', 'Token memberi akses baca ke seluruh data usaha Anda. Simpan seperti kata sandi, dan cabut token yang bocor atau tidak dipakai lagi.')
   const reveal = el('div', { className: 'aimcp-reveal-host' })
   const label = C.field({ label: 'Nama token', id: 'mcp-token-label', placeholder: 'Contoh: Claude di laptop kantor', hint: 'Untuk mengenali token ini nanti.', attrs: { maxlength: '60', autocomplete: 'off' } })
   const create = C.button({ label: 'Buat token', icon: 'plus', size: 'sm', variant: 'primary', type: 'submit' })
@@ -153,9 +249,8 @@ export async function renderAiAccessTab(container) {
 
   const createSection = el('section', { className: 'set-section' },
     el('div', { className: 'set-head' }, el('div', {},
-      el('span', { className: 'set-num' }, 'Akses AI · 01'),
       el('h3', { className: 'set-title' }, 'Buat token'),
-      el('p', { className: 'set-desc' }, 'Satu token untuk tiap perangkat atau aplikasi, supaya bisa dicabut sendiri-sendiri.'),
+      el('p', { className: 'set-desc' }, 'Untuk aplikasi yang belum mendukung login. Satu token untuk tiap perangkat atau aplikasi, supaya bisa dicabut sendiri-sendiri.'),
     )),
     data.demo ? demoNote() : null,
     fullNote,
@@ -164,10 +259,7 @@ export async function renderAiAccessTab(container) {
 
   const listHost = el('div', {})
   const listSection = el('section', { className: 'set-section' },
-    el('div', { className: 'set-head' }, el('div', {},
-      el('span', { className: 'set-num' }, 'Akses AI · 02'),
-      el('h3', { className: 'set-title' }, 'Token aktif'),
-    )),
+    el('div', { className: 'set-head' }, el('div', {}, el('h3', { className: 'set-title' }, 'Token aktif'))),
     listHost,
   )
 
@@ -177,18 +269,24 @@ export async function renderAiAccessTab(container) {
     ;[label.input, create].forEach((x) => { x.disabled = data.demo || full })
     listHost.replaceChildren(items.length
       ? el('ul', { className: 'aimcp-list' }, ...items.map((t) => tokenRow(t, drawList)))
-      : el('p', { className: 'set-desc aimcp-empty' }, 'Belum ada token. Buat token di atas untuk menghubungkan Claude.'))
+      : el('p', { className: 'set-desc aimcp-empty' }, 'Belum ada token manual.'))
   }
   async function drawList() {
     try { drawItems((await listTokens()).items) } catch (ex) { listHost.replaceChildren(C.errorState(ex.message)) }
   }
   drawItems(data.items)
 
-  container.replaceChildren(...parts, reveal, createSection, listSection)
+  // Open when manual tokens are already in use, so they stay one click away.
+  const advanced = el('details', { className: 'aimcp-advanced', open: data.items.length > 0 },
+    el('summary', {}, 'Cara lain: token manual (lanjutan)'),
+    el('div', { className: 'aimcp-advanced-body' }, warn, reveal, createSection, listSection),
+  )
+
+  container.replaceChildren(...parts, loginSection(data.demo || grants.demo), grantSection, advanced)
 }
 
 function demoNote() {
   const n = C.message()
-  n.show('info', 'Akun demo tidak bisa membuat token Akses AI. Masuk dengan akun usaha Anda sendiri untuk menghubungkan Claude.')
+  n.show('info', 'Akun demo tidak bisa dihubungkan ke Claude. Masuk dengan akun usaha Anda sendiri untuk menghubungkan Claude.')
   return n
 }

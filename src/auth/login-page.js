@@ -299,6 +299,10 @@ export function renderLoginPage(root, ctx = {}) {
   try {
     const notice = sessionStorage.getItem(AUTH_NOTICE_KEY)
     if (notice) { sessionStorage.removeItem(AUTH_NOTICE_KEY); say(notice, 'error') }
+    // Opened by Claude (OAuth consent #/izin-ai, see src/ui/app.js): say why we ask to sign in.
+    else if (/^#\/izin-ai\?/.test(sessionStorage.getItem('satualur_after_login') || '')) {
+      say('Masuk ke Satu Alur untuk menghubungkan Claude. Setelah masuk, Anda akan diminta memberi izin.', 'info')
+    }
   } catch { /* storage unavailable */ }
 
   function setSceneState(s) { scene?.setState?.(s) }

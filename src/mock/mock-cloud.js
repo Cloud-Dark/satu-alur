@@ -481,6 +481,80 @@ const mockMcpTokens = {
   },
 }
 
+// Akses AI by login (OAuth, worker/oauth.js): pending consent requests and connected apps.
+// The real flow starts at /oauth/authorize; in mock mode `startRequest` stands in for it (dev, e2e)
+// and the "code" in the redirect is simulated.
+const OAUTH_TOOLS = [
+  ['cari_pekerjaan', 'Cari pekerjaan', 'Daftar pekerjaan dan posisinya di alur kerja'],
+  ['progres_pelanggan', 'Progres pelanggan', 'Progres pekerjaan per pelanggan'],
+  ['detail_pekerjaan', 'Detail pekerjaan', 'Rincian satu pekerjaan: penawaran, penugasan, penyelesaian, pembukuan, invoice'],
+  ['ringkasan_keuangan', 'Ringkasan keuangan', 'Pendapatan, biaya, dan laba'],
+  ['daftar_invoice', 'Daftar invoice', 'Daftar invoice dan statusnya'],
+  ['info_akun', 'Info akun', 'Nama usaha, paket, dan jumlah data'],
+].map(([name, title, summary]) => ({ name, title, summary }))
+const hostOfUri = (u) => { try { return new URL(u).host } catch { return '' } }
+function oauthRefusal(user) {
+  if (_session?.is_staff || isStaffEmail(String(user.email || ''))) return 'Akun staf Satu Alur tidak bisa menghubungkan Claude. Masuk dengan akun usaha untuk memberi izin.'
+  if (isDemoEmail(user.email)) return 'Akun demo tidak bisa dihubungkan ke Claude. Masuk dengan akun usaha Anda sendiri untuk memberi izin.'
+  return null
+}
+function pendingOauth(req) {
+  const row = ensureTable('_oauth_requests').find((r) => r.id === String(req || ''))
+  if (!row || Date.parse(row.expires_at) <= Date.now()) throw new Error('Permintaan izin ini sudah kedaluwarsa atau sudah dijawab. Ulangi hubungkan dari Claude.')
+  return row
+}
+const mockAiOAuth = {
+  /** Dev/e2e stand-in for GET /oauth/authorize: parks a request and returns its id. */
+  startRequest({ client_name = 'Claude', redirect_uri = 'https://claude.ai/api/mcp/auth_callback', state = '' } = {}) {
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('')
+    ensureTable('_oauth_requests').push({ id, client_name, redirect_uri, state, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() })
+    persist()
+    return id
+  },
+  async request(req) {
+    const user = mcpTokenOwner()
+    const row = pendingOauth(req)
+    return {
+      client_name: row.client_name, client_uri: null, redirect_host: hostOfUri(row.redirect_uri), scope: 'satu-alur.read', read_only: true,
+      tools: OAUTH_TOOLS, account: { email: user.email, name: user.name || null, company: null }, refused: oauthRefusal(user), expires_at: row.expires_at,
+    }
+  },
+  async decide(req, approve) {
+    const user = mcpTokenOwner()
+    const row = pendingOauth(req)
+    if (approve) { const r = oauthRefusal(user); if (r) throw new Error(r) }
+    _state._oauth_requests = ensureTable('_oauth_requests').filter((x) => x.id !== row.id)
+    const u = new URL(row.redirect_uri)
+    if (approve) {
+      const grants = ensureTable('_oauth_grants')
+      grants.push({ id: grants.reduce((m, g) => Math.max(m, g.id), 0) + 1, owner_id: user.id, client_name: row.client_name, redirect_host: u.host, created_at: new Date().toISOString(), last_used_at: null, revoked_at: null })
+      u.searchParams.set('code', `mock_${crypto.randomUUID().replace(/-/g, '')}`)
+    } else {
+      u.searchParams.set('error', 'access_denied')
+      u.searchParams.set('error_description', 'Pemilik akun menolak akses.')
+    }
+    if (row.state) u.searchParams.set('state', row.state)
+    persist()
+    return { approved: Boolean(approve), redirect: u.toString() }
+  },
+  async grants() {
+    const user = mcpTokenOwner()
+    if (isDemoEmail(user.email)) return { items: [], demo: true }
+    const items = ensureTable('_oauth_grants').filter((g) => g.owner_id === user.id && !g.revoked_at)
+      .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id)
+      .map(({ id, client_name, redirect_host, created_at, last_used_at }) => ({ id, client_name, redirect_host, created_at, last_used_at }))
+    return { items, demo: false }
+  },
+  async revokeGrant(id) {
+    const user = mcpTokenOwner()
+    const g = ensureTable('_oauth_grants').find((x) => x.id === Number(id) && x.owner_id === user.id && !x.revoked_at)
+    if (!g) throw new Error('Koneksi tidak ditemukan atau sudah diputuskan.')
+    g.revoked_at = new Date().toISOString()
+    persist()
+    return { id: g.id, revoked: true }
+  },
+}
+
 const mockStorage = {
   userPath(uid, path) { return `users/${uid}/${path}` },
   sharedPath(uid, path) { return `shared/${uid}/${path}` },
@@ -693,5 +767,6 @@ export function createMockWorkBuddyCloud() {
     storage: mockStorage,
     llm: mockLLM,
     mcpTokens: mockMcpTokens,
+    aiOAuth: mockAiOAuth,
   }
 }

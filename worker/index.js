@@ -68,6 +68,9 @@ import { resolveAi, customChatStream, countByo, logAiFallback, platformProvider 
 import { handleWaguriPublic } from './waguri.js';
 import { handleMcp, handleMcpTokenList, handleMcpTokenCreate, handleMcpTokenRevoke } from './mcp-server.js';
 import {
+  handleWellKnown, handleOAuth, handleOAuthRequestGet, handleOAuthDecision, handleOAuthGrantList, handleOAuthGrantRevoke,
+} from './oauth.js';
+import {
   handleIntegrationsGet, handleIntegrationsEmailSave, handleIntegrationsAiSave, handleIntegrationsEmailTest,
   handleIntegrationsAiTest, handleIntegrationsAiModels, handleEmailSend,
 } from './integrations.js';
@@ -1333,6 +1336,11 @@ const ROUTES = {
   'GET /api/mcp-tokens': (req, env) => handleMcpTokenList(req, env, ROUTE_DEPS),
   'POST /api/mcp-tokens': (req, env) => handleMcpTokenCreate(req, env, ROUTE_DEPS),
   'DELETE /api/mcp-tokens/:id': (req, env, params) => handleMcpTokenRevoke(req, env, ROUTE_DEPS, params),
+  // Akses AI by login (OAuth 2.1, worker/oauth.js): the consent page #/izin-ai and connected apps.
+  'GET /api/oauth/request': (req, env) => handleOAuthRequestGet(req, env, ROUTE_DEPS),
+  'POST /api/oauth/decision': (req, env) => handleOAuthDecision(req, env, ROUTE_DEPS),
+  'GET /api/oauth/grants': (req, env) => handleOAuthGrantList(req, env, ROUTE_DEPS),
+  'DELETE /api/oauth/grants/:id': (req, env, params) => handleOAuthGrantRevoke(req, env, ROUTE_DEPS, params),
 
   // ------------------------------------------------------------ MCP / ERP
   // Dedicated routes, never the generic /api/db: connector rows hold secrets.
@@ -1396,9 +1404,16 @@ export default {
     const api = path === '/api' || path.startsWith('/api/');
     // Remote MCP server (Akses AI): /mcp and /mcp/<token>. Needs run_worker_first in wrangler*.toml.
     const mcp = path === '/mcp' || path.startsWith('/mcp/');
-    if (api || mcp) {
+    // OAuth 2.1 for /mcp (worker/oauth.js): metadata under /.well-known/*, endpoints under /oauth/*.
+    const oauth = path.startsWith('/oauth/');
+    if (path.startsWith('/.well-known/')) {
+      const res = handleWellKnown(request, path);
+      if (res) return res;
+    }
+    if (api || mcp || oauth) {
       try {
         if (mcp) return await handleMcp(request, env, path, ROUTE_DEPS);
+        if (oauth) return await handleOAuth(request, env, path, ROUTE_DEPS);
         return await handleApi(request, env, path);
       } catch (err) {
         if (err instanceof HttpError) return fail(err.status, err.message);

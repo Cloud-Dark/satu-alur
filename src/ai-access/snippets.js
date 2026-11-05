@@ -19,6 +19,12 @@ export const desktopConfig = (host, token) => JSON.stringify({
   mcpServers: { [SERVER_NAME]: { command: 'npx', args: ['-y', 'mcp-remote', connectorUrl(host, token)] } },
 }, null, 2)
 
+/** Login flow (OAuth): the bare server URL; Claude finds the login page itself. */
+export const serverUrl = (host) => `${trimHost(host)}/mcp`
+
+/** Claude Code with login: add the server, then /mcp -> Authenticate in Claude Code. */
+export const claudeCodeLoginCommand = (host) => `claude mcp add --transport http ${SERVER_NAME} ${serverUrl(host)}`
+
 /** All three snippets for one token. */
 export function snippets(host, token) {
   return {
