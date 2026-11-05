@@ -37,9 +37,11 @@ module.exports = async function flow(t) {
   t.check(review.includes(CUSTOMER) && review.includes('0812 7777 1234') && review.includes('Bekasi'), 'review shows entered data (name, phone, location)')
   await primary()
   await done()
-  t.check((await rowsWith(CUSTOMER)).length === 1, 'new request appears in the list')
+  t.check(norm(await p.textContent('.wiz-done')).includes(CUSTOMER) && await p.locator('.view .list-panel').count() === 0, 'request saved (form only, no list on the page)')
   await p.click('.wiz-done-actions .btn-primary') // Buat penawaran
   await p.waitForTimeout(900)
+  t.check(/^#\/app\/penawaran\/baru\?permintaan=\d+$/.test(await p.evaluate(() => location.hash)), '"Buat penawaran" opens #/app/penawaran/baru?permintaan=<id>', await p.evaluate(() => location.hash))
+  t.check(norm(await p.textContent('.view .job-head-name').catch(() => '')) === CUSTOMER, 'offer page names the job')
 
   /* ---- 02 Penawaran AI ---- */
   t.check(await step() === 'compose', 'offer opens on "compose" with the new request preselected', await step())
@@ -62,10 +64,15 @@ module.exports = async function flow(t) {
   t.check(!(await p.$eval('.wiz-primary', (b) => b.disabled)), 'valid price re-enables save')
   await primary()
   await done()
-  const offerRows = await rowsWith(CUSTOMER)
-  t.check(offerRows.length === 1 && /Disetujui/.test(offerRows[0]) && /1\.750\.000/.test(offerRows[0]), 'saved offer listed as Disetujui with Rp1.750.000', offerRows[0])
-  await p.click('.wiz-done-actions .btn-primary') // Tugaskan pekerja
+  const doneText = norm(await p.textContent('.wiz-done'))
+  t.check(/disetujui/.test(doneText) && /1\.750\.000/.test(doneText) && doneText.includes(CUSTOMER), 'saved offer: Rp1.750.000, disetujui', doneText)
+  await p.getByRole('button', { name: 'Lihat penawaran' }).click()
+  await p.waitForSelector('.view .offer-detail', { timeout: 8000 })
+  const detail = norm(await p.textContent('.view .offer-detail'))
+  t.check(/Disetujui/.test(detail) && /1\.750\.000/.test(detail) && /^#\/app\/penawaran\/\d+$/.test(await p.evaluate(() => location.hash)), 'the offer page (#/app/penawaran/<id>) shows it as Disetujui, Rp1.750.000', detail.slice(0, 160))
+  await p.getByRole('button', { name: 'Tugaskan', exact: true }).click()
   await p.waitForTimeout(900)
+  t.check(/^#\/app\/penugasan\?penawaran=\d+$/.test(await p.evaluate(() => location.hash)), '"Tugaskan" opens #/app/penugasan?penawaran=<id>')
 
   /* ---- 03 Penugasan ---- */
   await p.waitForSelector('.worker-pick input[type="checkbox"]')
@@ -78,8 +85,8 @@ module.exports = async function flow(t) {
   await firstWorker.locator('input[type="checkbox"]').check()
   await p.locator('.form-panel button[type="submit"]').click()
   await p.getByRole('button', { name: 'Tandai selesai nanti', exact: true }).waitFor()
-  const assignmentRows = await rowsWith(CUSTOMER)
-  t.check(assignmentRows.length === 1 && assignmentRows[0].includes(workerName), 'selected team assignment listed for the customer', assignmentRows.join(' | '))
+  const assignmentRows = await p.$$eval('.list-panel tbody tr', (r) => r.map((x) => x.textContent.replace(/\s+/g, ' ')))
+  t.check(assignmentRows.length === 1 && assignmentRows[0].includes(workerName) && norm(await p.textContent('.view .job-head-name')) === CUSTOMER, 'the job page shows its team assignment', assignmentRows.join(' | '))
   await p.getByRole('button', { name: 'Tandai selesai nanti', exact: true }).click()
   await p.waitForTimeout(900)
 
@@ -88,7 +95,7 @@ module.exports = async function flow(t) {
   await p.fill('textarea[name="notes"]', 'Delapan unit dibersihkan, dua unit isi freon. Pelanggan puas.')
   await primary()
   await done()
-  t.check((await rowsWith(CUSTOMER)).length >= 1, 'completion listed')
+  t.check(norm(await p.textContent('.wiz-done')).includes(CUSTOMER) && norm(await p.textContent('.view .job-head')).includes('Selesai'), 'completion saved, job marked Selesai')
   await p.click('.wiz-done-actions .btn-primary')
   await p.waitForTimeout(900)
 

@@ -51,16 +51,6 @@
 .wf-status { display: grid; gap: 4px; justify-items: start; }
 .wf-panel .col-action { white-space: nowrap; }
 .wf-row[data-position='booked'] .wf-open { font-weight: 500; }
-
-
-.wf-stage-links { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-1) var(--s-2); margin-top: calc(var(--s-2) * -1); font-size: var(--fs-xs); }
-.wf-stage-links-label { color: var(--text-faint); margin-right: var(--s-1); }
-.wf-stage-link {
-  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: var(--r-pill);
-  background: transparent; border: 1px solid var(--line); color: var(--text-2); font: inherit; font-weight: 500; cursor: pointer;
-}
-.wf-stage-link span { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--surface-sunken); color: var(--text-muted); font-size: 0.68rem; font-weight: 600; }
-.wf-stage-link:hover { border-color: var(--brand-300); color: var(--brand-600); }
 .wf-stage-link:focus-visible { outline: none; box-shadow: var(--ring); }
 
 /* Detail dialog: the job's journey */

@@ -1,10 +1,12 @@
-/** 01 — Permintaan: capture a customer request; list with derived status. */
+/**
+ * 01 — Permintaan: capture a customer request (#/app/permintaan/baru). The form only: every job
+ * is listed in Alur kerja, which this page links to.
+ */
 import { getCloud } from '../cloud.js'
 import * as C from '../ui/components.js'
-import { openWaDialog } from '../ui/wa-dialog.js'
-import { followUpMessage } from '../wa/rules.js'
 import { showToast } from '../ui/animations.js'
-import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
+import { loadFlow, notifyDataChanged } from './data.js'
+import { solo, workflowLink } from './job.js'
 import { openMapPicker } from '../leads/picker.js'
 import { autofillRequest } from '../ai/agent.js'
 import { readPartialJson } from '../offer/partial-json.js'
@@ -166,15 +168,9 @@ export async function render(container, ctx = {}) {
     if (pre.customer_name) queueMicrotask(() => wiz.go('need', { focus: false, animate: false }))
   }
 
-  const listBody = el('div', {}, C.skeletonRows(5))
-  const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari pelanggan atau layanan', 'aria-label': 'Cari permintaan' })
-  const searchBox = el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search)
-  const listPanel = C.panel({ title: 'Daftar permintaan', meta: 'memuat…', actions: searchBox, className: 'list-panel' }, listBody)
-  const pg = C.pager({ key: 'requests', label: 'daftar permintaan', onChange: () => drawList(), scrollTarget: listPanel })
-
   container.replaceChildren(
-    C.pageHeader({ title: 'Permintaan masuk' }),
-    el('div', { className: 'stage-grid has-wizard' }, wiz.root, listPanel),
+    C.pageHeader({ title: 'Permintaan baru' }),
+    solo(wiz.root, workflowLink(navigate)),
   )
 
   function drawReview() {
@@ -222,79 +218,18 @@ export async function render(container, ctx = {}) {
       wiz.complete({ text: `Permintaan ${data.customer_name} tersimpan. Lanjutkan dengan membuat penawaran.`, actions })
       showToast('Permintaan baru tersimpan.', 'success')
       notifyDataChanged()
-      await loadList()
+      await loadModel()
     } catch (err) {
       restore()
       msg.show('danger', `Gagal menyimpan: ${err.message}`)
     }
   }
 
-  /* ------------------------------------------------------------- List */
+  /* ---------------------------------------- Known services (AI hint) */
   let model = null
-  async function loadList() {
-    try {
-      model = await loadFlow(['requests', 'offers', 'assignments', 'completions', 'ledger_entries'])
-    } catch (err) {
-      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
-      return
-    }
-    if (ctx.signal?.aborted) return
-    drawList()
+  async function loadModel() {
+    try { model = await loadFlow(['requests']) } catch { /* only used for AI suggestions */ }
   }
 
-  function drawList() {
-    const q = search.value.trim().toLowerCase()
-    const rows = model.requests.filter((r) => !q || [r.customer_name, r.service_type, r.location].some((v) => String(v || '').toLowerCase().includes(q)))
-    listPanel.querySelector('.panel-meta').textContent = q ? `${rows.length} dari ${model.requests.length} baris` : `${model.requests.length} baris`
-    if (!model.requests.length) {
-      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada permintaan.', body: 'Isi formulir di samping untuk mencatat permintaan pertama.' }))
-      return
-    }
-    if (!rows.length) {
-      listBody.replaceChildren(C.emptyState({ kicker: 'Tidak ditemukan', title: `Tidak ada yang cocok dengan "${search.value.trim()}".` }))
-      return
-    }
-    listBody.replaceChildren(C.dataTable({
-      caption: 'Daftar permintaan',
-      rows: pg.slice(rows, { resetKey: q }),
-      columns: [
-        {
-          label: 'Pelanggan',
-          render: (r) => {
-            const stack = C.cellStack(customerLabel(r), [r.service_type, r.location].filter(Boolean).join(' · '))
-            stack.querySelector('.cell-primary').prepend(el('span', { className: 'cell-id tnum' }, `#${r.id}`))
-            if (r.description) stack.appendChild(el('span', { className: 'cell-note', title: r.description }, r.description))
-            if (r.phone) stack.appendChild(el('span', { className: 'cell-secondary tnum' }, r.phone))
-            if (r.requested_at) stack.appendChild(el('span', { className: 'cell-secondary' }, `Jadwal: ${C.formatDateTime(r.requested_at)}`))
-            return stack
-          },
-        },
-        { label: 'Status', render: (r) => { const s = model.requestStage(r); return C.tag(s.label, s.tone) } },
-        { label: 'Masuk', className: 'col-date', render: (r) => el('time', { className: 'tnum', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, C.formatDate(r.created_at)) },
-        {
-          label: 'Aksi',
-          className: 'col-action',
-          render: (r) => {
-            let main = el('span', { className: 'muted nil' }, '—')
-            if (!model.offersOf(r.id).length) {
-              main = C.button({ label: 'Tawarkan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
-              main.setAttribute('aria-label', `Buat penawaran untuk ${customerLabel(r)}`)
-              main.addEventListener('click', () => navigate('offer', { requestId: r.id }))
-            }
-            if (!r.phone) return main
-            const wa = C.button({ label: 'WhatsApp', icon: 'send', size: 'sm', variant: 'ghost' })
-            wa.setAttribute('aria-label', `Kirim pesan ke ${customerLabel(r)} via WhatsApp`)
-            wa.addEventListener('click', () => openWaDialog({
-              requestId: r.id, customer: customerLabel(r), phone: r.phone, kind: 'followup', opener: wa, openSettings: ctx.openSettings,
-              text: followUpMessage({ customer: r.customer_name, service: r.service_type, business: ctx.user?.name }),
-            }))
-            return el('div', { className: 'row-actions' }, main, wa)
-          },
-        },
-      ],
-    }), pg.root)
-  }
-  search.addEventListener('input', () => model && drawList())
-
-  await loadList()
+  await loadModel()
 }

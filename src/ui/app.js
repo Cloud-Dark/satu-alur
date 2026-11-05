@@ -5,12 +5,14 @@ import { renderStaffLogin } from '../auth/staff-login.js'
 import { renderShell } from './shell.js'
 import { renderDocPage } from '../site/doc-page.js'
 import { renderContactPage } from '../contact/page.js'
+import { isAppHash } from './routes.js'
 
 /**
  * Hash router:
  *   #/        landing page (public)
  *   #/masuk   login page (redirects to #/app when already signed in)
- *   #/app     application shell (requires a session)
+ *   #/app     application shell (requires a session); every page in it has its own
+ *             #/app/… route (see ./routes.js), handled by the shell without a re-render
  *   /super-admin-login   staff login, username + password (real path; lands on Kantor Satu Alur)
  *
  * Every page renderer receives (root, ctx) and may return a cleanup function
@@ -40,6 +42,14 @@ let cleanup = null
 let rootEl = null
 let waguri = null // { path, unmount } for the public pages' assistant
 let waguriSeq = 0
+let renderedPath = null // the page rendered last ('/app' while the shell is up)
+let appRouteHandler = null // the shell's handler for in-app hash changes
+// A signed-out visit to a deep app link logs in first, then opens that link.
+const AFTER_LOGIN_KEY = 'satualur_after_login'
+const session = {
+  get(k) { try { return sessionStorage.getItem(k) } catch { return null } },
+  set(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v) } catch { /* storage unavailable */ } },
+}
 
 const onStaffPath = () => location.pathname.replace(/\/+$/, '') === STAFF_PATH
 
@@ -52,8 +62,16 @@ export function navigate(path) {
 
 function currentPath() {
   if (onStaffPath()) return STAFF_PATH
+  if (isAppHash(location.hash)) return '/app'
   const path = location.hash.replace(/^#/, '').split('?')[0] || '/'
   return ROUTES[path] ? path : '/'
+}
+
+// After signing in: the app link that was opened while signed out, else #/app.
+function appTarget() {
+  const saved = session.get(AFTER_LOGIN_KEY)
+  session.set(AFTER_LOGIN_KEY, null)
+  return saved && isAppHash(saved) ? saved.replace(/^#/, '') : '/app'
 }
 
 // Staff sessions get the office menu in the shell, on the remembered section.
@@ -61,26 +79,34 @@ function openOffice() {
   navigate('/app')
 }
 
-function render() {
+function render({ force = false } = {}) {
   // The Meta OAuth callback returns to #/social-media?...; #/support?tiket=<id> links a ticket.
   // Open that stage inside the app, keeping the query for the stage to read.
   const back = /^#\/(social-media|support)(\?.*)?$/.exec(location.hash)
-  if (back) {
-    try { sessionStorage.setItem('satualur_stage', back[1]) } catch { /* storage unavailable */ }
-    history.replaceState(null, '', `#/app${back[2] || ''}`)
-  }
+  if (back) history.replaceState(null, '', `#/app/${back[1] === 'support' ? 'bantuan' : 'media-sosial'}${back[2] || ''}`)
   let path = currentPath()
   if (path === STAFF_PATH) {
     if (currentIsAdmin) { openOffice(); return }
   } else {
-    if (path === '/app' && !currentUser) path = '/masuk'
+    if (path === '/app' && !currentUser) {
+      if (location.hash.replace(/\/$/, '') !== '#/app') session.set(AFTER_LOGIN_KEY, location.hash)
+      path = '/masuk'
+    }
     if (path === '/masuk' && currentUser) path = '/app'
-    // Compare paths only, so a query such as #/masuk?demo survives.
+    // Compare paths only, so a query such as #/masuk?demo survives; any #/app/… route is the shell's.
     const hashPath = location.hash.replace(/^#/, '').split('?')[0]
-    if ((hashPath || '/') !== path && !(path === '/' && !location.hash)) {
+    const sameApp = path === '/app' && isAppHash(location.hash)
+    if (!sameApp && (hashPath || '/') !== path && !(path === '/' && !location.hash)) {
       history.replaceState(null, '', `#${path}`)
     }
   }
+
+  // Moving between pages of the signed-in app: the shell switches the page itself (no re-render),
+  // unless it asks for one (e.g. an email admin switching between the app and the office).
+  if (!force && path === '/app' && renderedPath === '/app' && appRouteHandler) {
+    if (appRouteHandler(location.hash) !== false) return
+  }
+  appRouteHandler = null
 
   if (typeof cleanup === 'function') {
     try { cleanup() } catch (e) { console.warn('Cleanup error:', e) }
@@ -90,16 +116,19 @@ function render() {
   document.body.dataset.page = path === '/' ? 'landing' : path.slice(1)
   window.scrollTo(0, 0)
 
+  renderedPath = path
   const ctx = {
     user: currentUser,
     isAdmin: currentIsAdmin,
     adminVia: currentAdminVia,
     navigate,
+    // The shell registers how it follows #/app/… hash changes (Back/Forward, links, deep links).
+    setRouteHandler(fn) { appRouteHandler = fn },
     async onSignedIn(user) {
       currentUser = user
       await loadAdmin()
-      if (path === STAFF_PATH && currentIsAdmin) openOffice()
-      else navigate('/app')
+      if (path === STAFF_PATH && currentIsAdmin) { session.set(AFTER_LOGIN_KEY, null); openOffice() }
+      else navigate(appTarget())
     },
     async signOut() {
       await signOut()
@@ -161,7 +190,7 @@ export async function mountApp(root) {
     currentUser = null
   }
 
-  window.addEventListener('hashchange', render)
+  window.addEventListener('hashchange', () => render())
   render()
 
   try {
@@ -172,7 +201,7 @@ export async function mountApp(root) {
       if (next) await loadAdmin()
       else { currentIsAdmin = false; currentAdminVia = null }
       // The login page shows its own success state and navigates via ctx.onSignedIn.
-      if (changed && !(next && (currentPath() === '/masuk' || currentPath() === STAFF_PATH))) render()
+      if (changed && !(next && (currentPath() === '/masuk' || currentPath() === STAFF_PATH))) render({ force: true })
     })
   } catch (e) {
     console.warn('Auth state observer error:', e.message)

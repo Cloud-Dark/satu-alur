@@ -30,7 +30,7 @@ export async function render(container, ctx = {}) {
   let replizPick = null
   let repliz = { status: null, accounts: [] }
   // Return from the Meta OAuth callback (see ui/app.js): open Akun, show the outcome, drop the query.
-  const query = new URLSearchParams(location.hash.split('?')[1] || '')
+  const query = ctx.query || new URLSearchParams(location.hash.split('?')[1] || '')
   const back = { connected: Object.hasOwn(CALLBACK_OK, query.get('social') || '') ? CALLBACK_OK[query.get('social')] : null,
     error: query.get('social_error'), pick: query.get('social_pick') }
   // Return from the Repliz connect page (worker/repliz.js): repliz=connected | repliz_error=… | repliz_pick=<id>.
@@ -40,7 +40,8 @@ export async function render(container, ctx = {}) {
   if (back.connected || back.error || back.pick || back.replizError || replizPick) {
     currentTab = 'account'
     pick = back.pick
-    history.replaceState(null, '', '#/app')
+    if (ctx.setRoute) ctx.setRoute({})
+    else history.replaceState(null, '', '#/app/media-sosial')
   }
   const status = C.message()
   const host = el('div')

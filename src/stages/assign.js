@@ -1,4 +1,8 @@
-/** 03 — Penugasan: assign an approved offer to a worker with AI matching, map, and team management. */
+/**
+ * 03 — Penugasan: assign an approved offer to a worker with AI matching, map, and team management.
+ * The Tugaskan tab shows one job (#/app/penugasan?penawaran=<offer id>): its form while it has no
+ * team yet, then its team, schedule and progress. Every job is listed in Alur kerja.
+ */
 import { loadWorkers, loadLinks, saveWorker, removeWorker, createTeamAssignment, loadSkills, addSkill, renameSkill, deleteSkill, saveWorkerLocation } from './workers-repo.js'
 import { geocode } from '../geo.js'
 import { loadLeaflet, addBaseLayer, disposeMap } from '../ui/leaflet.js'
@@ -9,6 +13,7 @@ import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 import { labelMap, sortSkills, nameProblem, workersUsing, NAME_MAX } from '../domain/skills.js'
 import { PROGRESS, progressOf, progressChip, progressCounts, planProgress, progressLabel, NOTE_MAX } from '../domain/progress.js'
 import { saveProgress, loadProgressLog } from './progress-repo.js'
+import { jobHeader, solo, pickFromWorkflow, workflowLink } from './job.js'
 
 const { el } = C
 
@@ -93,6 +98,18 @@ export async function render(container, ctx = {}) {
 function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam) {
   const navigate = ctx.navigate || (() => {})
   const params = ctx.params || {}
+  if (params.offerId == null) {
+    target.appendChild(pickFromWorkflow(navigate, { filter: 'assign', body: 'Penugasan dibuat untuk satu pekerjaan. Buka Alur kerja, lalu tekan "Tugaskan petugas" pada pekerjaan yang penawarannya sudah disetujui.' }))
+    return
+  }
+  const theOffer = flow.offer(params.offerId)
+  if (!theOffer) {
+    target.appendChild(pickFromWorkflow(navigate, { filter: 'assign', title: 'Penawaran tidak ditemukan.', body: 'Pilih pekerjaan lain dari Alur kerja.' }))
+    return
+  }
+  const theRequest = flow.requestOfOffer(theOffer)
+  const teamOf = () => flow.assignmentsOf(theOffer.id)
+  const hasTeam = teamOf().length > 0
 
   const offerSel = C.select({ label: 'Penawaran disetujui', name: 'offer_id', required: true, hint: 'Pilih penawaran untuk lihat rekomendasi petugas.', options: [{ value: '', label: 'Memuat…' }] })
   const preview = el('div', { className: 'req-preview', hidden: true })
@@ -129,13 +146,23 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
   )
   form.noValidate = true
 
-  const listBody = el('div', {}, C.skeletonRows(5))
-  const listPanel = C.panel({ title: 'Daftar penugasan', meta: 'memuat…', className: 'list-panel' }, listBody)
-  const pg = C.pager({ key: 'assignments', label: 'daftar penugasan', onChange: () => drawList(), scrollTarget: listPanel })
-
-  target.appendChild(el('div', { className: 'stage-grid' },
-    C.panel({ title: 'Tugaskan petugas', meta: 'Rekomendasi otomatis', raised: true, className: 'form-panel' }, form),
-    listPanel,
+  const listBody = el('div', {})
+  const listPanel = C.panel({ title: 'Tim pekerjaan ini', meta: `${teamOf().length} penugasan`, className: 'list-panel' }, listBody)
+  const head = jobHeader(theRequest, { tag: hasTeam ? null : C.tag('Belum ditugaskan', 'warn'), note: `Penawaran #${theOffer.id} · ${C.rupiah(theOffer.validated_price)}` })
+  const notApproved = theOffer.status !== 'approved'
+  const pending = el('div', {})
+  if (notApproved) {
+    const go = C.button({ label: 'Buka penawaran', iconRight: 'arrowRight', size: 'sm' })
+    go.addEventListener('click', () => navigate('offer', { offerId: theOffer.id }))
+    pending.append(el('div', { className: 'note note-info' }, C.icon('info'),
+      el('div', { className: 'note-body' }, el('p', {}, 'Penawaran pekerjaan ini belum disetujui. Setujui dulu, lalu tugaskan petugas.'), el('div', { className: 'note-actions' }, go))))
+  }
+  target.appendChild(solo(
+    head,
+    pending,
+    hasTeam || notApproved ? null : C.panel({ title: 'Tugaskan petugas', meta: 'Rekomendasi otomatis', raised: true, className: 'form-panel' }, form),
+    hasTeam ? listPanel : null,
+    workflowLink(navigate),
   ))
 
   let job = null // { skill, lat, lng } of the selected offer
@@ -196,9 +223,9 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
 
   function fillOffers() {
     if (!flow) return
-    const approved = flow.offers.filter((o) => o.status === 'approved')
-    // Only offers still waiting for a team; once assigned they live in Daftar penugasan.
-    const free = assignableOffers(flow)
+    const approved = flow.offers.filter((o) => o.status === 'approved' && String(o.id) === String(theOffer.id))
+    // Only this job's offer, while it still waits for a team.
+    const free = assignableOffers(flow).filter((o) => String(o.id) === String(theOffer.id))
     const label = (o) => { const r = flow.requestOfOffer(o); return `${customerLabel(r)} — ${C.rupiah(o.validated_price)}` }
     const opts = [{ value: '', label: free.length ? 'Pilih penawaran' : approved.length ? 'Semua penawaran sudah ditugaskan' : 'Belum ada penawaran disetujui' }]
     free.forEach((o) => opts.push({ value: o.id, label: label(o) }))
@@ -207,7 +234,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
     C.setOptions(offerSel.input, opts, keep)
     submit.disabled = !free.length
     if (approved.length && !free.length) {
-      msg.show('info', 'Semua penawaran yang disetujui sudah ditugaskan. Pantau progresnya di Daftar penugasan.')
+      msg.show('info', 'Pekerjaan ini sudah ditugaskan.')
     } else if (!approved.length) {
       msg.show('info', 'Belum ada penawaran yang disetujui. Simpan penawaran di tahap 02 terlebih dahulu.')
       const go = C.button({ label: 'Ke penawaran', iconRight: 'arrowRight', size: 'sm' })
@@ -283,18 +310,16 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
   }
 
   function drawList() {
-    const active = flow.activeAssignments().length
-    listPanel.querySelector('.panel-meta').textContent = `${flow.assignments.length} baris · ${active} aktif`
-    if (!flow.assignments.length) {
-      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Belum ada penugasan.', body: 'Pilih penawaran yang disetujui dan tentukan pelaksananya.' }))
-      return
-    }
+    const rows = teamOf()
+    if (!rows.length) return
     const now = Date.now()
+    const active = rows.find((a) => !flow.completionsOf(a.id).length)
+    const next = active ? C.button({ label: 'Tandai selesai', icon: 'checkCircle', size: 'sm', variant: 'primary' }) : null
+    next?.addEventListener('click', () => navigate('complete', { assignmentId: active.id }))
     listBody.replaceChildren(C.dataTable({
-      caption: 'Daftar penugasan',
-      rows: pg.slice(flow.assignments),
+      caption: 'Penugasan pekerjaan ini',
+      rows,
       columns: [
-        { label: 'Pelanggan', render: (a) => { const r = flow.requestOfAssignment(a); return C.cellStack(customerLabel(r), r?.service_type) } },
         {
           label: 'Petugas · jadwal',
           render: (a) => {
@@ -326,7 +351,7 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
           },
         },
       ],
-    }), pg.root)
+    }), next ? el('div', { className: 'job-actions panel-foot-actions' }, next) : '')
   }
 
   /** Progress editor: choose a status, add a note, see the history. "Selesai" opens Penyelesaian. */

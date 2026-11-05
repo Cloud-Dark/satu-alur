@@ -163,12 +163,10 @@ module.exports = async function pendapatan(t) {
   ))), 'optimasi: saved history is scoped to the signed-in user')
 
   // Test the new bookkeeping consumer directly; the older flow spec stops at assignment.
-  await goStage(p, 'bookkeeping')
-  const completion = p.locator('select[name="completion_id"]')
-  await p.waitForFunction(() => document.querySelector('select[name="completion_id"] option[value]:not([value=""])'))
-  const completionId = await completion.locator('option:not([value=""])').first().getAttribute('value')
-  await completion.selectOption(completionId, { force: true })
-  await p.locator('.wiz-primary').click()
+  // One job per page: #/app/pembukuan?penyelesaian=<id> opens on the journal step.
+  const completionId = await p.evaluate(() => (JSON.parse(localStorage.getItem('satualur_mock_v1') || '{}').completions || [])[0]?.id)
+  await goStage(p, 'bookkeeping', { completionId })
+  await p.waitForSelector('.wiz-pane[data-step="entry"]:not([hidden])', { timeout: 10000 })
   await p.locator('select[name="category"]').selectOption('pendapatan', { force: true })
   const vasSelect = p.locator('select[name="vas_item_id"]')
   await p.waitForFunction(() => document.querySelector('select[name="vas_item_id"] option[value="8001"]'))

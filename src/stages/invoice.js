@@ -211,7 +211,7 @@ export async function render(container, ctx = {}) {
     save.hidden = !editable
     const pdf = C.button({ label: 'Unduh PDF', icon: 'download', variant: 'soft' })
     const more = el('div', { className: 'inv-actions' })
-    const { form, close } = C.modal({
+    const { dialog, form, close } = C.modal({
       title: current.id ? `Invoice ${current.number}` : 'Invoice baru', wide: true, opener,
       children: [head,
         el('div', { className: 'form-grid-2' }, name.wrap, phone.wrap, email.wrap, addr.wrap, issue.wrap, due.wrap),
@@ -220,6 +220,9 @@ export async function render(container, ctx = {}) {
         totalsBox, pay.wrap, notes.wrap, more, err],
       actions: [C.button({ label: 'Tutup', variant: 'ghost', dismiss: true }), pdf, save],
     })
+    dialog.classList.add('inv-editor')
+    // A saved invoice has its own URL (#/app/invoice/<id>); Back closes it.
+    if (current.id) ctx.routeDialog?.(dialog, { invoiceId: current.id })
 
     const persist = async () => {
       const problems = invoiceProblems(current, items)
@@ -351,10 +354,16 @@ export async function render(container, ctx = {}) {
 
   await load()
   // Opened from Penyelesaian / Pembukuan: start an invoice for that job, or open its invoice.
-  if (params.completionId != null && flow) {
+  if (params.invoiceId != null) {
+    // #/app/invoice/<id>: open that invoice.
+    const inv = invoices.find((i) => String(i.id) === String(params.invoiceId))
+    ctx.setRoute?.({})
+    if (inv) openEditor(inv)
+    else status.show('info', 'Invoice tidak ditemukan.')
+  } else if (params.completionId != null && flow) {
     const existing = invoices.find((i) => String(i.completion_id) === String(params.completionId) && i.status !== 'batal')
     const c = flow.completion(params.completionId)
-    if (existing) openEditor(existing)
+    if (existing) { ctx.setRoute?.({}); openEditor(existing) }
     else if (c) openEditor(draftFor(c))
   }
 }

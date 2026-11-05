@@ -1,6 +1,10 @@
 /**
  * Application shell: sidebar flow nav, sticky topbar, stage host and the
  * settings drawer. renderShell(root, ctx) returns a cleanup function.
+ *
+ * Every page has its own URL (#/app/…, see ./routes.js). Moving inside the app pushes a history
+ * entry, so Back/Forward work; app.js hands #/app/… hash changes to the handler registered here
+ * through ctx.setRouteHandler, and a reload or a deep link opens exactly that page.
  */
 import { logoLink } from './brand.js'
 import { themeToggleButton } from './theme.js'
@@ -11,6 +15,7 @@ import { animateView } from './animations.js'
 import { isUsingMockCloud } from '../cloud.js'
 import { loadFlow } from '../stages/data.js'
 import { setOwner as setAiOwner } from '../ai/superpowers.js'
+import { parseAppRoute, formatAppRoute, resolveStage } from './routes.js'
 
 import * as StageDashboard from '../stages/dashboard.js'
 import * as StageWorkflow from '../stages/workflow.js'
@@ -65,7 +70,7 @@ export const STAGES = [
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
   { key: 'invoice', group: 'income', label: 'Invoice', sub: 'Tagihan pelanggan', icon: 'receipt',
     hint: 'Buat invoice dari pekerjaan selesai, kirim lewat email atau WhatsApp, lalu tandai lunas. Pendapatannya otomatis masuk Pembukuan.',
-    module: StageInvoice, action: { label: 'Ke pembukuan', iconRight: 'arrowRight', to: 'bookkeeping' } },
+    module: StageInvoice, action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
   { key: 'vas', group: 'income', label: 'Layanan tambahan', sub: 'VAS & katalog', icon: 'layers',
     hint: 'Dua cara menambah pendapatan: jual layanan tambahan ke pekerjaan yang sudah ada, dan hentikan kebocoran biaya. Di sini Anda menemukan peluang VAS, mengelola katalognya, lalu membahas rencananya bersama lima tim AI.',
     module: StageVas,
@@ -130,6 +135,10 @@ export function renderShell(root, ctx) {
   // Staff sessions only ever see the office. Email admins (ADMIN_EMAILS) also run a business, so
   // they switch between their app and Kantor Satu Alur; the choice is kept for this tab.
   const emailAdmin = ctx.isAdmin === true && ctx.adminVia === 'email'
+  const route0 = parseAppRoute(location.hash) || { bare: true, params: {} }
+  // An office URL opens Kantor Satu Alur for an email admin, a business URL their own app.
+  if (emailAdmin && route0.office) store.set(sessionStorage, ADMIN_VIEW_KEY, 'office')
+  else if (emailAdmin && !route0.bare && !route0.settings) store.set(sessionStorage, ADMIN_VIEW_KEY, 'app')
   const staff = ctx.isAdmin === true && (!emailAdmin || store.get(sessionStorage, ADMIN_VIEW_KEY) === 'office')
   const stages = staff ? STAFF_STAGES : STAGES
   const storeKey = staff ? STAFF_KEY : STAGE_KEY
@@ -142,8 +151,16 @@ export function renderShell(root, ctx) {
     disposers.push(() => target.removeEventListener(type, fn, opts))
   }
 
-  let current = store.get(sessionStorage, storeKey)
-  if (!stages.some((s) => s.key === current)) current = stages[0].key
+  const hasStage = (key) => stages.some((s) => s.key === key)
+  // The URL names the page; a bare #/app reopens the last page of this tab.
+  let current = null
+  let initialParams = {}
+  if (staff ? route0.office && hasStage(route0.stage) : !route0.office && !route0.bare && !route0.settings && hasStage(route0.stage)) {
+    current = route0.stage
+    initialParams = route0.params || {}
+  }
+  if (!current) current = store.get(sessionStorage, storeKey)
+  if (!hasStage(current)) current = stages[0].key
   let viewCtl = null
   let leaveGuard = null
   let lastFocus = null
@@ -245,7 +262,7 @@ export function renderShell(root, ctx) {
   const actionSlot = el('div', { className: 'topbar-action' })
   const switchOffice = () => {
     store.set(sessionStorage, ADMIN_VIEW_KEY, staff ? 'app' : 'office')
-    ctx.navigate('/app')
+    ctx.navigate(staff ? '/app' : '/app/kantor')
   }
   const profile = profileMenu({
     user, initials: initials(user), isAdmin: ctx.isAdmin === true, adminVia: ctx.adminVia || null, inOffice: staff,
@@ -339,8 +356,29 @@ export function renderShell(root, ctx) {
   scrim.addEventListener('click', () => closeNav())
   on(mq, 'change', () => closeNav({ restore: false }))
 
+  /* --------------------------------------------------------------- URLs */
+
+  const routeFor = (key, params = {}) => formatAppRoute(staff ? { stage: key, office: true } : { stage: key, params })
+  let stageHash = null // URL of the page on screen (without its dialog or the settings drawer)
+  let lastHash = null // URL this shell wrote last
+  let routeDialog = null // { dialog } of the open dialog that has its own URL
+  function writeHash(hash, { replace = false } = {}) {
+    lastHash = hash
+    if (location.hash === hash) return
+    if (replace) history.replaceState(null, '', hash)
+    else history.pushState(null, '', hash)
+  }
+
   let settingsReturn = null
-  function openSettings() {
+  let settingsPushed = false
+  function openSettings({ fromUrl = false } = {}) {
+    if (staff) return
+    if (!drawer.hidden) return
+    if (!fromUrl) {
+      const hash = formatAppRoute({ settings: true })
+      settingsPushed = location.hash !== hash
+      writeHash(hash)
+    } else settingsPushed = false
     settingsReturn = document.activeElement
     closeNav({ restore: false })
     StageSettings.render(drawerBody)
@@ -353,8 +391,13 @@ export function renderShell(root, ctx) {
       drawerClose.focus()
     })
   }
-  function closeSettings() {
+  function closeSettings({ fromUrl = false } = {}) {
     if (drawer.hidden) return
+    // Closing goes back to the page's own URL (Back when opening it added the history entry).
+    if (!fromUrl && location.hash === formatAppRoute({ settings: true }) && stageHash) {
+      if (settingsPushed) { lastHash = stageHash; history.back() } else writeHash(stageHash, { replace: true })
+    }
+    settingsPushed = false
     drawer.classList.remove('is-open')
     drawerScrim.classList.remove('is-open')
     document.body.classList.remove('scroll-lock')
@@ -364,9 +407,9 @@ export function renderShell(root, ctx) {
     else setTimeout(finish, 280)
     settingsReturn?.focus?.()
   }
-  settingsBtn.addEventListener('click', openSettings)
-  drawerClose.addEventListener('click', closeSettings)
-  drawerScrim.addEventListener('click', closeSettings)
+  settingsBtn.addEventListener('click', () => openSettings())
+  drawerClose.addEventListener('click', () => closeSettings())
+  drawerScrim.addEventListener('click', () => closeSettings())
 
   const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
   function trapFocus(container, e) {
@@ -440,16 +483,30 @@ export function renderShell(root, ctx) {
     actionSlot.replaceChildren(b)
   }
 
-  async function show(key, params = {}, { focus = false } = {}) {
-    const stage = stages.find((s) => s.key === key) || stages[0]
+  /**
+   * Opens a page. fromUrl: the URL already changed (Back/Forward, a link, a deep link), so it is
+   * only normalised; otherwise the page's URL is pushed as a new history entry.
+   */
+  async function show(key, params = {}, { focus = false, fromUrl = false } = {}) {
+    const stage = stages.find((s) => s.key === resolveStage(key)) || stages[0]
+    params = params || {}
     // The current stage may veto leaving (unsaved changes); it registers the guard through ctx.setLeaveGuard.
-    if (leaveGuard && !leaveGuard()) { closeNav({ restore: false }); return }
+    if (leaveGuard && !leaveGuard()) {
+      closeNav({ restore: false })
+      if (fromUrl && lastHash) history.replaceState(null, '', lastHash) // stay: put the address back
+      return
+    }
     leaveGuard = null
     viewCtl?.abort()
     viewCtl = new AbortController()
     const signal = viewCtl.signal
     current = stage.key
     store.set(sessionStorage, storeKey, stage.key)
+    routeDialog = null
+    // The query the page was opened with (OAuth returns carry keys the route table does not know).
+    const query = new URLSearchParams(fromUrl ? location.hash.split('?')[1] || '' : '')
+    stageHash = routeFor(stage.key, params)
+    writeHash(stageHash, { replace: fromUrl })
 
     const navKey = stage.parent || stage.key
     for (const [k, b] of navButtons) {
@@ -470,11 +527,39 @@ export function renderShell(root, ctx) {
       user,
       signal,
       params,
+      query,
       isMock,
       navigate: (to, p) => show(to, p, { focus: true }),
-      openSettings,
+      openSettings: () => openSettings(),
       setLeaveGuard: (fn) => { if (!signal.aborted) leaveGuard = fn },
       refreshBadges: refreshCounts,
+      /** Updates this page's URL (filters, search…) without a new history entry or a re-render. */
+      setRoute: (p = {}) => {
+        if (signal.aborted) return
+        stageHash = routeFor(stage.key, p)
+        writeHash(stageHash, { replace: true })
+      },
+      /**
+       * Gives an open dialog its own URL (e.g. #/app/alur-kerja/12): pushed now; closing the dialog
+       * goes Back to the page URL, and Back while it is open closes it.
+       */
+      routeDialog: (dialog, p = {}) => {
+        if (signal.aborted || !dialog) return
+        const hash = routeFor(stage.key, p)
+        if (hash === stageHash) return
+        const base = stageHash
+        const pushed = location.hash !== hash
+        writeHash(hash)
+        routeDialog = { dialog }
+        dialog.addEventListener('close', () => {
+          if (routeDialog?.dialog === dialog) routeDialog = null
+          // Deferred: a button that closes the dialog and then opens another page has pushed it by now.
+          setTimeout(() => {
+            if (signal.aborted || location.hash !== hash) return
+            if (pushed) { lastHash = base; history.back() } else writeHash(base, { replace: true })
+          }, 0)
+        }, { once: true })
+      },
     }
     try {
       const done = stage.module.render(view, stageCtx)
@@ -492,7 +577,39 @@ export function renderShell(root, ctx) {
     }
   }
 
-  show(current)
+  /** Follows a #/app/… hash change; false asks app.js to render the shell again. */
+  function onRoute(hash) {
+    if (hash === lastHash) return true
+    const r = parseAppRoute(hash) || { bare: true, params: {} }
+    if (emailAdmin) {
+      const wantOffice = r.office || (r.bare ? store.get(sessionStorage, ADMIN_VIEW_KEY) === 'office' : r.settings ? staff : false)
+      if (wantOffice !== staff) { store.set(sessionStorage, ADMIN_VIEW_KEY, wantOffice ? 'office' : 'app'); return false }
+    }
+    if (r.settings) {
+      if (staff) writeHash(stageHash, { replace: true })
+      else { lastHash = hash; openSettings({ fromUrl: true }) }
+      return true
+    }
+    if (!drawer.hidden) closeSettings({ fromUrl: true })
+    if (hash === stageHash) {
+      // Back from a dialog's URL: close the dialog, keep the page.
+      lastHash = hash
+      const d = routeDialog?.dialog
+      routeDialog = null
+      if (d?.open) d.close()
+      return true
+    }
+    let key = 'dashboard'
+    let params = {}
+    if (staff) key = r.office && hasStage(r.stage) ? r.stage : current
+    else if (!r.office && !r.bare && hasStage(r.stage)) { key = r.stage; params = r.params || {} }
+    show(key, params, { focus: true, fromUrl: true })
+    return true
+  }
+  ctx.setRouteHandler?.(onRoute)
+
+  show(current, initialParams, { fromUrl: true })
+  if (route0.settings && !staff) openSettings()
   refreshCounts()
   // A used-up AI quota anywhere opens one upsell dialog (plans / voucher / contact).
   if (!staff) disposers.push(mountUpsell((to, p) => show(to, p, { focus: true })))
