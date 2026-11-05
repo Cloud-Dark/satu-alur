@@ -305,6 +305,107 @@ export function addressFromTags(t = {}) {
   return [...new Set(parts.filter(Boolean).map((s) => String(s).trim()))].join(', ').slice(0, 200)
 }
 
+/** First valid e-mail address in an OSM value ("mailto:" and lists allowed), lower-cased. */
+export function cleanEmail(v) {
+  const e = firstOf(String(v || '').replace(/^mailto:/i, '')).toLowerCase()
+  return e.length <= 254 && /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(e) ? e : ''
+}
+
+/**
+ * Instagram / Facebook from an OSM value: a full URL or a bare handle.
+ * Returns a short readable form ("@handle" for Instagram, "facebook.com/x"), or ''.
+ */
+export function cleanSocial(v, kind) {
+  let s = firstOf(v)
+  if (!s) return ''
+  const host = kind === 'instagram' ? 'instagram.com' : 'facebook.com'
+  const m = s.match(/^(?:https?:\/\/)?(?:www\.|m\.|web\.)?(instagram\.com|facebook\.com|fb\.com)\/([^?#]+)/i)
+  if (m) {
+    if ((kind === 'instagram') !== (m[1].toLowerCase() === 'instagram.com')) return ''
+    s = m[2].replace(/\/+$/, '')
+  }
+  s = s.replace(/^@/, '')
+  if (!/^[\w.\-/]{1,80}$/.test(s) || /^\.|\.\./.test(s)) return ''
+  return kind === 'instagram' ? `@${s.split('/')[0]}` : `${host}/${s}`
+}
+
+const DAY_LABELS = { Mo: 'Sen', Tu: 'Sel', We: 'Rab', Th: 'Kam', Fr: 'Jum', Sa: 'Sab', Su: 'Min', PH: 'libur nasional' }
+
+/**
+ * Readable Indonesian opening hours from a (simple) OSM opening_hours value:
+ * "Mo-Su 08:00-21:00" -> "setiap hari 08:00–21:00", "24/7" -> "24 jam",
+ * "Mo-Fr 08:00-17:00; Sa 08:00-12:00" -> "Sen–Jum 08:00–17:00; Sab 08:00–12:00".
+ * Anything it cannot read is returned trimmed (max 80 chars).
+ */
+export function openingHoursText(v) {
+  const raw = String(v || '').replace(/\s+/g, ' ').trim()
+  if (!raw) return ''
+  if (raw === '24/7') return '24 jam'
+  const rules = raw.split(/\s*;\s*/).filter(Boolean).map((rule) => {
+    let r = rule.replace(/^Mo-Su\s+/, 'setiap hari ')
+    if (r === 'Mo-Su') r = 'setiap hari'
+    r = r.replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, (d) => DAY_LABELS[d])
+    r = r.replace(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/g, '$1–$2')
+    r = r.replace(/([A-Za-z]{3})-([A-Za-z]{3})/g, '$1–$2')
+    r = r.replace(/\boff\b|\bclosed\b/gi, 'tutup').replace(/\b00:00–24:00\b/, '24 jam')
+    return r
+  })
+  return rules.join('; ').slice(0, 80)
+}
+
+const CUISINE_LABELS = {
+  indonesian: 'Indonesia', regional: 'daerah', padang: 'Padang', sundanese: 'Sunda', javanese: 'Jawa', balinese: 'Bali', betawi: 'Betawi',
+  chinese: 'Tionghoa', japanese: 'Jepang', korean: 'Korea', thai: 'Thailand', western: 'Barat', italian: 'Italia', american: 'Amerika',
+  indian: 'India', arab: 'Arab', seafood: 'seafood', chicken: 'ayam', noodle: 'mi', coffee_shop: 'kopi', coffee: 'kopi', bakery: 'roti & kue',
+  burger: 'burger', pizza: 'pizza', steak_house: 'steak', satay: 'sate', soto: 'soto', bakso: 'bakso', vegetarian: 'vegetarian', ice_cream: 'es krim',
+}
+
+/** "padang;seafood" -> "Padang, seafood". */
+export function cuisineText(v) {
+  return String(v || '').split(/[;,]/).map((c) => c.trim().toLowerCase()).filter(Boolean).slice(0, 3)
+    .map((c) => CUISINE_LABELS[c] || c.replace(/_/g, ' ')).join(', ')
+}
+
+/**
+ * Short readable description of a business from its tags, e.g.
+ * "Laundry · buka setiap hari 08:00–21:00" or "Restoran · masakan Padang · …".
+ * Uses the OSM `description` when present. '' when there is nothing useful.
+ */
+export function describeBusiness(tags = {}, category = '') {
+  const cat = String(category || categoryFromTags(tags, '')).trim()
+  const parts = []
+  if (cat && cat !== 'Usaha') parts.push(cat)
+  const cuisine = cuisineText(tags.cuisine)
+  if (cuisine) parts.push(`masakan ${cuisine}`)
+  const note = String(tags.description || tags['description:id'] || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+  if (note && !parts.some((p) => p.toLowerCase() === note.toLowerCase())) parts.push(note)
+  const hours = openingHoursText(tags.opening_hours)
+  if (hours) parts.push(`buka ${hours}`)
+  return parts.join(' · ').slice(0, 300)
+}
+
+/**
+ * Every contact OSM has for a place (pure; unit tested). Only non-empty keys
+ * are returned. `phone` keeps the historical fallback chain; `mobile` is
+ * listed only when it differs from it, `whatsapp` whenever tagged (it tells
+ * the user the number is reachable on WhatsApp).
+ */
+export function contactsFromTags(t = {}) {
+  const phone = cleanPhone(t.phone || t['contact:phone'] || t['contact:mobile'] || t.mobile || t['contact:whatsapp'])
+  const mobile = cleanPhone(t['contact:mobile'] || t.mobile)
+  const whatsapp = cleanPhone(t['contact:whatsapp'] || t.whatsapp)
+  const out = {
+    email: cleanEmail(t.email || t['contact:email']),
+    phone,
+    mobile: mobile !== phone ? mobile : '',
+    whatsapp,
+    website: cleanWebsite(t.website || t['contact:website'] || t.url),
+    instagram: cleanSocial(t['contact:instagram'] || t.instagram, 'instagram'),
+    facebook: cleanSocial(t['contact:facebook'] || t.facebook, 'facebook'),
+  }
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v))
+}
+
 /** Overpass element -> lead result (or null when unusable). */
 export function normalizeElement(elm, origin, resolved = []) {
   const tags = elm?.tags || {}
@@ -316,18 +417,25 @@ export function normalizeElement(elm, origin, resolved = []) {
   for (const k of KEEP_TAGS) if (tags[k] != null) keep[k] = String(tags[k]).slice(0, 80)
   const matched = matchedKeywords(tags, resolved)
   const fallback = resolved.find((m) => matched.includes(m.keyword))?.label || 'Usaha'
+  const category = categoryFromTags(tags, fallback)
+  const contacts = contactsFromTags(tags)
+  const { phone: _p, website: _w, email: _e, ...other } = contacts
   return {
     id: `osm:${elm.type}/${elm.id}`,
     source: 'osm',
     source_id: `${elm.type}/${elm.id}`,
     name,
-    category: categoryFromTags(tags, fallback),
+    category,
     tags: keep,
     lat: Math.round(lat * 1e6) / 1e6,
     lon: Math.round(lon * 1e6) / 1e6,
     address: addressFromTags(tags),
-    phone: cleanPhone(tags.phone || tags['contact:phone'] || tags['contact:mobile'] || tags.mobile || tags['contact:whatsapp']),
-    website: cleanWebsite(tags.website || tags['contact:website'] || tags.url),
+    phone: contacts.phone || '',
+    website: contacts.website || '',
+    email: contacts.email || '',
+    contacts: other,
+    opening_hours: openingHoursText(tags.opening_hours),
+    description: describeBusiness(tags, category),
     distance_km: Math.round(haversineKm(origin, { lat, lon }) * 100) / 100,
     matched,
   }
@@ -335,7 +443,7 @@ export function normalizeElement(elm, origin, resolved = []) {
 
 export const nameKey = (s) => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
-const completenessCount = (r) => (r.phone ? 1 : 0) + (r.website ? 1 : 0) + (r.address ? 1 : 0)
+const completenessCount = (r) => (r.phone ? 1 : 0) + (r.website ? 1 : 0) + (r.address ? 1 : 0) + (r.email ? 1 : 0)
 
 /**
  * Drops obvious duplicates (same normalised name within 250 m — OSM often has

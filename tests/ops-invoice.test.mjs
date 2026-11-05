@@ -178,7 +178,8 @@ test('worker: progress values, invoice rows, mark-paid revenue posted once, prog
   const { default: worker } = await import('../worker/index.js')
   const call = caller(worker, ctx.env)
   const db = (uid, body, expected) => call(uid, 'POST', '/api/db', body, expected)
-  const req = (await db('alice', { table: 'requests', action: 'insert', values: { customer_name: 'PT A', service_type: 'Servis AC', status: 'new' } })).data[0]
+  const req = (await db('alice', { table: 'requests', action: 'insert', values: { customer_name: 'PT A', service_type: 'Servis AC', status: 'new', email: 'halo@pta.id', website: 'pta.id · IG @pta' } })).data[0]
+  assert.deepEqual([req.email, req.website], ['halo@pta.id', 'pta.id · IG @pta'], 'requests store email + website (migration 0021)')
   const off = (await db('alice', { table: 'offers', action: 'insert', values: { request_id: req.id, validated_price: 500000, validated_scope: 'Servis', status: 'approved' } })).data[0]
   const asg = (await db('alice', { table: 'assignments', action: 'insert', values: { offer_id: off.id, worker_name: 'Budi', scheduled_at: '2026-11-05T02:00:00Z', status: 'assigned' } })).data[0]
   assert.equal(asg.progress, 'belum', 'default progress')

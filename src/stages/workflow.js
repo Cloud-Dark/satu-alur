@@ -195,6 +195,8 @@ export async function render(container, ctx = {}) {
       ['Layanan', row.service || '—'],
       ['Lokasi', row.location || '—'],
       ['Telepon', row.request.phone || '—'],
+      ...(row.request.email ? [['Email', row.request.email]] : []),
+      ...(row.request.website ? [['Website / kontak lain', row.request.website]] : []),
       ['Nilai penawaran', row.price != null ? C.rupiah(row.price) : '—'],
       ['Status', C.tag(row.status.label, row.status.tone)],
       ['Invoice', invoice ? C.tag(`${invoice.number || 'Invoice'} · ${invoiceStatusLabel(invoice.status)}`, INVOICE_STATUSES.find((s) => s.value === invoice.status)?.tone || 'neutral') : '—'],

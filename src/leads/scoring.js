@@ -8,7 +8,7 @@
  *               the estimate they typed in.
  * Nilai harapan = potensi × conversion assumption (default 10%, user editable).
  */
-import { specForKeyword, offsetPoint, haversineKm, dedupeLeads, categoryFromTags, MAX_RESULTS } from './osm.js'
+import { specForKeyword, offsetPoint, haversineKm, dedupeLeads, categoryFromTags, contactsFromTags, describeBusiness, openingHoursText, MAX_RESULTS } from './osm.js'
 
 export const DEFAULT_CONVERSION = 0.1
 export const MIN_CONVERSION = 0.01
@@ -300,18 +300,30 @@ export function sampleLeads({ lat, lon, radiusKm, keywords, seed = '' }) {
       const p = offsetPoint(origin, Math.max(0.15, rand() * radiusKm * 0.95), rand() * 360)
       const hasPhone = rand() < 0.6
       const hasWeb = rand() < 0.35
+      // Extra contacts derive from n (no extra rand() calls, so the sample stays stable).
+      const tags = { [k]: v, ...(n % 3 !== 0 ? { opening_hours: n % 2 ? 'Mo-Su 08:00-21:00' : 'Mo-Sa 07:00-17:00' } : {}) }
+      const extra = contactsFromTags({
+        ...(n % 2 === 1 ? { email: `info@contoh-${n}.example` } : {}),
+        ...(n % 3 === 1 ? { 'contact:instagram': `contoh_${n}` } : {}),
+        ...(hasPhone && n % 4 === 1 ? { 'contact:whatsapp': '0812-0000-9999' } : {}),
+      })
+      const category = categoryFromTags({ [k]: v }, spec?.label || 'Usaha')
       rows.push({
         id: `demo:${n}`,
         source: 'demo',
         source_id: `demo/${n}`,
         name,
-        category: categoryFromTags({ [k]: v }, spec?.label || 'Usaha'),
+        category,
         tags: { [k]: v },
         lat: Math.round(p.lat * 1e6) / 1e6,
         lon: Math.round(p.lon * 1e6) / 1e6,
         address: rand() < 0.8 ? `${SAMPLE_STREETS[Math.floor(rand() * SAMPLE_STREETS.length)]} No. ${1 + Math.floor(rand() * 120)} (contoh)` : '',
         phone: hasPhone ? `0812-0000-${String(1000 + Math.floor(rand() * 9000))}` : '',
         website: hasWeb ? `https://contoh-${n}.example` : '',
+        email: extra.email || '',
+        contacts: Object.fromEntries(Object.entries(extra).filter(([key]) => key !== 'email' && key !== 'phone')),
+        opening_hours: openingHoursText(tags.opening_hours),
+        description: describeBusiness(tags, category),
         distance_km: 0,
         matched: [kw],
       })

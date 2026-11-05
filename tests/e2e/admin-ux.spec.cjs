@@ -43,14 +43,42 @@ module.exports = async function adminUx(t) {
   await mp.waitFor({ timeout: 3000 })
   await mp.getByLabel('Nama atau jenis usaha').fill('hotel')
   await mp.getByLabel('Kota atau area').fill('Bekasi')
+  // While searching every control but "Batalkan pencarian" is locked.
+  const lockState = () => mp.evaluate((d) => {
+    const stop = d.querySelector('.mp-stop')
+    const others = [...d.querySelectorAll('button')].filter((b) => b !== stop)
+    return {
+      allDisabled: others.length > 0 && others.every((b) => b.disabled),
+      noneDisabled: others.every((b) => !b.disabled),
+      stopShown: !!stop && !stop.hidden && !stop.disabled,
+      inputsReadOnly: [...d.querySelectorAll('.mp-form input')].every((i) => i.readOnly),
+      mapInert: d.querySelector('.mp-map').inert,
+      busy: d.getAttribute('aria-busy'),
+    }
+  })
   await mp.getByRole('button', { name: 'Cari' }).click()
+  let lk = await lockState()
+  t.check(lk.allDisabled && lk.stopShown && lk.inputsReadOnly && lk.mapInert && lk.busy === 'true', 'map picker: buttons, inputs and map locked while searching', JSON.stringify(lk))
+  await mp.getByRole('button', { name: 'Batalkan pencarian' }).click()
+  await p.waitForTimeout(150)
+  lk = await lockState()
+  t.check(lk.noneDisabled && !lk.stopShown && !lk.inputsReadOnly && /dibatalkan/i.test(await mp.textContent()), 'map picker: cancelling the search unlocks the dialog', JSON.stringify(lk))
+  await mp.getByRole('button', { name: 'Cari' }).click()
+  await mp.getByRole('button', { name: 'Cari' }).click({ force: true, timeout: 500 }).catch(() => {})
   await mp.locator('.mp-item').first().waitFor({ timeout: 8000 })
-  const first = await mp.locator('.mp-item strong').first().textContent()
-  t.check(await mp.locator('.mp-item').count() > 0 && /peta terbuka/i.test(await mp.locator('.mp-note').textContent()), 'map picker: results listed, open-map source noted')
-  await mp.locator('.mp-item').first().getByRole('button', { name: /^Pilih / }).click()
+  lk = await lockState()
+  t.check(lk.noneDisabled && !lk.stopShown && lk.busy === 'false', 'map picker: everything re-enabled once results show', JSON.stringify(lk))
+  const withEmail = mp.locator('.mp-item').filter({ has: p.locator('.mp-item-contacts', { hasText: /[^\s·]+@[^\s·]+\./ }) }).first()
+  t.check(await withEmail.count() === 1 && (await mp.locator('.mp-item-desc').first().textContent()).length > 0, 'map picker: rows show description and contacts')
+  const first = await withEmail.locator('strong').textContent()
+  const rowEmail = (await withEmail.locator('.mp-item-contacts').textContent()).match(/[^\s·]+@[^\s·]+\.[^\s·]+/)[0]
+  t.check(await mp.locator('.mp-item').count() > 0 && /peta terbuka/i.test(await mp.locator('.mp-note').textContent()) && /belum lengkap/i.test(await mp.locator('.mp-note').textContent()), 'map picker: results listed, open-map source and incompleteness noted')
+  await withEmail.getByRole('button', { name: /^Pilih / }).click()
   await p.waitForTimeout(300)
   t.check(await mp.isHidden(), 'map picker closes after picking')
   t.check(await p.inputValue('input[name="customer_name"]') === first && (await p.inputValue('input[name="location"]')).length > 0, 'picked business fills name and location', first)
+  t.check(await p.inputValue('input[name="email"]') === rowEmail, 'picked business fills email', rowEmail)
+  t.check((await p.inputValue('textarea[name="description"]')).length > 0, 'picked business seeds the empty description')
   t.check(await p.locator('.req-picked').isVisible(), 'picked note shown')
   await p.getByRole('button', { name: 'Isi manual' }).click()
   t.check(await p.locator('.req-picked').isHidden() && await p.evaluate(() => document.activeElement?.name) === 'customer_name', '"Isi manual" focuses the name field')

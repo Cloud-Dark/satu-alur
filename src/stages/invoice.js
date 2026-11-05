@@ -128,7 +128,7 @@ export async function render(container, ctx = {}) {
     const issue = todayLocal()
     return {
       completion_id: c.id, request_id: r?.id ?? null, number: '',
-      customer_name: r?.customer_name || customerLabel(r), customer_phone: r?.phone || '', customer_email: '', customer_address: r?.location || '',
+      customer_name: r?.customer_name || customerLabel(r), customer_phone: r?.phone || '', customer_email: r?.email || '', customer_address: r?.location || '',
       issue_date: issue, due_date: addDays(issue, settings?.due_days ?? 14), discount: 0, tax_rate: 0,
       payment_info: settings?.payment_info || '', notes: '', status: 'draft',
       _items: [{ description: [r?.service_type, o?.validated_scope].filter(Boolean).join(' — ').slice(0, LIMITS.description) || 'Jasa', qty: 1, unit_price: Math.round(Number(o?.validated_price) || 0) }],

@@ -129,7 +129,7 @@ test('profile menu items per account type', () => {
 
 test('map picker: fields from a picked business', () => {
   const f = pickedFields({ name: 'Hotel Bumi', address: 'Jl. Ahmad Yani 10', phone: '021-555 123', lat: -6.2, lon: 106.9 }, 'Bekasi Barat, Bekasi, Jawa Barat, Indonesia')
-  assert.deepEqual(f, { customer_name: 'Hotel Bumi', location: 'Jl. Ahmad Yani 10, Bekasi Barat, Bekasi, Jawa Barat', phone: '021-555 123', lat: -6.2, lng: 106.9 })
+  assert.deepEqual(f, { customer_name: 'Hotel Bumi', location: 'Jl. Ahmad Yani 10, Bekasi Barat, Bekasi, Jawa Barat', phone: '021-555 123', email: '', website: '', description: '', lat: -6.2, lng: 106.9 })
   assert.equal(pickedFields({ name: 'X', phone: 'call me' }, '').phone, '')
   assert.equal(pickLocation({ address: '' }, 'Bandung, Indonesia (contoh)'), 'Bandung')
   assert.equal(pickLocation({ address: 'Jl. Riau 5, Bandung' }, 'Bandung'), 'Jl. Riau 5, Bandung')

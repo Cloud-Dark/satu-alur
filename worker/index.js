@@ -111,7 +111,7 @@ const JSON_HINT =
 // Exported so tests can assert the contract the client relies on.
 export const TABLES = {
   requests: {
-    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'location', 'description', 'status', 'requested_at', 'lat', 'lng', 'created_at'],
+    columns: ['id', 'owner_id', 'customer_name', 'service_type', 'phone', 'email', 'website', 'location', 'description', 'status', 'requested_at', 'lat', 'lng', 'created_at'],
   },
   offers: {
     columns: ['id', 'owner_id', 'request_id', 'ai_proposal_json', 'validated_price', 'validated_scope', 'status', 'template_id', 'template_answers_json', 'created_at'],

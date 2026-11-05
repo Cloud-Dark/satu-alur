@@ -1972,6 +1972,9 @@ dialog.panel::backdrop { background: rgb(0 0 0 / 0.45); }
 .app-shell .mp-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .app-shell .mp-item-main > * { overflow-wrap: anywhere; }
 .app-shell .mp-item-side { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; }
+.app-shell .mp-item-contacts { color: var(--text-2); }
+.app-shell .mp-dialog.is-searching .mp-map { opacity: .6; }
+.app-shell .mp-dialog.is-searching .mp-list { opacity: .6; }
 @media (max-width: 640px) {
   .app-shell dialog.mp-dialog { width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; margin: 0; }
   .app-shell .mp-form { grid-template-columns: minmax(0, 1fr); }

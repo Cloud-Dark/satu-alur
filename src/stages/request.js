@@ -21,6 +21,8 @@ export async function render(container, ctx = {}) {
   const name = C.field({ label: 'Nama pelanggan', name: 'customer_name', required: true, placeholder: 'PT Maju Jaya', hint: 'Perusahaan atau perorangan yang meminta layanan.', attrs: { autocomplete: 'organization', maxlength: '120' } })
   const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
   const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
+  const email = C.field({ label: 'Email', name: 'email', type: 'email', placeholder: 'info@contoh.id', hint: 'Opsional.', attrs: { autocomplete: 'email', inputmode: 'email', maxlength: '254' } })
+  const website = C.field({ label: 'Website / kontak lain', name: 'website', placeholder: 'contoh.id · IG @usaha · WA 0812…', hint: 'Opsional: website, Instagram, WhatsApp, dll.', attrs: { maxlength: '300' } })
   const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
   const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
   const reviewBox = el('div', { className: 'proposal' })
@@ -37,10 +39,14 @@ export async function render(container, ctx = {}) {
       name.input.value = f.customer_name
       if (f.location) location.input.value = f.location
       if (f.phone) phone.input.value = f.phone
+      if (f.email) email.input.value = f.email
+      if (f.website) website.input.value = f.website
+      // Business description only seeds an empty "Deskripsi kebutuhan"; the user edits it in step 2.
+      if (f.description && !desc.input.value.trim()) { desc.input.value = f.description; desc.input.dispatchEvent(new Event('input', { bubbles: true })) }
       coords = f.lat !== null && f.lng !== null ? { lat: f.lat, lng: f.lng } : null
       pickedNote.textContent = `Diisi dari peta: ${f.customer_name}. Periksa dan ubah bila perlu.`
       pickedNote.hidden = false
-      ;[name, location, phone].forEach((x) => x.input.dispatchEvent(new Event('input', { bubbles: true })))
+      ;[name, location, phone, email, website].forEach((x) => x.input.dispatchEvent(new Event('input', { bubbles: true })))
       name.input.focus()
     },
   }))
@@ -59,6 +65,8 @@ export async function render(container, ctx = {}) {
     service_type: service.input.value.trim(),
     location: location.input.value.trim(),
     phone: phone.input.value.trim(),
+    email: email.input.value.trim(),
+    website: website.input.value.trim(),
     description: desc.input.value.trim(),
   })
   const customerErrors = () => {
@@ -66,6 +74,7 @@ export async function render(container, ctx = {}) {
     const errs = []
     if (!d.customer_name) errs.push({ text: 'Nama pelanggan wajib diisi.', input: name.input })
     if (d.phone && !PHONE_RE.test(d.phone)) errs.push({ text: 'Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.', input: phone.input })
+    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) errs.push({ text: 'Format email belum benar, contoh: info@contoh.id.', input: email.input })
     return errs
   }
   const needErrors = () => {
@@ -131,7 +140,7 @@ export async function render(container, ctx = {}) {
         key: 'customer',
         title: 'Pelanggan',
         description: 'Siapa yang meminta, dan di mana.',
-        content: [sourceRow, pickedNote, name.wrap, el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap)],
+        content: [sourceRow, pickedNote, name.wrap, el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap), el('div', { className: 'form-row' }, email.wrap, website.wrap)],
         validate: customerErrors,
       },
       {
@@ -162,7 +171,7 @@ export async function render(container, ctx = {}) {
   const pre = ctx.params?.prefill
   if (pre && typeof pre === 'object') {
     const put = (f, v) => { if (v) f.input.value = String(v).slice(0, Number(f.input.maxLength) > 0 ? Number(f.input.maxLength) : 2000) }
-    put(name, pre.customer_name); put(location, pre.location); put(phone, pre.phone); put(service, pre.service_type); put(desc, pre.description)
+    put(name, pre.customer_name); put(location, pre.location); put(phone, pre.phone); put(email, pre.email); put(website, pre.website); put(service, pre.service_type); put(desc, pre.description)
     if (pre.customer_name) queueMicrotask(() => wiz.go('need', { focus: false, animate: false }))
   }
 
@@ -186,6 +195,8 @@ export async function render(container, ctx = {}) {
           { icon: 'layers', text: d.service_type || '—', title: `Layanan: ${d.service_type || '—'}` },
           d.location ? { icon: 'mapPin', text: d.location, title: `Lokasi: ${d.location}` } : null,
           d.phone ? { icon: 'phone', text: d.phone, title: `Telepon: ${d.phone}` } : null,
+          d.email ? { icon: 'mail', text: d.email, title: `Email: ${d.email}` } : null,
+          d.website ? { icon: 'compass', text: d.website, title: `Website / kontak lain: ${d.website}` } : null,
         ],
         note: d.description || 'Tanpa deskripsi kebutuhan.',
         noteLines: 4,
@@ -211,7 +222,7 @@ export async function render(container, ctx = {}) {
       }
       const again = C.button({ label: 'Catat permintaan lain', icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
-        for (const f of [name, location, phone, service, desc, hint]) f.input.value = ''
+        for (const f of [name, location, phone, email, website, service, desc, hint]) f.input.value = ''
         fillStatus.textContent = ''
         coords = null
         pickedNote.hidden = true
