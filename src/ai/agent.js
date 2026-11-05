@@ -1,6 +1,7 @@
 import { getCloud } from '../cloud.js'
 import { getAgentPrompts, getAgentParams } from '../stages/settings.js'
 import { isQuotaError } from '../quota/errors.js'
+import { resolveServiceType } from './service-name.js'
 
 const OFFER_SCHEMA = {
   type: 'object',
@@ -87,7 +88,7 @@ export async function autofillRequest({ customer = {}, hint, services = [], mode
   const params = getAgentParams()
   const known = [...new Set(services.map((s) => String(s || '').trim()).filter(Boolean))].slice(0, 30)
   const messages = [
-    { role: 'system', content: `[agent:request-autofill] Anda membantu pemilik usaha jasa di Indonesia mencatat permintaan pelanggan. Dari petunjuk singkat atau potongan chat, tentukan "service_type" (pilih yang paling cocok dari daftar layanan yang sudah ada bila sesuai, atau usulkan nama baru yang singkat) dan tulis "description" yang rinci dalam bahasa Indonesia: jumlah unit atau luas, lokasi, waktu yang diinginkan, kondisi khusus, dan hal yang perlu ditanyakan bila belum jelas. Jangan mengarang angka yang tidak disebutkan; tulis "perlu dikonfirmasi". Keluarkan HANYA JSON dengan key "service_type" dan "description".` },
+    { role: 'system', content: `[agent:request-autofill] Anda membantu pemilik usaha jasa di Indonesia mencatat permintaan pelanggan. Dari petunjuk singkat atau potongan chat, tentukan "service_type": nama layanan singkat yang menggambarkan PERSIS apa yang diminta di petunjuk. Pakai nama dari daftar layanan yang sudah ada HANYA bila layanannya memang sama dengan yang diminta; bila berbeda, buat nama baru dari kata-kata petunjuk (contoh: petunjuk "aplikasi kasir lengkap dengan absensi" menjadi "Pembuatan aplikasi kasir & absensi", bukan layanan lain dari daftar) dan tulis "description" yang rinci dalam bahasa Indonesia: jumlah unit atau luas, lokasi, waktu yang diinginkan, kondisi khusus, dan hal yang perlu ditanyakan bila belum jelas. Jangan mengarang angka yang tidak disebutkan; tulis "perlu dikonfirmasi". Keluarkan HANYA JSON dengan key "service_type" dan "description".` },
     { role: 'user', content: [
       `Pelanggan: ${customer.customer_name || '—'}`,
       customer.location ? `Lokasi: ${customer.location}` : null,
@@ -105,7 +106,7 @@ export async function autofillRequest({ customer = {}, hint, services = [], mode
   let obj
   try { obj = parseModelJson(text) } catch { throw new Error('AI belum memberi jawaban yang bisa dipakai. Coba lagi.') }
   return {
-    service_type: String(obj.service_type || obj.layanan || '').trim().slice(0, 120),
+    service_type: resolveServiceType(hint, String(obj.service_type || obj.layanan || '').trim(), known).slice(0, 120),
     description: String(obj.description || obj.deskripsi || '').trim().slice(0, 2000),
   }
 }

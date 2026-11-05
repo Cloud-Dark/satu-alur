@@ -6,6 +6,8 @@
  * Pure: no storage, no network.
  */
 
+import { matchKnown, serviceFromHint } from './service-name.js'
+
 // Simulasi AI streaming dengan chunk
 async function* mockStreamOffer(request, context = '') {
   const scope = request.service_type || 'Pembersihan umum'
@@ -437,7 +439,7 @@ function mockAutofill(userMsg) {
   const known = (/Layanan yang sudah ada:\s*(.+)/.exec(userMsg)?.[1] || '').split(';').map((x) => x.trim()).filter(Boolean)
   const loc = /Lokasi:\s*(.+)/.exec(userMsg)?.[1]?.trim()
   const found = AUTOFILL_SERVICES.find(([re]) => re.test(hint))?.[1]
-  const service = known.find((k) => found && k.toLowerCase().includes(found.split(' ')[0].toLowerCase())) || found || known[0] || 'Layanan umum'
+  const service = known.find((k) => found && k.toLowerCase().includes(found.split(' ')[0].toLowerCase())) || found || matchKnown(hint, known) || serviceFromHint(hint) || 'Layanan umum'
   const qty = /(\d+)\s*(unit|kg|m2|m²|halaman|titik|ruang|lantai)/i.exec(hint)
   const parts = [
     `Pelanggan membutuhkan ${service.toLowerCase()}${loc ? ` di ${loc}` : ''}.`,
