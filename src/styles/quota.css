@@ -7,6 +7,8 @@
 .qt-plan-name { display: flex; align-items: center; gap: var(--s-2); font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); }
 .qt-credit { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .qt-credit strong { font-size: 1.15rem; color: var(--text); }
+/* When the credit wraps under the plan name it lines up left with it. */
+@media (max-width: 520px) { .qt-credit { align-items: flex-start; } }
 
 .qt-rows { list-style: none; margin: var(--s-3) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--s-4); }
 .qt-row-head { display: flex; justify-content: space-between; gap: var(--s-3); font-size: 0.9rem; margin-bottom: 6px; }
@@ -20,11 +22,19 @@
 .qt-row-note { margin-top: 6px; font-size: 0.8rem; color: var(--danger); }
 
 .qt-voucher-form { margin-top: var(--s-3); }
+.qt-voucher-form .field-error:empty { display: none; }
 .qt-voucher-form input { text-transform: uppercase; letter-spacing: 0.04em; }
 .qt-contact { margin-top: var(--s-4); display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 
 .qt-plans { background: none; }
-.qt-plans .lp-tiers { margin-top: 0; }
+.qt-plans .lp-tiers {
+  margin-top: 0; max-width: none; gap: var(--s-4);
+  /* Fill the panel: up to four plans side by side instead of two centred 380px columns. */
+  grid-template-columns: repeat(auto-fit, minmax(min(230px, 100%), 1fr));
+}
+.qt-plans .lp-tier { padding: 24px 20px 22px; }
+.qt-plans .lp-price { font-size: clamp(2rem, 1.7rem + 0.8vw, 2.5rem); }
+.qt-plans .lp-price.is-long { font-size: clamp(1.75rem, 1.45rem + 0.6vw, 2.1rem); }
 
 .qt-upsell .modal-actions { flex-wrap: wrap; }
 

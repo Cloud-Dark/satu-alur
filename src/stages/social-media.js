@@ -1,5 +1,6 @@
 import { loadModels, pickDefaultModel } from '../ai/models.js'
 import * as C from '../ui/components.js'
+import '../styles/social.css'
 import { getAccount } from '../social/api.js'
 import * as Repliz from '../repliz/api.js'
 import { safeCallbackMessage } from '../repliz/rules.js'

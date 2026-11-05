@@ -1558,6 +1558,10 @@ html.lp-lock { overflow: hidden; }
 .doc-empty, .doc-updated { color: var(--text-muted); }
 .doc-updated { margin-top: 2.5em; font-size: var(--fs-sm); }
 /* Contact form (#/kontak): two-column layout on desktop, stacked on mobile */
+/* Inside the document column the contact page gets the wide column, so the title, the intro and the
+   form card share one left edge and the two-column form has room for its placeholders. */
+.doc-col:has(.contact-page) { max-width: 1100px; }
+.doc-col .contact-page { padding: 0; max-width: none; }
 .contact-page {
   display: grid;
   grid-template-columns: 1fr;

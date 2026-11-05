@@ -1,0 +1,22 @@
+/* Media Sosial (src/stages/social-media.js + social-media/*): spacing inside the workspace tabs. */
+
+/* One gap between the tab bar and the tab content (the view's own gap), not two. */
+.view-social-media > .workspace-tabs { margin-bottom: 0; }
+
+/* A panel's intro paragraph reads as a lead, with room before the form or button under it. */
+.view-social-media .workspace-stack > .panel > .panel-body > p {
+  margin: 0 0 var(--s-4); max-width: 72ch;
+  font-size: var(--fs-sm); line-height: 1.6; color: var(--text-muted);
+}
+
+/* Two selects side by side only when the form column has room for their labels. */
+.view-social-media .workspace-grid > .panel { container-type: inline-size; }
+@container (max-width: 380px) {
+  .view-social-media .workspace-grid .form-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Influencer cards: same text size as the rest of the card, button on one baseline per row. */
+.view-social-media .sm-inf-card { display: flex; flex-direction: column; }
+.view-social-media .sm-inf-card > p:not(.small) { font-size: var(--fs-sm); line-height: 1.55; }
+.view-social-media .sm-inf-card > .btn { margin-top: auto; }
+.view-social-media .sm-inf-card > p:last-of-type { margin-bottom: var(--s-2); }

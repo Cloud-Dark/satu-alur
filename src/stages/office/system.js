@@ -267,6 +267,7 @@ export function drawAi(host, ctx, setDirty) {
         out.show('ok', `Model ${r.model} menjawab "${r.reply || '…'}"${r.ms ? ` dalam ${r.ms} ms` : ''}.`)
       } catch (ex) { out.show('danger', ex.message) } finally { restore() }
     })
+    form.querySelector('.form-actions')?.append(testBtn)
     host.replaceChildren(
       providerPanel(sys, setDirty),
       C.panel({ title: 'Workers AI & bisnis', meta: 'Model cadangan' },
@@ -275,7 +276,7 @@ export function drawAi(host, ctx, setDirty) {
           ['Bisnis dengan penyedia sendiri', el('span', {}, C.number(st.businesses_with_custom))],
           ['Kunci enkripsi', yes(sys.status.encryption, 'Aktif', 'Belum diatur')],
         ]),
-        form, el('div', { className: 'form-actions' }, testBtn), out),
+        form, out),
     )
   })
 }
@@ -329,7 +330,7 @@ const KINDS = [
 
 export function drawActivity(host, ctx) {
   const kind = C.select({ label: 'Jenis email', id: `of-sys-kind-${++seq}`, options: KINDS, value: '' })
-  const body = el('div', { 'aria-live': 'polite' })
+  const body = el('div', { className: 'of-content', 'aria-live': 'polite' })
   const pg = C.pager({ label: 'log email', pageSize: OFFICE_PAGE_SIZE, sizes: [OFFICE_PAGE_SIZE], hideSize: true, onChange: () => load(pg.page), scrollTarget: () => body })
   host.replaceChildren(body)
   const load = (page = 1) => loadInto(body, ctx, () => getActivity(kind.input.value, page), (a) => {
