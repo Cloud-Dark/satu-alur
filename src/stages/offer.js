@@ -48,6 +48,21 @@ export function abortable(promise, signal) {
 
 const offerTag = (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : o.status === 'rejected' ? C.tag('Ditolak', 'danger') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn'))
 
+/** Minimum time each "Susun dengan AI" step stays on screen (ms), so the pipeline reads as thinking. */
+export const MIN_STEP_MS = { data: 1400, schedule: 1200, offer: 2600, pdf: 1300, email: 1500, review: 1100 }
+const pacingOff = () => { try { return globalThis.localStorage?.getItem('satualur_fast_ai') === '1' } catch { return false } }
+
+/** Abortable wait; no-op for ms <= 0 or when pacing is switched off (tests). */
+function thinkPause(ms, signal) {
+  if (!(ms > 0) || pacingOff()) return Promise.resolve()
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve() }, ms)
+    const onAbort = () => { clearTimeout(t); reject(new DOMException('Dihentikan', 'AbortError')) }
+    if (signal?.aborted) return onAbort()
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
 export async function render(container, ctx = {}) {
   if (ctx.params?.offerId != null) return renderDetail(container, ctx)
   const navigate = ctx.navigate || (() => {})
@@ -333,7 +348,10 @@ export async function render(container, ctx = {}) {
     try {
       for (const key of order.slice(startAt)) {
         pipe.start(key); drawPipe()
+        const t0 = Date.now()
         await STEPS[key](work, ac.signal)
+        // Each step stays visible for a moment so the owner can follow what the AI is doing.
+        await thinkPause(MIN_STEP_MS[key] - (Date.now() - t0), ac.signal)
         pipe.done(key); drawPipe()
       }
       draft = work
