@@ -320,8 +320,8 @@ export async function render(container, ctx = {}) {
 
     catalogNote = el('span', { className: 'vas-toolbar-note' })
 
+    // "Item baru" lives in the page header; the toolbar only holds list tools.
     const toolbar = el('div', { className: 'vas-toolbar' },
-      C.button({ label: 'Tambah item', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
       C.button({ label: 'Impor massal', icon: 'layers', size: 'sm', onClick: openBulk }),
       el('div', { className: 'pd-filters' }, search, statusFilter),
       C.button({ label: 'Ekspor CSV', icon: 'file', size: 'sm', variant: 'ghost', onClick: exportCatalog }),

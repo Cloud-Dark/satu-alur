@@ -90,10 +90,10 @@ module.exports = async function flow(t) {
   const workerName = await firstWorker.locator('strong').innerText()
   await firstWorker.locator('input[type="checkbox"]').check()
   await p.locator('.form-panel button[type="submit"]').click()
-  await p.getByRole('button', { name: 'Tandai selesai nanti', exact: true }).waitFor()
+  await p.getByRole('button', { name: 'Tandai selesai', exact: true }).waitFor()
   const assignmentRows = await p.$$eval('.list-panel tbody tr', (r) => r.map((x) => x.textContent.replace(/\s+/g, ' ')))
   t.check(assignmentRows.length === 1 && assignmentRows[0].includes(workerName) && norm(await p.textContent('.view .job-head-name')) === CUSTOMER, 'the job page shows its team assignment', assignmentRows.join(' | '))
-  await p.getByRole('button', { name: 'Tandai selesai nanti', exact: true }).click()
+  await p.getByRole('button', { name: 'Tandai selesai', exact: true }).click()
   await p.waitForTimeout(900)
 
   /* ---- 04 Penyelesaian ---- */

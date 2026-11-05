@@ -99,6 +99,8 @@ export async function render(container, ctx = {}) {
   const revenue = () => (model?.ledger || [])
     .filter((l) => l.category === 'pendapatan')
     .reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  // "x% dari pendapatan" means nothing before any revenue is booked.
+  const shareText = (w, suffix = 'dari pendapatan') => (revenue() > 0 ? `${w.lossShare.toFixed(1)}% ${suffix}` : 'belum ada pendapatan tercatat')
 
   function draw() {
     if (currentTab === 'pemborosan') drawState()
@@ -141,7 +143,7 @@ export async function render(container, ctx = {}) {
           ? 'Tidak ada kerugian tercatat yang tersisa'
           : `${C.rupiah(w.remaining)} masih bocor setiap bulan`),
         el('p', { className: 'zw-hero-text' }, w.loss
-          ? `Dari ${C.rupiah(w.loss)} kerugian yang pernah Anda catat, ${C.rupiah(w.saved)} sudah dihentikan. Sisa ${w.remaining > 0 ? `${C.rupiah(w.remaining)}` : 'nol'} sama dengan ${w.lossShare.toFixed(1)}% dari pendapatan tercatat.`
+          ? `Dari ${C.rupiah(w.loss)} kerugian yang pernah Anda catat, ${C.rupiah(w.saved)} sudah dihentikan. Sisa ${w.remaining > 0 ? `${C.rupiah(w.remaining)}` : 'nol'} sama dengan ${revenue() > 0 ? shareText(w, 'dari pendapatan tercatat') : '— belum ada pendapatan tercatat untuk dibandingkan'}.`
           : 'Belum ada kerugian yang dicatat. Catat satu temuan pertama supaya target 100% bebas limbah punya titik awal yang jujur.'),
         el('div', { className: 'zw-hero-actions' },
           C.button({ label: 'Catat temuan', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
@@ -150,7 +152,7 @@ export async function render(container, ctx = {}) {
     )
 
     const kpis = el('div', { className: 'zw-kpis' },
-      C.kpi({ label: 'Sisa kerugian', value: C.rupiah(w.remaining), sub: `${w.lossShare.toFixed(1)}% dari pendapatan`, iconName: 'trendingDown' }),
+      C.kpi({ label: 'Sisa kerugian', value: C.rupiah(w.remaining), sub: revenue() > 0 ? shareText(w) : 'Belum ada pendapatan tercatat', iconName: 'trendingDown' }),
       C.kpi({ label: 'Sudah dihentikan', value: C.rupiah(w.saved), sub: `dari ${C.rupiah(w.loss)} tercatat`, iconName: 'checkCircle' }),
       C.kpi({ label: 'Masih bisa dihemat', value: C.rupiah(w.winnable), sub: `${w.open} temuan terbuka`, iconName: 'target' }),
       C.kpi({ label: 'Temuan selesai', value: String(w.done), sub: 'sudah ditutup', iconName: 'flag' }),
@@ -287,8 +289,8 @@ export async function render(container, ctx = {}) {
     statusFilter.addEventListener('change', () => { entryStatus = statusFilter.value; refreshEntries() })
 
     entryNote = el('span', { className: 'zw-toolbar-note' })
+    // "Catat temuan" lives in the page header; the toolbar only holds list tools.
     const toolbar = el('div', { className: 'zw-toolbar' },
-      C.button({ label: 'Catat temuan', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
       C.button({ label: 'Impor massal', icon: 'layers', size: 'sm', onClick: openBulk }),
       el('div', { className: 'pd-filters' }, search, streamFilter, statusFilter),
       C.button({ label: 'Ekspor CSV', icon: 'file', size: 'sm', variant: 'ghost', onClick: exportEntries }),
@@ -333,7 +335,7 @@ export async function render(container, ctx = {}) {
       `Pendapatan tercatat: ${C.rupiah(rev)}`,
       `Kerugian tercatat: ${C.rupiah(w.loss)} per bulan`,
       `Sudah dihentikan: ${C.rupiah(w.saved)} (${w.pct.toFixed(1)}%)`,
-      `Sisa kerugian: ${C.rupiah(w.remaining)} (${w.lossShare.toFixed(1)}% dari pendapatan)`,
+      `Sisa kerugian: ${C.rupiah(w.remaining)} (${shareText(w)})`,
       `Temuan terbuka: ${w.open}, selesai: ${w.done}`,
       `Masih bisa dihemat: ${C.rupiah(w.winnable)}`,
       `Sumber terbesar: ${top[0]?.remaining > 0 ? top[0].label : 'Tidak ada'}`,

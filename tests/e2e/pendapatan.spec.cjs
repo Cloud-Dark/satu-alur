@@ -49,7 +49,7 @@ module.exports = async function pendapatan(t) {
   await p.waitForTimeout(300)
 
   // Create
-  await p.getByRole('button', { name: 'Tambah item' }).first().click()
+  await p.getByRole('button', { name: 'Item baru' }).first().click()
   const dlg = p.getByRole('dialog')
   await dlg.waitFor()
   await dlg.locator('#vas-name').fill('Uji e2e item')
@@ -62,7 +62,7 @@ module.exports = async function pendapatan(t) {
   t.check((await toast(p)).includes('Item ditambahkan'), 'katalog: success toast')
 
   // Short name is rejected by the shared rules, inside the dialog
-  await p.getByRole('button', { name: 'Tambah item' }).first().click()
+  await p.getByRole('button', { name: 'Item baru' }).first().click()
   const dlg2 = p.getByRole('dialog')
   await dlg2.locator('#vas-name').fill('A')
   await dlg2.locator('#vas-price').fill('50000')

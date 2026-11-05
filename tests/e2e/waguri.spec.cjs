@@ -90,11 +90,16 @@ module.exports = async function waguri(t) {
   await lastBot(a).locator('.wg-action', { hasText: 'Buka di Alur kerja' }).click()
   await a.waitForSelector('.view-workflow input[type=search]', { timeout: 10000 }).catch(() => {})
   t.check(await a.inputValue('.view-workflow input[type=search]').catch(() => '') === 'PT Maju Jaya', 'action opens Alur kerja searched for the customer')
+  t.check(await a.locator(PANEL).isHidden(), 'action button closes the Waguri panel')
+  await a.click(FAB)
+  await a.waitForSelector(`${PANEL} [data-waguri-card="1005"]`, { timeout: 5000 }).catch(() => {})
 
   // Card button opens the stage of the next step.
   await a.locator(`${PANEL} [data-waguri-card="1005"] .wg-next`).first().click()
   await a.waitForTimeout(700)
   t.check(norm(await a.textContent('.crumb-title')) === 'Penawaran', 'next-step button opens the Penawaran stage')
+  t.check(await a.locator(PANEL).isHidden(), 'next-step button closes the Waguri panel')
+  await a.click(FAB)
 
   // Finance skill: deterministic totals from the seed ledger.
   await a.click(`${PANEL} .wg-skill[data-skill="finance"]`)

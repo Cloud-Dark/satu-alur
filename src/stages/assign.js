@@ -295,10 +295,9 @@ function renderAssign(target, ctx, flow, workers, links, reload, status, goTeam)
       showToast('Penugasan tersimpan.', 'success')
       // reload redraws this page, so the success note goes on the page-level status
       await reload()
-      status.show('ok', text)
-      const next = C.button({ label: 'Tandai selesai nanti', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
-      next.addEventListener('click', () => navigate('complete', { assignmentId: row?.id }))
-      status.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, next))
+      // "Tandai selesai" sits under the team table below; no second button in the note.
+      status.show('ok', `${text} Tandai selesai di bawah setelah pekerjaannya rampung.`)
+      void row
     } catch (err) {
       msg.show('danger', `Gagal menyimpan: ${err.message}`)
       restore()
@@ -530,7 +529,8 @@ function renderTeam(target, { workers, skills, assignments, completions, links, 
         inactive
           ? C.button({ label: 'Aktifkan', icon: 'check', variant: 'soft', size: 'sm', onClick: () => act('Aktifkan gagal', () => saveWorker({ id: w.id, name: w.name, phone: w.phone, address: w.address, skills: w.skills, status: 'active' }, w), `${w.name} diaktifkan.`) })
           : null,
-        removeAction(w),
+        // An inactive worker with history can only be reactivated; offering "Nonaktifkan" again made no sense.
+        inactive && hasHistory(w.id, links) ? null : removeAction(w),
       ),
     )
   }

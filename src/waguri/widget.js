@@ -185,6 +185,8 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   }
 
   function goTo(a) {
+    // Any action button closes the panel first so the page it opens is fully visible.
+    close({ restore: false })
     if (a.href) {
       if (a.href === '#harga' || a.href.startsWith('#') && !a.href.startsWith('#/')) {
         const target = document.getElementById(a.href.slice(1))
@@ -192,7 +194,6 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
         else navigate('/')
       } else navigate(a.href.slice(1))
     } else navigate(a.stage, a.params || {})
-    if (matchMedia(NARROW).matches) close({ restore: false })
   }
 
   function actionButtons(actions = []) {

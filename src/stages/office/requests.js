@@ -91,6 +91,6 @@ export function draw(host, ctx, setDirty) {
       : [C.emptyState({ title: 'Tidak ada permintaan', iconName: 'inbox', body: 'Belum ada permintaan dengan status ini.' })]))
   }
   const seg = C.segmented({ options: FILTERS, value: filter, label: 'Filter status', onChange: (v) => { filter = v; load(1) } })
-  host.replaceChildren(seg, list, pg.root)
+  host.replaceChildren(C.panel({ title: 'Permintaan iklan & kolaborasi' }, seg, list, pg.root))
   load(1)
 }

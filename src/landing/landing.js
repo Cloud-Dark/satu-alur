@@ -818,6 +818,12 @@ export function renderLanding(root, ctx = {}) {
   }, { rootMargin: '-45% 0px -50% 0px' })
   NAV.forEach((n) => { const s = page.querySelector(`#${n.id}`); if (s) sectionIO.observe(s) })
   disposers.push(() => sectionIO.disconnect())
+  // Back above the first nav section (the hero) nothing intersects, so the observer alone left the
+  // last link (often FAQ after a jump to the top) highlighted. Clear it there.
+  const firstNav = NAV.map((n) => page.querySelector(`#${n.id}`)).find(Boolean)
+  on(window, 'scroll', () => {
+    if (firstNav && firstNav.getBoundingClientRect().top > window.innerHeight * 0.5) navLinks.forEach((a) => a.classList.remove('is-active'))
+  }, { passive: true })
 
   /* --- Mobile menu --- */
   let lastFocus = null
