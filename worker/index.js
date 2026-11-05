@@ -64,7 +64,7 @@ import { DEMO_EMAILS, isDemoUser } from './demo.js';
 import { simulateAnswer } from '../src/ai/simulate.js';
 import { otpEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings } from './email.js';
-import { resolveAi, customChatStream, countByo, logAiFallback, platformProvider } from './ai-provider.js';
+import { resolveAi, customChatStream, countByo, logAiFallback, platformProvider, requireFirstText } from './ai-provider.js';
 import { handleWaguriPublic } from './waguri.js';
 import { handleMcp, handleMcpTokenList, handleMcpTokenCreate, handleMcpTokenRevoke } from './mcp-server.js';
 import {
@@ -1036,7 +1036,9 @@ async function handleChat(request, env) {
         max_tokens: params.max_tokens ?? ai.defaults?.max_tokens,
         schema, json: Boolean(rf && rf.type === 'json_object'),
       }, { HttpError });
-      return sseResponse(stream);
+      // A provider can accept the call and still end without any text (e.g. a reasoning model
+      // out of tokens): wait for the first real text, otherwise fall back like a refused call.
+      return sseResponse(await requireFirstText(stream));
     } catch (err) {
       await logAiFallback(env, ai, err?.message);
       await usage.refund().catch((e) => console.error('Quota refund failed', e));

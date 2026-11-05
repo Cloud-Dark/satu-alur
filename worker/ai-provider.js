@@ -183,3 +183,42 @@ export async function testProvider(provider, { HttpError, fetchImpl = fetch }) {
   if (error) throw new HttpError(502, error);
   return text.trim().slice(0, 200);
 }
+
+/**
+ * Reads an app-format SSE stream until the first non-empty text chunk and returns a stream that
+ * replays everything. Throws when the stream errors or ends before any text, so the caller can
+ * fall back to another model instead of sending the user an empty answer.
+ */
+export async function requireFirstText(stream) {
+  const reader = stream.getReader();
+  const dec = new TextDecoder();
+  const held = [];
+  let buf = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) throw new Error('Penyedia AI tidak mengirim jawaban.');
+    held.push(value);
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, i).trim();
+      buf = buf.slice(i + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let obj;
+      try { obj = JSON.parse(payload); } catch { continue; }
+      if (obj.error) { reader.cancel().catch(() => {}); throw new Error(String(obj.error.message || 'Penyedia AI mengembalikan galat.')); }
+      if (obj.choices?.[0]?.delta?.content) {
+        return new ReadableStream({
+          start(c) { for (const v of held) c.enqueue(v); },
+          async pull(c) {
+            const r = await reader.read();
+            if (r.done) c.close(); else c.enqueue(r.value);
+          },
+          cancel(reason) { return reader.cancel(reason); },
+        });
+      }
+    }
+  }
+}
