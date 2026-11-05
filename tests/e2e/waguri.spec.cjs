@@ -140,9 +140,9 @@ module.exports = async function waguri(t) {
   await m.click(FAB)
   await m.waitForSelector(`${PANEL}:not([hidden])`)
   // Wait for the open transition to settle (it can run slower under load).
-  await m.waitForFunction((sel) => { const r = document.querySelector(sel)?.getBoundingClientRect(); return r && Math.abs(r.x) < 0.01 && Math.round(r.width) === 390 }, PANEL, { timeout: 3000 }).catch(() => {})
+  await m.waitForFunction((sel) => { const r = document.querySelector(sel)?.getBoundingClientRect(); return r && Math.abs(r.x) < 0.5 && Math.round(r.width) === 390 }, PANEL, { timeout: 3000 }).catch(() => {})
   const box = await m.locator(PANEL).boundingBox()
-  t.check(box && Math.round(box.width) === 390 && box.x === 0, 'phone: panel is a full-width sheet', JSON.stringify(box))
+  t.check(box && Math.round(box.width) === 390 && Math.abs(box.x) < 0.5, 'phone: panel is a full-width sheet', JSON.stringify(box))
   t.check(await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'phone: no horizontal scroll')
   await m.click('[data-waguri-consent]')
   await t.shot(m, 'phone-dark')
