@@ -5,6 +5,7 @@ import { renderStaffLogin } from '../auth/staff-login.js'
 import { renderShell } from './shell.js'
 import { renderDocPage } from '../site/doc-page.js'
 import { renderContactPage } from '../contact/page.js'
+import { renderConsentPage } from '../ai-access/consent-page.js'
 import { isAppHash } from './routes.js'
 
 /**
@@ -13,6 +14,8 @@ import { isAppHash } from './routes.js'
  *   #/masuk   login page (redirects to #/app when already signed in)
  *   #/app     application shell (requires a session); every page in it has its own
  *             #/app/… route (see ./routes.js), handled by the shell without a re-render
+ *   #/izin-ai?req=…  "Izinkan Claude?" consent page of the OAuth login for /mcp (worker/oauth.js);
+ *             requires a session: signed out, it goes through #/masuk and comes back
  *   /super-admin-login   staff login, username + password (real path; lands on Kantor Satu Alur)
  *
  * Every page renderer receives (root, ctx) and may return a cleanup function
@@ -32,6 +35,7 @@ const ROUTES = {
   '/syarat': (root, ctx) => renderDocPage(root, ctx, 'terms'),
   '/cookie': (root, ctx) => renderDocPage(root, ctx, 'cookies'),
   '/kontak': renderContactPage,
+  '/izin-ai': renderConsentPage,
   [STAFF_PATH]: renderStaffLogin,
 }
 
@@ -44,13 +48,14 @@ let waguri = null // { path, unmount } for the public pages' assistant
 let waguriSeq = 0
 let renderedPath = null // the page rendered last ('/app' while the shell is up)
 let appRouteHandler = null // the shell's handler for in-app hash changes
-// A signed-out visit to a deep app link logs in first, then opens that link.
+// A signed-out visit to a deep app link (or the Claude consent page) logs in first, then opens that link.
 const AFTER_LOGIN_KEY = 'satualur_after_login'
 const session = {
   get(k) { try { return sessionStorage.getItem(k) } catch { return null } },
   set(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v) } catch { /* storage unavailable */ } },
 }
 
+const CONSENT_RE = /^#\/izin-ai\?/
 const onStaffPath = () => location.pathname.replace(/\/+$/, '') === STAFF_PATH
 
 export function navigate(path) {
@@ -71,7 +76,7 @@ function currentPath() {
 function appTarget() {
   const saved = session.get(AFTER_LOGIN_KEY)
   session.set(AFTER_LOGIN_KEY, null)
-  return saved && isAppHash(saved) ? saved.replace(/^#/, '') : '/app'
+  return saved && (isAppHash(saved) || CONSENT_RE.test(saved)) ? saved.replace(/^#/, '') : '/app'
 }
 
 // Staff sessions get the office menu in the shell, on the remembered section.
@@ -90,6 +95,10 @@ function render({ force = false } = {}) {
   } else {
     if (path === '/app' && !currentUser) {
       if (location.hash.replace(/\/$/, '') !== '#/app') session.set(AFTER_LOGIN_KEY, location.hash)
+      path = '/masuk'
+    }
+    if (path === '/izin-ai' && !currentUser) {
+      if (CONSENT_RE.test(location.hash)) session.set(AFTER_LOGIN_KEY, location.hash)
       path = '/masuk'
     }
     if (path === '/masuk' && currentUser) path = '/app'
@@ -149,7 +158,7 @@ function render({ force = false } = {}) {
 // only, never account data. The signed-in shell mounts its own (src/ui/shell.js); the staff
 // login page gets none. Loaded lazily so it never delays the first paint.
 function mountPublicWaguri(path) {
-  const wanted = path !== '/app' && path !== STAFF_PATH
+  const wanted = path !== '/app' && path !== STAFF_PATH && path !== '/izin-ai'
   if (wanted && waguri) return // stays open across public pages
   waguri?.unmount?.()
   waguri = null

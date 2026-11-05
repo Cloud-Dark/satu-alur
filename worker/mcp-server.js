@@ -34,6 +34,9 @@ export const LATEST_PROTOCOL = PROTOCOL_VERSIONS[0];
 export const SERVER_INFO = { name: 'satu-alur', title: 'Satu Alur', version: '1.0.0' };
 export const TOKEN_PREFIX = 'sa_mcp_';
 const TOKEN_RE = /^sa_mcp_[A-Za-z0-9_-]{43}$/;
+// OAuth access tokens (worker/oauth.js) share the mcp_tokens table (kind 'oauth', 1-hour expiry).
+export const ACCESS_PREFIX = 'sa_oat_';
+const ACCESS_RE = /^sa_oat_[A-Za-z0-9_-]{43}$/;
 export const MAX_TOKENS_PER_ACCOUNT = 10;
 const LABEL_MAX = 60;
 const MAX_BODY = 64 * 1024;
@@ -60,13 +63,15 @@ function b64url(bytes) {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/** New plain token: "sa_mcp_" + 32 random bytes (base64url, 43 chars). */
-export function newToken() {
+/** New plain token: prefix ("sa_mcp_" by default) + 32 random bytes (base64url, 43 chars). */
+export function newToken(prefix = TOKEN_PREFIX) {
   const a = new Uint8Array(32);
   crypto.getRandomValues(a);
-  return TOKEN_PREFIX + b64url(a);
+  return prefix + b64url(a);
 }
+export { b64url };
 export const tokenDisplayPrefix = (token) => String(token).slice(0, TOKEN_PREFIX.length + 4);
+export const isAccessTokenShape = (token) => ACCESS_RE.test(String(token || ''));
 export const isTokenShape = (token) => TOKEN_RE.test(String(token || ''));
 
 export function cleanLabel(v) {
@@ -92,7 +97,7 @@ export async function handleMcpTokenList(request, env, deps) {
   const demo = deps.isDemoUser(user);
   if (demo || user.is_staff === 1) return deps.ok({ items: [], demo, max: MAX_TOKENS_PER_ACCOUNT });
   const { results } = await env.DB.prepare(
-    'SELECT id, name, prefix, created_at, last_used_at FROM mcp_tokens WHERE owner_id = ? AND revoked_at IS NULL ORDER BY created_at DESC, id DESC',
+    "SELECT id, name, prefix, created_at, last_used_at FROM mcp_tokens WHERE owner_id = ? AND kind = 'manual' AND revoked_at IS NULL ORDER BY created_at DESC, id DESC",
   ).bind(user.id).all();
   return deps.ok({ items: (results || []).map(publicToken), demo: false, max: MAX_TOKENS_PER_ACCOUNT });
 }
@@ -104,7 +109,7 @@ export async function handleMcpTokenCreate(request, env, deps) {
   let body = {};
   try { body = await deps.readJson(request, 4096); } catch (err) { if (err?.status === 413) throw err; body = {}; }
   const name = cleanLabel(body?.name);
-  const active = await env.DB.prepare('SELECT COUNT(*) AS n FROM mcp_tokens WHERE owner_id = ? AND revoked_at IS NULL').bind(user.id).first();
+  const active = await env.DB.prepare("SELECT COUNT(*) AS n FROM mcp_tokens WHERE owner_id = ? AND kind = 'manual' AND revoked_at IS NULL").bind(user.id).first();
   if (Number(active?.n) >= MAX_TOKENS_PER_ACCOUNT) {
     throw new deps.HttpError(409, `Maksimal ${MAX_TOKENS_PER_ACCOUNT} token aktif. Cabut token yang tidak dipakai lagi dulu.`);
   }
@@ -123,7 +128,7 @@ export async function handleMcpTokenRevoke(request, env, deps, params) {
   const { user } = await deps.authenticate(request, env);
   const id = Number(params.id);
   if (!Number.isSafeInteger(id) || id <= 0) throw new deps.HttpError(400, 'ID token tidak valid.');
-  const r = await env.DB.prepare('UPDATE mcp_tokens SET revoked_at = ? WHERE id = ? AND owner_id = ? AND revoked_at IS NULL')
+  const r = await env.DB.prepare("UPDATE mcp_tokens SET revoked_at = ? WHERE id = ? AND owner_id = ? AND kind = 'manual' AND revoked_at IS NULL")
     .bind(nowIso(), id, user.id).run();
   if (!Number(r?.meta?.changes)) throw new deps.HttpError(404, 'Token tidak ditemukan atau sudah dicabut.');
   return deps.ok({ id, revoked: true });
@@ -135,7 +140,7 @@ const CACHE_HOST = 'https://mcp-rl.satualur.internal';
 const mem = new Map();
 const hasCacheApi = () => typeof caches !== 'undefined' && caches?.default;
 
-async function take(bucket, max, windowMs, now = Date.now()) {
+export async function take(bucket, max, windowMs, now = Date.now()) {
   const slot = Math.floor(now / windowMs);
   const key = `${bucket}:${windowMs}:${slot}`;
   let n = mem.get(key) || 0;
@@ -195,34 +200,54 @@ const rpcError = (id, code, message, data) => ({ jsonrpc: '2.0', id: id ?? null,
 const rpcResult = (id, result) => ({ jsonrpc: '2.0', id, result });
 
 class McpAuthError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, presented = false) { super(message); this.status = status; this.presented = presented; }
 }
 
-/** Resolves the token (header first, then /mcp/<token>) to its account, or throws McpAuthError. */
+/**
+ * Resolves the token to its account, or throws McpAuthError. The Authorization header carries a
+ * manual token (sa_mcp_…) or an OAuth access token (sa_oat_…); /mcp/<token> only takes manual
+ * tokens (OAuth tokens never go in a URL).
+ */
 async function authenticateToken(request, env, pathToken, sha256Hex) {
   const h = request.headers.get('authorization') || '';
   const m = /^Bearer\s+(\S+)$/i.exec(h.trim());
   const token = m ? m[1] : pathToken;
-  if (!token) throw new McpAuthError(401, 'Token Akses AI diperlukan: kirim "Authorization: Bearer sa_mcp_…" atau pakai URL /mcp/<token>.');
-  if (!isTokenShape(token)) throw new McpAuthError(401, 'Token Akses AI tidak valid.');
+  if (!token) throw new McpAuthError(401, 'Perlu login: hubungkan Claude lewat OAuth (cukup URL /mcp), atau kirim "Authorization: Bearer <token>".');
+  const oauth = Boolean(m) && isAccessTokenShape(token);
+  if (!oauth && !isTokenShape(token)) throw new McpAuthError(401, 'Token Akses AI tidak valid.', true);
   const row = await env.DB.prepare(
-    `SELECT t.id AS token_id, t.owner_id, t.name AS token_name, t.revoked_at, t.last_used_at,
+    `SELECT t.id AS token_id, t.owner_id, t.name AS token_name, t.revoked_at, t.last_used_at, t.kind, t.expires_at,
+            t.grant_id, g.revoked_at AS grant_revoked_at, g.last_used_at AS grant_last_used_at, g.client_name,
             u.email, u.name, u.created_at, f.suspended, COALESCE(f.plan, 'sole') AS plan
        FROM mcp_tokens t JOIN users u ON u.id = t.owner_id
+       LEFT JOIN oauth_grants g ON g.id = t.grant_id
        LEFT JOIN user_flags f ON f.user_id = u.id
       WHERE t.token_hash = ?`,
   ).bind(await sha256Hex(token)).first();
-  if (!row) throw new McpAuthError(401, 'Token Akses AI tidak valid.');
-  if (row.revoked_at) throw new McpAuthError(401, 'Token Akses AI ini sudah dicabut. Buat token baru di Pengaturan › Akses AI (MCP).');
+  if (!row || (row.kind === 'oauth') !== oauth) throw new McpAuthError(401, 'Token Akses AI tidak valid.', true);
+  if (oauth) {
+    if (!row.grant_id || row.grant_revoked_at || row.revoked_at) throw new McpAuthError(401, 'Koneksi ini sudah diputuskan. Hubungkan ulang Claude untuk login lagi.', true);
+    if (!row.expires_at || Date.parse(row.expires_at) <= Date.now()) throw new McpAuthError(401, 'Token akses sudah kedaluwarsa.', true);
+  } else if (row.revoked_at) {
+    throw new McpAuthError(401, 'Token Akses AI ini sudah dicabut. Buat token baru di Pengaturan › Akses AI (MCP).', true);
+  }
   if (row.suspended === 1) throw new McpAuthError(403, SUSPENDED_MESSAGE);
   return row;
 }
 
 async function touchToken(env, acct) {
-  const last = Date.parse(acct.last_used_at || '');
+  const lastSeen = acct.kind === 'oauth' ? acct.grant_last_used_at : acct.last_used_at;
+  const last = Date.parse(lastSeen || '');
   if (Number.isFinite(last) && Date.now() - last < TOUCH_MS) return;
-  try { await env.DB.prepare('UPDATE mcp_tokens SET last_used_at = ? WHERE id = ?').bind(nowIso(), acct.token_id).run(); } catch { /* best effort */ }
+  const now = nowIso();
+  try {
+    if (acct.kind === 'oauth') await env.DB.prepare('UPDATE oauth_grants SET last_used_at = ? WHERE id = ?').bind(now, acct.grant_id).run();
+    else await env.DB.prepare('UPDATE mcp_tokens SET last_used_at = ? WHERE id = ?').bind(now, acct.token_id).run();
+  } catch { /* best effort */ }
 }
+
+/** RFC 9728 pointer so clients can discover the authorization server and start OAuth. */
+export const resourceMetadataUrl = (origin) => `${origin}/.well-known/oauth-protected-resource`;
 
 /**
  * Entry point for /mcp and /mcp/<token> (any method). `path` is the normalized pathname.
@@ -244,14 +269,16 @@ export async function handleMcp(request, env, path, deps) {
     return respond(rpcError(null, -32000, 'Metode HTTP tidak didukung. Kirim JSON-RPC dengan POST.'), 405, { ...cors, allow: 'POST, OPTIONS' });
   }
 
-  const wwwAuth = { 'www-authenticate': 'Bearer realm="satu-alur", error="invalid_token"' };
+  const wwwAuth = (presented) => ({
+    'www-authenticate': `Bearer resource_metadata="${resourceMetadataUrl(url.origin)}"${presented ? ', error="invalid_token"' : ''}`,
+  });
   let acct;
   try {
     acct = await authenticateToken(request, env, pathToken, deps.sha256Hex);
     if (deps.isDemoUser({ email: acct.email })) throw new McpAuthError(403, 'Akun demo tidak bisa dipakai lewat Akses AI.');
   } catch (err) {
     if (!(err instanceof McpAuthError)) throw err;
-    return respond(rpcError(null, -32001, err.message), err.status, { ...cors, ...(err.status === 401 ? wwwAuth : {}) });
+    return respond(rpcError(null, -32001, err.message), err.status, { ...cors, ...(err.status === 401 ? wwwAuth(err.presented) : {}) });
   }
 
   if (!(await take(`m:${acct.token_id}`, LIMITS.perMinute, 60_000)) || !(await take(`h:${acct.token_id}`, LIMITS.perHour, 3_600_000))) {
@@ -316,7 +343,7 @@ async function dispatch(m, ctx) {
       case 'ping':
         return rpcResult(m.id, {});
       case 'tools/list':
-        return rpcResult(m.id, { tools: TOOLS.map(({ run, ...def }) => def) });
+        return rpcResult(m.id, { tools: TOOLS.map(({ run, consent, ...def }) => def) });
       case 'tools/call': {
         const tool = TOOLS.find((t) => t.name === params.name);
         if (!tool) return rpcError(m.id, -32602, `Tool tidak dikenal: ${String(params.name ?? '')}`);
@@ -710,7 +737,7 @@ async function infoAkun(_args, ctx) {
     `Akun: ${name} (${acct.email}). Skala akun: ${data.skala_akun}${data.paket ? `, paket ${data.paket}` : ''}. Terdaftar ${data.terdaftar || '—'}.`,
     `${j.pekerjaan} pekerjaan (${j.pekerjaan_berjalan} masih berjalan), ${j.penawaran} penawaran, ${j.petugas_aktif} petugas aktif, ${j.catatan_buku_besar} catatan buku besar, ${j.invoice} invoice.`,
     `Per posisi: ${POSISI.map((f) => `${f.label} ${data.jumlah_per_posisi[f.value]}`).join(', ')}.`,
-    data.token ? `Terhubung lewat token "${data.token}" (hanya baca).` : null,
+    data.token ? `Terhubung lewat ${acct.kind === 'oauth' ? `login (${data.token})` : `token "${data.token}"`} (hanya baca).` : null,
   ].filter(Boolean).join('\n');
   return { text, data };
 }
@@ -732,6 +759,7 @@ export const TOOLS = [
       additionalProperties: false,
     },
     annotations: ANN('Cari pekerjaan'),
+    consent: 'Daftar pekerjaan dan posisinya di alur kerja',
     run: cariPekerjaan,
   },
   {
@@ -746,6 +774,7 @@ export const TOOLS = [
       additionalProperties: false,
     },
     annotations: ANN('Progres pelanggan'),
+    consent: 'Progres pekerjaan per pelanggan',
     run: progresPelanggan,
   },
   {
@@ -760,6 +789,7 @@ export const TOOLS = [
       additionalProperties: false,
     },
     annotations: ANN('Detail pekerjaan'),
+    consent: 'Rincian satu pekerjaan: penawaran, penugasan, penyelesaian, pembukuan, invoice',
     run: detailPekerjaan,
   },
   {
@@ -773,6 +803,7 @@ export const TOOLS = [
       additionalProperties: false,
     },
     annotations: ANN('Ringkasan keuangan'),
+    consent: 'Pendapatan, biaya, dan laba',
     run: ringkasanKeuangan,
   },
   {
@@ -789,6 +820,7 @@ export const TOOLS = [
       additionalProperties: false,
     },
     annotations: ANN('Daftar invoice'),
+    consent: 'Daftar invoice dan statusnya',
     run: daftarInvoice,
   },
   {
@@ -797,6 +829,7 @@ export const TOOLS = [
     description: 'Nama usaha, skala akun/paket, dan jumlah data (pekerjaan, penawaran, petugas, pembukuan, invoice). Account overview.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: ANN('Info akun'),
+    consent: 'Nama usaha, paket, dan jumlah data',
     run: infoAkun,
   },
 ];

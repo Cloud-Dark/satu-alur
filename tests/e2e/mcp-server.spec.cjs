@@ -11,8 +11,22 @@ module.exports = async function mcpServer(t) {
   // Deep link opens the drawer on the Akses AI tab
   await p.evaluate(() => { location.hash = '#/app/pengaturan?bagian=mcp' })
   await p.waitForSelector('.drawer.is-open', { timeout: 5000 })
-  await p.waitForSelector('#mcp-token-label', { timeout: 8000 })
+  await p.waitForSelector('.aimcp-login', { timeout: 8000 })
   t.check(await p.getAttribute('.drawer .seg-btn[data-value="ai-access"]', 'aria-checked') === 'true', '?bagian=mcp selects the Akses AI (MCP) tab')
+
+  // Primary: the login flow (OAuth), nothing to copy but the server URL
+  const origin = await p.evaluate(() => location.origin)
+  t.check((await p.textContent('[data-copy="server-url"]')).trim() === `${origin}/mcp`, 'login flow shows <origin>/mcp')
+  t.check(await p.locator('.aimcp-login', { hasText: 'Add custom connector' }).count() === 1, 'claude.ai steps for the login flow')
+  t.check(await p.locator('.aimcp-login', { hasText: 'Izinkan' }).count() === 1, 'login steps end with Izinkan')
+  t.check((await p.textContent('[data-copy="claude-code-login"]')).trim() === `claude mcp add --transport http satu-alur ${origin}/mcp`, 'Claude Code command without a token')
+  t.check(await p.locator('.aimcp-grants-empty').count() === 1, 'no connected apps yet')
+  // Manual tokens are collapsed under "Cara lain"
+  const adv = p.locator('details.aimcp-advanced')
+  t.check(await adv.count() === 1 && !(await adv.evaluate((d) => d.open)), 'manual tokens collapsed by default')
+  t.check(!(await p.locator('#mcp-token-label').isVisible()), 'token form hidden until expanded')
+  await p.click('details.aimcp-advanced > summary')
+  await p.waitForSelector('#mcp-token-label', { timeout: 5000 })
   t.check(await p.locator('.drawer', { hasText: 'Token memberi akses baca' }).count() === 1, 'warns that a token gives read access')
   t.check(await p.locator('.aimcp-empty').count() === 1, 'no tokens yet')
 
@@ -22,7 +36,6 @@ module.exports = async function mcpServer(t) {
   await p.waitForSelector('.aimcp-reveal', { timeout: 5000 })
   const token = (await p.textContent('[data-copy="token"]')).trim()
   t.check(/^sa_mcp_[A-Za-z0-9_-]{43}$/.test(token), 'token shown once in the sa_mcp_ format', token)
-  const origin = await p.evaluate(() => location.origin)
   t.check((await p.textContent('[data-copy="connector"]')).trim() === `${origin}/mcp/${token}`, 'claude.ai connector URL = <origin>/mcp/<token>')
   t.check(await p.locator('.aimcp-reveal', { hasText: 'Add custom connector' }).count() === 1, 'claude.ai steps shown')
   const cc = (await p.textContent('[data-copy="claude-code"]')).trim()
@@ -49,6 +62,7 @@ module.exports = async function mcpServer(t) {
   await p.click('.drawer .seg-btn[data-value="ai-access"]')
   await p.waitForSelector('.aimcp-row', { timeout: 5000 })
   t.check(await p.locator('.aimcp-row').count() === 1, 'token persists across tab switches')
+  t.check(await adv.evaluate((d) => d.open), 'manual section opens by itself when tokens exist')
 
   // Revoke: inline confirm, cancel first
   await p.getByRole('button', { name: 'Cabut token Laptop kantor' }).click()
@@ -66,5 +80,27 @@ module.exports = async function mcpServer(t) {
   const overflow = await p.evaluate(() => { const d = document.querySelector('.drawer-body') || document.querySelector('.drawer'); return d.scrollWidth - d.clientWidth })
   t.check(overflow <= 1, 'no horizontal scroll on a phone', overflow)
   t.check(await p.locator('.aimcp-row', { hasText: 'Claude' }).count() === 1, 'empty label defaults to "Claude"')
+
+  // Connected apps (OAuth grants): approve one in the mock, it is listed, then "Putuskan"
+  await p.setViewportSize({ width: 1440, height: 900 })
+  await p.evaluate(async () => {
+    const { getCloud } = await import('/src/cloud.js')
+    const o = getCloud().aiOAuth
+    await o.decide(o.startRequest({ client_name: 'Claude', state: 's1' }), true)
+  })
+  await p.click('.drawer .seg-btn[data-value="agent"]')
+  await p.click('.drawer .seg-btn[data-value="ai-access"]')
+  await p.waitForSelector('.aimcp-grant', { timeout: 5000 })
+  const grant = p.locator('.aimcp-grant')
+  t.check(await grant.count() === 1, 'approved app listed under Aplikasi terhubung')
+  t.check((await grant.textContent()).includes('claude.ai') && (await grant.textContent()).includes('Terhubung sejak'), 'grant shows redirect host and since when', await grant.textContent())
+  t.check((await grant.textContent()).includes('Belum pernah dipakai'), 'grant shows last use')
+  await p.getByRole('button', { name: 'Putuskan Claude' }).click()
+  await p.getByRole('button', { name: 'Batal' }).click()
+  t.check(await p.locator('.aimcp-grant').count() === 1, 'Batal keeps the connection')
+  await p.getByRole('button', { name: 'Putuskan Claude' }).click()
+  await p.getByRole('button', { name: 'Ya, putuskan' }).click()
+  await p.waitForSelector('.aimcp-grants-empty', { timeout: 5000 })
+  t.check(await p.locator('.aimcp-grant').count() === 0, 'Putuskan removes the connection')
   await t.noErrors(p)
 }

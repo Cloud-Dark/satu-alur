@@ -5,12 +5,13 @@ main = "worker/index.js"
 compatibility_date = "2025-09-01"
 
 # Static SPA (Vite build) + Worker API. Only /api/* runs the Worker first;
-# everything else is served from ./dist with SPA fallback. /mcp and /mcp/* are the remote MCP server (Akses AI).
+# everything else is served from ./dist with SPA fallback. /mcp and /mcp/* are the remote MCP server (Akses AI);
+# /oauth/* and /.well-known/* are its OAuth 2.1 login (worker/oauth.js).
 [assets]
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-run_worker_first = ["/api/*", "/mcp", "/mcp/*"]
+run_worker_first = ["/api/*", "/mcp", "/mcp/*", "/oauth/*", "/.well-known/*"]
 
 [ai]
 binding = "AI"

@@ -35,3 +35,42 @@
 .aimcp-confirm { font-size: 0.8rem; color: var(--danger); }
 .aimcp-empty { margin: 0; }
 .aimcp-full[hidden] { display: none; }
+
+/* Login flow (primary) and the collapsed manual-token section */
+.aimcp-login { border-color: color-mix(in srgb, var(--brand) 25%, var(--line)); }
+.aimcp-login .aimcp-steps { font-size: 0.9rem; }
+.aimcp-advanced { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-3) var(--s-4); }
+.aimcp-advanced > summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; list-style-position: inside; }
+.aimcp-advanced > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 2px; }
+.aimcp-advanced[open] > summary { margin-bottom: var(--s-3); }
+.aimcp-advanced-body { display: flex; flex-direction: column; gap: var(--s-4); }
+.aimcp-host { font-size: 0.8rem; color: var(--text-muted); }
+
+/* #/izin-ai: "Izinkan Claude?" consent page (src/ai-access/consent-page.js), on the public doc layout */
+.consent-card {
+  max-width: 560px; margin: 0; display: flex; flex-direction: column; gap: 14px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: clamp(20px, 3vw, 32px); box-shadow: var(--shadow-sm); overflow-wrap: anywhere;
+}
+.consent-card p, .consent-card h2, .consent-card h3 { margin: 0; }
+.consent-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brand-500); }
+.consent-title { font-size: var(--fs-xl); line-height: 1.3; color: var(--text); }
+.consent-sub { font-size: var(--fs-sm); color: var(--text); margin-top: 4px !important; }
+.consent-account, .consent-muted, .consent-loading { font-size: var(--fs-sm); line-height: 1.55; color: var(--text-muted); }
+.consent-account strong, .consent-host { color: var(--text); }
+.consent-link { background: none; border: 0; padding: 0; font: inherit; color: var(--brand-500); text-decoration: underline; cursor: pointer; }
+.consent-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 2px; }
+.consent-tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-muted); }
+.consent-tools li { display: flex; gap: 8px; align-items: flex-start; }
+.consent-tools li > svg, .consent-tools li > .icon { flex-shrink: 0; margin-top: 3px; color: var(--success); }
+.consent-tools strong { color: var(--text); font-weight: 600; }
+.consent-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.consent-note { padding: 10px 12px; border-radius: var(--r-md); font-size: var(--fs-sm); line-height: 1.5; }
+.consent-note.is-warn { background: var(--warning-bg); color: var(--warning); }
+.consent-note.is-error { background: var(--danger-bg); color: var(--danger); }
+.consent-status { font-size: var(--fs-sm); color: var(--text-muted); }
+.consent-status[data-tone="error"] { color: var(--danger); }
+.consent-status[hidden] { display: none; }
+@media (max-width: 480px) {
+  .consent-actions .btn { flex: 1 1 100%; justify-content: center; }
+}

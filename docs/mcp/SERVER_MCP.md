@@ -9,63 +9,124 @@ langsung:
 - "Invoice mana yang belum lunas?"
 - "Pekerjaan apa saja yang perlu dibukukan?"
 
-Claude hanya bisa **membaca** data akun yang memiliki token. Tidak ada tool yang mengubah atau menghapus data.
+Claude hanya bisa **membaca** data akun yang memberi izin. Tidak ada tool yang mengubah atau menghapus data.
 
 > Jangan tertukar dengan konektor ERP di `docs/mcp/MCP_SPEC.md` / `worker/mcp.js` / `src/mcp/`. Itu fitur
-> integrasi ERP yang kebetulan juga bernama "MCP". Server untuk Claude ada di `worker/mcp-server.js`.
+> integrasi ERP yang kebetulan juga bernama "MCP". Server untuk Claude ada di `worker/mcp-server.js`, login
+> OAuth-nya di `worker/oauth.js`.
+
+## Menghubungkan dengan login (cara utama)
+
+Tidak ada token yang perlu disalin. Cukup alamat server: **`https://<domain>/mcp`**
+(produksi: `https://satu-alur.apipedia.workers.dev/mcp`).
+
+### claude.ai dan Claude Desktop
+
+1. Buka **Settings → Connectors**, klik **Add custom connector**.
+2. Beri nama "Satu Alur", tempel `https://<domain>/mcp`, lalu **Add**.
+3. Klik **Connect**. Claude membuka halaman masuk Satu Alur. Masuk seperti biasa (kode email / Google).
+4. Halaman **"Izinkan Claude mengakses data usaha Anda (hanya baca)?"** muncul. Klik **Izinkan**.
+5. Anda dikembalikan ke Claude dalam keadaan terhubung.
+
+### Claude Code
+
+```bash
+claude mcp add --transport http satu-alur https://<domain>/mcp
+```
+
+Lalu di Claude Code ketik `/mcp`, pilih `satu-alur`, pilih **Authenticate**. Browser terbuka ke halaman
+masuk Satu Alur; setelah **Izinkan**, Claude Code menerima tokennya sendiri.
+
+### Memutuskan koneksi
+
+**Pengaturan › Akses AI (MCP) › Aplikasi terhubung** menampilkan setiap aplikasi yang sudah diizinkan
+(nama, sejak kapan, terakhir dipakai). **Putuskan** langsung mematikan semua token aplikasi itu.
+
+## Cara lain: token manual (lanjutan)
+
+Untuk klien yang belum mendukung login OAuth. Di Pengaturan › Akses AI (MCP), buka
+**Cara lain: token manual (lanjutan)**, isi nama token, klik **Buat token**. Token (`sa_mcp_…`) dan petunjuk
+sambungan **hanya ditampilkan sekali**. Maksimal 10 token manual aktif per akun.
+
+- claude.ai: URL connector `https://<domain>/mcp/<token>`.
+- Claude Code: `claude mcp add --transport http satu-alur https://<domain>/mcp --header "Authorization: Bearer <token>"`.
+- Claude Desktop lewat `mcp-remote`:
+
+```json
+{
+  "mcpServers": {
+    "satu-alur": { "command": "npx", "args": ["-y", "mcp-remote", "https://<domain>/mcp/<token>"] }
+  }
+}
+```
 
 ## Endpoint
 
 | URL | Kegunaan |
 | --- | --- |
-| `POST https://<domain>/mcp` | Endpoint MCP, token di header `Authorization: Bearer sa_mcp_…` |
-| `POST https://<domain>/mcp/<token>` | Sama, token di URL (untuk connector kustom claude.ai yang hanya menerima URL) |
+| `POST /mcp` | Endpoint MCP. `Authorization: Bearer <token akses OAuth sa_oat_… atau token manual sa_mcp_…>` |
+| `POST /mcp/<token>` | Sama, token **manual** di URL (token OAuth tidak pernah diterima di URL) |
 | `GET /mcp`, `DELETE /mcp` | 405 (tanpa stream SSE dan tanpa sesi) |
-| `GET/POST /api/mcp-tokens`, `DELETE /api/mcp-tokens/:id` | Kelola token (sesi login biasa) |
+| `GET /.well-known/oauth-protected-resource` (juga `…/mcp`) | RFC 9728: resource `<origin>/mcp`, authorization server `<origin>` |
+| `GET /.well-known/oauth-authorization-server` (juga `…/mcp`, `/.well-known/openid-configuration`) | RFC 8414 metadata |
+| `POST /oauth/register` | RFC 7591 pendaftaran klien dinamis |
+| `GET /oauth/authorize` | Mulai login: validasi klien + PKCE, lalu 302 ke halaman izin `/#/izin-ai?req=…` |
+| `POST /oauth/token` | `authorization_code` (+ PKCE S256) dan `refresh_token` |
+| `POST /oauth/revoke` | RFC 7009 |
+| `GET /api/oauth/request?req=`, `POST /api/oauth/decision` | Halaman izin (sesi login biasa) |
+| `GET /api/oauth/grants`, `DELETE /api/oauth/grants/:id` | Aplikasi terhubung / Putuskan (sesi login biasa) |
+| `GET/POST /api/mcp-tokens`, `DELETE /api/mcp-tokens/:id` | Token manual (sesi login biasa) |
 
 Transport: MCP *Streamable HTTP* tanpa SSE dan tanpa sesi (stateless). Versi protokol 2025-06-18
 (2025-03-26 dan 2024-11-05 juga diterima saat `initialize`). Pesan JSON-RPC 2.0 tunggal maupun batch;
 notifikasi dijawab `202 Accepted`. Method: `initialize`, `notifications/initialized`, `ping`, `tools/list`,
 `tools/call`.
 
-## Membuat token
+## Alur OAuth (spesifikasi otorisasi MCP 2025-06-18)
 
-1. Masuk ke Satu Alur dengan akun usaha Anda.
-2. Buka **Pengaturan › Akses AI (MCP)** (atau langsung `#/app/pengaturan?bagian=mcp`).
-3. Isi nama token (misalnya "Claude di laptop kantor"), klik **Buat token**.
-4. Token (`sa_mcp_…`) dan petunjuk sambungan **hanya ditampilkan sekali**. Salin sekarang.
+Worker berperan sebagai *authorization server* sekaligus *resource server*.
 
-Satu token untuk tiap perangkat/aplikasi supaya bisa dicabut sendiri-sendiri. Maksimal 10 token aktif per akun.
+1. Klien memanggil `/mcp` tanpa token → `401` dengan
+   `WWW-Authenticate: Bearer resource_metadata="<origin>/.well-known/oauth-protected-resource"`
+   (ditambah `error="invalid_token"` bila token dikirim tetapi salah / kedaluwarsa / dicabut).
+2. Klien membaca metadata resource lalu metadata authorization server.
+3. Klien mendaftar di `POST /oauth/register` (`redirect_uris` wajib `https://`, atau `http://localhost` /
+   `http://127.0.0.1` untuk aplikasi desktop/CLI; tanpa fragmen). Klien publik (`token_endpoint_auth_method:
+   none`) tidak mendapat secret; `client_secret_post` / `client_secret_basic` juga didukung. Dibatasi
+   20 pendaftaran/jam per IP dan 500/jam total.
+4. `GET /oauth/authorize?response_type=code&client_id&redirect_uri&code_challenge&code_challenge_method=S256&state&scope&resource`.
+   `client_id` tidak dikenal atau `redirect_uri` tidak cocok persis (port bebas untuk loopback, RFC 8252)
+   → halaman galat, **tanpa** redirect. Galat lain dikembalikan ke `redirect_uri` dengan `error` dan `state`.
+   Parameter disimpan di server (`oauth_requests`, 10 menit) lalu 302 ke `/#/izin-ai?req=<id acak>`.
+   SPA tidak pernah dipercaya untuk parameter apa pun.
+5. Halaman `#/izin-ai`: belum masuk → halaman masuk biasa (`#/masuk`) lalu kembali otomatis. Sudah masuk →
+   kartu izin: nama klien, host tujuan, enam tool hanya-baca, email/nama usaha, tombol **Izinkan / Tolak**.
+   Sesi staf, akun demo bersama, dan pengguna yang ditangguhkan tidak bisa mengizinkan (pesan jelas; Tolak
+   tetap bisa).
+6. `POST /api/oauth/decision {req, approve}` → `{ redirect }`: `redirect_uri?code=…&state=…` (kode sekali
+   pakai, 5 menit) atau `redirect_uri?error=access_denied&state=…`. SPA mengarahkan browser ke sana.
+7. `POST /oauth/token` (form-urlencoded atau JSON):
+   - `grant_type=authorization_code`: kode belum dipakai & belum kedaluwarsa, `client_id` sama,
+     `redirect_uri` sama (bila dikirim), `code_verifier` cocok (S256). Kode yang dipakai dua kali →
+     ditolak dan seluruh koneksi dicabut.
+   - Jawaban: `{ access_token: "sa_oat_…", token_type: "Bearer", expires_in: 3600, refresh_token: "sa_ort_…", scope: "satu-alur.read" }`.
+   - `grant_type=refresh_token`: refresh token **dirotasi** setiap kali (berlaku 60 hari). Refresh token
+     lama yang muncul lagi = bocor → seluruh koneksi (keluarga token) dicabut.
+8. `/mcp` menerima token akses OAuth (cek kedaluwarsa dan koneksi belum diputus) dan token manual.
 
-## Menghubungkan
+## Tabel (migrasi `0023_oauth.sql`)
 
-### claude.ai (connector kustom)
+| Tabel | Isi |
+| --- | --- |
+| `oauth_clients` | Klien terdaftar: `client_id`, nama, `redirect_uris` (JSON), metode auth, hash secret (opsional) |
+| `oauth_requests` | Permintaan izin yang menunggu (hash id, PKCE challenge, redirect, state), 10 menit |
+| `oauth_grants` | Satu baris per izin = "aplikasi terhubung" (pemilik, klien, sejak, terakhir dipakai, dicabut) |
+| `oauth_codes` | Kode otorisasi (hash), sekali pakai, 5 menit |
+| `oauth_refresh_tokens` | Refresh token (hash), `used_at` untuk deteksi pemakaian ulang |
+| `mcp_tokens` (+ kolom `kind`, `grant_id`, `expires_at`) | Token akses OAuth (`kind='oauth'`, 1 jam) di samping token manual (`kind='manual'`) |
 
-1. Buka claude.ai → **Settings → Connectors**.
-2. Klik **Add custom connector**, beri nama "Satu Alur".
-3. Tempel URL `https://<domain>/mcp/<token>` lalu **Add**.
-
-### Claude Code
-
-```bash
-claude mcp add --transport http satu-alur https://<domain>/mcp --header "Authorization: Bearer <token>"
-```
-
-### Claude Desktop
-
-Tambahkan ke `claude_desktop_config.json` (Settings → Developer → Edit Config), lalu buka ulang Claude Desktop
-(perlu Node.js untuk `npx`):
-
-```json
-{
-  "mcpServers": {
-    "satu-alur": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://<domain>/mcp/<token>"]
-    }
-  }
-}
-```
+Semua kode, id permintaan, dan token disimpan sebagai **hash SHA-256** saja. Tidak satu pun tabel ini ada di
+whitelist `/api/db`.
 
 ## Tool
 
@@ -90,23 +151,31 @@ JSON rusak, tool tidak dikenal) sebagai error JSON-RPC.
 
 ## Keamanan
 
-- **Token = kunci baca seluruh data usaha.** Simpan seperti kata sandi. Cabut di Pengaturan › Akses AI (MCP)
-  bila bocor atau tidak dipakai lagi; token yang dicabut langsung ditolak (401).
-- Server hanya menyimpan **hash SHA-256** token (`mcp_tokens.token_hash`, migrasi `0022_mcp_tokens.sql`) dan
-  awalan untuk tampilan. Token asli tidak bisa dilihat lagi setelah dibuat.
-- Bentuk URL (`/mcp/<token>`) memasukkan token ke URL, sehingga bisa tercatat di log/riwayat. Untuk Claude Code
-  pakai bentuk header bila memungkinkan.
+- **Izin = akses baca seluruh data usaha.** Putuskan aplikasi yang tidak dipakai lagi di Pengaturan › Akses AI
+  (MCP); token akses dan refresh-nya langsung ditolak (401).
+- PKCE S256 wajib; `plain` ditolak. Kode otorisasi sekali pakai (5 menit), token akses 1 jam, refresh token
+  dirotasi dengan deteksi pemakaian ulang.
+- `redirect_uri` harus cocok persis dengan yang didaftarkan (loopback: port boleh beda). Galat sebelum
+  `redirect_uri` tervalidasi tidak pernah me-redirect.
+- Token manual = kunci baca. Simpan seperti kata sandi; cabut bila bocor. Bentuk URL (`/mcp/<token>`)
+  memasukkan token ke URL (bisa tercatat di log/riwayat), jadi lebih baik pakai login.
+- Server hanya menyimpan **hash SHA-256**; token asli tidak bisa dilihat lagi.
 - Setiap query dibatasi `owner_id` pemilik token; data akun lain tidak pernah ikut.
-- Pengguna yang ditangguhkan ditolak (403). **Akun demo tidak bisa membuat atau memakai token** (akun demo
-  dipakai bersama, jadi token di sana bisa dilihat/dicabut orang lain).
-- Batas permintaan per token: 60/menit dan 1.000/jam (best effort, per isolate + Cache API). Lewat batas → 429.
-- Header `Origin` (kalau ada) harus dari domain Satu Alur sendiri, claude.ai/claude.com/anthropic.com, atau
-  localhost (MCP Inspector). Klien server-ke-server tanpa `Origin` diterima.
+- Pengguna yang ditangguhkan ditolak (403 di `/mcp`, `invalid_grant` saat refresh). **Akun demo dan sesi staf
+  tidak bisa memberi izin atau membuat token** (akun demo dipakai bersama).
+- Batas permintaan `/mcp` per token: 60/menit dan 1.000/jam; `/oauth/token` 60/menit per IP;
+  `/oauth/authorize` 120/jam per IP (best effort, per isolate + Cache API).
+- Header `Origin` di `/mcp` (kalau ada) harus dari domain Satu Alur sendiri, claude.ai/claude.com/anthropic.com,
+  atau localhost (MCP Inspector). Endpoint `/oauth/*` dan `/.well-known/*` mengirim CORS `*` (tanpa cookie).
 - `last_used_at` diperbarui paling sering tiap 5 menit agar hemat kuota tulis D1.
 
 ## Deploy
 
-1. Terapkan migrasi baru: `npm run db:migrate:remote` (menambah tabel `mcp_tokens`).
-2. `wrangler.toml` dan `wrangler.deploy.toml` sudah memuat `run_worker_first = ["/api/*", "/mcp", "/mcp/*"]`
-   supaya `/mcp` dijalankan Worker, bukan dilayani sebagai halaman SPA.
-3. Deploy seperti biasa.
+1. Terapkan migrasi baru: `npm run db:migrate:remote` (menambah `0023_oauth.sql`: tabel `oauth_*` dan kolom
+   `kind`, `grant_id`, `expires_at` di `mcp_tokens`).
+2. `wrangler.toml` dan `wrangler.deploy.toml` memuat
+   `run_worker_first = ["/api/*", "/mcp", "/mcp/*", "/oauth/*", "/.well-known/*"]` supaya endpoint ini
+   dijalankan Worker, bukan dilayani sebagai halaman SPA. Path `/.well-known/*` lain tetap diteruskan ke aset.
+3. Build dan deploy seperti biasa: `npx vite build && npx wrangler deploy --config wrangler.deploy.toml`.
+4. Uji: `curl https://<domain>/.well-known/oauth-authorization-server` dan `curl -i -X POST https://<domain>/mcp`
+   (harus `401` dengan `WWW-Authenticate: Bearer resource_metadata=…`).
