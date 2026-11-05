@@ -16,7 +16,7 @@ Berisi **data demo DUMMY** untuk D1. Semua pelanggan, telepon, alamat, pekerja, 
 | `demo-summary.json` | Ringkasan mode penuh per usaha: asumsi `macro`, pendapatan/biaya/laba bulanan, tren nominal vs volume riil, CV, struktur biaya, laba sebelum pajak dan estimasi setelah pajak, headcount, jumlah baris, estimasi tulis. **Sumber tabel dokumen.** |
 | `demo-lean.part1of3.sql` … `part3of3.sql` | Mode `--lean` dibagi 3 file (17.763 baris total). Masing-masing ±34–36 ribu writes bila mengganti seed penuh. Terapkan **satu file per hari** di akun Free. |
 | `demo-lean-summary.json` | Ringkasan mode lean, termasuk `write_estimate`. |
-| `office.sql` | Data contoh Kantor Satu Alur (halaman staf): konten situs, paket Free/Lite/Pro dengan kuota AI, pelanggan, kontak, tiket, influencer, permintaan, kampanye, voucher, saldo AI. 103 baris. Lihat [Data Kantor](#data-kantor-officesql). |
+| `office.sql` | Data contoh Kantor Satu Alur (halaman staf): konten situs, paket Free/Lite/Pro/Enterprise dengan kuota AI, pelanggan, kontak, tiket, influencer, permintaan, kampanye, voucher, saldo AI. 104 baris. Lihat [Data Kantor](#data-kantor-officesql). |
 
 ## Data Kantor (`office.sql`)
 
@@ -26,8 +26,8 @@ Dibuat oleh `node scripts/seed-office.mjs` (jangan edit `office.sql` manual). Se
 
 | Tabel | Baris | Isi |
 |-------|------:|-----|
-| `site_content` | 5 | `landing` (hero + FAQ, sama dengan teks bawaan `src/landing/content.js`, FAQ paket diperbarui ke Free/Lite/Pro) dan draf `about`, `privacy`, `terms`, `cookies` (ditandai "Draf contoh", perlu ditinjau penasihat hukum). |
-| `subscription_plans` | 3 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi). Kuota AI yang berlaku di `quota_json` (Free = kuota coba: 10 per fitur termasuk Optimasi pendapatan, Penasihat AI 5; Lite optimasi 30; Pro tanpa batas kecuali prospek 100 dan penasihat 500); teks kartu di `limits_json`. Setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
+| `site_content` | 5 | `landing` (hero + FAQ, sama dengan teks bawaan `src/landing/content.js`, FAQ paket diperbarui ke Free/Lite/Pro/Enterprise) dan draf `about`, `privacy`, `terms`, `cookies` (ditandai "Draf contoh", perlu ditinjau penasihat hukum). |
+| `subscription_plans` | 4 | Free Rp0, Lite Rp99.000/bulan, Pro Rp249.000/bulan (rekomendasi), Enterprise Rp3.512.172/bulan (Pro + NDA + SLA, tombol "Hubungi kami"; nilainya dari `ENTERPRISE_PLAN` di `src/business/plan-rules.js`, dan migrasi `0020_enterprise_plan.sql` menambahkannya ke database yang sudah berjalan). Kuota AI yang berlaku di `quota_json` (Free = kuota coba: 10 per fitur termasuk Optimasi pendapatan, Penasihat AI 5; Lite optimasi 30; Pro tanpa batas kecuali prospek 100 dan penasihat 500; Enterprise tanpa batas kecuali prospek 500 dan penasihat 2.500); teks kartu di `limits_json`. Setiap paket mencatat "Tidak termasuk saldo AI". Upsert per `slug`. |
 | `payment_settings` | 1 | Penyedia `none`, mode sandbox, **tanpa kunci**. Gateway tetap mati sampai staf mengisi kunci asli di halaman Payment gateway. |
 | `users` | 13 | 9 akun demo (`INSERT OR IGNORE`, tidak mengubah baris yang sudah ada) + 4 pendaftar contoh. |
 | `customer_accounts` | 12 | Paket dan status campuran: aktif, uji coba, tertunggak, berhenti. Pendaftar ke-13 sengaja "Belum diatur". |

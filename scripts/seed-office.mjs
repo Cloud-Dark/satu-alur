@@ -5,7 +5,7 @@
  *
  *   node scripts/seed-office.mjs            tulis seeds/office.sql
  *
- * Isi: konten situs (landing + 4 halaman dokumen), paket Free/Lite/Pro, pengaturan pembayaran
+ * Isi: konten situs (landing + 4 halaman dokumen), paket Free/Lite/Pro/Enterprise, pengaturan pembayaran
  * (tanpa kunci), akun pelanggan, pesan kontak, tiket bantuan, influencer, permintaan layanan,
  * kampanye, kuota AI per paket, voucher (paket / saldo AI / gabungan) beserta contoh penukaran.
  * Aman dijalankan ulang: setiap baris memakai id/kunci tetap dan upsert.
@@ -14,7 +14,8 @@
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { HERO, HERO_POINTS, FAQS } from '../src/landing/content.js'
-import { periodOf } from '../src/quota/rules.js'
+import { periodOf, rupiah } from '../src/quota/rules.js'
+import { ENTERPRISE_PLAN } from '../src/business/plan-rules.js'
 
 const OUT = fileURLToPath(new URL('../seeds/office.sql', import.meta.url))
 const BY = 'seed-office'
@@ -62,9 +63,10 @@ const landing = {
     points: HERO_POINTS.slice(0, 4),
   },
   faqs: FAQS.map((f) => (/batasan paket gratis/i.test(f.q)
-    ? { q: f.q, a: 'Paket Free bisa dipakai tanpa batas waktu untuk 1 pengguna, dengan kuota AI kecil (3 penawaran AI, 3 penjelasan laporan, dan 3 pencarian prospek per bulan). Butuh lebih? Naik ke Lite atau Pro kapan saja. Harga paket tidak termasuk saldo AI.' }
+    ? { q: f.q, a: 'Paket Free bisa dipakai tanpa batas waktu untuk 1 pengguna, dengan kuota AI kecil (3 penawaran AI, 3 penjelasan laporan, dan 3 pencarian prospek per bulan). Butuh lebih? Naik ke Lite, Pro, atau Enterprise kapan saja. Harga paket tidak termasuk saldo AI.' }
     : f)).concat([
     { q: 'Apa beda paket dan saldo AI?', a: 'Paket membuka fitur dan kuota bulanan. Saldo AI terpisah dan dipakai saat kuota AI paket habis. Voucher bisa berisi paket, saldo AI, atau keduanya.' },
+    { q: 'Apa yang didapat di paket Enterprise?', a: `Semua fitur Pro dengan kuota AI lebih besar, ditambah NDA (perjanjian kerahasiaan) dan SLA (uptime 99,9% per bulan, respons dukungan maksimal 4 jam kerja). Harganya ${rupiah(ENTERPRISE_PLAN.price_idr)} per bulan dengan kontrak; hubungi kami lewat halaman Kontak.` },
   ]),
 }
 
@@ -185,6 +187,8 @@ const PLANS = [
     features: ['Semua fitur Lite', 'Publikasi ke Facebook, Instagram, dan Threads', 'Permintaan kolaborasi influencer', 'Permintaan iklan Meta', 'Prioritas bantuan', 'Tidak termasuk saldo AI'],
     cta_label: 'Pilih Pro', cta_kind: 'signup', sort: 3,
   },
+  // Pro + NDA + SLA, sold under contract (Hubungi kami). Also added to live databases by migration 0020.
+  ENTERPRISE_PLAN,
 ]
 
 section('subscription_plans', 'subscription_plans', 'slug', PLANS.map((p) => ({

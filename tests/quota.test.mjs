@@ -8,6 +8,7 @@ import {
   validateVoucher, redeemProblem, planAfterVoucher, generateCode, normalizeCode, usageRows, voucherValue,
 } from '../src/quota/rules.js'
 import { featureFrom, meter, handleVoucherRedeem } from '../worker/quota.js'
+import { ENTERPRISE_PLAN } from '../src/business/plan-rules.js'
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status }
@@ -43,6 +44,20 @@ test('effectivePlan: active plan in period; lapsed, cancelled, past_due or none 
   assert.equal(effectivePlan({ plan_id: 3, status: 'past_due', period_end: null }, plans, today).plan.slug, 'free')
   assert.equal(effectivePlan(null, plans, today).plan.slug, 'free')
   assert.deepEqual(effectivePlan(null, [], today).plan.quota, FREE_QUOTA, 'no plans table rows: built-in Free')
+})
+
+test('Enterprise paket: applies like any plan, unlimited where Pro is, bigger leads/advisor caps', () => {
+  const plans = [{ id: 1, slug: 'free', quota: FREE_QUOTA }, { id: 4, slug: ENTERPRISE_PLAN.slug, name: ENTERPRISE_PLAN.name, quota: ENTERPRISE_PLAN.quota }]
+  const { plan } = effectivePlan({ plan_id: 4, status: 'active', period_end: '2026-11-29' }, plans, '2026-10-30')
+  assert.equal(plan.slug, 'enterprise')
+  const rows = Object.fromEntries(usageRows(plan.quota, { offer: 900, leads: 120, advisor: 600 }).map((r) => [r.key, r]))
+  assert.equal(rows.offer.limit, null)
+  assert.equal(rows.leads.limit, 500); assert.equal(rows.leads.left, 380)
+  assert.equal(rows.advisor.limit, 2500); assert.equal(rows.advisor.left, 1900)
+  assert.equal(Object.keys(rows).length, FEATURES.length, 'every metered feature has a row')
+  // Beyond Pro's 100 searches an Enterprise account is still served from quota, not credit.
+  assert.deepEqual(decide({ used: 120, limit: limitFor(plan.quota, 'leads'), balance: 0, price: 2000 }), { allow: true, via: 'quota' })
+  assert.deepEqual(decide({ used: 9999, limit: limitFor(plan.quota, 'report'), balance: 0, price: 1000 }), { allow: true, via: 'unlimited' })
 })
 
 test('decide: quota first, then credit, else refused; demo and unlimited never refused', () => {

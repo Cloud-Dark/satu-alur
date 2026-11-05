@@ -17,7 +17,7 @@ import { mountAgentDemo } from './terminal.js'
 import { PRICING_TIERS, PRICING_NOTE } from './pricing.js'
 import { getSite } from '../site/api.js'
 import { getPlans } from '../business/api.js'
-import { renderPlanCard } from '../business/plan-card.js'
+import { renderPlanCard, isLongPrice } from '../business/plan-card.js'
 import { renderHero } from '../site/hero.js'
 import { NAV, HERO, HERO_POINTS, STAGES, TICKER, FEATURES, INCOME, GROWTH, INTEGRATION, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
 
@@ -489,11 +489,11 @@ function pricingHTML() {
       <header class="lp-tier-head">
         <div class="lp-tier-name-row">
           <h3 class="lp-tier-name" id="tier-${t.id}">${esc(t.name)}</h3>
-          ${t.recommended ? `<span class="tag tag-accent lp-tier-badge">${iconHTML('sparkles', { size: 12, stroke: 2 })}${esc(t.badge)}</span>` : ''}
+          ${t.recommended ? `<span class="tag tag-accent lp-tier-badge">${iconHTML('sparkles', { size: 12, stroke: 2 })}${esc(t.badge)}</span>` : t.badge ? `<span class="tag lp-tier-pill">${iconHTML('shield', { size: 12, stroke: 2 })}${esc(t.badge)}</span>` : ''}
         </div>
         <p class="lp-tier-tag">${esc(t.tagline)}</p>
       </header>
-      <p class="lp-tier-price"><span class="display lp-price">${esc(t.price)}</span><span class="lp-period">${esc(t.period)}</span></p>
+      <p class="lp-tier-price"><span class="display lp-price${isLongPrice(t.price) ? ' is-long' : ''}">${esc(t.price)}</span><span class="lp-period">${esc(t.period)}</span></p>
       <dl class="lp-tier-limits">
         ${t.limits.map((l) => `<div><dt>${esc(l.label)}</dt><dd>${esc(l.value)}</dd></div>`).join('')}
       </dl>

@@ -1,5 +1,5 @@
 // Pure validators + price formatting for subscription plans. Errors carry Indonesian text.
-import { validateQuota } from '../quota/rules.js'
+import { validateQuota, rupiah } from '../quota/rules.js'
 
 export const PERIODS = ['month', 'year', 'once', 'custom']
 export const CTA_KINDS = ['signup', 'contact']
@@ -22,11 +22,56 @@ const flag = (v, label) => {
   return fail(`${label} tidak valid.`)
 }
 
+/**
+ * Enterprise: the top paket (slug 'enterprise'). Everything in Pro plus an NDA and an SLA, so it is sold
+ * under contract: the button goes to the contact form, not to sign-up. Single source for migration
+ * 0020_enterprise_plan.sql (tests/business-plans.test.mjs checks they match), scripts/seed-office.mjs and
+ * the landing's built-in Enterprise card (src/landing/pricing.js).
+ * Not the same as the "skala akun" Enterprise in plan-access.js, which staff set per user to open ERP integration.
+ */
+export const ENTERPRISE_PLAN = Object.freeze({
+  slug: 'enterprise',
+  name: 'Enterprise',
+  tagline: 'Untuk operasi jasa berskala besar yang butuh kerahasiaan dan jaminan layanan tertulis.',
+  price_idr: 3_512_172,
+  period: 'month',
+  period_label: 'per bulan',
+  recommended: 0,
+  badge: 'NDA + SLA',
+  limits: [
+    { label: 'Pengguna', value: 'Tanpa batas' },
+    { label: 'Transaksi', value: 'Tanpa batas' },
+    { label: 'Penawaran AI', value: 'Tanpa batas' },
+    { label: 'Laporan AI', value: 'Tanpa batas' },
+    { label: 'Pencari prospek', value: '500 pencarian per bulan' },
+    { label: 'Penasihat AI', value: '2.500 pesan per bulan' },
+  ],
+  // At least Pro everywhere (Pro: leads 100, advisor 500, the rest unlimited); null = unlimited.
+  quota: { offer: null, report: null, leads: 500, radar: null, advisor: 2500, social: null, income: null },
+  features: [
+    'Semua fitur Pro',
+    'NDA: perjanjian kerahasiaan untuk data usaha Anda',
+    'SLA uptime layanan 99,9% per bulan',
+    'SLA respons dukungan maksimal 4 jam kerja',
+    'Kontrak dan tagihan atas nama perusahaan',
+    'Tidak termasuk saldo AI',
+  ],
+  cta_label: 'Hubungi kami',
+  cta_kind: 'contact',
+  sort: 4,
+})
+
+/** Built-in card price text -> rupiah: 'Rp0' -> 0, 'Rp349rb' -> 349000, 'Rp3.512.172' -> 3512172, 'Kustom' -> null. */
+export function priceFromText(s) {
+  const m = /(\d[\d.]*)\s*(rb)?/i.exec(String(s ?? ''))
+  return m ? Number(m[1].replace(/\./g, '')) * (m[2] ? 1000 : 1) : null
+}
+
 /** { price, period } display strings: Rp349.000 / Kustom, and the period suffix or period_label. */
 export function formatPrice(plan) {
   const price = plan.price_idr === null || plan.price_idr === undefined
     ? 'Kustom'
-    : `Rp${new Intl.NumberFormat('id-ID').format(plan.price_idr)}`
+    : rupiah(plan.price_idr)
   const label = str(plan.period_label)
   return { price, period: label || SUFFIX[plan.period] || '' }
 }

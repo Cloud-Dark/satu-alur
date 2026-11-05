@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { validatePlan, validateReorder, formatPrice, PERIODS } from '../src/business/plan-rules.js'
+import { readFile } from 'node:fs/promises'
+import './helpers/setup.mjs'
+import { validatePlan, validateReorder, formatPrice, PERIODS, ENTERPRISE_PLAN, priceFromText } from '../src/business/plan-rules.js'
+import { FEATURES as QUOTA_FEATURES, limitFor } from '../src/quota/rules.js'
+import { PRICING_TIERS } from '../src/landing/pricing.js'
+import { isLongPrice } from '../src/business/plan-card.js'
+import { handlePlansPublic } from '../worker/business.js'
+import { makeD1 } from './helpers/d1-sqlite.mjs'
 
 const base = { slug: 'ukm', name: 'UKM', tagline: 'Untuk tim', price_idr: 349000, period: 'month', cta_label: 'Pilih', cta_kind: 'signup' }
 
@@ -71,4 +78,74 @@ test('validateReorder: needs every existing id exactly once', () => {
 test('validatePlan: tags every failure as a validation error', () => {
   try { validatePlan({ ...base, slug: '!' }) } catch (e) { assert.equal(e.validation, true); return }
   assert.fail('should throw')
+})
+
+/* ------------------------------------------------------------- Enterprise */
+
+// Pro as seeded by scripts/seed-office.mjs: the highest paket before Enterprise.
+const PRO_QUOTA = { offer: null, report: null, leads: 100, radar: null, advisor: 500, social: null, income: null }
+
+test('Enterprise: Rp3.512.172 per bulan, contact CTA, passes validatePlan unchanged', () => {
+  assert.deepEqual(formatPrice(ENTERPRISE_PLAN), { price: 'Rp3.512.172', period: 'per bulan' })
+  assert.equal(ENTERPRISE_PLAN.period, 'month')
+  assert.equal(ENTERPRISE_PLAN.slug, 'enterprise')
+  assert.equal(ENTERPRISE_PLAN.cta_kind, 'contact')
+  assert.equal(ENTERPRISE_PLAN.cta_label, 'Hubungi kami')
+  const v = validatePlan(ENTERPRISE_PLAN)
+  for (const k of ['slug', 'name', 'tagline', 'price_idr', 'period', 'period_label', 'badge', 'limits', 'features', 'quota', 'cta_label', 'cta_kind', 'sort']) {
+    assert.deepEqual(v[k], ENTERPRISE_PLAN[k], k)
+  }
+})
+
+test('Enterprise: NDA and SLA on top of every Pro feature, AI quota at least Pro', () => {
+  const f = ENTERPRISE_PLAN.features.join(' | ')
+  assert.match(f, /Semua fitur Pro/)
+  assert.match(f, /NDA: perjanjian kerahasiaan/)
+  assert.match(f, /SLA uptime layanan 99,9%/)
+  assert.match(f, /SLA respons dukungan/)
+  for (const { key } of QUOTA_FEATURES) {
+    const ent = limitFor(ENTERPRISE_PLAN.quota, key)
+    const pro = limitFor(PRO_QUOTA, key)
+    assert.ok(ent === null || (pro !== null && ent > pro), `${key}: Enterprise ${ent} vs Pro ${pro}`)
+  }
+})
+
+test('priceFromText: built-in card prices, thousands separators included', () => {
+  assert.equal(priceFromText('Rp0'), 0)
+  assert.equal(priceFromText('Rp349rb'), 349000)
+  assert.equal(priceFromText('Rp3.512.172'), 3512172)
+  assert.equal(priceFromText('Kustom'), null)
+})
+
+test('landing built-in Enterprise card: same price, NDA + SLA, contact CTA, imports with its quota', () => {
+  const t = PRICING_TIERS.find((x) => x.id === 'enterprise')
+  assert.equal(t.price, 'Rp3.512.172')
+  assert.equal(t.period, 'per bulan')
+  assert.equal(t.cta.href, null)
+  assert.equal(t.cta.label, 'Hubungi kami')
+  assert.ok(t.features.some((x) => x.startsWith('NDA')) && t.features.some((x) => x.startsWith('SLA')))
+  assert.deepEqual(t.quota, ENTERPRISE_PLAN.quota)
+  assert.equal(priceFromText(t.price), ENTERPRISE_PLAN.price_idr)
+  assert.equal(isLongPrice(t.price), true)
+  assert.equal(isLongPrice('Rp349.000'), false)
+})
+
+test('migration 0020 adds the Enterprise row exactly as ENTERPRISE_PLAN, last in order, public via /api/plans', async (t) => {
+  const { DatabaseSync } = await import('node:sqlite').catch(() => ({}))
+  if (!DatabaseSync) { t.skip('needs node:sqlite'); return }
+  const D1 = await makeD1()
+  const res = await handlePlansPublic(null, { DB: D1 }, { ok: (data) => new Response(JSON.stringify({ data })) })
+  const plans = (await res.json()).data
+  const ent = plans.find((p) => p.slug === 'enterprise')
+  assert.ok(ent, 'enterprise plan exists after migrations')
+  assert.equal(plans.at(-1).slug, 'enterprise')
+  for (const k of ['name', 'tagline', 'price_idr', 'period', 'period_label', 'recommended', 'badge', 'limits', 'features', 'quota', 'cta_label', 'cta_kind']) {
+    assert.deepEqual(ent[k], ENTERPRISE_PLAN[k], k)
+  }
+  assert.equal(ent.active, 1)
+  // Re-running is a no-op (INSERT OR IGNORE on the unique slug), so a hand-edited 'enterprise' row survives.
+  D1.raw.exec("UPDATE subscription_plans SET name = 'Enterprise (staf)' WHERE slug = 'enterprise'")
+  D1.raw.exec(await readFile(new URL('../migrations/0020_enterprise_plan.sql', import.meta.url), 'utf8'))
+  const rows = D1.raw.prepare("SELECT name FROM subscription_plans WHERE slug = 'enterprise'").all()
+  assert.deepEqual(rows.map((r) => r.name), ['Enterprise (staf)'])
 })

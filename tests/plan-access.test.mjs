@@ -10,6 +10,7 @@ import {
   canUse, planLockMessage, planForScale,
 } from '../src/business/plan-access.js'
 import { handleConnectorList, handleMigrationList } from '../worker/mcp.js'
+import { ENTERPRISE_PLAN } from '../src/business/plan-rules.js'
 
 class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status }
@@ -73,6 +74,15 @@ test('labels and demo scales map onto tiers', () => {
   assert.equal(planForScale('enterprise'), 'enterprise')
   assert.equal(planForScale('ukm'), 'ukm')
   assert.equal(planForScale(undefined), 'sole')
+})
+
+test('the Enterprise paket and the Enterprise skala share id and name, and the top skala opens every gated feature', () => {
+  // Two different "Enterprise"s (see plan-access.js header): keep the words aligned so the UI never shows two spellings.
+  assert.equal(ENTERPRISE_PLAN.slug, PLANS.at(-1))
+  assert.equal(ENTERPRISE_PLAN.name, planLabel(PLANS.at(-1)))
+  assert.equal(normalizePlan(ENTERPRISE_PLAN.slug), 'enterprise')
+  for (const key of Object.keys(FEATURES)) assert.equal(canUse('enterprise', key), true, `${key} open on enterprise`)
+  assert.equal(canUse('enterprise', 'ungatedFeature'), true)
 })
 
 test('every gated feature declares a label, a tier and a summary', () => {

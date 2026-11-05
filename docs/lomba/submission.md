@@ -154,8 +154,8 @@ Cloudflare D1 (SQLite)  ·  aset statis di Workers Assets
 |---|---|---|
 | Free | Rp0 | Seluruh alur kerja, dengan kuota percobaan AI per fitur |
 | Lite | Rp99.000 / bulan | Kuota AI lebih besar untuk tim kecil |
-| Pro | Rp249.000 / bulan | Kuota AI terbesar, fitur pertumbuhan penuh |
-| Enterprise | Hubungi kami | Konektor ERP, migrasi data, dukungan khusus |
+| Pro | Rp249.000 / bulan | Kuota AI besar, fitur pertumbuhan penuh |
+| Enterprise | Rp3.512.172 / bulan (kontrak, lewat "Hubungi kami") | Semua fitur Pro dengan kuota AI lebih besar, ditambah NDA (perjanjian kerahasiaan) dan SLA (uptime 99,9%, respons dukungan maks. 4 jam kerja) |
 
 - **Saldo AI terpisah dari paket.** Membeli paket tidak termasuk saldo AI. Setelah kuota bulanan habis, pemakaian AI memotong saldo.
 - **Voucher tiga jenis** untuk peluncuran: voucher paket (misalnya Pro 30 hari), voucher saldo AI (misalnya Rp50.000), dan voucher gabungan. Setiap penukaran tercatat sebagai data calon pelanggan; voucher bernilai besar lewat "Hubungi kami".
