@@ -197,7 +197,9 @@ test('knowledgeAnswer: strong hits answer directly with a link; misses go to AI 
   assert.deepEqual(inv.actions, [{ label: 'Buka Invoice', stage: 'invoice' }])
   const price = A.knowledgeAnswer('berapa harga paketnya?', { mode: 'public', only: ['harga', 'kontak'] })
   assert.equal(price.entry, 'harga')
-  assert.match(price.text, /Sole Trader: Rp0/)
+  assert.match(price.text, /Ada 3 paket/)
+  assert.deepEqual(price.plans.map((p) => p.name).slice(0, 1), ['Sole Trader'])
+  assert.equal(price.plans[0].price, 'Rp0')
   assert.deepEqual(price.actions, [{ label: 'Lihat harga', href: '#harga' }])
   const miss = A.knowledgeAnswer('siapa presiden pertama?', { mode: 'public' })
   assert.equal(miss.strong, false)
@@ -280,4 +282,9 @@ test('public endpoint: builds its own prompt from public knowledge and rate-limi
   for (let i = 1; i < W.PUBLIC_LIMITS.perIp; i++) await W.handleWaguriPublic(req('1.2.3.4'), env, deps)
   await assert.rejects(W.handleWaguriPublic(req('1.2.3.4'), env, deps), (e) => e.status === 429)
   await W.handleWaguriPublic(req('5.6.7.8'), env, deps) // another visitor is unaffected
+})
+
+test('format: glued bullets become separate lines', async () => {
+  const { normalizeLines } = await import('../src/waguri/format.js')
+  assert.deepEqual(normalizeLines('Paket: • A: Rp0 • B: Rp99.000').map((s) => s.trim()), ['Paket:', '• A: Rp0', '• B: Rp99.000'])
 })

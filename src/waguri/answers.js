@@ -7,7 +7,7 @@
  * actions  buttons: { label, stage, params } in the app, { label, href } on public pages
  * ai       optional { context } — facts the model may rephrase (never invent beyond them)
  */
-import { normalize, tokens, searchKnowledge, knowledgeText } from './knowledge.js'
+import { normalize, tokens, searchKnowledge, knowledgeText, pricingRows } from './knowledge.js'
 import { STEPS } from '../domain/workflow.js'
 
 const idrFmt = new Intl.NumberFormat('id-ID')
@@ -327,6 +327,14 @@ export function knowledgeAnswer(question, { mode = 'public', plans, only } = {})
     ? (e.stage ? [{ label: `Buka ${e.title}`, stage: e.stage }] : [])
     : (e.href ? [{ label: e.href === '#harga' ? 'Lihat harga' : e.href === '#/masuk' ? 'Masuk / daftar' : `Buka ${e.title}`, href: e.href }] : []))
   if (best && best.score >= 3) {
+    if (best.entry.id === 'harga') {
+      const { live, rows } = pricingRows(plans)
+      return {
+        kind: 'kb', strong: true, entry: 'harga',
+        text: `Ada ${rows.length} paket${live ? '' : ' (harga sementara)'}. Pindah paket kapan saja:`,
+        plans: rows, actions: link(best.entry), ai: { context: best.entry.text },
+      }
+    }
     return { kind: 'kb', strong: true, entry: best.entry.id, text: best.entry.text, actions: link(best.entry), ai: { context: best.entry.text } }
   }
   const context = knowledgeText(mode, { plans, only })

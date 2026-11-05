@@ -15,6 +15,7 @@ import { skillsFor, skillById, greeting } from './skills.js'
 import { answerFor, wantsAi } from './engine.js'
 import { askApp, askPublic, aiErrorNote } from './ai.js'
 import { STEPS } from '../domain/workflow.js'
+import { formatText } from './format.js'
 
 const CONSENT_KEY = 'satualur_waguri_consent'
 const MAX_SAVED = 40
@@ -223,6 +224,16 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
       next)
   }
 
+  function planCard(r) {
+    const items = [...(r.features || []), ...(r.limits || [])].slice(0, 4)
+    return h('article', { className: 'wg-plan' },
+      h('div', { className: 'wg-plan-top' },
+        h('strong', { className: 'wg-plan-name' }, r.name),
+        h('span', { className: 'wg-plan-price' }, r.price, r.period ? h('small', {}, ` / ${r.period.replace(/^per /, '')}`) : null)),
+      r.tagline ? h('p', { className: 'wg-plan-tag' }, r.tagline) : null,
+      items.length ? h('ul', { className: 'wg-plan-list' }, items.map((t) => h('li', {}, t))) : null)
+  }
+
   function copyButton(text) {
     const b = h('button', { type: 'button', className: 'wg-copy' }, icon('copy', { size: 14 }), 'Salin pesan')
     b.addEventListener('click', async () => {
@@ -234,7 +245,8 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
 
   function messageEl(m) {
     if (m.role === 'user') return h('div', { className: 'wg-msg is-user' }, h('p', { className: 'wg-bubble' }, m.text))
-    const bubble = h('div', { className: 'wg-bubble' }, h('p', { className: 'wg-text' }, m.text))
+    const bubble = h('div', { className: 'wg-bubble' }, h('div', { className: 'wg-text' }, formatText(m.text)))
+    if (m.plans?.length) bubble.append(h('div', { className: 'wg-plans' }, m.plans.map(planCard)))
     if (m.cards?.length) bubble.append(h('div', { className: 'wg-cards' }, m.cards.map(jobCard)))
     if (m.copy) bubble.append(copyButton(m.copy))
     if (m.note) bubble.append(h('p', { className: 'wg-msg-note' }, m.note))
@@ -275,7 +287,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
     let reply
     try {
       const result = await answerFor(asked, question, { mode, loaders, sender: '' })
-      reply = { role: 'assistant', skill: asked.id, text: result.text, cards: result.cards, actions: result.actions, suggestions: result.suggestions, copy: result.copy }
+      reply = { role: 'assistant', skill: asked.id, text: result.text, cards: result.cards, actions: result.actions, suggestions: result.suggestions, copy: result.copy, plans: result.plans }
       if (wantsAi(asked, result)) {
         const live = messageEl({ ...reply, text: '' })
         const liveText = live.querySelector('.wg-text')
@@ -287,7 +299,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
             skill: asked, question, context: result.ai.context, history: prior, signal: ctl.signal,
             onChunk: (_d, full) => {
               if (!started) { started = true; typing.replaceWith(live) }
-              liveText.textContent = full
+              liveText.replaceChildren(formatText(full))
               scrollDown()
             },
           })

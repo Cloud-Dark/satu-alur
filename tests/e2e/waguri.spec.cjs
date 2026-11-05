@@ -43,7 +43,7 @@ module.exports = async function waguri(t) {
   await ask(p, 'Berapa harga paketnya?')
   await p.waitForFunction(() => /Sole Trader|Paket Satu Alur/.test(document.querySelector('[data-waguri-panel] .wg-msg.is-bot:not(.is-typing):last-child')?.textContent || ''), null, { timeout: 10000 }).catch(() => {})
   const priceText = await lastBot(p).textContent()
-  t.check(/Paket Satu Alur/.test(priceText) && /Sole Trader/.test(priceText), 'pricing answer from public knowledge', priceText.slice(0, 120))
+  t.check(/paket/i.test(priceText) && await lastBot(p).locator('.wg-plan').count() >= 3 && await lastBot(p).locator('.wg-plan-name', { hasText: 'Sole Trader' }).count() === 1, 'pricing answer shows one card per plan', priceText.slice(0, 120))
   t.check(await lastBot(p).locator('.wg-action', { hasText: 'Lihat harga' }).count() === 1, 'pricing answer links to the pricing section')
 
   // A question the knowledge base cannot answer outright goes to the (simulated) public AI.

@@ -191,10 +191,14 @@ body.has-waguri:has(.wiz-foot) .wg { bottom: calc(var(--wg-gap) + 64px); }
 .wg-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .wg-skills {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   padding: 10px 12px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
 }
+.wg-skills::-webkit-scrollbar { display: none; }
 .wg-skill {
   flex: none;
   display: inline-flex;
@@ -238,7 +242,21 @@ body.has-waguri:has(.wiz-foot) .wg { bottom: calc(var(--wg-gap) + 64px); }
 }
 .is-bot .wg-bubble { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 6px; color: var(--text); box-shadow: var(--shadow-xs); }
 .is-user .wg-bubble { background: var(--brand); color: var(--text-on-brand); border-bottom-right-radius: 6px; white-space: pre-line; }
-.wg-text { white-space: pre-line; }
+.wg-text { white-space: normal; }
+.wg-text > * { margin: 0; }
+.wg-text > * + * { margin-top: 8px; }
+.wg-text ul, .wg-text ol { padding-left: 18px; display: grid; gap: 4px; }
+.wg-text li::marker { color: var(--brand-500); }
+.wg-text strong { font-weight: 700; }
+.wg-plans { display: grid; gap: 8px; margin-top: 10px; }
+.wg-plan { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2); }
+.wg-plan-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.wg-plan-name { font-size: var(--fs-sm); }
+.wg-plan-price { font-weight: 700; color: var(--brand-600); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wg-plan-price small { font-weight: 500; color: var(--text-muted); font-size: var(--fs-xs); }
+.wg-plan-tag { margin: 4px 0 0; font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.45; }
+.wg-plan-list { margin: 6px 0 0; padding-left: 16px; display: grid; gap: 2px; font-size: var(--fs-xs); color: var(--text-2); line-height: 1.45; }
+.wg-plan-list li::marker { color: var(--brand-500); }
 .wg-msg-note { margin-top: 8px; font-size: var(--fs-xs); color: var(--warning); }
 
 .wg-dots { display: inline-flex; gap: 4px; padding: 4px 2px; }

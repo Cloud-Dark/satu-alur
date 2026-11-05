@@ -139,7 +139,7 @@ export function normalize(s) {
 export const tokens = (s, stop = STOP) => normalize(s).split(' ').filter((t) => t.length > 1 && !stop.has(t))
 
 /** Pricing text from live plans (worker/business.js shape) or the landing's draft tiers. */
-export function pricingText(plans) {
+export function pricingRows(plans) {
   const live = Array.isArray(plans) && plans.length > 0
   const rows = live
     ? plans.map((p) => {
@@ -149,6 +149,11 @@ export function pricingText(plans) {
       return { name: p.name, price, period, tagline: p.tagline || '', limits, features: (p.features || []).slice(0, 4) }
     })
     : PRICING_TIERS.map((t) => ({ name: t.name, price: t.price, period: t.period, tagline: t.tagline, limits: t.limits.map((l) => `${l.label} ${l.value}`), features: t.features }))
+  return { live, rows }
+}
+
+export function pricingText(plans) {
+  const { live, rows } = pricingRows(plans)
   const lines = rows.map((r) => `• ${r.name}: ${r.price}${r.period ? ` (${r.period})` : ''}${r.tagline ? ` — ${r.tagline}` : ''}${r.limits.length ? ` ${r.limits.join(', ')}.` : ''}${r.features.length ? ` Termasuk: ${r.features.join(', ')}.` : ''}`)
   return [`Paket Satu Alur${live ? '' : ` (${PRICING_NOTE.toLowerCase()})`}:`, ...lines, 'Pindah paket kapan saja; detail lengkap ada di bagian Harga.'].join('\n')
 }
