@@ -369,7 +369,7 @@
 
 .zw-streams {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: var(--s-4);
   margin: var(--s-4) 0 var(--s-6);
 }
@@ -384,6 +384,8 @@
   display: grid;
   gap: var(--s-3);
   align-content: start;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .zw-stream[data-tone='ok'] { border-left-color: var(--success); }
@@ -393,8 +395,11 @@
 .zw-stream-head {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   gap: var(--s-2);
 }
+/* The verdict chip sits on its own line under the name (labels like "Belum ada data pendapatan" are long). */
+.zw-stream-head > .tag { flex-shrink: 1; max-width: calc(100% - 40px); margin-left: 40px; white-space: normal; }
 
 .zw-stream-ico {
   display: grid;
@@ -413,7 +418,7 @@
   display: grid;
   gap: 1px;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 calc(100% - 40px);
 }
 
 .zw-stream-name {
@@ -428,6 +433,7 @@
 
 .zw-stream-money {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: var(--s-2);
 }
@@ -463,7 +469,8 @@
 .zw-stream-foot {
   display: flex;
   justify-content: space-between;
-  gap: var(--s-2);
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-2);
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
@@ -823,3 +830,9 @@
   .pd-filters { width: 100%; }
   .pd-filter { flex: 1 1 140px; }
 }
+
+/* Layanan tambahan / Tanpa limbah: the tabs and the page action share one header row. */
+.view-vas > .page-head,
+.view-zero-waste > .page-head { justify-content: space-between; }
+.view-vas > .page-head > .workspace-tabs,
+.view-zero-waste > .page-head > .workspace-tabs { margin-bottom: 0; }

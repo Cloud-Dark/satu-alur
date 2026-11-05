@@ -88,13 +88,13 @@ export async function render(container, ctx = {}) {
   })
   tabs.classList.add('workspace-tabs')
 
-  container.replaceChildren(
-    C.pageHeader({
-      title: 'Bebas limbah', em: 'limbah',
-      actions: C.button({ label: 'Catat temuan', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
-    }),
-    tabs, status, host,
-  )
+  const head = C.pageHeader({
+    title: 'Bebas limbah', em: 'limbah',
+    actions: C.button({ label: 'Catat temuan', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
+  })
+  // The tabs share the header row with the page action (one row instead of two).
+  head.insertBefore(tabs, head.querySelector('.page-head-actions'))
+  container.replaceChildren(head, status, host)
 
   const revenue = () => (model?.ledger || [])
     .filter((l) => l.category === 'pendapatan')

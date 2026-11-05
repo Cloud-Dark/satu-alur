@@ -18,6 +18,10 @@
 /* Other bottom-right fixed elements stack above the FAB. */
 body.has-waguri .lp-totop { bottom: calc(20px + 56px + 12px); }
 body.has-waguri .toast-stack { bottom: calc(20px + 56px + 12px); }
+/* Page bottoms scroll clear of the FAB, so the last buttons and footer lines are never under it. */
+body.has-waguri .stage-host { padding-bottom: calc(20px + 56px + var(--s-8)); }
+body.has-waguri .lp-footer { padding-bottom: calc(20px + 56px + 24px); }
+body.has-waguri .auth-foot { padding-right: 210px; }
 /* A sticky wizard footer (Penawaran) keeps its buttons clear of the FAB. */
 body.has-waguri:has(.wiz-foot) .wg { bottom: calc(var(--wg-gap) + 64px); }
 
@@ -400,6 +404,7 @@ body.has-waguri:has(.wiz-foot) .wg { bottom: calc(var(--wg-gap) + 64px); }
 @media (max-width: 640px) {
   .wg { --wg-gap: 14px; --wg-fab-h: 52px; }
   body.has-waguri .lp-totop { bottom: calc(14px + 52px + 10px); }
+  body.has-waguri .auth-foot { padding-right: 10px; padding-bottom: calc(14px + 52px + 12px); }
   .wg-fab { padding-right: 16px; font-size: 0.9rem; }
   .wg-fab-ava, .wg-fab-x { width: 40px; height: 40px; }
   .wg.is-open .wg-fab { display: none; }
