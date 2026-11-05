@@ -139,7 +139,8 @@ module.exports = async function waguri(t) {
   await m.waitForSelector(FAB, { timeout: 15000 })
   await m.click(FAB)
   await m.waitForSelector(`${PANEL}:not([hidden])`)
-  await m.waitForTimeout(400) // open transition
+  // Wait for the open transition to settle (it can run slower under load).
+  await m.waitForFunction((sel) => { const r = document.querySelector(sel)?.getBoundingClientRect(); return r && Math.abs(r.x) < 0.01 && Math.round(r.width) === 390 }, PANEL, { timeout: 3000 }).catch(() => {})
   const box = await m.locator(PANEL).boundingBox()
   t.check(box && Math.round(box.width) === 390 && box.x === 0, 'phone: panel is a full-width sheet', JSON.stringify(box))
   t.check(await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'phone: no horizontal scroll')

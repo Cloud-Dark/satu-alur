@@ -190,6 +190,24 @@ test('ai: OpenAI-compatible SSE passes content through', async () => {
   assert.equal((out.match(/\[DONE\]/g) || []).length, 1)
 })
 
+test('ai: provider replies that end without text never stream back empty', async () => {
+  // Non-streamed JSON body (provider ignored stream: true)
+  const whole = await collect(sseSource('{"choices":[{"message":{"content":"{\\"price\\":1}"},"finish_reason":"stop"}]}').pipeThrough(openAiToAppStream()))
+  assert.match(whole, /"content":"\{\\"price\\":1\}"/)
+  assert.doesNotMatch(whole, /"error"/)
+  // Content as an array of parts
+  const parts = await collect(sseSource('data: {"choices":[{"delta":{"content":[{"type":"text","text":"Hai"}]}}]}\n\ndata: [DONE]\n\n').pipeThrough(openAiToAppStream()))
+  assert.match(parts, /"content":"Hai"/)
+  // Reasoning only, then cut off: a clear error instead of an empty answer
+  const think = await collect(sseSource('data: {"choices":[{"delta":{"reasoning_content":"hmm"}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n').pipeThrough(openAiToAppStream()))
+  assert.match(think, /kehabisan token/)
+  assert.doesNotMatch(think, /hmm/)
+  // Nothing at all
+  const empty = await collect(sseSource('data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n').pipeThrough(openAiToAppStream()))
+  assert.match(empty, /tidak mengembalikan jawaban/)
+  assert.equal((empty.match(/\[DONE\]/g) || []).length, 1)
+})
+
 test('ai: request builders (system merge, JSON instruction, headers)', () => {
   const a = anthropicRequest({
     baseUrl: 'https://api.anthropic.com', apiKey: 'k', model: 'claude-x', json: true, schema: { type: 'object' },
