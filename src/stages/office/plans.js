@@ -2,7 +2,7 @@ import '../../styles/landing.css'
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import { adminListPlans, adminCreatePlan, adminUpdatePlan, adminReorderPlans } from '../../business/api.js'
-import { validatePlan, formatPrice } from '../../business/plan-rules.js'
+import { validatePlan, formatPrice, priceFromText } from '../../business/plan-rules.js'
 import { renderPlanCard } from '../../business/plan-card.js'
 import { PRICING_TIERS } from '../../landing/pricing.js'
 import { stampLine } from './site-landing.js'
@@ -14,17 +14,13 @@ const PERIOD_OPTIONS = [{ value: 'month', label: 'Per bulan' }, { value: 'year',
 const CTA_OPTIONS = [{ value: 'signup', label: 'Daftar / masuk' }, { value: 'contact', label: 'Hubungi kami' }]
 let seq = 0
 
-// 'Rp0' -> 0, 'Rp349rb' -> 349000, 'Kustom' -> null.
-function priceFromText(s) {
-  const m = /(\d+)\s*(rb)?/i.exec(s)
-  return m ? Number(m[1]) * (m[2] ? 1000 : 1) : null
-}
-
 const fromTier = (t, i) => {
   const price_idr = priceFromText(t.price)
   return {
     slug: t.id, name: t.name, tagline: t.tagline, price_idr, period: price_idr === null ? 'custom' : 'month', period_label: t.period,
     recommended: t.recommended ? 1 : 0, badge: t.badge || '', limits: t.limits, features: t.features,
+    // Built-in tiers without a quota fall back to the Free numbers (limitFor); Enterprise brings its own.
+    ...(t.quota ? { quota: t.quota } : {}),
     cta_label: t.cta.label, cta_kind: t.cta.href ? 'signup' : 'contact', sort: i + 1, active: 1,
   }
 }
@@ -40,7 +36,7 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   const period = C.select({ label: 'Periode', id: `of-pl-period-${id}`, options: PERIOD_OPTIONS, value: v.period })
   const periodLabel = f('Label periode', 'period_label', { hint: 'Opsional; menggantikan akhiran periode, mis. "Gratis 3 bulan".', attrs: { maxlength: '40' } })
   const rec = C.choiceGroup({ legend: 'Rekomendasi', name: `of-pl-rec-${id}`, options: [{ value: 'on', label: 'Tandai sebagai paket rekomendasi', checked: Boolean(v.recommended), hint: 'Paket lain kehilangan tanda ini.' }] })
-  const badge = f('Badge', 'badge', { hint: 'Kosong berarti "Rekomendasi".', attrs: { maxlength: '30' } })
+  const badge = f('Badge', 'badge', { hint: 'Tampil di kartu. Pada paket rekomendasi, kosong berarti "Rekomendasi".', attrs: { maxlength: '30' } })
   const ctaLabel = f('Teks tombol', 'cta_label', { required: true, attrs: { maxlength: '30' } })
   const ctaKind = C.select({ label: 'Tujuan tombol', id: `of-pl-cta-${id}`, options: CTA_OPTIONS, value: v.cta_kind })
   const act = C.choiceGroup({ legend: 'Status', name: `of-pl-act-${id}`, options: [{ value: 'on', label: 'Aktif (tampil di landing page)', checked: v.active !== 0 }] })

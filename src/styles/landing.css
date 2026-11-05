@@ -1290,6 +1290,9 @@ html.lp-lock { overflow: hidden; }
 .lp-tier-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-top: 28px; }
 .lp-price { font-size: clamp(2.75rem, 2rem + 1.6vw, 3.5rem); line-height: 1; letter-spacing: -0.02em; }
 .lp-period { font-size: var(--fs-sm); color: var(--text-muted); font-weight: 500; }
+/* Seven-digit prices (Rp3.512.172) would overflow a narrow card at the full display size. */
+.lp-price.is-long { font-size: clamp(2rem, 1.6rem + 0.9vw, 2.5rem); }
+.lp-tier-pill { flex-shrink: 0; white-space: nowrap; }
 .lp-tier-limits { margin: 24px 0 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
 .lp-tier-limits div { display: flex; justify-content: space-between; gap: 12px; font-size: var(--fs-sm); }
 .lp-tier-limits dt { color: var(--text-muted); }
@@ -1326,6 +1329,19 @@ html.lp-lock { overflow: hidden; }
 .lp-tier.is-recommended .lp-tick { background: rgba(255, 255, 255, 0.1); border-color: var(--lp-on-deep-line); color: var(--accent); }
 .lp-tier-badge { background: var(--accent); color: var(--text-on-accent); border-color: var(--accent); }
 :root[data-theme='dark'] .lp-tier-badge { color: var(--text-on-accent); }
+
+/* auto-fit counts columns at the 380px maximum, so three or four plans would wrap to 2+1 / 2+2 on a
+   1200px container. On wide landing screens put them on one row; the in-app Paket & kuota panel keeps auto-fit. */
+@media (min-width: 1024px) {
+  .lp-tiers:not(.qt-tiers):has(> .lp-tier:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 380px)); }
+}
+@media (min-width: 1200px) {
+  .lp-tiers:not(.qt-tiers):has(> .lp-tier:nth-child(4)) { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .lp-tiers:not(.qt-tiers):has(> .lp-tier:nth-child(4)) .lp-tier { padding: 26px 22px 24px; }
+  .lp-tiers:not(.qt-tiers):has(> .lp-tier:nth-child(4)) .lp-tier-limits dt { white-space: nowrap; }
+  .lp-tiers:not(.qt-tiers):has(> .lp-tier:nth-child(4)) .lp-price { font-size: clamp(2.25rem, 1.8rem + 1vw, 2.75rem); }
+  .lp-tiers:not(.qt-tiers):has(> .lp-tier:nth-child(4)) .lp-price.is-long { font-size: clamp(1.9rem, 1.5rem + 0.8vw, 2.25rem); }
+}
 
 @media (max-width: 1023px) {
   .lp-tiers { grid-template-columns: minmax(0, 1fr); max-width: 480px; margin-left: auto; margin-right: auto; }

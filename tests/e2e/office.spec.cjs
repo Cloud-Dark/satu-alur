@@ -245,6 +245,8 @@ module.exports = async function office(t) {
   await p.getByRole('button', { name: 'Impor paket dari landing saat ini' }).click()
   await p.locator('.of-plan').nth(2).waitFor({ timeout: 8000 })
   t.check(await p.locator('.of-plan').count() === 3 && await p.getByRole('button', { name: 'Impor paket dari landing saat ini' }).count() === 0, 'import creates the three default plans and the offer goes away')
+  const entPlan = await p.evaluate(() => JSON.parse(localStorage.getItem('satualur_business_demo_v1')).plans.find((x) => x.slug === 'enterprise'))
+  t.check(entPlan?.price_idr === 3512172 && entPlan.period === 'month' && entPlan.cta_kind === 'contact' && entPlan.quota?.advisor === 2500 && /Rp3\.512\.172/.test(await p.locator('.of-plan', { hasText: 'Enterprise' }).textContent()), 'imported Enterprise: Rp3.512.172 per bulan, contact CTA, its own AI quota', JSON.stringify(entPlan))
   const plan = (n) => p.locator('.of-plan', { hasText: n })
   t.check(await plan('UKM').locator('.tag', { hasText: 'Rekomendasi' }).count() === 1, 'UKM is tagged Rekomendasi')
   // unsaved plan edits: Escape asks first

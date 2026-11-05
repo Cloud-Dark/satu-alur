@@ -8,6 +8,8 @@
  * cta.variant: 'primary' | 'accent' | 'soft' (kelas tombol design system v2).
  */
 
+import { ENTERPRISE_PLAN, formatPrice } from '../business/plan-rules.js'
+
 export const PRICING_NOTE = 'Harga draf — dapat berubah.'
 
 export const PRICING_TIERS = [
@@ -50,22 +52,25 @@ export const PRICING_TIERS = [
     cta: { label: 'Pilih UKM', href: '#/masuk', variant: 'accent' },
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    tagline: 'Untuk operasi jasa berskala besar.',
-    price: 'Kustom',
-    period: 'Hubungi kami',
+    // Same numbers and wording as the Enterprise paket in the database (ENTERPRISE_PLAN).
+    id: ENTERPRISE_PLAN.slug,
+    name: ENTERPRISE_PLAN.name,
+    tagline: ENTERPRISE_PLAN.tagline,
+    price: formatPrice(ENTERPRISE_PLAN).price,
+    period: formatPrice(ENTERPRISE_PLAN).period,
     recommended: false,
+    badge: ENTERPRISE_PLAN.badge,
     limits: [
       { label: 'Transaksi', value: 'Tanpa batas' },
       { label: 'Pengguna', value: 'Tanpa batas' },
     ],
     features: [
-      'Forecasting & model data kustom',
-      'SSO & integrasi sistem internal',
-      'SLA & pendampingan implementasi',
+      'Semua fitur UKM',
+      ...ENTERPRISE_PLAN.features.filter((f) => /^(NDA|SLA)/.test(f)),
+      'Integrasi ERP & migrasi data',
     ],
+    quota: ENTERPRISE_PLAN.quota,
     // href null = contact CTA: the landing links it to #/kontak and the plan importer saves it as cta_kind 'contact'.
-    cta: { label: 'Hubungi kami', href: null, variant: 'primary' },
+    cta: { label: ENTERPRISE_PLAN.cta_label, href: null, variant: 'primary' },
   },
 ]

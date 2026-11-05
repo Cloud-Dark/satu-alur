@@ -36,6 +36,10 @@ module.exports = async function landing(t) {
 
   const pricing = await p.textContent('#harga')
   t.check(/Sole Trader/.test(pricing) && /UKM/.test(pricing) && /Enterprise/.test(pricing), 'pricing shows Sole Trader, UKM, Enterprise')
+  const ent = p.locator('#harga .lp-tier', { has: p.locator('.lp-tier-name', { hasText: 'Enterprise' }) })
+  const entText = (await ent.textContent()).replace(/\s+/g, ' ')
+  t.check(/Rp3\.512\.172/.test(entText) && /per bulan/.test(entText) && /NDA \+ SLA/.test(entText) && /NDA: perjanjian kerahasiaan/.test(entText) && /SLA respons dukungan/.test(entText), 'Enterprise card: Rp3.512.172 per bulan, NDA + SLA highlighted', entText)
+  t.check(await ent.locator('.lp-tier-cta').getAttribute('href') === '#/kontak' && /Hubungi kami/.test(await ent.locator('.lp-tier-cta').textContent()), 'Enterprise CTA is "Hubungi kami" to the contact page')
 
   // anchor scroll keeps the hash router route
   await p.click('.lp-nav a[data-scroll="harga"]')

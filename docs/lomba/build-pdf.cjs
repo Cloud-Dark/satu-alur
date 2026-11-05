@@ -330,10 +330,10 @@ pages.push(page(`
   <div class="grid g3" style="align-items:stretch">
     ${plan('Free', 'Rp0', '', 'Seluruh alur kerja dengan kuota percobaan AI.', ['Enam tahap alur kerja', 'Kuota AI percobaan per fitur', 'Akses semua menu'])}
     ${plan('Lite', 'Rp99rb', '/ bulan', 'Untuk tim kecil yang mulai rutin memakai AI.', ['Kuota AI lebih besar', 'Radar & prospek lebih sering', 'Penasihat AI harian'])}
-    ${plan('Pro', 'Rp249rb', '/ bulan', 'Untuk usaha yang tumbuh dengan data.', ['Kuota AI terbesar', 'Fitur pertumbuhan penuh', 'Prioritas dukungan'], true)}
+    ${plan('Pro', 'Rp249rb', '/ bulan', 'Untuk usaha yang tumbuh dengan data.', ['Kuota AI besar', 'Fitur pertumbuhan penuh', 'Prioritas dukungan'], true)}
   </div>
   <div class="card tint" style="margin-top:5mm;display:flex;justify-content:space-between;align-items:center">
-    <div><h4>Enterprise</h4><p class="muted">Konektor ERP, migrasi data, dan dukungan khusus.</p></div><span class="tag green">Hubungi kami</span>
+    <div><h4>Enterprise · Rp3.512.172 / bulan</h4><p class="muted">Semua fitur Pro, ditambah NDA (perjanjian kerahasiaan) dan SLA: uptime 99,9%, respons dukungan maks. 4 jam kerja.</p></div><span class="tag green">Hubungi kami</span>
   </div>
   <div class="fill"></div>
   <div class="grid g3">

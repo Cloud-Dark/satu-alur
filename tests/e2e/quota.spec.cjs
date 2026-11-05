@@ -9,9 +9,11 @@ const VOUCHERS = {
     { id: 2, code: 'SATU-E2E-OLD', type: 'credit', plan_id: null, plan_days: null, credit_idr: 5000, max_redemptions: null, redeemed_count: 0, expires_on: '2020-01-01', active: 1, note: '', created_at: '2026-10-30T00:00:00.000Z' },
   ],
 }
-const PLANS = { next: 3, plans: [
+const PLANS = { next: 4, plans: [
   { id: 1, slug: 'free', name: 'Free', price_idr: 0, period: 'month', period_label: '', recommended: 0, badge: '', limits: [], features: [], quota: { offer: 10, report: 10, leads: 10, radar: 10, advisor: 5, social: 10 }, cta_label: 'Mulai', cta_kind: 'signup', sort: 1, active: 1 },
   { id: 2, slug: 'lite', name: 'Lite', price_idr: 99000, period: 'month', period_label: '', recommended: 1, badge: '', limits: [], features: [], quota: { offer: 50, report: 20, leads: 20, radar: 30, advisor: 2, social: 60 }, cta_label: 'Pilih Lite', cta_kind: 'signup', sort: 2, active: 1 },
+  // Same shape as ENTERPRISE_PLAN (src/business/plan-rules.js): contract plan, so the button is "Hubungi kami".
+  { id: 3, slug: 'enterprise', name: 'Enterprise', tagline: 'Untuk operasi jasa berskala besar.', price_idr: 3512172, period: 'month', period_label: 'per bulan', recommended: 0, badge: 'NDA + SLA', limits: [{ label: 'Pengguna', value: 'Tanpa batas' }], features: ['Semua fitur Pro', 'NDA: perjanjian kerahasiaan untuk data usaha Anda', 'SLA uptime layanan 99,9% per bulan'], quota: { offer: null, report: null, leads: 500, radar: null, advisor: 2500, social: null, income: null }, cta_label: 'Hubungi kami', cta_kind: 'contact', sort: 3, active: 1 },
 ] }
 
 module.exports = async function quota(t) {
@@ -28,7 +30,13 @@ module.exports = async function quota(t) {
   t.check(rows.length === 7 && rows.some((r) => /Penawaran AI.*0 \/ 10 draf/.test(r)) && rows.some((r) => /Penasihat AI.*0 \/ 5 pesan/.test(r)) && rows.some((r) => /Optimasi pendapatan.*0 \/ 10/.test(r)), 'Free trial quota: seven features, 10 each, advisor 5', rows.join(' | '))
   t.check(/Skala akun: .*Skala akun tidak mengubah kuota AI/.test(await p.textContent('.qt-tier')), 'quota page separates the business scale from the paket')
   t.check(/Free/.test(await p.locator('.qt-plan-name').textContent()) && /Rp0/.test(await p.locator('.qt-credit').textContent()), 'starts on Free with Rp0 AI credit')
-  t.check(await p.locator('.lp-tier').count() === 2, 'the active plans are listed on the page')
+  t.check(await p.locator('.lp-tier').count() === 3, 'the active plans are listed on the page')
+  const ent = p.locator('.lp-tier', { has: p.locator('.lp-tier-name', { hasText: 'Enterprise' }) })
+  const entText = (await ent.textContent()).replace(/\s+/g, ' ')
+  t.check(/Rp3\.512\.172/.test(entText) && /per bulan/.test(entText) && /NDA \+ SLA/.test(entText) && /NDA: perjanjian kerahasiaan/.test(entText) && /SLA uptime/.test(entText), 'Enterprise card: Rp3.512.172 per bulan with the NDA + SLA badge and features', entText)
+  t.check(await ent.getByRole('link', { name: 'Hubungi kami' }).getAttribute('href') === '#/kontak', 'Enterprise card asks to contact us')
+  const fits = await ent.locator('.lp-price').evaluate((n) => n.scrollWidth <= n.closest('.lp-tier').clientWidth)
+  t.check(fits, 'the seven-digit Enterprise price fits inside its card')
 
   const redeem = async (code) => {
     await p.fill('#qt-voucher-code', code)
