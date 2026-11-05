@@ -91,7 +91,7 @@ module.exports = async function offerFlow(t) {
 
   /* ---- 02 Penawaran: template, pipeline, review ---- */
   t.check(await step() === 'compose', 'offer opens on the AI step')
-  await p.getByRole('button', { name: 'Kembali' }).click()
+  await p.getByRole('button', { name: 'Kembali', exact: true }).click()
   await p.waitForTimeout(400)
   t.check(await step() === 'pick', 'back to step 1 to choose a template')
   await p.getByRole('combobox', { name: 'Template penawaran' }).click()

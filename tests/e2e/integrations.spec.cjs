@@ -8,7 +8,7 @@ module.exports = async function integrations(t) {
   await loginLive(p, t.base)
 
   /* ---------------------------------------------------------------- WhatsApp */
-  t.check(await goStage(p, 'request'), 'sidebar has "Permintaan"')
+  t.check(await goStage(p, 'request'), 'Alur kerja opens "Permintaan"')
   await p.waitForSelector('.view table', { timeout: 10000 })
   const waBtn = p.getByRole('button', { name: /via WhatsApp$/ }).first()
   t.check(await waBtn.count() === 1, 'request list offers "WhatsApp" for a customer with a phone')

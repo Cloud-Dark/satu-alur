@@ -60,7 +60,7 @@ module.exports = async function opsInvoice(t) {
   await dlg.locator('.progress-opt', { hasText: 'Selesai' }).click()
   await dlg.getByRole('button', { name: 'Simpan progres' }).click()
   await p.waitForTimeout(800)
-  const cur = await p.evaluate(() => ({ stage: document.querySelector('.flow-item[aria-current="page"]')?.dataset.stage, dlg: !!document.querySelector('dialog[open]'), err: document.querySelector('dialog[open] .field-error')?.textContent }))
+  const cur = await p.evaluate(() => ({ stage: document.querySelector('.crumb-title')?.textContent === 'Penyelesaian' && document.querySelector('.flow-item[aria-current="page"]')?.dataset.stage === 'workflow' ? 'complete' : document.querySelector('.crumb-title')?.textContent, dlg: !!document.querySelector('dialog[open]'), err: document.querySelector('dialog[open] .field-error')?.textContent }))
   t.check(cur.stage === 'complete', 'progress: Selesai opens Penyelesaian', JSON.stringify(cur))
   const before = ((await mockState(p)).completions || []).length
   await p.getByRole('button', { name: 'Tandai selesai' }).first().click()

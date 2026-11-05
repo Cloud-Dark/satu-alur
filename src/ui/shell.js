@@ -13,6 +13,7 @@ import { loadFlow } from '../stages/data.js'
 import { setOwner as setAiOwner } from '../ai/superpowers.js'
 
 import * as StageDashboard from '../stages/dashboard.js'
+import * as StageWorkflow from '../stages/workflow.js'
 import * as StageRequest from '../stages/request.js'
 import * as StageOffer from '../stages/offer.js'
 import * as StageAssign from '../stages/assign.js'
@@ -37,23 +38,29 @@ import { mountUpsell } from '../quota/upsell.js'
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home',
     hint: 'Ringkasan alur kerja dan keuangan, dihitung langsung dari data Anda.', module: StageDashboard,
+    action: { label: 'Alur kerja', iconRight: 'arrowRight', to: 'workflow', primary: true } },
+  // One menu for the whole job flow: a table with one row per job. The five stage
+  // pages below are opened from that table (parent: 'workflow') and stay out of the sidebar.
+  { key: 'workflow', group: 'main', label: 'Alur kerja', sub: 'Semua pekerjaan', icon: 'activity',
+    hint: 'Satu baris untuk satu pekerjaan pelanggan, dari permintaan sampai pembukuan. Kolom Posisi menunjukkan sudah sampai mana; tombol Langkah berikutnya membuka tahap yang perlu dikerjakan.',
+    module: StageWorkflow,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request', primary: true } },
-  { key: 'request', num: '01', label: 'Permintaan', icon: 'inbox',
+  { key: 'request', parent: 'workflow', num: '01', label: 'Permintaan', icon: 'inbox',
     hint: 'Catat kebutuhan pelanggan. Statusnya ikut bergerak sesuai tahap alur.', module: StageRequest,
     action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'offer', num: '02', label: 'Penawaran', icon: 'sparkles',
+  { key: 'offer', parent: 'workflow', num: '02', label: 'Penawaran', icon: 'sparkles',
     hint: 'AI menyusun ruang lingkup dan harga, lalu aturan bisnis memeriksanya sebelum disimpan.', module: StageOffer,
     action: { label: 'Ke penugasan', iconRight: 'arrowRight', to: 'assign' } },
-  { key: 'assign', num: '03', label: 'Penugasan', icon: 'users',
+  { key: 'assign', parent: 'workflow', num: '03', label: 'Penugasan', icon: 'users',
     hint: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.', module: StageAssign,
     action: { label: 'Ke penyelesaian', iconRight: 'arrowRight', to: 'complete' } },
-  { key: 'complete', num: '04', label: 'Penyelesaian', icon: 'checkCircle',
+  { key: 'complete', parent: 'workflow', num: '04', label: 'Penyelesaian', icon: 'checkCircle',
     hint: 'Tutup penugasan yang sudah dikerjakan agar siap dibukukan.', module: StageComplete,
     action: { label: 'Ke pembukuan', iconRight: 'arrowRight', to: 'bookkeeping' } },
-  { key: 'bookkeeping', num: '05', label: 'Pembukuan', icon: 'ledger',
+  { key: 'bookkeeping', parent: 'workflow', num: '05', label: 'Pembukuan', icon: 'ledger',
     hint: 'Catat pendapatan dan biaya tiap pekerjaan. Saldo dihitung berjalan.', module: StageBookkeeping,
     action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
-  { key: 'report', num: '06', label: 'Laporan', icon: 'chart',
+  { key: 'report', group: 'main', label: 'Laporan', sub: 'Untung & rugi', icon: 'chart',
     hint: 'Angka periode terpilih dari buku besar, plus penjelasan AI.', module: StageReport,
     action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
   { key: 'invoice', group: 'income', label: 'Invoice', sub: 'Tagihan pelanggan', icon: 'receipt',
@@ -193,7 +200,7 @@ export function renderShell(root, ctx) {
   })
 
   const [dash, ...rest] = stages
-  const flow = rest.filter((s) => !s.group)
+  const main = rest.filter((s) => s.group === 'main')
   const income = rest.filter((s) => s.group === 'income')
   const growth = rest.filter((s) => s.group === 'growth')
   const help = rest.filter((s) => s.group === 'help')
@@ -202,9 +209,7 @@ export function renderShell(root, ctx) {
       el('div', { className: 'side-label' }, el('span', {}, g.title)),
       el('ol', { className: 'flow-list' }, stages.filter((s) => s.group === g.title).map(navItem))])
     : [
-      el('ol', { className: 'flow-list flow-list-top' }, navItem(dash)),
-      el('div', { className: 'side-label' }, el('span', {}, 'Alur kerja'), el('span', { className: 'side-label-count tnum' }, '6 tahap')),
-      el('ol', { className: 'flow-list flow-list-stages' }, flow.map(navItem)),
+      el('ol', { className: 'flow-list flow-list-top' }, navItem(dash), main.map(navItem)),
       el('div', { className: 'side-label' }, el('span', {}, 'Pendapatan'), el('span', { className: 'side-label-count tnum' }, '2 cara')),
       el('ol', { className: 'flow-list flow-list-income' }, income.map(navItem)),
       el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
@@ -397,6 +402,7 @@ export function renderShell(root, ctx) {
         complete: m.activeAssignments().length,
         bookkeeping: m.completionsWithoutLedger().length,
       }
+      if (!staff) pending.workflow = pending.offer + pending.assign + pending.complete + pending.bookkeeping
       if (seq !== countsSeq) return
       for (const [k, countEl] of navCounts) {
         const n = pending[k] || 0
@@ -418,11 +424,12 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    const groupLabel = { income: 'Pendapatan', growth: 'Pertumbuhan', help: 'Satu Alur' }[stage.group]
-    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' ? 'Satu Alur' : groupLabel || `Tahap ${stage.num}`
+    const groupLabel = { main: 'Satu Alur', income: 'Pendapatan', growth: 'Pertumbuhan', help: 'Satu Alur' }[stage.group]
+    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' ? 'Satu Alur' : stage.parent ? 'Alur kerja' : groupLabel || 'Satu Alur'
     crumbTitle.textContent = stage.label
     crumbTip.replaceChildren(stage.hint ? infoTip(stage.hint, { label: `Tentang ${stage.label}` }) : '')
-    const a = stage.action
+    // A stage page opened from the Alur kerja table leads back to it.
+    const a = stage.parent ? { label: 'Kembali ke alur kerja', icon: 'arrowLeft', to: stage.parent } : stage.action
     if (!a) { actionSlot.replaceChildren(); return }
     const b = button({
       label: a.label, icon: a.icon, iconRight: a.iconRight, size: 'sm',
@@ -444,8 +451,9 @@ export function renderShell(root, ctx) {
     current = stage.key
     store.set(sessionStorage, storeKey, stage.key)
 
+    const navKey = stage.parent || stage.key
     for (const [k, b] of navButtons) {
-      const active = k === stage.key
+      const active = k === navKey
       b.classList.toggle('is-active', active)
       if (active) b.setAttribute('aria-current', 'page')
       else b.removeAttribute('aria-current')

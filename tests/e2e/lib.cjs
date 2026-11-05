@@ -12,7 +12,7 @@
 const path = require('path')
 
 const STAGE_LABELS = {
-  dashboard: 'Ringkasan', request: 'Permintaan', offer: 'Penawaran', assign: 'Penugasan',
+  dashboard: 'Ringkasan', workflow: 'Alur kerja', request: 'Permintaan', offer: 'Penawaran', assign: 'Penugasan',
   complete: 'Penyelesaian', bookkeeping: 'Pembukuan', report: 'Laporan',
   'social-media': 'Media Sosial', advisor: 'Penasihat AI', radar: 'Radar peluang', leads: 'Pencari prospek',
 }
@@ -94,7 +94,19 @@ async function waitDashboard(page) {
 const isMobile = (page) => (page.viewportSize()?.width || 1440) < 1024
 
 /** Opens a stage from the sidebar (opens the drawer menu first on small screens). */
+// Stage pages opened from the "Alur kerja" table, not from the sidebar.
+const WORKFLOW_STAGES = new Set(['request', 'offer', 'assign', 'complete', 'bookkeeping'])
+
 async function goStage(page, key) {
+  if (WORKFLOW_STAGES.has(key)) {
+    if (!(await goStage(page, 'workflow'))) return false
+    const link = page.locator(`.wf-stage-link[data-stage="${key}"]`)
+    await link.waitFor({ timeout: 8000 }).catch(() => {})
+    if (!(await link.count())) return false
+    await link.click()
+    await page.waitForTimeout(600)
+    return true
+  }
   const item = page.locator(`.flow-item[data-stage="${key}"]`)
   if (!(await item.count())) return false
   if (!(await item.first().isVisible())) {
@@ -123,4 +135,4 @@ async function kpiValue(page, label, scope = '.view') {
 
 const norm = (s) => String(s ?? '').replace(/\s+/g, ' ').trim()
 
-module.exports = { makeContext, loginLive, waitDashboard, goStage, kpiValue, isMobile, norm, STAGE_LABELS }
+module.exports = { makeContext, loginLive, waitDashboard, goStage, WORKFLOW_STAGES, kpiValue, isMobile, norm, STAGE_LABELS }

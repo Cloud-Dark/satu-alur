@@ -40,7 +40,7 @@ module.exports = async function dashboard(t) {
   // nav counter badges reflect queues; funnel row opens the stage
   await p.locator('.funnel-row').nth(1).click()
   await p.waitForTimeout(700)
-  t.check(await p.locator('.flow-item[data-stage="offer"][aria-current="page"], .flow-item[data-stage="offer"].is-active').count() === 1, 'funnel row opens Penawaran stage')
+  t.check(await p.locator('.flow-item[data-stage="workflow"][aria-current="page"]').count() === 1 && norm(await p.textContent('.crumb-title')) === 'Penawaran', 'funnel row opens Penawaran stage (under Alur kerja)')
   await goStage(p, 'dashboard')
   await t.noErrors(p)
 

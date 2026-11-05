@@ -19,7 +19,7 @@ module.exports = async function office(t) {
   await loginLive(u, t.base, 'pemilik@usaha.id')
   t.check(await u.locator('.flow-item[data-stage="office"]').count() === 0 && await u.locator('.flow-item[data-stage="landing"], .flow-item[data-stage="contact"]').count() === 0, 'regular user: no "Kantor Satu Alur" or office items in the menu')
   const bizNames = await u.locator('.side .flow-name').allTextContents()
-  t.check(bizNames.includes('Ringkasan') && bizNames.includes('Media Sosial') && bizNames.includes('Bantuan') && (await u.locator('.side-label > span:first-child').allTextContents()).join('|') === 'Alur kerja|Pendapatan|Pertumbuhan' && await u.getByRole('button', { name: 'Pengaturan' }).count() >= 1, 'business sidebar unchanged: Ringkasan, Media Sosial, Bantuan, Pengaturan, workflow/income/growth groups', bizNames.join())
+  t.check(bizNames.includes('Ringkasan') && bizNames.includes('Alur kerja') && bizNames.includes('Media Sosial') && bizNames.includes('Bantuan') && (await u.locator('.side-label > span:first-child').allTextContents()).join('|') === 'Pendapatan|Pertumbuhan' && await u.getByRole('button', { name: 'Pengaturan' }).count() >= 1, 'business sidebar unchanged: Ringkasan, Media Sosial, Bantuan, Pengaturan, workflow/income/growth groups', bizNames.join())
   await u.evaluate(() => sessionStorage.setItem('satualur_stage', 'office'))
   await u.goto(`${t.base}/#/app`)
   await u.waitForSelector('.app-shell')

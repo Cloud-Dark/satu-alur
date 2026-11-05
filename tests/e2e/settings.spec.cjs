@@ -106,13 +106,13 @@ module.exports = async function settings(t) {
   // mobile: sidebar is a drawer opened by the menu button
   const m = await t.page({ width: 390, height: 844 })
   await loginLive(m, t.base)
-  t.check(!(await m.isVisible('.flow-item[data-stage="request"]')), 'mobile: sidebar hidden by default')
+  t.check(!(await m.isVisible('.flow-item[data-stage="workflow"]')), 'mobile: sidebar hidden by default')
   await m.click('.topbar-menu')
   await m.waitForTimeout(400)
-  t.check(await m.isVisible('.flow-item[data-stage="request"]') && await m.getAttribute('.topbar-menu', 'aria-expanded') === 'true', 'mobile: menu button opens the sidebar')
+  t.check(await m.isVisible('.flow-item[data-stage="workflow"]') && await m.getAttribute('.topbar-menu', 'aria-expanded') === 'true', 'mobile: menu button opens the sidebar')
   await m.keyboard.press('Escape')
   await m.waitForTimeout(400)
-  t.check(!(await m.isVisible('.flow-item[data-stage="request"]')), 'mobile: Escape closes the sidebar')
+  t.check(!(await m.isVisible('.flow-item[data-stage="workflow"]')), 'mobile: Escape closes the sidebar')
   t.check(await m.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'mobile app: no horizontal scroll')
   await t.noErrors(m)
 }
