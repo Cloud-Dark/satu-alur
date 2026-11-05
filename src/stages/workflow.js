@@ -213,6 +213,8 @@ export async function render(container, ctx = {}) {
   }
 
   search.addEventListener('input', () => drawList())
+  // Opened with a search (e.g. from Waguri's "Buka di Alur kerja"): show that customer's rows.
+  if (ctx.params?.q) { search.value = String(ctx.params.q); filter = 'all' }
 
   async function load() {
     try {

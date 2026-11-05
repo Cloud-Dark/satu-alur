@@ -496,6 +496,17 @@ export function renderShell(root, ctx) {
   refreshCounts()
   // A used-up AI quota anywhere opens one upsell dialog (plans / voucher / contact).
   if (!staff) disposers.push(mountUpsell((to, p) => show(to, p, { focus: true })))
+  // "Tanya Waguri" floating assistant: reads this account's data and opens stages for it.
+  // Loaded after the first stage so it never delays the app; staff (office) sessions get none.
+  if (!staff) {
+    let unmountWaguri = null
+    let gone = false
+    import('../waguri/widget.js').then(({ mountWaguri }) => {
+      if (gone) return
+      unmountWaguri = mountWaguri({ mode: 'app', user, navigate: (to, p) => show(to, p, { focus: true }) })
+    }).catch((e) => console.warn('Waguri gagal dimuat:', e?.message))
+    disposers.push(() => { gone = true; unmountWaguri?.() })
+  }
 
   return () => {
     viewCtl?.abort()

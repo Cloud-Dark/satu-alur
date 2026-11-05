@@ -785,6 +785,23 @@ function leadMockAnswer(ctx) {
   ].join('\n')
 }
 
+// Waguri (src/waguri/skills.js buildMessages): answers from the BAHAN block only. A whole
+// knowledge base (## sections) is narrowed to the section sharing most words with the question.
+export function waguriMockAnswer(userText) {
+  const text = String(userText || '')
+  const bahan = (/BAHAN:\n([\s\S]*?)\n\nPERTANYAAN:/.exec(text)?.[1] || '').trim()
+  const question = (/PERTANYAAN:\n([\s\S]*)$/.exec(text)?.[1] || '').toLowerCase()
+  let answer = bahan
+  if (bahan.includes('## ')) {
+    const words = question.split(/[^a-z0-9]+/).filter((w) => w.length > 3)
+    const sections = bahan.split(/\n(?=## )/).map((s) => s.replace(/^## [^\n]*\n/, '').trim())
+    const score = (s) => words.filter((w) => s.toLowerCase().includes(w)).length
+    answer = sections.slice().sort((a, b) => score(b) - score(a))[0] || ''
+  }
+  if (!answer) answer = 'Maaf, saya belum punya informasi untuk pertanyaan itu. Coba tanyakan dengan kata lain.'
+  return `${answer}\n\n(Jawaban simulasi, tanpa model AI.)`
+}
+
 // The canned answer for a prompt (matched on its system/user text).
 export function simulateAnswer({ messages, response_format }) {
   const userMsg = [...messages].reverse().find(m => m.role === 'user')?.content || ''
@@ -796,6 +813,7 @@ export function simulateAnswer({ messages, response_format }) {
   }
   const agent = system.match(/\[agent:([\w-]+)\]/)?.[1]
   if (agent === 'social') return streamText(socialMockAnswer(lastUserText(messages), system))
+  if (agent === 'waguri') return streamText(waguriMockAnswer(lastUserText(messages)), { step: 8, delay: 10 })
   if (agent?.startsWith('tim-')) return streamText(teamMockAnswer(agent.slice(4), system))
   if (agent === 'pimpinan-optimasi') return streamText(leadMockAnswer(system))
   if (agent) return streamText(advisorMockAnswer(agent, lastUserText(messages), system))
