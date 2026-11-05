@@ -38,6 +38,8 @@ let currentIsAdmin = false
 let currentAdminVia = null // 'staff' | 'email' | null
 let cleanup = null
 let rootEl = null
+let waguri = null // { path, unmount } for the public pages' assistant
+let waguriSeq = 0
 
 const onStaffPath = () => location.pathname.replace(/\/+$/, '') === STAFF_PATH
 
@@ -108,9 +110,27 @@ function render() {
     },
   }
   cleanup = ROUTES[path](rootEl, ctx) || null
+  mountPublicWaguri(path)
   if (cleanup && typeof cleanup.then === 'function') {
     cleanup.then((fn) => { cleanup = fn || null })
   }
+}
+
+// "Tanya Waguri" on every public page (landing, masuk, tentang, kontak, …): public knowledge
+// only, never account data. The signed-in shell mounts its own (src/ui/shell.js); the staff
+// login page gets none. Loaded lazily so it never delays the first paint.
+function mountPublicWaguri(path) {
+  const wanted = path !== '/app' && path !== STAFF_PATH
+  if (wanted && waguri) return // stays open across public pages
+  waguri?.unmount?.()
+  waguri = null
+  if (!wanted) return
+  const mine = ++waguriSeq
+  waguri = { unmount: null }
+  import('../waguri/widget.js').then(({ mountWaguri }) => {
+    if (mine !== waguriSeq || !waguri) return
+    waguri.unmount = mountWaguri({ mode: 'public', navigate })
+  }).catch((e) => console.warn('Waguri gagal dimuat:', e?.message))
 }
 
 // UX only: the worker enforces admin rights on every /api/office/admin call.

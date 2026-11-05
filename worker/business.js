@@ -34,6 +34,9 @@ async function list(env, where) {
   return results.map(toPlan);
 }
 
+/** Active plans (public data), for Waguri's pricing answers. */
+export const activePlans = (env) => list(env, 'WHERE active = 1');
+
 export async function handlePlansPublic(request, env, { ok }) {
   const res = ok(await list(env, 'WHERE active = 1'));
   res.headers.set('cache-control', 'public, max-age=60');

@@ -35,7 +35,7 @@ export async function loadPlatformAi(env) {
   }
 }
 
-async function platformProvider(env) {
+export async function platformProvider(env) {
   const p = await loadPlatformAi(env);
   if (p.mode === 'workers' || !p.key_enc || !p.base_url || !p.model) return null;
   let apiKey;

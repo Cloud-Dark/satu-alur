@@ -37,7 +37,7 @@ import {
   handleAdminRedemptions, handleAdminCustomerQuota, handleAdminCustomerCredit,
 } from './quota.js';
 import { handleTemplatesList, handleAdminTemplates, handleAdminTemplateCreate, handleAdminTemplateUpdate, handleAdminTemplateDelete } from './offer-templates.js';
-import { handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
+import { activePlans, handlePlansPublic, handleAdminPlans, handleAdminPlanCreate, handleAdminPlanUpdate, handleAdminPlanReorder, handleAdminPaymentGet, handleAdminPaymentPut, handleAdminPaymentTest } from './business.js';
 import {
   handleAdminCustomers, handleAdminCustomerGet, handleAdminCustomerPut,
   handleAdminUsers, handleAdminUserSuspend, handleAdminUserRestore, handleAdminUserRevokeSessions,
@@ -64,7 +64,8 @@ import { DEMO_EMAILS, isDemoUser } from './demo.js';
 import { simulateAnswer } from '../src/ai/simulate.js';
 import { otpEmail } from '../src/email/templates.js';
 import { sendEmail, loadSystemSettings } from './email.js';
-import { resolveAi, customChatStream, countByo, logAiFallback } from './ai-provider.js';
+import { resolveAi, customChatStream, countByo, logAiFallback, platformProvider } from './ai-provider.js';
+import { handleWaguriPublic } from './waguri.js';
 import {
   handleIntegrationsGet, handleIntegrationsEmailSave, handleIntegrationsAiSave, handleIntegrationsEmailTest,
   handleIntegrationsAiTest, handleIntegrationsAiModels, handleEmailSend,
@@ -1221,6 +1222,10 @@ const ROUTES = {
   'POST /api/db': handleDb,
   'GET /api/llm/models': handleModels,
   'POST /api/llm/chat': handleChat,
+  // Public (no session): Waguri on the landing and login pages. Public knowledge only, rate-limited per IP.
+  'POST /api/waguri/public': (req, env) => handleWaguriPublic(req, env, {
+    ...ROUTE_DEPS, sseResponse, translateStream, platformProvider, customChatStream, loadSystemSettings, activePlans,
+  }),
   'POST /api/leads/search': (req, env) => handleLeadSearch(req, env, ROUTE_DEPS),
   'GET /api/leads/geocode': (req, env) => handleLeadGeocode(req, env, ROUTE_DEPS),
   'GET /api/leads/sources': (req, env) => handleLeadSources(req, env, ROUTE_DEPS),
