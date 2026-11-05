@@ -78,8 +78,8 @@ export async function render(container, ctx = {}) {
   body.replaceChildren(
     el('div', { className: 'kpis is-loading' }, [0, 1, 2, 3].map((i) => el('div', { className: `kpi ${i === 0 ? 'is-hero' : ''}`.trim() }, C.skeleton({ lines: 2 })))),
     el('div', { className: 'dash-grid' },
-      C.panel({ title: 'Pendapatan vs biaya', className: 'span-8' }, C.skeletonRows(5)),
-      C.panel({ title: 'Alur kerja', className: 'span-4' }, C.skeletonRows(4)),
+      C.panel({ title: 'Pendapatan vs biaya', className: 'span-7' }, C.skeletonRows(5)),
+      C.panel({ title: 'Alur kerja', className: 'span-5' }, C.skeletonRows(4)),
     ),
   )
 
@@ -111,8 +111,8 @@ export async function render(container, ctx = {}) {
       renderActivity(m),
     ))
     sections.push(el('div', { className: 'dash-grid' },
-      renderStatusMix(m),
       renderComposition(m),
+      renderStatusMix(m),
     ))
   }
   body.replaceChildren(...sections)
@@ -216,7 +216,7 @@ function renderPipeline(m, navigate) {
     return el('li', {}, b)
   }))
 
-  return C.panel({ title: 'Alur kerja', meta: `${reqTotal} permintaan · konversi per tahap`, className: 'span-4 funnel-panel' }, list)
+  return C.panel({ title: 'Alur kerja', meta: `${reqTotal} permintaan · konversi per tahap`, className: 'span-5 funnel-panel' }, list)
 }
 
 /* =============================================================== Chart */
@@ -236,7 +236,7 @@ function renderChart(m, ctx) {
     options: [{ value: '14', label: '14 hari' }, { value: '30', label: '30 hari' }],
     onChange: (v) => { range = Number(v); draw() },
   })
-  const p = C.panel({ title: 'Pendapatan vs biaya', className: 'span-8 chart-panel', actions: seg }, legend, wrap, summary)
+  const p = C.panel({ title: 'Pendapatan vs biaya', className: 'span-7 chart-panel', actions: seg }, legend, wrap, summary)
 
   function series() {
     const end = startOfDay(Date.now())

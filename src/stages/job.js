@@ -5,6 +5,7 @@
  */
 import * as C from '../ui/components.js'
 import { customerLabel } from './data.js'
+import '../styles/flow-pages.css'
 
 const { el } = C
 

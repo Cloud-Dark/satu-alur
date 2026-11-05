@@ -9,11 +9,11 @@
 .inv-line-nums { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.3fr) minmax(0, 1.3fr) auto; gap: var(--s-2); align-items: end; }
 .inv-mini { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 0.75rem; color: var(--text-muted); }
 .inv-mini .input { width: 100%; min-width: 0; }
-.inv-mini-amt span:last-child, .inv-line-amt { color: var(--text); font-weight: 600; font-size: 0.9rem; padding: 10px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inv-mini-amt span:last-child, .inv-line-amt { color: var(--text); font-weight: 600; font-size: 0.9rem; padding: 0; line-height: 48px; /* = input height (46px + borders): label rows line up */ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 420px) {
   .inv-line-nums { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; }
   .inv-mini-amt { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
-  .inv-mini-amt span:last-child { padding: 0; }
+  .inv-mini-amt span:last-child { padding: 0; line-height: 1.4; }
 }
 .inv-ppn { justify-content: flex-end; }
 .inv-totals { margin: 0; display: flex; flex-direction: column; gap: var(--s-1); padding: var(--s-3) var(--s-4); border-radius: var(--r-md); background: var(--surface-2); }
