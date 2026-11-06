@@ -1183,25 +1183,56 @@ html.lp-lock { overflow: hidden; }
 .lp-grow-post {
   margin-top: 18px;
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
   padding: 12px;
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
   background: var(--surface-2);
   border: 1px solid var(--line);
 }
-.lp-grow-post-thumb {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-sm);
-  color: var(--text-on-brand);
-  background: linear-gradient(140deg, var(--brand-500), var(--brand));
+/* A small "creative" like the image of the scheduled post. */
+.lp-grow-post-art {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 96px;
+  padding: 10px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  /* A picture, not UI chrome: it keeps its deep-green look in both themes. */
+  color: #f7f4ee;
+  background:
+    radial-gradient(80% 70% at 90% 0%, color-mix(in srgb, #e7a13a 55%, transparent) 0%, transparent 70%),
+    linear-gradient(150deg, #2b7560, #134235);
 }
-.lp-grow-post p { font-size: var(--fs-xs); color: var(--text-2); line-height: 1.45; }
-.lp-grow-post span { display: block; margin-top: 4px; font-size: 10px; color: var(--text-faint); }
+.lp-grow-post-art-ico {
+  position: absolute; top: 8px; left: 8px;
+  display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(247, 244, 238, 0.18);
+}
+.lp-grow-post-art strong { font-family: var(--font-display); font-size: 1.15rem; font-weight: 400; line-height: 1; }
+.lp-grow-post-art small { margin-top: 3px; font-size: 9px; line-height: 1.2; opacity: 0.85; }
+.lp-grow-post-body { display: grid; align-content: center; gap: 6px; min-width: 0; }
+.lp-grow-post-acct { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: var(--fs-xs); }
+.lp-grow-post-ava {
+  flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%;
+  font-size: 9px; font-weight: 700; color: var(--brand-600); background: var(--brand-50); border: 1px solid var(--brand-100);
+}
+.lp-grow-post-name { font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-grow-post-plat { flex: none; margin-left: auto; font-size: 10px; color: var(--text-faint); }
+.lp-grow-post-cap {
+  font-size: var(--fs-xs); color: var(--text-2); line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lp-grow-post-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.lp-grow-post-when, .lp-grow-post-ai {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: var(--r-pill);
+  font-size: 10px; font-weight: 600;
+}
+.lp-grow-post-when { color: var(--brand-600); background: var(--brand-50); border: 1px solid var(--brand-100); }
+.lp-grow-post-ai { color: var(--accent-600); background: var(--accent-50); border: 1px solid var(--accent-100); }
 
 .lp-grow-assists {
   margin-top: 20px;

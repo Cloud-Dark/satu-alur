@@ -356,10 +356,22 @@ function growVisual(c) {
   if (c.post) {
     return `
     <div class="lp-grow-post">
-      <span class="lp-grow-post-thumb" aria-hidden="true">${iconHTML('megaphone', { size: 16, stroke: 1.8 })}</span>
-      <div>
-        <p>${esc(c.post.caption)}</p>
-        <span>${esc(c.post.meta)}</span>
+      <div class="lp-grow-post-art" aria-hidden="true">
+        <span class="lp-grow-post-art-ico">${iconHTML('zap', { size: 14, stroke: 2 })}</span>
+        <strong>${esc(c.post.headline)}</strong>
+        <small>${esc(c.post.sub)}</small>
+      </div>
+      <div class="lp-grow-post-body">
+        <p class="lp-grow-post-acct">
+          <span class="lp-grow-post-ava" aria-hidden="true">${esc(c.post.initials)}</span>
+          <span class="lp-grow-post-name">${esc(c.post.account)}</span>
+          <span class="lp-grow-post-plat">${esc(c.post.platform)}</span>
+        </p>
+        <p class="lp-grow-post-cap">${esc(c.post.caption)}</p>
+        <p class="lp-grow-post-meta">
+          <span class="lp-grow-post-when">${iconHTML('calendar', { size: 12, stroke: 2 })}Dijadwalkan · ${esc(c.post.when)}</span>
+          <span class="lp-grow-post-ai">${iconHTML('sparkles', { size: 12, stroke: 2 })}Ditulis AI</span>
+        </p>
       </div>
     </div>`
   }

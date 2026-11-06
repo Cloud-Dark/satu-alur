@@ -221,7 +221,12 @@ export const GROWTH = {
       icon: 'megaphone',
       title: 'Media Sosial',
       desc: 'Tulis konten dengan AI, jadwalkan tayang ke Facebook, Instagram, atau Threads yang sudah terhubung, lalu ajukan iklan atau kolaborasi ke tim Satu Alur.',
-      post: { caption: 'Servis AC sebelum musim hujan — slot minggu ini masih ada.', meta: 'Instagram · dijadwalkan' },
+      post: {
+        account: 'Dingin Jaya Service', initials: 'DJ', platform: 'Instagram',
+        headline: 'Servis AC', sub: 'sebelum musim hujan',
+        caption: 'Servis AC sebelum musim hujan — slot minggu ini masih ada. Booking lewat DM ya!',
+        when: 'Sab, 08.00',
+      },
     },
   ],
   assistants: [
