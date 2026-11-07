@@ -15,11 +15,35 @@ const { execFileSync } = require('child_process')
 const { chromium } = require('playwright')
 
 const OUT = path.resolve(process.argv[2] || path.join(__dirname, 'out'))
+const LANG = process.env.VIDEO_LANG === 'en' ? 'en' : 'id'
+const COPY = {
+  id: {
+    sped: 'dipercepat', note: 'Data demo fiktif · AI pada rekaman ini disimulasikan',
+    title: 'Bisnis jasa Anda,<br><em>tumbuh</em> dalam satu alur.',
+    sub: 'Dari permintaan pelanggan sampai laporan, lalu mesin pendapatan dan pertumbuhan.',
+    end: 'Coba sekarang.',
+  },
+  en: {
+    sped: 'sped up', note: 'Fictional demo data · AI is simulated in this recording',
+    title: 'Your service business,<br><em>growing</em> in one flow.',
+    sub: 'From customer request to report, then the revenue and growth engines.',
+    end: 'Try it now.',
+  },
+}[LANG]
 const TARGET = 165 // seconds of scene footage in the full cut (cards come on top)
 const MAX_RATE = 1.45
 const CUT_SCENES = { 1: 'head', 4: 'tail', 7: 'tail', 8: 'head', 10: 'tail', 11: 'tail', 13: 'tail', 16: 'head' }
 const CUT_LEN = 6.9
-const FONT = '/usr/share/fonts/opentype/inter/Inter-SemiBold.otf'
+/* Windows: ffmpeg filter args and concat lists want forward slashes; no-op elsewhere. */
+const slash = (p) => (process.platform === 'win32' ? p.replace(/\\/g, '/') : p)
+/* drawtext font: VIDEO_FONT, else Inter (Linux), else a Windows bold sans. */
+const FONT_FILE = [process.env.VIDEO_FONT, '/usr/share/fonts/opentype/inter/Inter-SemiBold.otf',
+  'C:/Windows/Fonts/segoeuib.ttf', 'C:/Windows/Fonts/arialbd.ttf'].find((f) => f && fs.existsSync(f))
+if (!FONT_FILE) throw new Error('No drawtext font found; set VIDEO_FONT to a .ttf/.otf path')
+/* Escape the drive colon for both filtergraph and option parsing (C\\:/...). No-op for the Linux path. */
+const FONT = slash(FONT_FILE).replace(/:/g, '\\\\:')
+/* One ffmpeg concat-list line; single quotes escaped as '\'' (no-op for normal paths). */
+const listLine = (p) => `file '${slash(p).replace(/'/g, "'\\''")}'`
 const ENC = ['-c:v', 'libx264', '-preset', 'medium', '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '30']
 
 const ff = (args) => execFileSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', ...args], { stdio: 'inherit' })
@@ -71,13 +95,13 @@ for (const sc of scenes) {
     const vf = [`setpts=(PTS-STARTPTS)/${r.toFixed(4)}`, 'fps=30']
     if (sp >= 2) {
       vf.push(`drawbox=x=iw-262:y=22:w=236:h=44:color=0x173f33@0.85:t=fill`,
-        `drawtext=fontfile=${FONT}:text='dipercepat ×${sp}':fontcolor=0xf6f0e2:fontsize=22:x=w-246:y=33`)
+        `drawtext=fontfile=${FONT}:text='${COPY.sped} ×${sp}':fontcolor=0xf6f0e2:fontsize=22:x=w-246:y=33`)
     }
     ff(['-ss', a.toFixed(3), '-to', b.toFixed(3), '-i', raw, '-an', '-vf', vf.join(','), ...ENC, f])
     return f
   })
   const list = path.join(tmp, `s${sc.n}.txt`)
-  fs.writeFileSync(list, parts.map((p) => `file '${p}'`).join('\n'))
+  fs.writeFileSync(list, parts.map(listLine).join('\n'))
   const clip = path.join(tmp, `scene${sc.n}.mp4`)
   ff(['-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', clip])
   sceneClips[sc.n] = clip
@@ -94,12 +118,12 @@ async function cards() {
 .logo b{font-weight:500;color:#9fd1b9;margin-left:6px}h1{font-family:"Instrument Serif",serif;font-weight:400;font-size:112px;line-height:1.02;margin:0;letter-spacing:-.02em}
 h1 em{color:#e7a13a}p{font-size:34px;color:#cfe3d8;margin:40px 0 0}.u{display:inline-block;margin-top:46px;padding:16px 30px;border-radius:999px;background:#f6f0e2;color:#173f33;font-weight:700;font-size:36px}
 .t{margin-top:40px;font-size:30px;color:#cfe3d8}.n{position:fixed;bottom:40px;left:0;right:0;text-align:center;font-size:20px;color:#9fbfb1}</style></head>
-<body><div class="w">${body}</div><div class="n">Data demo fiktif · AI pada rekaman ini disimulasikan</div></body></html>`
+<body><div class="w">${body}</div><div class="n">${COPY.note}</div></body></html>`
   const mark = `<svg width="64" height="64" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#f6f0e2"/><path d="M7.5 23.5h5.5v-5h5.5v-5h4" stroke="#173f33" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23.5" cy="9.5" r="3" fill="#e7a13a"/></svg>`
-  await page.setContent(shell(`<div class="logo">${mark}<span>Satu<b>Alur</b></span></div><h1>Bisnis jasa Anda,<br><em>tumbuh</em> dalam satu alur.</h1><p>Dari permintaan pelanggan sampai laporan, lalu mesin pendapatan dan pertumbuhan.</p>`), { waitUntil: 'networkidle' }).catch(() => {})
+  await page.setContent(shell(`<div class="logo">${mark}<span>Satu<b>Alur</b></span></div><h1>${COPY.title}</h1><p>${COPY.sub}</p>`), { waitUntil: 'networkidle' }).catch(() => {})
   await page.waitForTimeout(600)
   await page.screenshot({ path: path.join(tmp, 'title.png') })
-  await page.setContent(shell(`<div class="logo">${mark}<span>Satu<b>Alur</b></span></div><h1>Coba sekarang.</h1><div class="u">satu-alur.apipedia.workers.dev</div><div class="t">Syahdan · Zulfikar · Margareta Lola</div>`), { waitUntil: 'networkidle' }).catch(() => {})
+  await page.setContent(shell(`<div class="logo">${mark}<span>Satu<b>Alur</b></span></div><h1>${COPY.end}</h1><div class="u">satu-alur.apipedia.workers.dev</div><div class="t">Syahdan · Zulfikar · Margareta Lola</div>`), { waitUntil: 'networkidle' }).catch(() => {})
   await page.waitForTimeout(600)
   await page.screenshot({ path: path.join(tmp, 'end.png') })
   await browser.close()
@@ -112,7 +136,7 @@ function card(png, seconds, out) {
 /** Concatenates clips (re-encoded for clean joins) and adds a silent AAC track. */
 function join(clips, out) {
   const list = path.join(tmp, `${path.basename(out)}.txt`)
-  fs.writeFileSync(list, clips.map((c) => `file '${c}'`).join('\n'))
+  fs.writeFileSync(list, clips.map(listLine).join('\n'))
   const silent = path.join(tmp, `${path.basename(out)}.v.mp4`)
   ff(['-f', 'concat', '-safe', '0', '-i', list, ...ENC, silent])
   ff(['-i', silent, '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000', '-shortest',

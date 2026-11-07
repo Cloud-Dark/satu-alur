@@ -1,0 +1,34 @@
+{
+  "voice": "en-US-AvaNeural",
+  "note": "English voice-over. Same ids as vo.json; start/end are re-timed by retime-vo.cjs (VIDEO_LANG=en). 'say' is what the TTS reads; 'text' is the plain line.",
+  "full": [
+    { "id": "title", "start": 0.5, "end": 3.2, "text": "Satu Alur." },
+    { "id": "s1", "start": 3.4, "end": 10.1, "text": "In a service business, work gets scattered across chats, notes, and spreadsheets." },
+    { "id": "s2", "start": 10.3, "end": 14.8, "text": "Sign in with a demo account full of sample data." },
+    { "id": "s3", "start": 15, "end": 31.6, "text": "The overview shows profit, revenue against costs, where every job stands, and what needs your attention, straight from your own data." },
+    { "id": "s4", "start": 31.8, "end": 56.3, "text": "A customer request comes in. The quote agent drafts the scope, price, and terms. Business rules check it before it is saved, and the final call stays with you." },
+    { "id": "s5", "start": 56.5, "end": 64.2, "text": "Approved quotes are scheduled to a worker, then marked as done." },
+    { "id": "s6", "start": 64.4, "end": 71.2, "text": "Every job is booked, with a running balance kept for you." },
+    { "id": "s7", "start": 71.4, "end": 86.2, "text": "The report agent explains this period's numbers, streaming live." },
+    { "id": "s8", "start": 86.4, "end": 99.5, "text": "The revenue engines, add-on services and zero waste, find new income and close cost leaks." },
+    { "id": "s9", "start": 99.7, "end": 104.8, "text": "Five agent teams and one lead build an optimization plan." },
+    { "id": "s10", "start": 105, "end": 111.4, "text": "Opportunity radar finds openings in your own data, with the score behind each one." },
+    { "id": "s11", "start": 111.6, "end": 122.3, "text": "The prospect finder maps potential customers near you from legal data sources, and AI rates the fit.", "say": "The prospect finder maps potential customers near you from legal data sources, and A I rates the fit." },
+    { "id": "s12", "start": 122.5, "end": 139, "text": "In Social Media, AI writes content for each platform. It is saved to the library, then scheduled to go live.", "say": "In Social Media, A I writes content for each platform. It is saved to the library, then scheduled to go live." },
+    { "id": "s13", "start": 139.2, "end": 145.1, "text": "Five AI advisors answer with your business in mind.", "say": "Five A I advisors answer with your business in mind." },
+    { "id": "s14", "start": 145.3, "end": 159, "text": "From the Satu Alur office, the team manages plans, customers, the influencer catalogue, and system health." },
+    { "id": "s15", "start": 159.2, "end": 194.6, "text": "For enterprise, connect a legacy ERP from a connector template, test the connection, then run a phased migration: master data first, then active transactions, with rollback when needed.", "say": "For enterprise, connect a legacy E R P from a connector template, test the connection, then run a phased migration: master data first, then active transactions, with rollback when needed." },
+    { "id": "s16", "start": 194.8, "end": 200.9, "text": "Your service business, growing in one flow. Try it now." }
+  ],
+  "short": [
+    { "id": "title", "start": 0.5, "end": 2.7, "text": "Satu Alur." },
+    { "id": "c1", "start": 2.9, "end": 9.6, "text": "Service work gets scattered everywhere." },
+    { "id": "c4", "start": 9.8, "end": 16.5, "text": "An AI agent drafts the quote, then business rules check it.", "say": "An A I agent drafts the quote, then business rules check it." },
+    { "id": "c7", "start": 16.7, "end": 23.4, "text": "AI explains the report, streaming live.", "say": "A I explains the report, streaming live." },
+    { "id": "c8", "start": 23.6, "end": 30.3, "text": "Revenue engines find new income and cost leaks." },
+    { "id": "c10", "start": 30.5, "end": 36.8, "text": "Opportunity radar reads your own data." },
+    { "id": "c11", "start": 37, "end": 43.7, "text": "New prospects from the map, using legal data." },
+    { "id": "c13", "start": 43.9, "end": 49.8, "text": "AI advisors that know your business.", "say": "A I advisors that know your business." },
+    { "id": "c16", "start": 50, "end": 55, "text": "Your service business, growing in one flow." }
+  ]
+}

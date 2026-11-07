@@ -17,6 +17,8 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SR = 48000
+# Windows: 'python3' may be the Microsoft Store stub; reuse this interpreter there.
+PY = sys.executable if os.name == 'nt' else 'python3'
 
 
 def run(args):
@@ -35,7 +37,7 @@ def tts_fit(line, voice, tts, work):
     for rate in (0, 4, 8, 12):
         raw = os.path.join(work, f"{line['id']}.mp3")
         out = os.path.join(work, f"{line['id']}.wav")
-        run(['python3', tts, text, voice, raw, f'+{rate}%'])
+        run([PY, tts, text, voice, raw, f'+{rate}%'])
         # edge-tts pads both ends with silence; trim it so lines sit on their cue
         run(['ffmpeg', '-y', '-i', raw, '-af',
              'silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse,apad=pad_dur=0.12',
@@ -142,9 +144,11 @@ def write_wav(path, stereo):
 
 def main():
     src, cut, out, tts = sys.argv[1:5]
-    cfg = json.load(open(os.path.join(HERE, 'vo.json')))
+    lang = os.environ.get('VIDEO_LANG', 'id')
+    vo_file = 'vo.json' if lang == 'id' else f'vo.{lang}.json'
+    cfg = json.load(open(os.path.join(HERE, vo_file), encoding='utf-8'))
     lines = cfg[cut]
-    work = os.path.join(HERE, 'out', f'audio-{cut}')
+    work = os.path.join(HERE, 'out', f'audio-{lang}-{cut}')
     os.makedirs(work, exist_ok=True)
     total = duration(src)
 
