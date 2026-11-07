@@ -1,5 +1,6 @@
 import './styles/tokens.css'
 import './styles.css'
+import './styles/lang.css'
 import { mountApp } from './ui/app.js'
 import { enableDevAudit, injectAntiSlopStyles } from './ui/antislop.js'
 

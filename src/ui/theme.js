@@ -3,6 +3,7 @@
  * index.html (before first paint) to avoid a flash; this module handles toggling.
  */
 import { icon } from './icons.js'
+import { t } from '../i18n/index.js'
 
 const KEY = 'theme'
 
@@ -35,7 +36,7 @@ export function themeToggleButton() {
     if (btn.isConnected) btn.dataset.mounted = '1'
     const dark = getTheme() === 'dark'
     btn.replaceChildren(icon(dark ? 'sun' : 'moon'))
-    btn.setAttribute('aria-label', dark ? 'Gunakan mode terang' : 'Gunakan mode gelap')
+    btn.setAttribute('aria-label', dark ? t('common.theme.light') : t('common.theme.dark'))
     btn.title = btn.getAttribute('aria-label')
   }
   btn.addEventListener('click', toggleTheme)

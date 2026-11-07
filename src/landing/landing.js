@@ -20,6 +20,8 @@ import { getPlans } from '../business/api.js'
 import { renderPlanCard, isLongPrice } from '../business/plan-card.js'
 import { renderHero } from '../site/hero.js'
 import { NAV, HERO, HERO_POINTS, STAGES, TICKER, FEATURES, INCOME, GROWTH, INTEGRATION, ROADMAP, FAQS, AGENT_DEMO } from './content.js'
+import { langSwitcher } from '../i18n/index.js'
+
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 const clamp01 = (v) => Math.min(1, Math.max(0, v))
@@ -765,7 +767,7 @@ export function renderLanding(root, ctx = {}) {
 
   page.querySelector('[data-slot="logo"]').replaceWith(logoLink({ size: 30 }))
   page.querySelector('[data-slot="foot-logo"]').replaceWith(logoLink({ size: 30 }))
-  page.querySelector('[data-slot="theme"]').replaceWith(themeToggleButton())
+  page.querySelector('[data-slot="theme"]').replaceWith(langSwitcher(), themeToggleButton())
 
   const header = page.querySelector('[data-header]')
   const progress = page.querySelector('[data-progress]')

@@ -7,6 +7,8 @@ import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
 import { getSite } from './api.js'
 import { parseDoc } from './content-rules.js'
+import { langSwitcher } from '../i18n/index.js'
+
 
 export const DOC_TITLES = {
   about: 'Tentang Satu Alur',
@@ -45,7 +47,7 @@ export function docShell(root, headingText, docTitle) {
   const actions = el('div', 'lp-header-actions')
   const home = el('a', 'btn btn-ghost btn-sm', 'Beranda')
   home.href = '#/'
-  actions.append(themeToggleButton(), home)
+  actions.append(langSwitcher(), themeToggleButton(), home)
   bar.append(logoLink({ size: 30 }), actions)
   header.append(bar)
 

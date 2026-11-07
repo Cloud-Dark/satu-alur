@@ -8,6 +8,8 @@ import { VALIDATOR, CONTENT_GATE, solidColor, createSkeleton } from './antislop.
 import { icon } from './icons.js'
 import { countUp } from './animations.js'
 import { PAGE_SIZES, GAP, pageCount, clampPage, pageWindow, pageBounds, rangeLabel, pageOfIndex, readPageSize, writePageSize } from './paging.js'
+import { t, locale } from '../i18n/index.js'
+
 
 export { icon }
 
@@ -62,13 +64,13 @@ export function toDate(v) {
 
 export function formatDate(v, opts = { day: '2-digit', month: 'short', year: 'numeric' }) {
   const d = toDate(v)
-  return d ? d.toLocaleDateString('id-ID', opts) : '—'
+  return d ? d.toLocaleDateString(locale(), opts) : '—'
 }
 
 export function formatDateTime(v) {
   const d = toDate(v)
   return d
-    ? d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    ? d.toLocaleString(locale(), { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—'
 }
 
@@ -78,13 +80,13 @@ export function relativeTime(v, now = Date.now()) {
   const diff = now - d.getTime()
   const abs = Math.abs(diff)
   const past = diff >= 0
-  const fmt = (n, unit) => (past ? `${n} ${unit} lalu` : `dalam ${n} ${unit}`)
-  if (abs < 60000) return 'baru saja'
-  if (abs < 3600000) return fmt(Math.round(abs / 60000), 'mnt')
-  if (abs < 86400000) return fmt(Math.round(abs / 3600000), 'jam')
+  const fmt = (n, unit) => t(past ? 'common.time.ago' : 'common.time.in', { n, unit: t(`common.time.${unit}`) })
+  if (abs < 60000) return t('common.time.justNow')
+  if (abs < 3600000) return fmt(Math.round(abs / 60000), 'min')
+  if (abs < 86400000) return fmt(Math.round(abs / 3600000), 'hour')
   const days = Math.round(abs / 86400000)
-  if (days === 1) return past ? 'kemarin' : 'besok'
-  if (days < 30) return fmt(days, 'hari')
+  if (days === 1) return t(past ? 'common.time.yesterday' : 'common.time.tomorrow')
+  if (days < 30) return fmt(days, 'day')
   return formatDate(d)
 }
 

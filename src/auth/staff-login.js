@@ -8,6 +8,8 @@ import { staffLogin } from './auth.js'
 import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
 import { iconHTML } from '../ui/icons.js'
+import { langSwitcher } from '../i18n/index.js'
+
 
 function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag)
@@ -70,7 +72,7 @@ export function renderStaffLogin(root, ctx = {}) {
     h('p', { class: 'auth-privacy' }, h('span', { html: iconHTML('shield', { size: 14 }) }),
       'Akun terkunci 15 menit setelah 5 kali salah password.'))
   root.replaceChildren(h('div', { class: 'auth auth-staff' },
-    h('header', { class: 'auth-bar' }, logoLink({ size: 28 }), themeToggleButton()),
+    h('header', { class: 'auth-bar' }, logoLink({ size: 28 }), h('div', { class: 'auth-bar-tools' }, langSwitcher(), themeToggleButton())),
     h('main', { class: 'auth-main', id: 'konten' }, card),
     h('footer', { class: 'auth-foot' }, h('p', {}, 'Halaman internal. Jangan bagikan alamat ini.'), h('p', {}, '© 2026 Satu Alur'))))
   user.input.focus()

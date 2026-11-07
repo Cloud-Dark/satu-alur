@@ -43,14 +43,16 @@ function makeContext({ browser, base, spec, results, shotDir }) {
       results.push({ spec, label, ok: true, todo: reason })
       console.log(`  TODO  ${label}  (${reason})`)
     },
-    async page({ width = 1440, height = 900, theme = 'light', reducedMotion, permissions, timezoneId } = {}) {
-      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion, permissions, timezoneId })
+    async page({ width = 1440, height = 900, theme = 'light', reducedMotion, permissions, timezoneId, lang = 'id', locale } = {}) {
+      const ctx = await browser.newContext({ viewport: { width, height }, reducedMotion, permissions, timezoneId, locale })
       const page = await ctx.newPage()
       page.errors = []
       page.on('pageerror', (e) => page.errors.push(e.stack || String(e)))
       page.on('console', (m) => { if (m.type() === 'error') page.errors.push(m.text()) })
       // Initial theme only; a theme the page stored itself (toggle) wins on reload.
       await page.addInitScript((th) => { try { if (!localStorage.getItem('theme')) localStorage.setItem('theme', th) } catch { /* */ } }, theme)
+      // The specs read Indonesian copy: pin the language unless a spec chose one (lang: 'en' / null = browser detection).
+      if (lang) await page.addInitScript((l) => { try { if (!localStorage.getItem('satualur_lang')) localStorage.setItem('satualur_lang', l) } catch { /* */ } }, lang)
       pages.push(page)
       return page
     },

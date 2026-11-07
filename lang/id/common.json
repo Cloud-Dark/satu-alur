@@ -1,0 +1,20 @@
+{
+  "lang": {
+    "switchTo": "Ganti bahasa ke {lang}",
+    "label": "Bahasa"
+  },
+  "time": {
+    "justNow": "baru saja",
+    "ago": "{n} {unit} lalu",
+    "in": "dalam {n} {unit}",
+    "yesterday": "kemarin",
+    "tomorrow": "besok",
+    "min": "mnt",
+    "hour": "jam",
+    "day": "hari"
+  },
+  "theme": {
+    "light": "Gunakan mode terang",
+    "dark": "Gunakan mode gelap"
+  }
+}

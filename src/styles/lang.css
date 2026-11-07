@@ -1,0 +1,13 @@
+/* Language switch (src/i18n/index.js langSwitcher): a small pill "ID / EN" next to the theme toggle. */
+.lang-switch {
+  display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 12px;
+  border-radius: var(--r-pill); border: 1px solid var(--line); background: var(--surface);
+  color: var(--text-muted); font: 600 0.78rem/1 var(--font-sans); letter-spacing: 0.04em; cursor: pointer;
+  box-shadow: var(--shadow-xs); transition: border-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease);
+}
+.lang-switch:hover { border-color: var(--brand-300); color: var(--text); }
+.lang-switch:focus-visible { outline: none; box-shadow: var(--ring); }
+.lang-switch-cur { color: var(--brand-600); }
+.lang-switch-sep { opacity: 0.4; }
+.auth-bar-tools { display: inline-flex; align-items: center; gap: 8px; }
+@media (max-width: 720px) { .lang-switch { height: 34px; padding: 0 10px; } }

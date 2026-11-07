@@ -1,0 +1,20 @@
+{
+  "lang": {
+    "switchTo": "Switch language to {lang}",
+    "label": "Language"
+  },
+  "time": {
+    "justNow": "just now",
+    "ago": "{n} {unit} ago",
+    "in": "in {n} {unit}",
+    "yesterday": "yesterday",
+    "tomorrow": "tomorrow",
+    "min": "min",
+    "hour": "h",
+    "day": "days"
+  },
+  "theme": {
+    "light": "Use light mode",
+    "dark": "Use dark mode"
+  }
+}

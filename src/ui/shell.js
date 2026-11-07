@@ -39,6 +39,8 @@ import * as Office from '../stages/office/index.js'
 import * as StageSupport from '../support/page.js'
 import * as StagePlan from '../quota/page.js'
 import { mountUpsell } from '../quota/upsell.js'
+import { langSwitcher } from '../i18n/index.js'
+
 
 export const STAGES = [
   { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home',
@@ -277,7 +279,7 @@ export function renderShell(root, ctx) {
   const topbar = el('header', { className: 'topbar' },
     menuBtn,
     el('div', { className: 'crumb' }, crumbNum, el('span', { className: 'crumb-sep', 'aria-hidden': 'true' }, icon('chevronRight', { size: 14 })), crumbTitle, crumbTip),
-    el('div', { className: 'topbar-right' }, themeToggleButton(), actionSlot, avatar),
+    el('div', { className: 'topbar-right' }, langSwitcher(), themeToggleButton(), actionSlot, avatar),
   )
 
   const host = el('main', { className: 'stage-host', id: 'main', tabindex: '-1' })
