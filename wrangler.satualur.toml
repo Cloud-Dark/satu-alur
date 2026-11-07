@@ -1,0 +1,62 @@
+# Production deploy config used while R2 and cron triggers are unavailable on the account.
+# Deploy with: npx wrangler deploy --config wrangler.deploy.toml
+name = "satu-alur"
+main = "worker/index.js"
+account_id = "ce7ee45b6c1002aa4c2501ae4bcd9cd9"
+routes = [{ pattern = "satualur.biz.id", custom_domain = true }, { pattern = "www.satualur.biz.id", custom_domain = true }]
+compatibility_date = "2025-09-01"
+
+# Static SPA (Vite build) + Worker API. Only /api/* runs the Worker first;
+# everything else is served from ./dist with SPA fallback. /mcp and /mcp/* are the remote MCP server (Akses AI);
+# /oauth/* and /.well-known/* are its OAuth 2.1 login (worker/oauth.js).
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/mcp", "/mcp/*", "/oauth/*", "/.well-known/*"]
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "satu-alur-db"
+database_id = "a50971e7-a487-4b03-b783-c93df9d7084f"
+migrations_dir = "migrations"
+
+[vars]
+# "true" = send-otp shows the code on screen and sends no email (local demo only). Production sends
+# the code by email (Resend, secret RESEND_API_KEY). Email admins (ADMIN_EMAILS) only count while this is "false".
+DEMO_OTP = "false"
+# Sender of platform email (OTP, tests, offers without own SMTP); the domain must be verified in Resend.
+EMAIL_FROM = "Satu Alur <noreply@apipedia.id>"
+# Email-login users with full Kantor Satu Alur (admin) rights, comma-separated.
+ADMIN_EMAILS = "apipedia22@gmail.com"
+# Google sign-in. Secret: GOOGLE_CLIENT_SECRET. Redirect URI: <PUBLIC_BASE_URL or origin>/api/auth/google/callback.
+GOOGLE_CLIENT_ID = "959606928858-tdplvh4l80rl1n72b5uhdcu0eki7l0v6.apps.googleusercontent.com"
+# Other secrets (wrangler secret put): RESEND_API_KEY, TOKEN_KEY (32-byte base64; encrypts own SMTP passwords
+# and own AI keys), GOOGLE_CLIENT_SECRET.
+# Demo accounts: one-click login to the seeded demo businesses (POST /api/auth/demo-login).
+DEMO_LOGIN = "true"
+# Meta publishing (Social Media). Secrets (wrangler secret put): META_APP_SECRET, TOKEN_KEY (32-byte base64).
+# The integration stays "not configured" until DEMO_OTP is "false" and META_APP_ID, META_APP_SECRET, TOKEN_KEY and PUBLIC_BASE_URL are all set.
+META_APP_ID = ""
+# Threads publishing (Social Media). Secret (wrangler secret put): THREADS_APP_SECRET. Needs TOKEN_KEY and PUBLIC_BASE_URL too.
+# Independent of META_*: Threads stays "not configured" until DEMO_OTP is "false" and THREADS_APP_ID, THREADS_APP_SECRET,
+# TOKEN_KEY and PUBLIC_BASE_URL are all set.
+THREADS_APP_ID = ""
+# Staff (Kantor Satu Alur) sign in at /super-admin-login with accounts made by `npm run staff`.
+# Public origin without a trailing slash (OAuth redirect + media URLs Meta fetches).
+PUBLIC_BASE_URL = ""
+# Per-business integrations (WhatsApp via WAPilot / WAConsole, social media via Repliz): every business stores its OWN
+# keys in the app (Pengaturan › Konektor), encrypted with the TOKEN_KEY secret. See docs/integrations/.
+# While DEMO_OTP is "true" anyone can sign in as any email, so integrations stay off unless this is "true".
+INTEGRATIONS_ALLOW_DEMO_OTP = "false"
+# Optional platform WhatsApp keys (secrets WAPILOT_TOKEN, WACONSOLE_APP_KEY, WACONSOLE_AUTH_KEY, var WACONSOLE_DEVICE_ID)
+# are used for businesses ONLY when this is "true" (admin decision; default off).
+WA_PLATFORM_FALLBACK = "false"
+
+# R2 binding omitted: R2 is not enabled on this account yet (uploads answer 503).
+
+# Cron trigger omitted: the account is at its cron limit on the Free plan, so due Meta/Threads posts
+# scheduled inside Satu Alur are not published automatically. Restore [triggers] from wrangler.toml when needed.
