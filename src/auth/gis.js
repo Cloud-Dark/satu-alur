@@ -8,6 +8,7 @@
  * a fake credential, so dev and e2e never touch Google.
  */
 import { GIS_SCRIPT_URL } from './google.js'
+import { t, getLang } from '../i18n/index.js'
 
 const LOAD_TIMEOUT_MS = 8000
 const DISMISS_KEY = 'satualur_gis_dismissed'
@@ -51,7 +52,7 @@ export function mockGis() {
       btn.type = 'button'
       btn.className = 'gis-mock-btn'
       btn.dataset.theme = opts.theme || 'outline'
-      btn.textContent = 'Masuk dengan Google (simulasi)'
+      btn.textContent = t('auth.google.mockButton')
       btn.addEventListener('click', () => {
         const payload = { email: 'pengguna.google@contoh.satualur.id', name: 'Pengguna Google', email_verified: true, nonce: config?.nonce }
         config?.callback?.({ credential: `mockgis.${b64(payload)}`, select_by: 'btn' })
@@ -105,7 +106,7 @@ export async function mountGoogleIdentity({ container, clientId, mock = false, g
     const width = Math.round(Math.min(400, Math.max(220, box - 12)))
     id.renderButton(container, {
       type: 'standard', theme: gisTheme(), size: 'large', text: 'continue_with',
-      shape: 'pill', logo_alignment: 'left', locale: 'id', width,
+      shape: 'pill', logo_alignment: 'left', locale: getLang(), width,
     })
     if (prompt && !promptDismissed()) {
       // With FedCM most moment notifications are gone; skipped/dismissed still arrive.

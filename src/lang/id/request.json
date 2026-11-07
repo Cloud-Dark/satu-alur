@@ -1,0 +1,72 @@
+{
+  "title": "Permintaan baru",
+  "field": {
+    "name": "Nama pelanggan",
+    "namePh": "PT Maju Jaya",
+    "nameHint": "Perusahaan atau perorangan yang meminta layanan.",
+    "location": "Lokasi",
+    "locationPh": "Jakarta Selatan",
+    "phone": "Telepon",
+    "email": "Email",
+    "optional": "Opsional.",
+    "website": "Website / kontak lain",
+    "websitePh": "contoh.id · IG @usaha · WA 0812…",
+    "websiteHint": "Opsional: website, Instagram, WhatsApp, dll.",
+    "service": "Jenis layanan",
+    "servicePh": "Pembersihan AC",
+    "serviceHint": "Satu layanan utama per permintaan.",
+    "desc": "Deskripsi kebutuhan",
+    "descPh": "Jumlah unit, luas area, waktu yang diinginkan…",
+    "descHint": "Semakin rinci, semakin akurat penawaran AI di tahap 02."
+  },
+  "source": {
+    "map": "Cari dari peta",
+    "manual": "Isi manual",
+    "picked": "Diisi dari peta: {name}. Periksa dan ubah bila perlu."
+  },
+  "error": {
+    "name": "Nama pelanggan wajib diisi.",
+    "phone": "Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.",
+    "email": "Format email belum benar, contoh: info@contoh.id.",
+    "service": "Jenis layanan wajib diisi."
+  },
+  "ai": {
+    "hint": "Petunjuk singkat",
+    "hintPh": "Contoh: AC 3 unit bocor di ruang rapat, minta Sabtu pagi. Atau tempel chat WhatsApp pelanggan.",
+    "hintHint": "AI mengisi jenis layanan dan deskripsi. Hasilnya tetap bisa Anda ubah.",
+    "fill": "Isi otomatis dengan AI",
+    "needHint": "Tulis petunjuk singkat dulu, misalnya \"AC 3 unit bocor\".",
+    "stop": "Hentikan",
+    "writing": "AI sedang menulis…",
+    "unavailable": "AI sedang tidak tersedia.",
+    "filled": "Terisi. Periksa dan ubah bila perlu.",
+    "stopped": "Dihentikan.",
+    "failed": "Gagal mengisi otomatis."
+  },
+  "wiz": {
+    "customer": "Pelanggan",
+    "customerDesc": "Siapa yang meminta, dan di mana.",
+    "need": "Kebutuhan",
+    "needDesc": "Layanan yang diminta dan rinciannya.",
+    "review": "Tinjau",
+    "reviewDesc": "Periksa sebelum disimpan.",
+    "save": "Simpan permintaan"
+  },
+  "review": {
+    "service": "Layanan: {value}",
+    "location": "Lokasi: {value}",
+    "phone": "Telepon: {value}",
+    "email": "Email: {value}",
+    "website": "Website / kontak lain: {value}",
+    "noDesc": "Tanpa deskripsi kebutuhan.",
+    "tip": "Tip: deskripsi yang rinci membuat penawaran AI lebih akurat."
+  },
+  "saving": "Menyimpan…",
+  "done": {
+    "offer": "Buat penawaran",
+    "another": "Catat permintaan lain",
+    "text": "Permintaan {name} tersimpan. Lanjutkan dengan membuat penawaran.",
+    "toast": "Permintaan baru tersimpan."
+  },
+  "saveError": "Gagal menyimpan: {error}"
+}

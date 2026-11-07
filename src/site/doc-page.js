@@ -5,9 +5,12 @@
 import '../styles/landing.css'
 import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
+import { langToggleButton } from '../i18n/switcher.js'
+import { t, getLang, locale } from '../i18n/index.js'
 import { getSite } from './api.js'
 import { parseDoc } from './content-rules.js'
 
+// Indonesian titles: the staff editor's defaults (office/site-doc.js). The public page shows legal.titles.* instead.
 export const DOC_TITLES = {
   about: 'Tentang Satu Alur',
   privacy: 'Kebijakan Privasi',
@@ -15,7 +18,7 @@ export const DOC_TITLES = {
   cookies: 'Kebijakan Cookie',
 }
 
-const LINKS = [['Tentang kami', '#/tentang'], ['Kebijakan privasi', '#/privasi'], ['Syarat & ketentuan', '#/syarat'], ['Kebijakan cookie', '#/cookie']]
+const LINKS = [['about', '#/tentang'], ['privacy', '#/privasi'], ['terms', '#/syarat'], ['cookies', '#/cookie']]
 
 const el = (tag, cls, text) => {
   const n = document.createElement(tag)
@@ -43,9 +46,9 @@ export function docShell(root, headingText, docTitle) {
   const header = el('header', 'lp-header is-scrolled')
   const bar = el('div', 'lp-header-bar')
   const actions = el('div', 'lp-header-actions')
-  const home = el('a', 'btn btn-ghost btn-sm', 'Beranda')
+  const home = el('a', 'btn btn-ghost btn-sm', t('legal.home'))
   home.href = '#/'
-  actions.append(themeToggleButton(), home)
+  actions.append(langToggleButton(), themeToggleButton(), home)
   bar.append(logoLink({ size: 30 }), actions)
   header.append(bar)
 
@@ -60,9 +63,9 @@ export function docShell(root, headingText, docTitle) {
   const footer = el('footer', 'lp-footer doc-foot')
   const fc = el('div', 'lp-container')
   const nav = el('nav', 'doc-foot-links')
-  nav.setAttribute('aria-label', 'Halaman Satu Alur')
-  nav.append(...LINKS.map(([label, href]) => { const a = el('a', '', label); a.href = href; return a }))
-  fc.append(nav, el('p', 'doc-foot-copy', '© 2026 Satu Alur. Hak cipta dilindungi.'))
+  nav.setAttribute('aria-label', t('legal.navLabel'))
+  nav.append(...LINKS.map(([key, href]) => { const a = el('a', '', t(`legal.links.${key}`)); a.href = href; return a }))
+  fc.append(nav, el('p', 'doc-foot-copy', t('footer.copyright')))
   footer.append(fc)
 
   page.append(header, main, footer)
@@ -72,16 +75,19 @@ export function docShell(root, headingText, docTitle) {
 
 export function renderDocPage(root, ctx, key) {
   let disposed = false
-  const { title, body, close } = docShell(root, DOC_TITLES[key], DOC_TITLES[key])
+  const heading = t(`legal.titles.${key}`)
+  const { title, body, close } = docShell(root, heading, heading)
 
   getSite(key).then((row) => {
     if (disposed) return
     const v = row?.value
     if (!v || typeof v.title !== 'string') {
-      body.append(el('p', 'doc-empty', 'Dokumen ini sedang disiapkan.'))
+      body.append(el('p', 'doc-empty', t('legal.empty')))
       return
     }
-    if (v.title.trim()) {
+    // Stored documents are written in Indonesian; in another language the translated title stays and a note says so.
+    if (getLang() !== 'id') body.append(el('p', 'doc-updated', t('legal.onlyIndonesian')))
+    else if (v.title.trim()) {
       title.textContent = v.title.trim()
       document.title = `${v.title.trim()} — Satu Alur`
     }
@@ -89,7 +95,7 @@ export function renderDocPage(root, ctx, key) {
     if (row.updated_at) {
       const d = new Date(row.updated_at)
       if (!Number.isNaN(d.getTime())) {
-        body.append(el('p', 'doc-updated', `Terakhir diperbarui ${d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`))
+        body.append(el('p', 'doc-updated', t('legal.updated', { date: d.toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' }) })))
       }
     }
   })

@@ -1,0 +1,148 @@
+{
+  "stages": {
+    "dashboard": {
+      "label": "Overview",
+      "hint": "Your workflow and finances at a glance, calculated straight from your data.",
+      "action": "Workflow"
+    },
+    "workflow": {
+      "label": "Workflow",
+      "sub": "All jobs",
+      "hint": "One row per customer job, from request to bookkeeping. The Position column shows how far each job has got; the Next step button opens the stage that needs work.",
+      "action": "New request"
+    },
+    "request": {
+      "label": "Requests",
+      "hint": "Record what the customer needs. Its status moves along with the workflow stages.",
+      "action": "To offers"
+    },
+    "offer": {
+      "label": "Offers",
+      "hint": "AI drafts the scope and price, then business rules check it before it is saved.",
+      "action": "To assignments"
+    },
+    "assign": {
+      "label": "Assignments",
+      "hint": "Schedule who works on each approved offer, and when.",
+      "action": "To completion"
+    },
+    "complete": {
+      "label": "Completion",
+      "hint": "Close finished assignments so they are ready to book.",
+      "action": "To bookkeeping"
+    },
+    "bookkeeping": {
+      "label": "Bookkeeping",
+      "hint": "Record income and costs for each job. The balance is kept running.",
+      "action": "View report"
+    },
+    "report": {
+      "label": "Reports",
+      "sub": "Profit & loss",
+      "hint": "Figures for the selected period from the ledger, plus an AI explanation.",
+      "action": "New request"
+    },
+    "invoice": {
+      "label": "Invoices",
+      "sub": "Customer billing",
+      "hint": "Create invoices from finished jobs, send them by email or WhatsApp, then mark them paid. The income goes into Bookkeeping automatically.",
+      "action": "View report"
+    },
+    "vas": {
+      "label": "Add-on services",
+      "sub": "VAS & catalog",
+      "hint": "Two ways to grow revenue: sell add-on services on existing jobs, and stop cost leaks. Here you find VAS opportunities, manage the catalog, and plan them with five AI teams.",
+      "action": "Check leaks"
+    },
+    "zeroWaste": {
+      "label": "Zero waste",
+      "sub": "Five sources of waste",
+      "hint": "Measure idle time, travel, materials, rework, and water and chemicals in Rupiah. Log findings, act on them, and see how close you are to zero loss.",
+      "action": "Grow revenue"
+    },
+    "radar": {
+      "label": "Opportunity radar",
+      "sub": "Leads from your transactions",
+      "hint": "Opportunities from your own transactions: recurring services coming due, customers who went quiet, stalled offers, and busy seasons.",
+      "action": "Ask the advisor"
+    },
+    "leads": {
+      "label": "Lead finder",
+      "sub": "Map & radius",
+      "hint": "Pick a point and a radius, then choose a business type. AI scores the fit and helps draft an offer. No messages are sent automatically.",
+      "action": "To offers"
+    },
+    "socialMedia": {
+      "label": "Social media",
+      "sub": "Content & schedule",
+      "hint": "Connect Facebook and Instagram, write content with AI, schedule posts, and request ads or collaborations.",
+      "action": "Ask the advisor"
+    },
+    "advisor": {
+      "label": "AI advisor",
+      "sub": "Multi-agent business advice",
+      "hint": "An AI advisor that reads your business numbers. Conversations are stored on this device.",
+      "action": "To overview"
+    },
+    "aiAssistant": {
+      "label": "AI Superpowers",
+      "sub": "Assistant & tools",
+      "hint": "An AI assistant with calculator, business data and rupiah formatting tools. Conversations are kept in session memory.",
+      "action": "Social media"
+    },
+    "pertumbuhan": {
+      "label": "Growth",
+      "action": "AI Superpowers"
+    },
+    "plan": {
+      "label": "Plan & quota",
+      "sub": "AI quota & vouchers",
+      "hint": "Your plan, this month's remaining AI quota, AI balance, and voucher redemption.",
+      "action": "To overview"
+    },
+    "support": {
+      "label": "Help",
+      "sub": "Tickets to the Satu Alur team",
+      "hint": "Send questions or complaints to the Satu Alur team and follow their replies here.",
+      "action": "To overview"
+    }
+  },
+  "nav": {
+    "stage": "Stage {num}",
+    "stageTitle": "Stage {num} · {label}",
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar",
+    "closeMenu": "Close menu",
+    "openMenu": "Open menu",
+    "settings": "Settings",
+    "backToBusiness": "Back to my business",
+    "office": "Satu Alur Office",
+    "signOut": "Sign out",
+    "income": "Revenue",
+    "incomeCount": "2 ways",
+    "growth": "Growth",
+    "growthCount": "AI",
+    "officeMenu": "Satu Alur Office menu",
+    "flowNav": "Workflow navigation",
+    "officeSections": "Satu Alur Office sections",
+    "flowStages": "Workflow stages",
+    "user": "User",
+    "pending": "{n} awaiting action",
+    "skip": "Skip to content"
+  },
+  "crumb": {
+    "home": "Satu Alur",
+    "workflow": "Workflow",
+    "about": "About {label}",
+    "backToWorkflow": "Back to workflow"
+  },
+  "drawer": {
+    "close": "Close settings",
+    "closeTitle": "Close (Esc)",
+    "pre": "Workspace configuration",
+    "title": "Sett<em>ings</em>",
+    "note": "Changes are saved automatically in this browser.",
+    "done": "Done"
+  },
+  "loadFailed": "Couldn't load the {label} stage: {error}"
+}

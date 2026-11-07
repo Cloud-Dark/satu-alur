@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "pemborosan": "Waste",
+    "tindakan": "Actions",
+    "optimasi": "Optimization room"
+  },
+  "stream": {
+    "waktu": {
+      "label": "Idle technician time",
+      "short": "Idle time",
+      "why": "Technicians get paid to wait for the schedule, the customer or materials.",
+      "fix": "Group jobs by zone, set 2-hour slots and fill gaps with small jobs."
+    },
+    "perjalanan": {
+      "label": "Travel & fuel",
+      "short": "Travel",
+      "why": "Unordered routes send the crew back and forth, burning fuel and work hours.",
+      "fix": "Order visits by zone, assign the nearest crew and avoid cross-city schedules."
+    },
+    "bahan": {
+      "label": "Materials & consumables",
+      "short": "Materials",
+      "why": "Overdosing, wasted packaging and leftover materials.",
+      "fix": "Measure per job, log leftovers per technician and reorder based on real usage."
+    },
+    "pengerjaan_ulang": {
+      "label": "Rework & callbacks",
+      "short": "Rework",
+      "why": "Inconsistent quality forces unpaid second visits.",
+      "fix": "A checklist before leaving the site, photos of the result and a customer signature."
+    },
+    "air_kimia": {
+      "label": "Water & chemicals",
+      "short": "Water & chemicals",
+      "why": "Mixing without measuring and over-rinsing waste water and chemicals.",
+      "fix": "Use measuring tools and dosing tablets, and recycle rinse water on heavy jobs."
+    }
+  },
+  "status": {
+    "open": "Not started",
+    "progress": "In progress",
+    "done": "Done"
+  },
+  "verdict": {
+    "noRevenue": "No revenue data yet",
+    "free": "Waste-free",
+    "below": "Below benchmark",
+    "at": "At benchmark",
+    "above": "Above benchmark"
+  },
+  "tabsLabel": "Zero waste",
+  "page": {
+    "title": "Waste-free",
+    "em": "Waste-free",
+    "record": "Log a finding"
+  },
+  "share": {
+    "ofRevenue": "{pct}% of revenue",
+    "ofRecorded": "{pct}% of recorded revenue",
+    "none": "no revenue recorded yet"
+  },
+  "ring": {
+    "aria": "{pct} percent waste-free",
+    "caption": "waste-free"
+  },
+  "hero": {
+    "clean": "No recorded loss is left",
+    "leaking": "{amount} still leaks every month",
+    "text": "Of the {loss} in losses you have logged, {saved} has been stopped. The remaining {remaining} equals {share}.",
+    "zero": "zero",
+    "noCompare": "— no recorded revenue to compare against",
+    "empty": "No losses logged yet. Log a first finding so the 100% waste-free target has an honest starting point.",
+    "viewActions": "View actions"
+  },
+  "kpi": {
+    "remaining": "Remaining loss",
+    "noRevenue": "No revenue recorded yet",
+    "stopped": "Already stopped",
+    "ofRecorded": "of {amount} recorded",
+    "winnable": "Still winnable",
+    "openFindings": "{count} open findings",
+    "done": "Findings closed",
+    "doneSub": "closed"
+  },
+  "streamCard": {
+    "sub": "{count} findings · {open} open",
+    "perMonth": "left / month",
+    "barAria": "{pct} percent stopped",
+    "stopped": "{pct}% stopped",
+    "benchmark": "benchmark {pct}% of revenue"
+  },
+  "plan": {
+    "title": "Shortest path to zero",
+    "meta": "Sorted by largest leak first",
+    "clean": "Every stream is clean. Keep it that way with a monthly check."
+  },
+  "table": {
+    "caption": "Waste findings and their actions",
+    "finding": "Finding",
+    "source": "Source",
+    "lossMonth": "Loss/mo",
+    "stopped": "Stopped",
+    "remaining": "Remaining",
+    "owner": "Owner",
+    "status": "Status",
+    "markDone": "Mark done: {title}",
+    "edit": "Edit {title}",
+    "delete": "Delete {title}"
+  },
+  "list": {
+    "note": "{shown} of {total} findings · {open} open · {amount} winnable",
+    "noRows": "Nothing to export.",
+    "exported": "{count} findings exported to CSV.",
+    "searchPlaceholder": "Search findings, actions or owners…",
+    "searchLabel": "Search waste findings",
+    "streamFilter": "Filter by waste source",
+    "allSources": "All sources",
+    "statusFilter": "Filter by finding status",
+    "allStatuses": "All statuses",
+    "bulk": "Bulk import",
+    "export": "Export CSV",
+    "emptyKicker": "No findings yet",
+    "emptyTitle": "Start with the leak you feel most",
+    "emptyBody": "For example: technicians wait 45 minutes for materials per job, or a return visit because a stain stayed. Every finding needs a monthly loss figure.",
+    "recordFirst": "Log the first finding",
+    "zero": "0 findings",
+    "pagerLabel": "waste findings",
+    "noMatch": "No matching findings. Change the search or filters."
+  },
+  "csv": {
+    "lossMonth": "Loss per month",
+    "action": "Action",
+    "created": "Created"
+  },
+  "facts": {
+    "revenue": "Revenue",
+    "recordedLoss": "Recorded loss",
+    "perMonth": "{amount}/mo",
+    "stopped": "Stopped so far",
+    "open": "Open findings",
+    "top": "Largest source",
+    "none": "None"
+  },
+  "presets": {
+    "rework": {
+      "label": "Stop return visits",
+      "problem": "Rework and callbacks cost money. I want to push this to zero without slowing the crew down."
+    },
+    "route": {
+      "label": "Tidy routes & fuel",
+      "problem": "Travel costs are up because schedules are not ordered. I want to save the fuel and work hours lost on the road."
+    },
+    "zero": {
+      "label": "100% waste-free target",
+      "problem": "I want to close every recorded leak and reach zero monthly loss within three months."
+    }
+  },
+  "editor": {
+    "stream": "Waste source",
+    "streamHint": "Pick one source so reports stay separate.",
+    "title": "What's leaking",
+    "titlePlaceholder": "Example: Technicians wait for materials at the warehouse",
+    "detail": "How it happens",
+    "detailPlaceholder": "When, where and how often.",
+    "loss": "Loss per month (Rp)",
+    "lossHint": "An honest estimate is more useful than a number that looks good.",
+    "saved": "Stopped per month (Rp)",
+    "savedHint": "Enter zero if nothing has been done yet.",
+    "action": "Action",
+    "actionPlaceholder": "What will be or has been done.",
+    "owner": "Action owner",
+    "ownerPlaceholder": "Example: Operations team",
+    "status": "Status",
+    "save": "Save changes",
+    "record": "Log finding",
+    "editTitle": "Edit finding",
+    "newTitle": "New waste finding",
+    "description": "One finding = one leak with a number and an owner. That is what makes the 100% target measurable.",
+    "titleRequired": "Describe what's leaking first.",
+    "lossRequired": "Monthly loss must be more than zero.",
+    "savedTooHigh": "The stopped amount cannot exceed the recorded loss.",
+    "updated": "Finding updated.",
+    "recorded": "Finding logged."
+  },
+  "common": {
+    "cancel": "Cancel",
+    "saving": "Saving…"
+  },
+  "markDone": {
+    "done": "Finding closed; the loss now counts as stopped."
+  },
+  "delete": {
+    "confirm": "Delete",
+    "title": "Delete this finding?",
+    "description": "\"{title}\" will be deleted and no longer count toward the waste-free target.",
+    "irreversible": "This can't be undone.",
+    "busy": "Deleting…",
+    "done": "Finding deleted."
+  },
+  "bulk": {
+    "label": "Paste data",
+    "hint": "A JSON array, or one line per finding: source | title | loss | stopped | owner | status. Sources: waktu, perjalanan, bahan, pengerjaan_ulang, air_kimia.",
+    "placeholder": "perjalanan | Unordered routes between districts | 900000 | 0 | Operations team | open\nbahan | Too much chemical in small pools | 400000 | 150000 | Operations team | progress",
+    "skip": "Skip findings whose title already exists",
+    "dupes": " · {count} already exist{skipped}",
+    "andSkipped": " and will be skipped",
+    "preview": "{count} new findings{extra}. Example: {title} — {amount}",
+    "import": "Import",
+    "title": "Bulk import findings",
+    "description": "Paste from a spreadsheet. If one row is invalid the whole import is rejected, so the totals are never half-done.",
+    "allDupes": "Every finding already exists. Nothing was imported.",
+    "importing": "Importing…",
+    "done": "{count} findings imported{skipped}.",
+    "skippedCount": ", {count} skipped"
+  },
+  "load": {
+    "retry": "Try again",
+    "failed": "Couldn't load data: {error}"
+  },
+  "parse": {
+    "line": "Line {line}: {error}",
+    "empty": "There is no data to import.",
+    "badJson": "Invalid JSON. Check commas and quotes.",
+    "notArray": "The JSON must be a list of findings."
+  }
+}

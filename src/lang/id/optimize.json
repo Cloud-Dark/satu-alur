@@ -1,0 +1,85 @@
+{
+  "phase": {
+    "idle": "Menunggu",
+    "working": "Menulis",
+    "done": "Selesai",
+    "error": "Gagal",
+    "stopped": "Dihentikan"
+  },
+  "scope": {
+    "vas": "Layanan tambahan (VAS)",
+    "waste": "Tanpa limbah (zero waste)"
+  },
+  "teams": {
+    "kreatif": {
+      "name": "Tim Kreatif",
+      "role": "Nama, kemasan, cerita",
+      "ask": "Usulkan nama dan isi paket yang bisa dijelaskan dalam satu kalimat."
+    },
+    "pemasaran": {
+      "name": "Tim Marketing",
+      "role": "Permintaan & kanal",
+      "ask": "Tentukan kanal termurah untuk menjangkau pelanggan yang sudah ada."
+    },
+    "keuangan": {
+      "name": "Tim Keuangan",
+      "role": "Harga, margin, arus kas",
+      "ask": "Hitung margin dan harga minimum yang masih sehat."
+    },
+    "operasional": {
+      "name": "Tim Operasional",
+      "role": "Kapasitas & eksekusi",
+      "ask": "Perkirakan tambahan waktu kerja per pekerjaan dan apakah tim sanggup."
+    },
+    "riset": {
+      "name": "Tim Riset & Data",
+      "role": "Bukti & asumsi",
+      "ask": "Pisahkan fakta dari asumsi pada brief ini."
+    }
+  },
+  "lead": {
+    "name": "Pimpinan Optimasi",
+    "waiting": "Menunggu lima tim",
+    "merging": "Menyatukan usulan lima tim…",
+    "noConclusion": "Tidak ada kesimpulan yang bisa disusun.",
+    "hint": "Kesimpulan muncul setelah kelima tim selesai menjawab.",
+    "done": "Selesai{when}",
+    "mergingShort": "Menyatukan usulan…",
+    "stopped": "Dihentikan sebelum kesimpulan"
+  },
+  "form": {
+    "problem": "Masalah yang ingin dipecahkan",
+    "problemPlaceholderVas": "Contoh: penawaran saya selalu berhenti di harga jasa dasar, padahal pelanggan minta perawatan lanjutan.",
+    "problemPlaceholderWaste": "Contoh: teknisi sering menunggu bahan dan bolak-balik, biaya bensin naik tapi jumlah pekerjaan tetap.",
+    "target": "Target tambahan per bulan (Rp)",
+    "targetHint": "Kosongkan bila belum ada angka. Tim akan memakai angka bisnis Anda sebagai patokan.",
+    "note": "Catatan pemilik usaha",
+    "notePlaceholder": "Batasan yang harus dipatuhi, misalnya: tidak menambah teknisi bulan ini.",
+    "presets": "Contoh brief",
+    "run": "Jalankan 5 tim",
+    "stop": "Hentikan",
+    "title": "Ruang optimasi {scope}",
+    "meta": "Lima tim bekerja bersamaan, lalu pimpinan optimasi menyatukan hasilnya"
+  },
+  "facts": {
+    "title": "Angka yang dibaca setiap tim",
+    "empty": "Belum ada data. Tim akan menjawab dengan asumsi yang ditulis terbuka."
+  },
+  "teamsHead": {
+    "title": "Lima tim",
+    "note": "Setiap tim melihat angka yang sama dari sudut berbeda"
+  },
+  "team": {
+    "working": "Sedang menyusun usulan…",
+    "error": "Tim ini tidak berhasil menjawab.",
+    "waiting": "Menunggu brief. {ask}"
+  },
+  "run": {
+    "needProblem": "Tulis dulu masalah yang ingin dipecahkan, supaya tim tidak menebak.",
+    "modelNotReady": "Model AI belum siap ({error}). Coba lagi sebentar.",
+    "genericError": "Terjadi kesalahan.",
+    "ready": "Rencana optimasi siap.",
+    "stopped": "Dihentikan. Usulan yang sudah jadi tetap tersimpan di halaman ini.",
+    "stopping": "Menghentikan tim…"
+  }
+}

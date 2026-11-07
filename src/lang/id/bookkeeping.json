@@ -1,0 +1,92 @@
+{
+  "title": "Pembukuan",
+  "pickBody": "Buka Alur kerja, lalu tekan \"Bukukan\" pada pekerjaan yang sudah selesai. Total semua pekerjaan ada di Laporan.",
+  "loading": "Memuat…",
+  "category": {
+    "pendapatan": "Pendapatan",
+    "biaya_tenaga": "Biaya tenaga kerja",
+    "biaya_bahan": "Biaya bahan / material",
+    "biaya_transport": "Biaya transportasi",
+    "biaya_lain": "Biaya lain-lain"
+  },
+  "form": {
+    "job": "Pekerjaan selesai",
+    "jobHint": "Satu pekerjaan boleh punya beberapa jurnal: pendapatan dan biaya-biayanya.",
+    "chooseJob": "Pilih pekerjaan",
+    "noJobs": "Belum ada pekerjaan selesai",
+    "category": "Kategori",
+    "chooseCategory": "Pilih kategori",
+    "amount": "Jumlah (Rp)",
+    "vas": "Layanan tambahan (opsional)",
+    "vasHint": "Tandai bila pendapatan ini berasal dari item di menu Layanan tambahan.",
+    "notVas": "Bukan layanan tambahan",
+    "vasError": "Gagal memuat layanan tambahan: {error}",
+    "fillOffer": "Isi nilai penawaran {price}"
+  },
+  "wiz": {
+    "label": "Posting jurnal",
+    "pick": "Pilih pekerjaan",
+    "pickDesc": "Pekerjaan selesai yang akan dibukukan.",
+    "entry": "Jurnal",
+    "entryDesc": "Pendapatan atau biaya, beserta jumlahnya.",
+    "review": "Tinjau",
+    "reviewDesc": "Periksa jurnal sebelum diposting."
+  },
+  "error": {
+    "pick": "Pilih pekerjaan selesai.",
+    "category": "Pilih kategori.",
+    "amount": "Jumlah harus angka lebih dari nol.",
+    "revenueTakenLong": "Pendapatan pekerjaan ini sudah diposting. Pilih kategori biaya, atau pekerjaan lain.",
+    "revenueTaken": "Pendapatan pekerjaan ini sudah diposting."
+  },
+  "preview": {
+    "doneDate": "Tanggal selesai"
+  },
+  "entries": {
+    "one": "{count} jurnal",
+    "other": "{count} jurnal"
+  },
+  "booked": "Dibukukan",
+  "notBooked": "Belum dibukukan",
+  "offerValueNote": "Nilai penawaran {price}",
+  "review": {
+    "job": "Pekerjaan",
+    "offerValue": "Nilai penawaran",
+    "previous": "Jurnal sebelumnya"
+  },
+  "notFound": "Pekerjaan selesai ini tidak ditemukan.",
+  "toWorkflow": "Ke alur kerja",
+  "posting": "Memposting…",
+  "done": {
+    "more": "Tambah jurnal",
+    "other": "Pekerjaan lain",
+    "report": "Lihat laporan",
+    "invoice": "Buat invoice",
+    "text": "{category} {amount} untuk {name} diposting.",
+    "toast": "Jurnal diposting."
+  },
+  "postError": "Gagal memposting: {error}",
+  "loadError": "Gagal memuat: {error}",
+  "kpi": {
+    "revenue": "Pendapatan",
+    "cost": "Biaya",
+    "profit": "Laba",
+    "loss": "Rugi",
+    "margin": "Margin {pct}%",
+    "marginNone": "Margin —"
+  },
+  "list": {
+    "title": "Jurnal pekerjaan ini",
+    "loading": "memuat…",
+    "emptyKicker": "Belum ada data",
+    "emptyTitle": "Pekerjaan ini belum dibukukan.",
+    "emptyBody": "Jurnal pendapatan dan biayanya muncul di sini beserta saldo berjalan."
+  },
+  "col": {
+    "date": "Tanggal",
+    "desc": "Keterangan",
+    "in": "Masuk",
+    "out": "Keluar",
+    "balance": "Saldo"
+  }
+}

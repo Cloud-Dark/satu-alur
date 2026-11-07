@@ -8,11 +8,14 @@ import { integrationCard } from '../../ui/integration-card.js'
 import { REPLIZ_PLATFORMS, POST_TYPES, SCHEDULE_STATUS, CAPTION_MAX } from '../../repliz/rules.js'
 import { toUtcIso } from '../../social/rules.js'
 import '../../styles/repliz.css'
+import { t, has } from '../../i18n/index.js'
 
 const { el } = C
 const BADGE = { instagram: 'IG', facebook: 'FB', threads: '@', tiktok: 'TT', youtube: 'YT', linkedin: 'in', twitter: 'X', pinterest: 'P' }
 const TONE = { pending: 'brand', process: 'warn', success: 'ok', error: 'danger' }
 let seq = 0
+const typeLabel = (k) => (has(`social.status.postType.${k}`) ? t(`social.status.postType.${k}`) : POST_TYPES[k]?.label || k)
+const statusLabel = (k) => (has(`social.status.repliz.${k}`) ? t(`social.status.repliz.${k}`) : SCHEDULE_STATUS[k] || k)
 
 export const replizReady = (ctx) => Boolean(ctx.repliz?.status?.configured)
 
@@ -24,8 +27,8 @@ export function credentialsPanel(ctx) {
     const item = list.items.find((i) => i.provider === 'repliz')
     host.replaceChildren(integrationCard(item, { demo: list.demo, enabled: list.enabled, onChange: () => ctx.refresh() }))
   }).catch((err) => { if (!ctx.signal.aborted) host.replaceChildren(C.errorState(err.message)) })
-  return C.panel({ title: 'Hubungkan akun Repliz Anda', raised: true },
-    el('p', {}, 'Satu Alur mengunggah ke Instagram, Facebook, TikTok, dan lainnya lewat akun Repliz milik usaha Anda. Isi kuncinya sekali di sini.'),
+  return C.panel({ title: t('social.repliz.credTitle'), raised: true },
+    el('p', {}, t('social.repliz.credBody')),
     host)
 }
 export const usableAccounts = (ctx) => (ctx.repliz?.accounts || []).filter((a) => !a.needs_reconnect)
@@ -39,19 +42,19 @@ function badge(platform) {
 
 export function pickPanel(ctx) {
   const list = el('div', {}, C.skeletonRows(2))
-  const panel = C.panel({ title: 'Pilih yang akan dihubungkan', meta: 'Beberapa pilihan ditemukan', raised: true }, list)
+  const panel = C.panel({ title: t('social.repliz.pickTitle'), meta: t('social.repliz.pickMeta'), raised: true }, list)
   Repliz.getPick(ctx.replizPick).then((pick) => {
     if (ctx.signal.aborted) return
-    panel.querySelector('.panel-title').textContent = `Pilih ${pick.label}`
+    panel.querySelector('.panel-title').textContent = t('social.account.pick.chooseName', { name: pick.label })
     list.replaceChildren(...pick.entities.map((e) => {
-      const btn = C.button({ label: 'Pilih', variant: 'soft', size: 'sm' })
-      btn.setAttribute('aria-label', `Pilih ${e.name}`)
+      const btn = C.button({ label: t('social.account.pick.choose'), variant: 'soft', size: 'sm' })
+      btn.setAttribute('aria-label', t('social.account.pick.chooseName', { name: e.name }))
       btn.addEventListener('click', async () => {
-        const restore = C.setBusy(btn, 'Menghubungkan…')
+        const restore = C.setBusy(btn, t('social.account.connecting'))
         try {
           await Repliz.choosePick(ctx.replizPick, e.id)
           ctx.clearReplizPick()
-          showToast('Akun berhasil terhubung.', 'success')
+          showToast(t('social.callback.connected'), 'success')
           await ctx.refresh()
         } catch (err) { ctx.status.show('danger', err.message); restore() }
       })
@@ -66,37 +69,37 @@ export function pickPanel(ctx) {
 }
 
 function accountRow(ctx, a) {
-  const off = C.button({ label: 'Putuskan', icon: 'x', variant: 'ghost', size: 'sm' })
-  off.setAttribute('aria-label', `Putuskan ${REPLIZ_PLATFORMS[a.platform]?.label || a.platform} ${handle(a)}`)
+  const off = C.button({ label: t('social.account.disconnect'), icon: 'x', variant: 'ghost', size: 'sm' })
+  off.setAttribute('aria-label', t('social.repliz.disconnectAria', { platform: REPLIZ_PLATFORMS[a.platform]?.label || a.platform, handle: handle(a) }))
   off.addEventListener('click', async () => {
-    if (!confirm(`Putuskan ${handle(a)}? Unggahan yang belum tayang dari akun ini tidak akan terkirim.`)) return
-    const restore = C.setBusy(off, 'Memutuskan…')
+    if (!confirm(t('social.repliz.disconnectConfirm', { handle: handle(a) }))) return
+    const restore = C.setBusy(off, t('social.account.disconnecting'))
     ctx.status.hide()
     try {
       await Repliz.disconnect(a.id)
-      showToast('Akun diputuskan.', 'success')
+      showToast(t('social.account.disconnected'), 'success')
       await ctx.refresh()
     } catch (err) { ctx.status.show('danger', err.message); restore() }
   })
-  const again = a.needs_reconnect ? connectButton(ctx, a.platform, 'Sambungkan ulang', a.id) : null
+  const again = a.needs_reconnect ? connectButton(ctx, a.platform, t('social.repliz.reconnect'), a.id) : null
   return el('li', { className: 'rz-account' },
     a.picture ? el('img', { src: a.picture, alt: '', className: 'rz-avatar', referrerpolicy: 'no-referrer' }) : null,
-    el('div', { className: 'rz-account-text' }, el('strong', {}, handle(a) || 'Akun'), a.name && a.name !== handle(a) ? el('span', { className: 'muted small' }, a.name) : null),
-    a.needs_reconnect ? C.tag('Perlu disambung ulang', 'warn') : C.tag('Terhubung', 'ok'),
+    el('div', { className: 'rz-account-text' }, el('strong', {}, handle(a) || t('social.repliz.account')), a.name && a.name !== handle(a) ? el('span', { className: 'muted small' }, a.name) : null),
+    a.needs_reconnect ? C.tag(t('social.repliz.needsReconnect'), 'warn') : C.tag(t('social.account.connected'), 'ok'),
     el('div', { className: 'rz-account-actions' }, again, off))
 }
 
 function connectButton(ctx, platform, label, reconnect = null) {
   const name = REPLIZ_PLATFORMS[platform].label
   const btn = C.button({ label, icon: 'plug', variant: reconnect ? 'soft' : 'primary', size: 'sm' })
-  btn.setAttribute('aria-label', `${label} akun ${name}`)
+  btn.setAttribute('aria-label', t('social.repliz.connectAria', { label, name }))
   if (ctx.repliz?.status?.demo) btn.disabled = true
   btn.addEventListener('click', async () => {
-    const restore = C.setBusy(btn, 'Membuka…')
+    const restore = C.setBusy(btn, t('social.repliz.opening'))
     ctx.status.hide()
     try {
       const res = await Repliz.connect(platform, reconnect)
-      if (res?.connected) { showToast(`${name} terhubung.`, 'success'); await ctx.refresh() }
+      if (res?.connected) { showToast(t('social.repliz.connected', { name }), 'success'); await ctx.refresh() }
     } catch (err) { ctx.status.show('danger', err.message); restore() }
   })
   return btn
@@ -104,24 +107,24 @@ function connectButton(ctx, platform, label, reconnect = null) {
 
 export function accountsSection(ctx) {
   const { status, accounts = [], error } = ctx.repliz || {}
-  if (error) return C.panel({ title: 'Akun media sosial', raised: true }, C.errorState(`Akun tidak dapat dimuat: ${error}`))
-  const intro = el('p', {}, 'Hubungkan akun bisnis Anda sekali. Setelah itu konten bisa langsung diunggah atau dijadwalkan dari Satu Alur.')
-  if (status?.error) return C.panel({ title: 'Akun media sosial', raised: true }, C.errorState(status.error))
+  if (error) return C.panel({ title: t('social.repliz.accountsTitle'), raised: true }, C.errorState(t('social.repliz.loadError', { message: error })))
+  const intro = el('p', {}, t('social.repliz.intro'))
+  if (status?.error) return C.panel({ title: t('social.repliz.accountsTitle'), raised: true }, C.errorState(status.error))
   const notes = []
-  if (status?.demo) notes.push(el('div', { className: 'note note-info' }, C.icon('info'), el('div', { className: 'note-body' }, el('p', {}, 'Akun demo dipakai bersama, jadi tidak bisa menghubungkan media sosial. Masuk dengan email Anda sendiri untuk mencobanya.'))))
+  if (status?.demo) notes.push(el('div', { className: 'note note-info' }, C.icon('info'), el('div', { className: 'note-body' }, el('p', {}, t('social.repliz.demoNote')))))
   if (status?.capacity?.limit && status.capacity.used >= status.capacity.limit) {
-    notes.push(el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' }, el('p', {}, `Paket Repliz Anda memuat ${status.capacity.limit} akun dan sudah penuh. Putuskan akun lain atau naikkan paket Repliz untuk menambah.`))))
+    notes.push(el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' }, el('p', {}, t('social.repliz.full', { limit: status.capacity.limit })))))
   }
   const cards = el('ul', { className: 'rz-grid', role: 'list' }, ...(status?.platforms || []).map((p) => {
     const mine = accounts.filter((a) => a.platform === p.key)
     return el('li', { className: 'rz-card' },
       el('div', { className: 'rz-card-head' }, badge(p.key),
-        el('div', {}, el('strong', {}, p.label), el('p', { className: 'muted small' }, mine.length ? `${mine.length} akun terhubung` : 'Belum terhubung'))),
+        el('div', {}, el('strong', {}, p.label), el('p', { className: 'muted small' }, mine.length ? t('social.repliz.nConnected', { count: mine.length }) : t('social.account.notConnected')))),
       mine.length ? el('ul', { className: 'rz-accounts', role: 'list' }, ...mine.map((a) => accountRow(ctx, a))) : null,
-      el('div', { className: 'form-actions' }, connectButton(ctx, p.key, mine.length ? 'Tambah akun' : 'Hubungkan')))
+      el('div', { className: 'form-actions' }, connectButton(ctx, p.key, mine.length ? t('social.repliz.addAccount') : t('social.repliz.connect'))))
   }))
-  return C.panel({ title: 'Akun media sosial', meta: `${accounts.length} terhubung`, raised: true },
-    intro, ...notes, cards, el('p', { className: 'muted small rz-powered' }, 'Koneksi akun ditenagai Repliz milik usaha Anda. Kuncinya bisa diganti di Pengaturan › Konektor.'))
+  return C.panel({ title: t('social.repliz.accountsTitle'), meta: t('social.repliz.metaConnected', { n: accounts.length }), raised: true },
+    intro, ...notes, cards, el('p', { className: 'muted small rz-powered' }, t('social.repliz.powered')))
 }
 
 /* ------------------------------------------------------------------ post dialog */
@@ -136,31 +139,31 @@ export function openPostDialog(ctx, draft, opener) {
   const accounts = usableAccounts(ctx)
   const id = ++seq
   if (!accounts.length) {
-    const go = C.button({ label: 'Buka tab Akun', iconRight: 'arrowRight', variant: 'primary', type: 'button' })
-    const { close } = C.modal({ title: 'Belum ada akun terhubung', children: [el('p', {}, 'Hubungkan akun media sosial di tab Akun, lalu kembali ke sini.')],
-      actions: [C.button({ label: 'Tutup', variant: 'ghost', dismiss: true }), go], opener })
+    const go = C.button({ label: t('social.repliz.openAccounts'), iconRight: 'arrowRight', variant: 'primary', type: 'button' })
+    const { close } = C.modal({ title: t('social.repliz.noAccountsTitle'), children: [el('p', {}, t('social.repliz.noAccountsBody'))],
+      actions: [C.button({ label: t('social.close'), variant: 'ghost', dismiss: true }), go], opener })
     go.addEventListener('click', () => { close(); ctx.goto('account') })
     return
   }
-  const accountSel = C.select({ label: 'Akun', id: `rz-acc-${id}`, required: true,
+  const accountSel = C.select({ label: t('social.repliz.account'), id: `rz-acc-${id}`, required: true,
     options: accounts.map((a) => ({ value: a.id, label: `${REPLIZ_PLATFORMS[a.platform]?.label || a.platform} · ${handle(a)}` })) })
-  const typeSel = C.select({ label: 'Jenis unggahan', id: `rz-type-${id}`, required: true, options: [] })
-  const title = C.field({ label: 'Judul', id: `rz-title-${id}`, attrs: { maxlength: '100' }, hint: 'Wajib untuk YouTube.' })
-  const caption = C.textarea({ label: 'Teks', id: `rz-text-${id}`, value: draft?.body || '', rows: 6, attrs: { maxlength: String(CAPTION_MAX) } })
-  const media = C.textarea({ label: 'Tautan media', id: `rz-media-${id}`, rows: 2, placeholder: 'https://…', hint: 'Satu tautan per baris. Album: 2–5 gambar.' })
+  const typeSel = C.select({ label: t('social.repliz.postType'), id: `rz-type-${id}`, required: true, options: [] })
+  const title = C.field({ label: t('social.repliz.title'), id: `rz-title-${id}`, attrs: { maxlength: '100' }, hint: t('social.repliz.titleHint') })
+  const caption = C.textarea({ label: t('social.repliz.text'), id: `rz-text-${id}`, value: draft?.body || '', rows: 6, attrs: { maxlength: String(CAPTION_MAX) } })
+  const media = C.textarea({ label: t('social.repliz.media'), id: `rz-media-${id}`, rows: 2, placeholder: 'https://…', hint: t('social.repliz.mediaHint') })
   const fileId = `rz-file-${id}`
   const file = el('input', { id: fileId, type: 'file', accept: 'image/jpeg,image/png,video/mp4', className: 'input' })
-  const fileWrap = el('div', { className: 'field' }, el('label', { className: 'field-label', htmlFor: fileId }, 'Atau unggah berkas'), file,
-    el('span', { className: 'field-hint' }, 'JPG, PNG, atau MP4, maksimal 50 MB.'))
-  const boardSel = C.select({ label: 'Papan Pinterest', id: `rz-board-${id}`, options: [{ value: '', label: 'Memuat papan…' }] })
-  const privacySel = C.select({ label: 'Siapa yang bisa menonton', id: `rz-priv-${id}`, value: 'public',
-    options: [{ value: 'public', label: 'Publik' }, { value: 'unlisted', label: 'Hanya yang punya tautan' }, { value: 'private', label: 'Pribadi' }] })
-  const when = C.choiceGroup({ legend: 'Kapan tayang', type: 'radio', name: `rz-when-${id}`,
-    options: [{ value: 'now', label: 'Sekarang', checked: true }, { value: 'later', label: 'Jadwalkan' }] })
-  const at = C.field({ label: 'Tanggal dan waktu', id: `rz-at-${id}`, type: 'datetime-local', attrs: { min: localMin() } })
+  const fileWrap = el('div', { className: 'field' }, el('label', { className: 'field-label', htmlFor: fileId }, t('social.repliz.orUpload')), file,
+    el('span', { className: 'field-hint' }, t('social.repliz.fileHint')))
+  const boardSel = C.select({ label: t('social.repliz.board'), id: `rz-board-${id}`, options: [{ value: '', label: t('social.repliz.boardLoading') }] })
+  const privacySel = C.select({ label: t('social.repliz.privacy'), id: `rz-priv-${id}`, value: 'public',
+    options: [{ value: 'public', label: t('social.repliz.public') }, { value: 'unlisted', label: t('social.repliz.unlisted') }, { value: 'private', label: t('social.repliz.private') }] })
+  const when = C.choiceGroup({ legend: t('social.repliz.when'), type: 'radio', name: `rz-when-${id}`,
+    options: [{ value: 'now', label: t('social.repliz.now'), checked: true }, { value: 'later', label: t('social.repliz.later') }] })
+  const at = C.field({ label: t('social.dateTime'), id: `rz-at-${id}`, type: 'datetime-local', attrs: { min: localMin() } })
   const err = el('p', { className: 'field-error', role: 'alert' })
-  const submit = C.button({ label: 'Unggah', icon: 'send', variant: 'primary', type: 'submit' })
-  const cancel = C.button({ label: 'Batal', variant: 'ghost', dismiss: true })
+  const submit = C.button({ label: t('social.repliz.upload'), icon: 'send', variant: 'primary', type: 'submit' })
+  const cancel = C.button({ label: t('social.cancel'), variant: 'ghost', dismiss: true })
   let boards = []
 
   const current = () => accounts.find((a) => a.id === accountSel.input.value) || accounts[0]
@@ -168,7 +171,7 @@ export function openPostDialog(ctx, draft, opener) {
     const a = current()
     const p = REPLIZ_PLATFORMS[a.platform]
     const keep = typeSel.input.value
-    C.setOptions(typeSel.input, p.types.map((t) => ({ value: t, label: POST_TYPES[t].label })), p.types.includes(keep) ? keep : p.types[0])
+    C.setOptions(typeSel.input, p.types.map((k) => ({ value: k, label: typeLabel(k) })), p.types.includes(keep) ? keep : p.types[0])
     const type = typeSel.input.value
     title.wrap.hidden = !['youtube', 'pinterest', 'tiktok', 'facebook'].includes(a.platform)
     media.wrap.hidden = type === 'text'
@@ -178,7 +181,7 @@ export function openPostDialog(ctx, draft, opener) {
     if (p.needsBoard) {
       Repliz.listBoards(a.id).then((list) => {
         boards = list
-        C.setOptions(boardSel.input, list.length ? list.map((b) => ({ value: b.id, label: b.name })) : [{ value: '', label: 'Belum ada papan' }])
+        C.setOptions(boardSel.input, list.length ? list.map((b) => ({ value: b.id, label: b.name })) : [{ value: '', label: t('social.repliz.noBoards') }])
       }).catch((e) => { C.setOptions(boardSel.input, [{ value: '', label: e.message }]) })
     }
   }
@@ -191,7 +194,7 @@ export function openPostDialog(ctx, draft, opener) {
     const f = file.files[0]
     if (!f) return
     err.textContent = ''
-    const restore = C.setBusy(submit, 'Mengunggah berkas…')
+    const restore = C.setBusy(submit, t('social.repliz.uploadingFile'))
     try {
       const up = await Repliz.uploadMedia(f)
       media.input.value = [media.input.value.trim(), up.url].filter(Boolean).join('\n')
@@ -201,7 +204,7 @@ export function openPostDialog(ctx, draft, opener) {
   })
 
   const { form, close } = C.modal({
-    title: 'Unggah ke media sosial', wide: true,
+    title: t('social.repliz.dialogTitle'), wide: true,
     children: [accountSel.wrap, typeSel.wrap, title.wrap, caption.wrap, media.wrap, fileWrap, boardSel.wrap, privacySel.wrap, when.wrap, at.wrap, err],
     actions: [cancel, submit], opener,
   })
@@ -211,7 +214,7 @@ export function openPostDialog(ctx, draft, opener) {
     e.preventDefault()
     err.textContent = ''
     const later = when.inputs.later.checked
-    if (later && (!at.input.value || Number.isNaN(Date.parse(at.input.value)))) { err.textContent = 'Pilih tanggal dan waktu tayang.'; return }
+    if (later && (!at.input.value || Number.isNaN(Date.parse(at.input.value)))) { err.textContent = t('social.repliz.pickDate'); return }
     const a = current()
     const input = {
       account_id: a.id,
@@ -223,11 +226,11 @@ export function openPostDialog(ctx, draft, opener) {
       privacy: privacySel.input.value,
       board: REPLIZ_PLATFORMS[a.platform].needsBoard ? boards.find((b) => b.id === boardSel.input.value) : undefined,
     }
-    const restore = C.setBusy(submit, later ? 'Menjadwalkan…' : 'Mengunggah…')
+    const restore = C.setBusy(submit, later ? t('social.repliz.scheduling') : t('social.repliz.uploading'))
     try {
       await Repliz.schedule(input)
       close()
-      showToast(later ? 'Unggahan dijadwalkan.' : 'Unggahan dikirim. Statusnya ada di Jadwal › Laporan tayang.', 'success', 5000)
+      showToast(later ? t('social.repliz.scheduled') : t('social.repliz.sent'), 'success', 5000)
       ctx.onPosted?.()
     } catch (e2) { err.textContent = e2.message } finally { restore() }
   })
@@ -237,20 +240,20 @@ export function openPostDialog(ctx, draft, opener) {
 
 export function postsSection(ctx, redraw) {
   const list = el('div', {}, C.skeletonRows(2))
-  const panel = C.panel({ title: 'Unggahan akun terhubung', meta: 'memuat…' }, list)
+  const panel = C.panel({ title: t('social.repliz.postsTitle'), meta: t('social.repliz.loading') }, list)
   Repliz.listPosts().then((rows) => {
     if (ctx.signal.aborted) return
-    panel.querySelector('.panel-meta').textContent = `${rows.length} unggahan`
-    if (!rows.length) { list.replaceChildren(C.emptyState({ title: 'Belum ada unggahan', iconName: 'send', body: 'Unggah dari tab Konten atau dari Daftar konten.' })); return }
+    panel.querySelector('.panel-meta').textContent = t('social.repliz.nPosts', { count: rows.length })
+    if (!rows.length) { list.replaceChildren(C.emptyState({ title: t('social.repliz.postsEmpty'), iconName: 'send', body: t('social.repliz.postsEmptyBody') })); return }
     const renderRow = (r) => {
       let action = null
-      if (r.status === 'success' && r.link) action = el('a', { href: r.link, target: '_blank', rel: 'noopener' }, 'Lihat unggahan ↗')
+      if (r.status === 'success' && r.link) action = el('a', { href: r.link, target: '_blank', rel: 'noopener' }, t('social.repliz.viewPost'))
       else if (r.status === 'pending') {
-        action = C.button({ label: 'Batalkan', variant: 'ghost', size: 'sm' })
+        action = C.button({ label: t('social.schedule.cancelPost'), variant: 'ghost', size: 'sm' })
         action.addEventListener('click', async () => {
-          const restore = C.setBusy(action, 'Membatalkan…')
+          const restore = C.setBusy(action, t('social.schedule.cancelling'))
           ctx.status.hide()
-          try { await Repliz.cancelPost(r.id); showToast('Jadwal dibatalkan.', 'success') } catch (err) { ctx.status.show('danger', err.message) }
+          try { await Repliz.cancelPost(r.id); showToast(t('social.repliz.cancelled'), 'success') } catch (err) { ctx.status.show('danger', err.message) }
           restore()
           if (!ctx.signal.aborted) redraw()
         })
@@ -258,13 +261,13 @@ export function postsSection(ctx, redraw) {
       return el('article', { className: 'workspace-entry rz-post' },
         el('div', { className: 'workspace-entry-head' },
           el('div', { className: 'rz-who' }, badge(r.platform), el('strong', {}, `${REPLIZ_PLATFORMS[r.platform]?.label || r.platform}${r.account_label ? ` · ${r.account_label}` : ''}`)),
-          C.tag(SCHEDULE_STATUS[r.status] || r.status, TONE[r.status] || 'neutral'),
+          C.tag(statusLabel(r.status), TONE[r.status] || 'neutral'),
           el('span', { className: 'muted small' }, C.formatDateTime(r.scheduled_at))),
         r.preview ? el('p', { className: 'workspace-preview' }, r.preview.slice(0, 160)) : null,
         r.status === 'error' && r.error ? el('p', { className: 'field-error' }, r.error) : null,
         action)
     }
-    list.replaceChildren(C.paginate({ key: 'rz-posts', label: 'unggahan', pageSize: 10, items: rows, render: (page) => page.map(renderRow) }).root)
+    list.replaceChildren(C.paginate({ key: 'rz-posts', label: t('social.repliz.postsPaging'), pageSize: 10, items: rows, render: (page) => page.map(renderRow) }).root)
   }).catch((err) => { if (!ctx.signal.aborted) list.replaceChildren(C.errorState(err.message)) })
   return panel
 }

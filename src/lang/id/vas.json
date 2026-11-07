@@ -1,0 +1,225 @@
+{
+  "tabs": {
+    "peluang": "Peluang",
+    "katalog": "Katalog",
+    "optimasi": "Ruang optimasi"
+  },
+  "category": {
+    "perawatan": "Perawatan berkala",
+    "perlindungan": "Perlindungan & garansi",
+    "peningkatan": "Peningkatan kualitas",
+    "kecepatan": "Kecepatan & prioritas",
+    "paket": "Paket & langganan",
+    "lain": "Lain-lain"
+  },
+  "status": {
+    "active": "Aktif",
+    "draft": "Draf",
+    "retired": "Dihentikan"
+  },
+  "kind": {
+    "langganan": "Langganan",
+    "berkala": "Berkala",
+    "garansi": "Garansi",
+    "bundling": "Bundling",
+    "tertahan": "Penawaran tertahan",
+    "marginkatalog": "Margin katalog"
+  },
+  "owner": {
+    "Keuangan": "Keuangan",
+    "Operasional": "Operasional",
+    "Marketing": "Marketing",
+    "Kreatif": "Kreatif"
+  },
+  "opp": {
+    "langganan": {
+      "title": "Kontrak perawatan bulanan untuk pelanggan berulang",
+      "why": "{count} pelanggan sudah memesan lebih dari sekali. Mereka membeli ulang secara manual — kontrak bulanan mengubahnya menjadi pendapatan tetap dan mengunci jadwal.",
+      "basisItem": "{name} ({count} permintaan)"
+    },
+    "berkala": {
+      "title": "Servis berkala untuk pekerjaan yang lewat 30 hari",
+      "why": "{count} pekerjaan selesai lebih dari sebulan lalu dan pelanggannya belum memesan lagi. Servis berkala adalah alasan alami untuk menghubungi mereka.",
+      "basisItem": "{customer} — {service}, {age} hari lalu"
+    },
+    "garansi": {
+      "title": "Perpanjangan garansi untuk pekerjaan bernilai besar",
+      "why": "{count} pekerjaan bernilai di atas rata-rata. Pada nilai sebesar itu, pelanggan biasanya mau membayar untuk ketenangan — dan biaya klaim Anda rendah karena pekerjaannya baru.",
+      "basis": "{count} pekerjaan di atas {amount}"
+    },
+    "bundling": {
+      "title": "Paket tambahan untuk \"{type}\"",
+      "why": "\"{type}\" adalah layanan Anda yang paling sering diminta tanpa produk tambahan menempel padanya. Satu add-on kecil di setiap penawaran menaikkan nilai tanpa menambah kunjungan.",
+      "basis": "{count} permintaan \"{type}\" belum punya VAS aktif"
+    },
+    "tertahan": {
+      "title": "Buka penawaran tertahan dengan bonus kecil",
+      "why": "{count} penawaran belum dijawab lebih dari 3 hari. Tambahan bernilai kecil yang diberikan gratis bersyarat sering menghidupkan kembali percakapan yang berhenti.",
+      "basis": "{count} penawaran menunggu jawaban"
+    },
+    "marginkatalog": {
+      "title": "Perbaiki margin item VAS yang tipis",
+      "why": "{count} item aktif bermargin di bawah 25%. Menaikkan harga atau menurunkan biaya pada item yang sudah terjual lebih mudah daripada mencari pelanggan baru."
+    },
+    "price": "Harga saran",
+    "perMonth": "Pelanggan/bulan",
+    "attach": "Tingkat pasang",
+    "confidence": "Keyakinan",
+    "potential": "Potensi/bulan",
+    "basis": "Dasar: ",
+    "toCatalog": "Jadikan item katalog",
+    "discuss": "Bahas 5 tim",
+    "owner": "Pemilik: {owner}"
+  },
+  "tabsLabel": "Layanan tambahan",
+  "page": {
+    "title": "Pendapatan tambahan",
+    "em": "tambahan",
+    "newItem": "Item baru"
+  },
+  "kpi": {
+    "potential": "Potensi bulanan",
+    "potentialSub": "dari peluang yang terdeteksi",
+    "open": "Peluang terbuka",
+    "openSub": "dihitung dari data Anda",
+    "catalogMargin": "Margin katalog",
+    "activeItems": "{count} item aktif",
+    "share": "Porsi VAS",
+    "shareSub": "dari {amount} pendapatan"
+  },
+  "empty": {
+    "kicker": "Belum ada peluang",
+    "title": "Catat beberapa permintaan dan penyelesaian dulu",
+    "body": "Peluang dihitung dari pekerjaan yang sudah Anda catat. Setelah ada riwayat, halaman ini akan menunjuk pelanggan dan layanan yang siap ditawari tambahan."
+  },
+  "section": {
+    "title": "Peluang dari pekerjaan Anda",
+    "note": "Margin rata-rata katalog {pct}% · angka diperbarui setiap halaman dibuka"
+  },
+  "table": {
+    "caption": "Katalog layanan tambahan",
+    "item": "Item",
+    "category": "Kategori",
+    "price": "Harga",
+    "cost": "Biaya",
+    "margin": "Margin",
+    "attachTo": "Menempel pada",
+    "allServices": "Semua layanan",
+    "attach": "Pasang",
+    "status": "Status",
+    "edit": "Ubah {name}",
+    "delete": "Hapus {name}"
+  },
+  "catalog": {
+    "note": "{shown} dari {total} item · {active} aktif · potensi {amount}/bulan",
+    "noRows": "Tidak ada baris untuk diekspor.",
+    "exported": "{count} item diekspor ke CSV.",
+    "searchPlaceholder": "Cari item, layanan induk, atau kategori…",
+    "searchLabel": "Cari item katalog",
+    "filterLabel": "Saring status item",
+    "allStatuses": "Semua status",
+    "bulk": "Impor massal",
+    "export": "Ekspor CSV",
+    "emptyKicker": "Katalog kosong",
+    "emptyTitle": "Belum ada layanan tambahan",
+    "emptyBody": "Tambahkan satu item, atau tempel daftar harga Anda sekaligus lewat Impor massal.",
+    "addFirst": "Tambah item pertama",
+    "emptyNote": "0 item · potensi Rp0/bulan",
+    "pagerLabel": "katalog layanan tambahan",
+    "noMatch": "Tidak ada item yang cocok. Ubah kata kunci atau saringan status."
+  },
+  "csv": {
+    "marginPct": "Margin persen",
+    "parent": "Layanan induk",
+    "created": "Dibuat"
+  },
+  "facts": {
+    "revenue": "Pendapatan tercatat",
+    "avgJob": "Rata-rata pekerjaan",
+    "activeItems": "Item VAS aktif",
+    "catalogPotential": "Potensi katalog",
+    "perMonth": "{amount}/bln",
+    "detected": "Peluang terdeteksi"
+  },
+  "presets": {
+    "offer": {
+      "label": "Naikkan nilai penawaran",
+      "problem": "Nilai penawaran saya berhenti di jasa dasar. Saya ingin setiap penawaran membawa satu layanan tambahan yang relevan tanpa membuat pelanggan menolak."
+    },
+    "contract": {
+      "label": "Kontrak perawatan bulanan",
+      "problem": "Saya ingin mengubah pelanggan berulang menjadi kontrak perawatan bulanan supaya pendapatan lebih pasti."
+    },
+    "margin": {
+      "label": "Perbaiki margin katalog",
+      "problem": "Beberapa item tambahan saya dijual terlalu murah. Saya ingin tahu mana yang harus dinaikkan harganya atau dihentikan."
+    }
+  },
+  "editor": {
+    "name": "Nama item",
+    "namePlaceholder": "Contoh: Perawatan AC 3 bulan",
+    "category": "Kategori",
+    "price": "Harga jual (Rp)",
+    "cost": "Biaya langsung (Rp)",
+    "costHint": "Bahan dan waktu yang benar-benar keluar untuk item ini.",
+    "attachTo": "Menempel pada layanan",
+    "attachPlaceholder": "Kosongkan untuk semua layanan",
+    "attachHint": "Nama layanan persis seperti di permintaan, mis. Pembersihan AC.",
+    "rate": "Perkiraan tingkat pasang (%)",
+    "rateHint": "Berapa persen pelanggan yang biasanya mengambil item ini.",
+    "desc": "Penjelasan singkat",
+    "descPlaceholder": "Satu atau dua kalimat yang bisa dibaca pelanggan.",
+    "status": "Status",
+    "marginAuto": "Margin dihitung otomatis.",
+    "margin": "Margin {amount} ({pct}%) per item",
+    "save": "Simpan perubahan",
+    "add": "Tambah item",
+    "editTitle": "Ubah item VAS",
+    "newTitle": "Item VAS baru",
+    "description": "Item ini muncul sebagai tawaran tambahan di penawaran dan dihitung dalam potensi katalog.",
+    "nameRequired": "Nama item wajib diisi.",
+    "priceRequired": "Harga harus lebih dari nol.",
+    "updated": "Item diperbarui.",
+    "added": "Item ditambahkan."
+  },
+  "common": {
+    "cancel": "Batal",
+    "saving": "Menyimpan…"
+  },
+  "delete": {
+    "confirm": "Hapus",
+    "title": "Hapus item VAS?",
+    "description": "\"{name}\" akan dihapus dari katalog. Riwayat pendapatan yang sudah tercatat tidak berubah.",
+    "irreversible": "Tindakan ini tidak bisa dibatalkan.",
+    "busy": "Menghapus…",
+    "done": "Item dihapus."
+  },
+  "bulk": {
+    "label": "Tempel data",
+    "hint": "Dua format diterima: JSON array, atau satu baris per item dengan pemisah | — nama | harga | biaya | kategori | layanan | tingkat pasang.",
+    "placeholder": "Perawatan AC 3 bulan | 450000 | 120000 | perawatan | Pembersihan AC | 30\nCuci karpet express | 250000 | 60000 | kecepatan | Cuci Sofa & Karpet | 20",
+    "unreadable": "Berkas tidak bisa dibaca.",
+    "skip": "Lewati item yang namanya sudah ada di katalog",
+    "dupes": " · {count} sudah ada{skipped}",
+    "andSkipped": " dan dilewati",
+    "preview": "{count} item baru{extra}. Contoh: {name} — {price}",
+    "import": "Impor",
+    "title": "Impor massal item VAS",
+    "description": "Tempel dari spreadsheet, atau pilih berkas JSON/CSV. Baris yang salah akan ditolak seluruhnya agar katalog tidak setengah jadi.",
+    "pickFile": "Pilih berkas",
+    "allDupes": "Semua baris sudah ada di katalog. Tidak ada yang diimpor.",
+    "importing": "Mengimpor…",
+    "done": "{count} item diimpor{skipped}.",
+    "skippedCount": ", {count} dilewati"
+  },
+  "parse": {
+    "empty": "Tidak ada data untuk diimpor.",
+    "badJson": "JSON tidak valid. Periksa koma dan tanda kutip.",
+    "notArray": "JSON harus berupa daftar item.",
+    "line": "Baris {line}: {error}"
+  },
+  "load": {
+    "retry": "Coba lagi",
+    "failed": "Gagal memuat data: {error}"
+  }
+}

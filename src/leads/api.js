@@ -6,6 +6,7 @@
  */
 import { isUsingMockCloud } from '../cloud.js'
 import { demoGeocode, demoSearch } from './demo.js'
+import { t } from '../i18n/index.js'
 
 const TOKEN_KEY = 'satualur_token'
 const token = () => { try { return localStorage.getItem(TOKEN_KEY) } catch { return null } }
@@ -24,7 +25,7 @@ async function call(path, { method = 'GET', body, signal } = {}) {
     })
   } catch (e) {
     if (e.name === 'AbortError') throw e
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('leads.api.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }

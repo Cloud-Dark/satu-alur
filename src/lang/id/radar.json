@@ -1,0 +1,275 @@
+{
+  "tabs": {
+    "radar": "Radar",
+    "week": "Minggu ini",
+    "ai": "Rekomendasi AI",
+    "predict": "Prediksi"
+  },
+  "sorts": {
+    "score": "Skor tertinggi",
+    "value": "Nilai terbesar",
+    "recent": "Terbaru"
+  },
+  "types": {
+    "due": {
+      "label": "Layanan berulang",
+      "short": "Jatuh tempo"
+    },
+    "churn": {
+      "label": "Risiko churn",
+      "short": "Risiko churn"
+    },
+    "upsell": {
+      "label": "Upsell kontrak",
+      "short": "Upsell"
+    },
+    "cross": {
+      "label": "Cross-sell",
+      "short": "Cross-sell"
+    },
+    "pending": {
+      "label": "Penawaran tertunda",
+      "short": "Tertunda"
+    },
+    "reapproach": {
+      "label": "Tawarkan ulang",
+      "short": "Tawarkan ulang"
+    },
+    "season": {
+      "label": "Musiman",
+      "short": "Musiman"
+    }
+  },
+  "tier": {
+    "high": "Prioritas tinggi",
+    "mid": "Prioritas sedang",
+    "low": "Prioritas rendah"
+  },
+  "factor": {
+    "chance": "Peluang historis",
+    "value": "Nilai",
+    "frequency": "Frekuensi",
+    "confidence": "Keyakinan data",
+    "timing": "Waktu",
+    "lift": "Kenaikan tahun lalu"
+  },
+  "header": {
+    "loading": "Memuat data…",
+    "refresh": "Hitung ulang radar",
+    "title": "Radar peluang",
+    "asOf": "Dihitung {date} · {count} permintaan"
+  },
+  "tabsLabel": "Tampilan radar peluang",
+  "live": {
+    "recalculated": "Radar dihitung ulang: {count} peluang."
+  },
+  "load": {
+    "failed": "Gagal memuat data transaksi: {error}"
+  },
+  "kpi": {
+    "value": "Estimasi nilai peluang",
+    "valueSub": "Dari {count} peluang pelanggan; musiman tidak dijumlahkan.",
+    "valueNone": "Belum ada peluang bernilai.",
+    "count": "Jumlah peluang",
+    "countNone": "Belum terdeteksi.",
+    "high": "Prioritas tinggi",
+    "highSub": "Skor {min} ke atas{top}",
+    "topScore": " · teratas {score}",
+    "week": "Perlu minggu ini",
+    "weekSub": "Jatuh tempo, tertunda, atau persiapan musim.",
+    "weekNone": "Tidak ada yang mendesak."
+  },
+  "empty": {
+    "kicker": "Belum ada data",
+    "title": "Radar butuh riwayat transaksi.",
+    "body": "Peluang dihitung dari permintaan, penawaran, dan pembukuan Anda. Catat beberapa pekerjaan dulu; radar akan menemukan pelanggan yang jatuh tempo, penawaran tertunda, dan pola musiman.",
+    "action": "Catat permintaan"
+  },
+  "filter": {
+    "label": "Saring jenis peluang",
+    "all": "Semua"
+  },
+  "sort": {
+    "label": "Urutkan"
+  },
+  "search": {
+    "placeholder": "Cari pelanggan atau layanan",
+    "label": "Cari peluang"
+  },
+  "hidden": {
+    "back": "Kembali ke radar",
+    "show": "Disembunyikan ({count})",
+    "note": "Peluang yang sudah ditindaklanjuti, ditunda, atau diabaikan. Pulihkan bila ingin menampilkannya lagi di radar."
+  },
+  "states": {
+    "unavailable": "Status tindak lanjut belum bisa dimuat (tabel opportunity_states belum tersedia). Radar tetap tampil, tetapi tombol tandai/abaikan tidak tersimpan."
+  },
+  "list": {
+    "meta": "{count} peluang{value}",
+    "estimate": " · estimasi {amount}",
+    "emptyKicker": "Kosong",
+    "hiddenEmpty": "Tidak ada peluang yang disembunyikan.",
+    "notFoundKicker": "Tidak ditemukan",
+    "notFoundTitle": "Tidak ada peluang yang cocok.",
+    "notFoundBody": "Ubah pencarian atau pilih jenis lain.",
+    "cleanKicker": "Radar bersih",
+    "cleanTitle": "Belum ada peluang terdeteksi.",
+    "cleanBody": "Semua pelanggan rutin masih dalam jadwal dan tidak ada penawaran yang tertahan. Radar dihitung ulang setiap kali data berubah."
+  },
+  "score": {
+    "aria": "Skor {score} dari 100",
+    "title": "Skor {score}/100",
+    "short": "Skor {score}"
+  },
+  "ev": {
+    "season": "{name}: {count} permintaan tahun lalu vs ±{expected} biasanya",
+    "more": "+{count} bukti",
+    "label": "Bukti dari riwayat"
+  },
+  "factors": {
+    "neutral": "netral",
+    "off": "tidak dihitung",
+    "calc": "{value} × bobot {weight}% = {points} poin"
+  },
+  "card": {
+    "factors": "Faktor skor",
+    "detail": "Detail",
+    "detailAria": "Detail peluang {title}"
+  },
+  "state": {
+    "done": "Ditindaklanjuti {date}",
+    "snoozed": "Ditunda sampai {date}",
+    "dismissed": "Diabaikan"
+  },
+  "week": {
+    "lead": "Daftar kerja yang diturunkan dari radar: layanan yang jatuh tempo dalam 7 hari, pelanggan rutin yang mulai menghilang, penawaran tertahan, dan persiapan musim. Bukan notifikasi otomatis; tandai selesai setelah Anda menghubungi pelanggan.",
+    "emptyKicker": "Minggu ini",
+    "emptyTitle": "Tidak ada tindak lanjut mendesak.",
+    "emptyBody": "Lihat tab Radar untuk peluang lain seperti paket berkala dan cross-sell.",
+    "groupMeta": "{count} peluang · {amount}",
+    "overdue": "Hari ini atau terlambat",
+    "soon": "Dalam 7 hari",
+    "done": "Selesai",
+    "doneAria": "Tandai {title} sudah ditindaklanjuti"
+  },
+  "ai": {
+    "build": "Susun rekomendasi",
+    "title": "Rekomendasi AI",
+    "meta": "Ringkasan 5 peluang teratas",
+    "lead": "AI membaca lima peluang dengan skor tertinggi beserta buktinya, lalu menyusun urutan kerja minggu ini. AI tidak menambah angka; semua angka berasal dari radar.",
+    "topMeta": "skor {score}{value}",
+    "nothing": "Belum ada peluang untuk dirangkum.",
+    "busy": "Menyusun…",
+    "noModel": "Model AI tidak tersedia. Periksa koneksi lalu coba lagi.",
+    "console": "Analis peluang",
+    "retry": "Koneksi terputus, mencoba lagi…",
+    "empty": "Model mengembalikan jawaban kosong.",
+    "done": "Selesai",
+    "stopped": "Dihentikan",
+    "failed": "Gagal",
+    "error": "AI gagal menjawab: {error}"
+  },
+  "predict": {
+    "notEnough": "belum cukup data",
+    "sample": "Sampel",
+    "success": "Berhasil",
+    "rate": "Tingkat",
+    "range": "Rentang 95%",
+    "seg": {
+      "all": "Semua penawaran",
+      "new": "Pelanggan baru",
+      "returning": "Pelanggan lama",
+      "same": "Pelanggan lama, layanan sama",
+      "newService": "Pelanggan lama, layanan baru"
+    },
+    "offerTitle": "Penawaran disetujui",
+    "offerMeta": "Dasar prediksi penawaran tertunda, tawarkan ulang, dan cross-sell",
+    "offerCaption": "Tingkat persetujuan penawaran per segmen",
+    "segment": "Segmen",
+    "svcTitle": "Persetujuan per layanan",
+    "svcMeta": "{count} layanan",
+    "svcCaption": "Tingkat persetujuan per layanan",
+    "service": "Layanan",
+    "svcEmpty": "Belum ada penawaran yang diputuskan.",
+    "repTitle": "Pelanggan kembali tanpa diminta",
+    "repMeta": "Dasar prediksi layanan berulang",
+    "repLead": "Untuk layanan yang berulang, berapa kunjungan yang diikuti kunjungan berikutnya dalam 1,5× jarak biasanya. Angka rendah berarti pelanggan jarang kembali sendiri: di sinilah follow-up paling berguna.",
+    "repCaption": "Tingkat kembali alami per layanan",
+    "notDetected": "Belum terdeteksi",
+    "repEmpty": "Belum ada layanan yang terbukti berulang.",
+    "repEmptyBody": "Butuh minimal {min} kunjungan yang bisa dinilai dan {pct}% di antaranya kembali.",
+    "winback": "Kembali setelah jeda panjang",
+    "winbackHint": "Dasar prediksi risiko churn",
+    "contract": "Pelanggan sering yang memakai kontrak",
+    "contractHint": "Dasar prediksi upsell kontrak",
+    "rejection": "Membeli lagi setelah menolak",
+    "rejectionHint": "Pembanding tawarkan ulang",
+    "patterns": "Pola pelanggan",
+    "patternsMeta": "Dari riwayat akun ini",
+    "pattern": "Pola",
+    "noContract": "Belum ada layanan kontrak/langganan di akun ini, jadi peluang upsell kontrak tidak punya pembanding historis.",
+    "pairsTitle": "Layanan yang sering dibeli bersama",
+    "pairsMeta": "{count} pasangan",
+    "pairsBasis": "Dasar cross-sell",
+    "pairsCaption": "Pasangan layanan",
+    "ifBuys": "Jika membeli",
+    "alsoBuys": "Juga membeli",
+    "customers": "Pelanggan",
+    "pairCount": "{both} dari {total}",
+    "confidence": "Keyakinan",
+    "lift": "Lift",
+    "pairsEmpty": "Belum ada pasangan layanan yang kuat.",
+    "pairsEmptyBody": "Butuh minimal {min} pelanggan yang membeli keduanya dan keyakinan {pct}%.",
+    "note": "Prediksi keberhasilan = tingkat historis akun Anda sendiri untuk situasi serupa. Di bawah {min} sampel, angka tidak ditampilkan. Rentang 95% (Wilson) menunjukkan ketidakpastian; makin sedikit data, makin lebar."
+  },
+  "drawer": {
+    "close": "Tutup detail",
+    "prediction": "Prediksi keberhasilan",
+    "na": "Tidak berlaku",
+    "notEnough": "Belum cukup data",
+    "unavailable": "Tidak tersedia",
+    "seasonNote": "Peluang musiman bukan transaksi satu pelanggan.",
+    "predEnough": "{k} dari {n} {basis} (rentang {lo}–{hi}).",
+    "predFew": "{n} sampel {basis}; minimal {min}.",
+    "noHistory": "Tidak ada riwayat pembanding.",
+    "score": "Skor peluang",
+    "evCaption": "Bukti dari riwayat transaksi",
+    "date": "Tanggal",
+    "service": "Layanan",
+    "requestRef": "Permintaan #{id}{offer}",
+    "offerRef": " · penawaran #{id}",
+    "value": "Nilai",
+    "status": "Status",
+    "calendarOnly": "Tidak ada baris transaksi: peluang ini berasal dari kalender umum.",
+    "season": "{label}: {start}–{end} ({note}).{prev}",
+    "seasonPrev": " Pembanding: {start}–{end}.",
+    "breakdown": "Rincian skor",
+    "evidence": "Bukti",
+    "markDone": "Tandai ditindaklanjuti",
+    "snooze": "Abaikan {days} hari",
+    "restore": "Pulihkan ke radar",
+    "noTable": "Tabel status belum tersedia"
+  },
+  "fu": {
+    "title": "Pesan follow-up",
+    "hint": "Periksa dan ubah sebelum dikirim. AI hanya memakai bukti di atas.",
+    "copy": "Salin",
+    "openWa": "Buka WhatsApp",
+    "copied": "Pesan disalin.",
+    "copyManual": "Tekan Ctrl+C untuk menyalin.",
+    "build": "Susun pesan follow-up"
+  },
+  "nav": {
+    "social": "Siapkan konten promosi",
+    "review": "Tinjau penawaran",
+    "create": "Buat penawaran",
+    "requestTitle": "Buka formulir permintaan yang sudah terisi data pelanggan"
+  },
+  "toast": {
+    "done": "{title} ditandai sudah ditindaklanjuti.",
+    "snoozed": "{title} disembunyikan sampai {date}.",
+    "saveFailed": "Gagal menyimpan: {error}",
+    "restored": "{title} kembali ke radar.",
+    "restoreFailed": "Gagal memulihkan: {error}"
+  }
+}

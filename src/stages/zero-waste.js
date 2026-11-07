@@ -24,13 +24,19 @@ import {
 } from '../pendapatan/rules.js'
 import { downloadText, datedName } from '../ui/download.js'
 import { renderOptimasi } from './optimasi-panel.js'
+import { t } from '../i18n/index.js'
 
 const { el, icon } = C
-const TABS = [
-  { value: 'pemborosan', label: 'Pemborosan' },
-  { value: 'tindakan', label: 'Tindakan' },
-  { value: 'optimasi', label: 'Ruang optimasi' },
-]
+const TAB_KEYS = ['pemborosan', 'tindakan', 'optimasi']
+const tabOptions = () => TAB_KEYS.map((value) => ({ value, label: t(`zeroWaste.tabs.${value}`) }))
+
+// Labels for stable keys from the shared engine, worded in the viewer's language.
+const known = (key) => WASTE_STREAMS.some((s) => s.key === key)
+const streamText = (key, field) => (known(key) ? t(`zeroWaste.stream.${key}.${field}`) : streamMeta(key)[field])
+const stLabel = (v) => (WASTE_STATUSES.some((s) => s.value === v) ? t(`zeroWaste.status.${v}`) : statusLabel(v))
+const stOptions = () => WASTE_STATUSES.map((s) => ({ value: s.value, label: stLabel(s.value) }))
+const VERDICT_KEYS = { 'Belum ada data pendapatan': 'noRevenue', 'Bebas limbah': 'free', 'Di bawah patokan': 'below', 'Sesuai patokan': 'at', 'Di atas patokan': 'above' }
+const verdictLabel = (label) => (VERDICT_KEYS[label] ? t(`zeroWaste.verdict.${VERDICT_KEYS[label]}`) : label)
 let currentTab = 'pemborosan'
 // Survives tab switches so the user's filter is still there when they return.
 let entryQuery = ''
@@ -83,14 +89,14 @@ export async function render(container, ctx = {}) {
 
   const host = el('div')
   const tabs = C.segmented({
-    options: TABS, value: currentTab, label: 'Tanpa limbah',
+    options: tabOptions(), value: currentTab, label: t('zeroWaste.tabsLabel'),
     onChange: (value) => { currentTab = value; status.hide(); draw() },
   })
   tabs.classList.add('workspace-tabs')
 
   const head = C.pageHeader({
-    title: 'Bebas limbah', em: 'limbah',
-    actions: C.button({ label: 'Catat temuan', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
+    title: t('zeroWaste.page.title'), em: t('zeroWaste.page.em'),
+    actions: C.button({ label: t('zeroWaste.page.record'), icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
   })
   // The tabs share the header row with the page action (one row instead of two).
   head.insertBefore(tabs, head.querySelector('.page-head-actions'))
@@ -100,7 +106,7 @@ export async function render(container, ctx = {}) {
     .filter((l) => l.category === 'pendapatan')
     .reduce((s, l) => s + (Number(l.amount) || 0), 0)
   // "x% dari pendapatan" means nothing before any revenue is booked.
-  const shareText = (w, suffix = 'dari pendapatan') => (revenue() > 0 ? `${w.lossShare.toFixed(1)}% ${suffix}` : 'belum ada pendapatan tercatat')
+  const shareText = (w, suffix = 'ofRevenue') => (revenue() > 0 ? t(`zeroWaste.share.${suffix}`, { pct: w.lossShare.toFixed(1) }) : t('zeroWaste.share.none'))
 
   function draw() {
     if (currentTab === 'pemborosan') drawState()
@@ -122,7 +128,7 @@ export async function render(container, ctx = {}) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('viewBox', '0 0 128 128')
     svg.setAttribute('role', 'img')
-    svg.setAttribute('aria-label', `Bebas limbah ${freePct} persen`)
+    svg.setAttribute('aria-label', t('zeroWaste.ring.aria', { pct: freePct }))
     const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
     track.setAttribute('cx', '64'); track.setAttribute('cy', '64'); track.setAttribute('r', String(R))
     track.setAttribute('class', 'zw-ring-track')
@@ -134,28 +140,28 @@ export async function render(container, ctx = {}) {
     svg.append(track, arc)
     ring.append(svg, el('div', { className: 'zw-ring-label' },
       el('span', { className: 'zw-ring-value tnum' }, `${freePct}%`),
-      el('span', { className: 'zw-ring-caption' }, 'bebas limbah')))
+      el('span', { className: 'zw-ring-caption' }, t('zeroWaste.ring.caption'))))
 
     const hero = el('div', { className: 'zw-hero' },
       ring,
       el('div', { className: 'zw-hero-body' },
         el('h2', { className: 'zw-hero-title' }, freePct >= 100
-          ? 'Tidak ada kerugian tercatat yang tersisa'
-          : `${C.rupiah(w.remaining)} masih bocor setiap bulan`),
+          ? t('zeroWaste.hero.clean')
+          : t('zeroWaste.hero.leaking', { amount: C.rupiah(w.remaining) })),
         el('p', { className: 'zw-hero-text' }, w.loss
-          ? `Dari ${C.rupiah(w.loss)} kerugian yang pernah Anda catat, ${C.rupiah(w.saved)} sudah dihentikan. Sisa ${w.remaining > 0 ? `${C.rupiah(w.remaining)}` : 'nol'} sama dengan ${revenue() > 0 ? shareText(w, 'dari pendapatan tercatat') : '— belum ada pendapatan tercatat untuk dibandingkan'}.`
-          : 'Belum ada kerugian yang dicatat. Catat satu temuan pertama supaya target 100% bebas limbah punya titik awal yang jujur.'),
+          ? t('zeroWaste.hero.text', { loss: C.rupiah(w.loss), saved: C.rupiah(w.saved), remaining: w.remaining > 0 ? `${C.rupiah(w.remaining)}` : t('zeroWaste.hero.zero'), share: revenue() > 0 ? shareText(w, 'ofRecorded') : t('zeroWaste.hero.noCompare') })
+          : t('zeroWaste.hero.empty')),
         el('div', { className: 'zw-hero-actions' },
-          C.button({ label: 'Catat temuan', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
-          C.button({ label: 'Lihat tindakan', iconRight: 'arrowRight', size: 'sm', variant: 'ghost', onClick: () => tabs.querySelector('[data-value="tindakan"]')?.click() })),
+          C.button({ label: t('zeroWaste.page.record'), icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
+          C.button({ label: t('zeroWaste.hero.viewActions'), iconRight: 'arrowRight', size: 'sm', variant: 'ghost', onClick: () => tabs.querySelector('[data-value="tindakan"]')?.click() })),
       ),
     )
 
     const kpis = el('div', { className: 'zw-kpis' },
-      C.kpi({ label: 'Sisa kerugian', value: C.rupiah(w.remaining), sub: revenue() > 0 ? shareText(w) : 'Belum ada pendapatan tercatat', iconName: 'trendingDown' }),
-      C.kpi({ label: 'Sudah dihentikan', value: C.rupiah(w.saved), sub: `dari ${C.rupiah(w.loss)} tercatat`, iconName: 'checkCircle' }),
-      C.kpi({ label: 'Masih bisa dihemat', value: C.rupiah(w.winnable), sub: `${w.open} temuan terbuka`, iconName: 'target' }),
-      C.kpi({ label: 'Temuan selesai', value: String(w.done), sub: 'sudah ditutup', iconName: 'flag' }),
+      C.kpi({ label: t('zeroWaste.kpi.remaining'), value: C.rupiah(w.remaining), sub: revenue() > 0 ? shareText(w) : t('zeroWaste.kpi.noRevenue'), iconName: 'trendingDown' }),
+      C.kpi({ label: t('zeroWaste.kpi.stopped'), value: C.rupiah(w.saved), sub: t('zeroWaste.kpi.ofRecorded', { amount: C.rupiah(w.loss) }), iconName: 'checkCircle' }),
+      C.kpi({ label: t('zeroWaste.kpi.winnable'), value: C.rupiah(w.winnable), sub: t('zeroWaste.kpi.openFindings', { count: w.open }), iconName: 'target' }),
+      C.kpi({ label: t('zeroWaste.kpi.done'), value: String(w.done), sub: t('zeroWaste.kpi.doneSub'), iconName: 'flag' }),
     )
 
     const streamCards = el('div', { className: 'zw-streams' }, w.streams.map((s) => {
@@ -164,37 +170,37 @@ export async function render(container, ctx = {}) {
         el('header', { className: 'zw-stream-head' },
           el('span', { className: 'zw-stream-ico', 'aria-hidden': 'true' }, icon(s.icon, { size: 18 })),
           el('div', { className: 'zw-stream-id' },
-            el('h3', { className: 'zw-stream-name' }, s.short),
-            el('p', { className: 'zw-stream-sub' }, `${s.rows.length} temuan · ${s.open} terbuka`),
+            el('h3', { className: 'zw-stream-name' }, streamText(s.key, 'short')),
+            el('p', { className: 'zw-stream-sub' }, t('zeroWaste.streamCard.sub', { count: s.rows.length, open: s.open })),
           ),
-          C.tag(verdict.label, verdict.tone),
+          C.tag(verdictLabel(verdict.label), verdict.tone),
         ),
         el('div', { className: 'zw-stream-money' },
           el('span', { className: 'zw-stream-money-value tnum' }, C.rupiah(s.remaining)),
-          el('span', { className: 'zw-stream-money-label' }, 'sisa / bulan'),
+          el('span', { className: 'zw-stream-money-label' }, t('zeroWaste.streamCard.perMonth')),
         ),
-        el('div', { className: 'zw-bar', role: 'img', 'aria-label': `Terhentikan ${Math.round(s.pct)} persen` },
+        el('div', { className: 'zw-bar', role: 'img', 'aria-label': t('zeroWaste.streamCard.barAria', { pct: Math.round(s.pct) }) },
           el('span', { className: 'zw-bar-fill', style: `width:${Math.max(0, Math.min(100, s.pct))}%` })),
         el('div', { className: 'zw-stream-foot' },
-          el('span', { className: 'tnum' }, `${Math.round(s.pct)}% terhenti`),
-          el('span', { className: 'tnum' }, `patokan ${s.benchmark}% pendapatan`),
+          el('span', { className: 'tnum' }, t('zeroWaste.streamCard.stopped', { pct: Math.round(s.pct) })),
+          el('span', { className: 'tnum' }, t('zeroWaste.streamCard.benchmark', { pct: s.benchmark })),
         ),
-        el('p', { className: 'zw-stream-why' }, s.why),
+        el('p', { className: 'zw-stream-why' }, streamText(s.key, 'why')),
       )
     }))
 
     const planPanel = plan.length
-      ? C.panel({ title: 'Jalan terpendek menuju nol', meta: 'Diurutkan dari kebocoran terbesar' },
+      ? C.panel({ title: t('zeroWaste.plan.title'), meta: t('zeroWaste.plan.meta') },
         el('ol', { className: 'zw-plan' }, plan.map((p) => el('li', { className: 'zw-plan-item' },
           el('div', { className: 'zw-plan-head' },
-            el('span', { className: 'zw-plan-name' }, p.label),
+            el('span', { className: 'zw-plan-name' }, streamText(p.stream, 'short')),
             el('span', { className: 'zw-plan-value tnum' }, C.rupiah(p.remaining))),
-          el('p', { className: 'zw-plan-action' }, p.action),
-          el('div', { className: 'zw-bar is-thin', role: 'img', 'aria-label': `Terhentikan ${Math.round(p.pct)} persen` },
+          el('p', { className: 'zw-plan-action' }, streamText(p.stream, 'fix')),
+          el('div', { className: 'zw-bar is-thin', role: 'img', 'aria-label': t('zeroWaste.streamCard.barAria', { pct: Math.round(p.pct) }) },
             el('span', { className: 'zw-bar-fill', style: `width:${Math.max(0, Math.min(100, p.pct))}%` })),
         ))))
-      : C.panel({ title: 'Jalan terpendek menuju nol' },
-        el('p', { className: 'zw-muted' }, 'Semua stream sudah bersih. Pertahankan dengan pemeriksaan bulanan.'))
+      : C.panel({ title: t('zeroWaste.plan.title') },
+        el('p', { className: 'zw-muted' }, t('zeroWaste.plan.clean')))
 
     host.replaceChildren(hero, kpis, streamCards, planPanel)
   }
@@ -212,29 +218,29 @@ export async function render(container, ctx = {}) {
 
   function entryTable(rows) {
     return C.dataTable({
-      caption: 'Temuan pemborosan dan tindakannya',
+      caption: t('zeroWaste.table.caption'),
       columns: [
-        { key: 'title', label: 'Temuan', render: (r) => C.cellStack(r.title, el('span', { className: 'zw-clamp' }, r.detail || streamMeta(r.stream).label)) },
-        { key: 'stream', label: 'Sumber', render: (r) => streamMeta(r.stream).short },
-        { key: 'monthly_loss', label: 'Kerugian/bln', align: 'right', render: (r) => C.rupiah(r.monthly_loss) },
-        { key: 'saved', label: 'Terhenti', align: 'right', render: (r) => C.rupiah(r.saved) },
+        { key: 'title', label: t('zeroWaste.table.finding'), render: (r) => C.cellStack(r.title, el('span', { className: 'zw-clamp' }, r.detail || streamText(r.stream, 'label'))) },
+        { key: 'stream', label: t('zeroWaste.table.source'), render: (r) => streamText(r.stream, 'short') },
+        { key: 'monthly_loss', label: t('zeroWaste.table.lossMonth'), align: 'right', render: (r) => C.rupiah(r.monthly_loss) },
+        { key: 'saved', label: t('zeroWaste.table.stopped'), align: 'right', render: (r) => C.rupiah(r.saved) },
         {
-          key: 'remaining', label: 'Sisa', align: 'right',
+          key: 'remaining', label: t('zeroWaste.table.remaining'), align: 'right',
           render: (r) => {
             const left = Math.max(0, (Number(r.monthly_loss) || 0) - (Number(r.saved) || 0))
             return el('strong', { className: `tnum ${left > 0 ? 'zw-left' : ''}` }, C.rupiah(left))
           },
         },
-        { key: 'owner', label: 'Pemilik', render: (r) => r.owner || el('span', { className: 'muted' }, '—') },
-        { key: 'status', label: 'Status', render: (r) => C.tag(statusLabel(r.status), STATUS_TONE[r.status] || 'neutral') },
+        { key: 'owner', label: t('zeroWaste.table.owner'), render: (r) => r.owner || el('span', { className: 'muted' }, '—') },
+        { key: 'status', label: t('zeroWaste.table.status'), render: (r) => C.tag(stLabel(r.status), STATUS_TONE[r.status] || 'neutral') },
         {
           key: 'act', label: '', className: 'zw-row-actions',
           render: (r) => el('div', { className: 'zw-row-actions-in' },
             r.status !== 'done'
-              ? C.iconButton({ iconName: 'check', label: `Tandai selesai: ${r.title}`, onClick: () => markDone(r) })
+              ? C.iconButton({ iconName: 'check', label: t('zeroWaste.table.markDone', { title: r.title }), onClick: () => markDone(r) })
               : null,
-            C.iconButton({ iconName: 'pencil', label: `Ubah ${r.title}`, onClick: () => openEditor(r) }),
-            C.iconButton({ iconName: 'trash', label: `Hapus ${r.title}`, onClick: () => confirmDelete(r) })),
+            C.iconButton({ iconName: 'pencil', label: t('zeroWaste.table.edit', { title: r.title }), onClick: () => openEditor(r) }),
+            C.iconButton({ iconName: 'trash', label: t('zeroWaste.table.delete', { title: r.title }), onClick: () => confirmDelete(r) })),
         },
       ],
       rows,
@@ -247,24 +253,24 @@ export async function render(container, ctx = {}) {
     const rows = filteredEntries()
     entryList.update(rows, { resetKey: `${entryQuery}|${entryStream}|${entryStatus}` })
     const w = computeWaste(entries, revenue())
-    entryNote.textContent = `${rows.length} dari ${entries.length} temuan · ${w.open} terbuka · ${C.rupiah(w.winnable)} bisa dihemat`
+    entryNote.textContent = t('zeroWaste.list.note', { shown: rows.length, total: entries.length, open: w.open, amount: C.rupiah(w.winnable) })
   }
 
   function exportEntries() {
     const rows = filteredEntries()
-    if (!rows.length) { showToast('Tidak ada baris untuk diekspor.', 'warn'); return }
+    if (!rows.length) { showToast(t('zeroWaste.list.noRows'), 'warn'); return }
     downloadText(datedName('temuan-limbah'), toCsv([
-      { label: 'Temuan', value: (r) => r.title },
-      { label: 'Sumber', value: (r) => streamMeta(r.stream).label },
-      { label: 'Kerugian per bulan', key: 'monthly_loss' },
-      { label: 'Sudah dihentikan', key: 'saved' },
-      { label: 'Sisa', value: (r) => Math.max(0, (Number(r.monthly_loss) || 0) - (Number(r.saved) || 0)) },
-      { label: 'Tindakan', value: (r) => r.action || '' },
-      { label: 'Pemilik', value: (r) => r.owner || '' },
-      { label: 'Status', value: (r) => statusLabel(r.status) },
-      { label: 'Dibuat', value: (r) => r.created_at || '' },
+      { label: t('zeroWaste.table.finding'), value: (r) => r.title },
+      { label: t('zeroWaste.table.source'), value: (r) => streamText(r.stream, 'label') },
+      { label: t('zeroWaste.csv.lossMonth'), key: 'monthly_loss' },
+      { label: t('zeroWaste.kpi.stopped'), key: 'saved' },
+      { label: t('zeroWaste.table.remaining'), value: (r) => Math.max(0, (Number(r.monthly_loss) || 0) - (Number(r.saved) || 0)) },
+      { label: t('zeroWaste.csv.action'), value: (r) => r.action || '' },
+      { label: t('zeroWaste.table.owner'), value: (r) => r.owner || '' },
+      { label: t('zeroWaste.table.status'), value: (r) => stLabel(r.status) },
+      { label: t('zeroWaste.csv.created'), value: (r) => r.created_at || '' },
     ], rows))
-    showToast(`${rows.length} temuan diekspor ke CSV.`, 'success')
+    showToast(t('zeroWaste.list.exported', { count: rows.length }), 'success')
   }
 
   function drawActions() {
@@ -272,51 +278,51 @@ export async function render(container, ctx = {}) {
       type: 'search',
       className: 'pd-search',
       value: entryQuery,
-      placeholder: 'Cari temuan, tindakan, atau pemilik…',
-      'aria-label': 'Cari temuan pemborosan',
+      placeholder: t('zeroWaste.list.searchPlaceholder'),
+      'aria-label': t('zeroWaste.list.searchLabel'),
     })
     search.addEventListener('input', debounce(() => { entryQuery = search.value; refreshEntries() }, 150))
 
-    const streamFilter = el('select', { className: 'pd-filter', 'aria-label': 'Saring sumber pemborosan' },
-      [{ value: 'all', label: 'Semua sumber' }, ...WASTE_STREAMS.map((s) => ({ value: s.key, label: s.short }))]
+    const streamFilter = el('select', { className: 'pd-filter', 'aria-label': t('zeroWaste.list.streamFilter') },
+      [{ value: 'all', label: t('zeroWaste.list.allSources') }, ...WASTE_STREAMS.map((s) => ({ value: s.key, label: streamText(s.key, 'short') }))]
         .map((o) => el('option', { value: o.value }, o.label)))
     streamFilter.value = entryStream
     streamFilter.addEventListener('change', () => { entryStream = streamFilter.value; refreshEntries() })
 
-    const statusFilter = el('select', { className: 'pd-filter', 'aria-label': 'Saring status temuan' },
-      [{ value: 'all', label: 'Semua status' }, ...WASTE_STATUSES].map((o) => el('option', { value: o.value }, o.label)))
+    const statusFilter = el('select', { className: 'pd-filter', 'aria-label': t('zeroWaste.list.statusFilter') },
+      [{ value: 'all', label: t('zeroWaste.list.allStatuses') }, ...stOptions()].map((o) => el('option', { value: o.value }, o.label)))
     statusFilter.value = entryStatus
     statusFilter.addEventListener('change', () => { entryStatus = statusFilter.value; refreshEntries() })
 
     entryNote = el('span', { className: 'zw-toolbar-note' })
     // "Catat temuan" lives in the page header; the toolbar only holds list tools.
     const toolbar = el('div', { className: 'zw-toolbar' },
-      C.button({ label: 'Impor massal', icon: 'layers', size: 'sm', onClick: openBulk }),
+      C.button({ label: t('zeroWaste.list.bulk'), icon: 'layers', size: 'sm', onClick: openBulk }),
       el('div', { className: 'pd-filters' }, search, streamFilter, statusFilter),
-      C.button({ label: 'Ekspor CSV', icon: 'file', size: 'sm', variant: 'ghost', onClick: exportEntries }),
+      C.button({ label: t('zeroWaste.list.export'), icon: 'file', size: 'sm', variant: 'ghost', onClick: exportEntries }),
       entryNote,
     )
 
     if (!entries.length) {
       entryList = null
       host.replaceChildren(toolbar, C.emptyState({
-        kicker: 'Belum ada temuan',
-        title: 'Mulai dari kebocoran yang paling Anda rasakan',
-        body: 'Contoh: teknisi menunggu bahan 45 menit per pekerjaan, atau kunjungan ulang karena noda tidak hilang. Setiap temuan butuh angka kerugian per bulan.',
+        kicker: t('zeroWaste.list.emptyKicker'),
+        title: t('zeroWaste.list.emptyTitle'),
+        body: t('zeroWaste.list.emptyBody'),
         iconName: 'sprout',
-        action: C.button({ label: 'Catat temuan pertama', icon: 'plus', variant: 'primary', onClick: () => openEditor(null) }),
+        action: C.button({ label: t('zeroWaste.list.recordFirst'), icon: 'plus', variant: 'primary', onClick: () => openEditor(null) }),
       }))
-      entryNote.textContent = '0 temuan'
+      entryNote.textContent = t('zeroWaste.list.zero')
       return
     }
 
     entryList = C.paginate({
       key: 'zw-tindakan',
-      label: 'temuan pemborosan',
+      label: t('zeroWaste.list.pagerLabel'),
       pageSize: 10,
       render: (rows) => (rows.length
         ? entryTable(rows)
-        : el('p', { className: 'pd-none' }, 'Tidak ada temuan yang cocok. Ubah kata kunci atau saringan.')),
+        : el('p', { className: 'pd-none' }, t('zeroWaste.list.noMatch'))),
     })
     host.replaceChildren(toolbar, entryList.root)
     refreshEntries()
@@ -335,7 +341,7 @@ export async function render(container, ctx = {}) {
       `Pendapatan tercatat: ${C.rupiah(rev)}`,
       `Kerugian tercatat: ${C.rupiah(w.loss)} per bulan`,
       `Sudah dihentikan: ${C.rupiah(w.saved)} (${w.pct.toFixed(1)}%)`,
-      `Sisa kerugian: ${C.rupiah(w.remaining)} (${shareText(w)})`,
+      `Sisa kerugian: ${C.rupiah(w.remaining)} (${rev > 0 ? `${w.lossShare.toFixed(1)}% dari pendapatan` : 'belum ada pendapatan tercatat'})`,
       `Temuan terbuka: ${w.open}, selesai: ${w.done}`,
       `Masih bisa dihemat: ${C.rupiah(w.winnable)}`,
       `Sumber terbesar: ${top[0]?.remaining > 0 ? top[0].label : 'Tidak ada'}`,
@@ -345,28 +351,28 @@ export async function render(container, ctx = {}) {
     ].join('\n')
 
     const facts = [
-      { label: 'Pendapatan', value: C.rupiah(rev) },
-      { label: 'Kerugian tercatat', value: `${C.rupiah(w.loss)}/bln` },
-      { label: 'Sisa kerugian', value: `${C.rupiah(w.remaining)}/bln` },
-      { label: 'Sudah terhenti', value: `${w.pct.toFixed(0)}%` },
-      { label: 'Temuan terbuka', value: String(w.open) },
-      { label: 'Sumber terbesar', value: top[0]?.remaining > 0 ? top[0].short : 'Tidak ada' },
+      { label: t('zeroWaste.facts.revenue'), value: C.rupiah(rev) },
+      { label: t('zeroWaste.facts.recordedLoss'), value: t('zeroWaste.facts.perMonth', { amount: C.rupiah(w.loss) }) },
+      { label: t('zeroWaste.kpi.remaining'), value: t('zeroWaste.facts.perMonth', { amount: C.rupiah(w.remaining) }) },
+      { label: t('zeroWaste.facts.stopped'), value: `${w.pct.toFixed(0)}%` },
+      { label: t('zeroWaste.facts.open'), value: String(w.open) },
+      { label: t('zeroWaste.facts.top'), value: top[0]?.remaining > 0 ? t(`zeroWaste.stream.${top[0].key}.short`) : t('zeroWaste.facts.none') },
     ]
 
     const presets = [
       {
-        label: 'Hentikan kunjungan ulang',
-        problem: 'Pekerjaan ulang dan panggilan balik memakan biaya. Saya ingin menekan angka ini sampai nol tanpa memperlambat tim.',
+        label: t('zeroWaste.presets.rework.label'),
+        problem: t('zeroWaste.presets.rework.problem'),
         target: 1500000,
       },
       {
-        label: 'Rapikan rute & bahan bakar',
-        problem: 'Biaya perjalanan naik karena jadwal tidak diurutkan. Saya ingin menghemat bahan bakar dan jam kerja yang hilang di jalan.',
+        label: t('zeroWaste.presets.route.label'),
+        problem: t('zeroWaste.presets.route.problem'),
         target: 800000,
       },
       {
-        label: 'Target 100% bebas limbah',
-        problem: 'Saya ingin menutup semua kebocoran yang tercatat dan mencapai nol kerugian bulanan dalam tiga bulan.',
+        label: t('zeroWaste.presets.zero.label'),
+        problem: t('zeroWaste.presets.zero.problem'),
         target: Math.max(500000, Math.round(w.remaining / 3 / 50000) * 50000),
       },
     ]
@@ -380,24 +386,24 @@ export async function render(container, ctx = {}) {
     const isEdit = Boolean(existing)
     const seed = existing || {}
     const stream = C.select({
-      label: 'Sumber pemborosan', id: 'zw-stream',
-      options: WASTE_STREAMS.map((s) => ({ value: s.key, label: s.label })),
+      label: t('zeroWaste.editor.stream'), id: 'zw-stream',
+      options: WASTE_STREAMS.map((s) => ({ value: s.key, label: streamText(s.key, 'label') })),
       value: seed.stream || 'waktu',
-      hint: 'Pilih satu sumber supaya laporan tidak tercampur.',
+      hint: t('zeroWaste.editor.streamHint'),
     })
-    const title = C.field({ label: 'Apa yang bocor', id: 'zw-title', required: true, value: seed.title || '', placeholder: 'Contoh: Teknisi menunggu bahan di gudang' })
-    const detail = C.textarea({ label: 'Bagaimana hal itu terjadi', id: 'zw-detail', rows: 3, value: seed.detail || '', placeholder: 'Kapan, di mana, dan seberapa sering.' })
-    const loss = C.field({ label: 'Kerugian per bulan (Rp)', id: 'zw-loss', type: 'number', required: true, value: seed.monthly_loss ?? '', hint: 'Perkiraan yang jujur lebih berguna daripada angka yang terlihat bagus.', attrs: { min: '0', step: '50000', inputmode: 'numeric' } })
-    const saved = C.field({ label: 'Sudah dihentikan per bulan (Rp)', id: 'zw-saved', type: 'number', value: seed.saved ?? 0, hint: 'Isi nol bila belum ada yang dikerjakan.', attrs: { min: '0', step: '50000', inputmode: 'numeric' } })
-    const action = C.textarea({ label: 'Tindakan', id: 'zw-action', rows: 2, value: seed.action || '', placeholder: 'Apa yang akan atau sudah dilakukan.' })
-    const owner = C.field({ label: 'Pemilik tindakan', id: 'zw-owner', value: seed.owner || '', placeholder: 'Contoh: Tim Operasional' })
-    const statusSel = C.select({ label: 'Status', id: 'zw-status', options: WASTE_STATUSES, value: seed.status || 'open' })
+    const title = C.field({ label: t('zeroWaste.editor.title'), id: 'zw-title', required: true, value: seed.title || '', placeholder: t('zeroWaste.editor.titlePlaceholder') })
+    const detail = C.textarea({ label: t('zeroWaste.editor.detail'), id: 'zw-detail', rows: 3, value: seed.detail || '', placeholder: t('zeroWaste.editor.detailPlaceholder') })
+    const loss = C.field({ label: t('zeroWaste.editor.loss'), id: 'zw-loss', type: 'number', required: true, value: seed.monthly_loss ?? '', hint: t('zeroWaste.editor.lossHint'), attrs: { min: '0', step: '50000', inputmode: 'numeric' } })
+    const saved = C.field({ label: t('zeroWaste.editor.saved'), id: 'zw-saved', type: 'number', value: seed.saved ?? 0, hint: t('zeroWaste.editor.savedHint'), attrs: { min: '0', step: '50000', inputmode: 'numeric' } })
+    const action = C.textarea({ label: t('zeroWaste.editor.action'), id: 'zw-action', rows: 2, value: seed.action || '', placeholder: t('zeroWaste.editor.actionPlaceholder') })
+    const owner = C.field({ label: t('zeroWaste.editor.owner'), id: 'zw-owner', value: seed.owner || '', placeholder: t('zeroWaste.editor.ownerPlaceholder') })
+    const statusSel = C.select({ label: t('zeroWaste.editor.status'), id: 'zw-status', options: stOptions(), value: seed.status || 'open' })
 
-    const saveBtn = C.button({ label: isEdit ? 'Simpan perubahan' : 'Catat temuan', variant: 'primary' })
+    const saveBtn = C.button({ label: isEdit ? t('zeroWaste.editor.save') : t('zeroWaste.editor.record'), variant: 'primary' })
     const modalNote = C.message()
     const dialog = C.modal({
-      title: isEdit ? 'Ubah temuan' : 'Temuan pemborosan baru',
-      description: 'Satu temuan = satu kebocoran dengan angka dan pemilik. Ini yang membuat target 100% bisa diukur.',
+      title: isEdit ? t('zeroWaste.editor.editTitle') : t('zeroWaste.editor.newTitle'),
+      description: t('zeroWaste.editor.description'),
       wide: true,
       children: [
         modalNote,
@@ -408,19 +414,19 @@ export async function render(container, ctx = {}) {
         action.wrap,
         owner.wrap,
       ],
-      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), saveBtn],
+      actions: [C.button({ label: t('zeroWaste.common.cancel'), variant: 'ghost', dismiss: true }), saveBtn],
       opener: container,
     })
 
     saveBtn.addEventListener('click', async (e) => {
       e.preventDefault()
       modalNote.hide()
-      if (!title.input.value.trim()) { title.input.focus(); modalNote.show('warn', 'Tulis dulu apa yang bocor.'); return }
-      if (!(Number(loss.input.value) > 0)) { loss.input.focus(); modalNote.show('warn', 'Kerugian per bulan harus lebih dari nol.'); return }
+      if (!title.input.value.trim()) { title.input.focus(); modalNote.show('warn', t('zeroWaste.editor.titleRequired')); return }
+      if (!(Number(loss.input.value) > 0)) { loss.input.focus(); modalNote.show('warn', t('zeroWaste.editor.lossRequired')); return }
       if (Number(saved.input.value) > Number(loss.input.value)) {
-        saved.input.focus(); modalNote.show('warn', 'Yang sudah dihentikan tidak boleh melebihi kerugian tercatat.'); return
+        saved.input.focus(); modalNote.show('warn', t('zeroWaste.editor.savedTooHigh')); return
       }
-      const restore = C.setBusy(saveBtn, 'Menyimpan…')
+      const restore = C.setBusy(saveBtn, t('zeroWaste.common.saving'))
       try {
         await saveEntry({
           stream: stream.input.value, title: title.input.value, detail: detail.input.value,
@@ -429,7 +435,7 @@ export async function render(container, ctx = {}) {
         }, existing?.id)
         dialog.close()
         status.hide()
-        showToast(isEdit ? 'Temuan diperbarui.' : 'Temuan dicatat.', 'success')
+        showToast(isEdit ? t('zeroWaste.editor.updated') : t('zeroWaste.editor.recorded'), 'success')
         await reload()
       } catch (err) { modalNote.show('danger', err.message) } finally { restore() }
     })
@@ -438,27 +444,27 @@ export async function render(container, ctx = {}) {
   async function markDone(entry) {
     try {
       await closeEntry(entry)
-      showToast('Temuan ditutup, kerugian dihitung terhenti.', 'success')
+      showToast(t('zeroWaste.markDone.done'), 'success')
       await reload()
     } catch (err) { status.show('danger', err.message) }
   }
 
   function confirmDelete(entry) {
-    const delBtn = C.button({ label: 'Hapus', variant: 'danger' })
+    const delBtn = C.button({ label: t('zeroWaste.delete.confirm'), variant: 'danger' })
     const dialog = C.modal({
-      title: 'Hapus temuan?',
-      description: `"${entry.title}" akan dihapus dan tidak lagi dihitung dalam target bebas limbah.`,
-      children: [el('p', { className: 'zw-muted' }, 'Tindakan ini tidak bisa dibatalkan.')],
-      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), delBtn],
+      title: t('zeroWaste.delete.title'),
+      description: t('zeroWaste.delete.description', { title: entry.title }),
+      children: [el('p', { className: 'zw-muted' }, t('zeroWaste.delete.irreversible'))],
+      actions: [C.button({ label: t('zeroWaste.common.cancel'), variant: 'ghost', dismiss: true }), delBtn],
       opener: container,
     })
     delBtn.addEventListener('click', async (e) => {
       e.preventDefault()
-      const restore = C.setBusy(delBtn, 'Menghapus…')
+      const restore = C.setBusy(delBtn, t('zeroWaste.delete.busy'))
       try {
         await removeEntry(entry.id)
         dialog.close()
-        showToast('Temuan dihapus.', 'success')
+        showToast(t('zeroWaste.delete.done'), 'success')
         await reload()
       } catch (err) { status.show('danger', err.message) } finally { restore() }
     })
@@ -466,17 +472,17 @@ export async function render(container, ctx = {}) {
 
   function openBulk() {
     const ta = C.textarea({
-      label: 'Tempel data',
+      label: t('zeroWaste.bulk.label'),
       id: 'zw-bulk',
       rows: 10,
-      hint: 'JSON array, atau satu baris per temuan: sumber | judul | kerugian | terhenti | pemilik | status. Sumber: waktu, perjalanan, bahan, pengerjaan_ulang, air_kimia.',
-      placeholder: 'perjalanan | Rute tidak diurutkan antar kecamatan | 900000 | 0 | Tim Operasional | open\nbahan | Dosis kimia berlebih pada kolam kecil | 400000 | 150000 | Tim Operasional | progress',
+      hint: t('zeroWaste.bulk.hint'),
+      placeholder: t('zeroWaste.bulk.placeholder'),
     })
     const preview = el('div', { className: 'zw-bulk-preview' })
     const skip = el('input', { type: 'checkbox', id: 'zw-bulk-skip', checked: skipDuplicates })
     skip.addEventListener('change', () => { skipDuplicates = skip.checked; check() })
     const skipWrap = el('label', { className: 'pd-check', for: 'zw-bulk-skip' },
-      skip, el('span', {}, 'Lewati temuan dengan judul yang sudah ada'))
+      skip, el('span', {}, t('zeroWaste.bulk.skip')))
 
     const split = () => {
       const rows = parseBulk(ta.input.value)
@@ -487,9 +493,9 @@ export async function render(container, ctx = {}) {
       try {
         const { fresh, duplicates } = split()
         preview.className = 'zw-bulk-preview is-ok'
-        const extra = duplicates.length ? ` · ${duplicates.length} sudah ada${skip.checked ? ' dan dilewati' : ''}` : ''
+        const extra = duplicates.length ? t('zeroWaste.bulk.dupes', { count: duplicates.length, skipped: skip.checked ? t('zeroWaste.bulk.andSkipped') : '' }) : ''
         const sample = fresh[0] || duplicates[0]
-        preview.textContent = `${fresh.length} temuan baru${extra}. Contoh: ${sample?.title} — ${C.rupiah(sample?.monthly_loss || 0)}`
+        preview.textContent = t('zeroWaste.bulk.preview', { count: fresh.length, extra, title: sample?.title, amount: C.rupiah(sample?.monthly_loss || 0) })
       } catch (err) {
         preview.className = 'zw-bulk-preview is-bad'
         preview.textContent = err.message
@@ -497,14 +503,14 @@ export async function render(container, ctx = {}) {
     }
     ta.input.addEventListener('input', check)
 
-    const importBtn = C.button({ label: 'Impor', variant: 'primary' })
+    const importBtn = C.button({ label: t('zeroWaste.bulk.import'), variant: 'primary' })
     const modalNote = C.message()
     const dialog = C.modal({
-      title: 'Impor massal temuan',
-      description: 'Tempel dari spreadsheet. Seluruh baris ditolak bila ada satu yang tidak valid, supaya hitungan tidak setengah jadi.',
+      title: t('zeroWaste.bulk.title'),
+      description: t('zeroWaste.bulk.description'),
       wide: true,
       children: [modalNote, ta.wrap, skipWrap, preview],
-      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), importBtn],
+      actions: [C.button({ label: t('zeroWaste.common.cancel'), variant: 'ghost', dismiss: true }), importBtn],
       opener: container,
     })
 
@@ -515,13 +521,13 @@ export async function render(container, ctx = {}) {
       try { plan = split() } catch (err) { modalNote.show('warn', err.message); return }
       const rows = skip.checked ? plan.fresh : plan.rows
       const skipped = plan.rows.length - rows.length
-      if (!rows.length) { modalNote.show('warn', 'Semua temuan sudah ada. Tidak ada yang diimpor.'); return }
-      const restore = C.setBusy(importBtn, 'Mengimpor…')
+      if (!rows.length) { modalNote.show('warn', t('zeroWaste.bulk.allDupes')); return }
+      const restore = C.setBusy(importBtn, t('zeroWaste.bulk.importing'))
       try {
         const { error } = await getCloud().database.from('waste_entries').insert(rows)
         if (error) throw new Error(error.message)
         dialog.close()
-        showToast(`${rows.length} temuan diimpor${skipped ? `, ${skipped} dilewati` : ''}.`, 'success')
+        showToast(t('zeroWaste.bulk.done', { count: rows.length, skipped: skipped ? t('zeroWaste.bulk.skippedCount', { count: skipped }) : '' }), 'success')
         notifyDataChanged()
         await reload()
       } catch (err) { modalNote.show('danger', err.message) } finally { restore() }
@@ -534,7 +540,7 @@ export async function render(container, ctx = {}) {
   function errorView(message) {
     const box = C.errorState(message)
     const retry = C.button({
-      label: 'Coba lagi', icon: 'refresh', size: 'sm',
+      label: t('zeroWaste.load.retry'), icon: 'refresh', size: 'sm',
       onClick: () => { host.replaceChildren(C.skeletonRows(4)); reload() },
     })
     box.querySelector('.note-body')?.appendChild(el('div', { className: 'note-actions' }, retry))
@@ -548,7 +554,7 @@ export async function render(container, ctx = {}) {
       entries = list
     } catch (err) {
       if (ctx.signal?.aborted) return
-      status.show('danger', `Gagal memuat data: ${err.message}`)
+      status.show('danger', t('zeroWaste.load.failed', { error: err.message }))
       host.replaceChildren(errorView(err.message))
       return
     }
@@ -588,17 +594,17 @@ function normalizeRow(r, lineNo) {
     assertWasteInvariants(row)
     return row
   } catch (err) {
-    throw new Error(`Baris ${lineNo}: ${err.message}`)
+    throw new Error(t('zeroWaste.parse.line', { line: lineNo, error: err.message }))
   }
 }
 
 function parseBulk(text) {
   const raw = String(text || '').trim()
-  if (!raw) throw new Error('Tidak ada data untuk diimpor.')
+  if (!raw) throw new Error(t('zeroWaste.parse.empty'))
   if (raw.startsWith('[')) {
     let rows
-    try { rows = JSON.parse(raw) } catch { throw new Error('JSON tidak valid. Periksa koma dan tanda kutip.') }
-    if (!Array.isArray(rows)) throw new Error('JSON harus berupa daftar temuan.')
+    try { rows = JSON.parse(raw) } catch { throw new Error(t('zeroWaste.parse.badJson')) }
+    if (!Array.isArray(rows)) throw new Error(t('zeroWaste.parse.notArray'))
     const parsed = rows.map((r, i) => normalizeRow(r, i + 1))
     assertImportSize(parsed.length)
     return parsed

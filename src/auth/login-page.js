@@ -16,32 +16,23 @@ import { AUTH_NOTICE_KEY } from '../customers/rules.js'
 import { enhanceSelect } from '../ui/combobox.js'
 import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
+import { langToggleButton } from '../i18n/switcher.js'
 import { icon, iconHTML } from '../ui/icons.js'
 import { prefersReducedMotion } from '../ui/reveal.js'
+import { t } from '../i18n/index.js'
 
 const GOOGLE_MARK = '<svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 7.9-2.9l-3.9-3c-1.1.7-2.4 1.2-4 1.2-3.1 0-5.7-2.1-6.6-4.9H1.4v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.4 14.4a7.2 7.2 0 0 1 0-4.7V6.6h-4a12 12 0 0 0 0 10.8l4-3z"/><path fill="#EA4335" d="M12 4.8c1.7 0 3.3.6 4.5 1.8l3.4-3.4A12 12 0 0 0 1.4 6.6l4 3.1c.9-2.8 3.5-4.9 6.6-4.9z"/></svg>'
 const CODE_LENGTH = 6
 const RESEND_SECONDS = 30
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
-const COPY = {
-  email: {
-    title: 'Masuk ke <em>Satu Alur</em>.',
-    helper: 'Masukkan email kerja Anda. Kami kirim kode 6 digit, tanpa kata sandi. Akun baru dibuat otomatis saat pertama masuk.',
-    status: 'Menunggu email',
-  },
-  code: {
-    title: 'Cek <em>kotak masuk</em> Anda.',
-    helper: 'Masukkan kodenya di bawah. Kode yang dikirim sebelumnya otomatis tidak berlaku.',
-    status: 'Menunggu kode',
-  },
-}
+const copy = (step) => ({
+  title: t(`auth.login.${step}.title`),
+  helper: t(`auth.login.${step}.helper`),
+  status: t(`auth.login.${step}.status`),
+})
 
-const POINTS = [
-  { icon: 'lock', text: 'Masuk dengan kode sekali pakai, tanpa kata sandi.' },
-  { icon: 'layers', text: 'Enam tahap kerja, dari permintaan sampai laporan.' },
-  { icon: 'sparkles', text: 'AI membantu menyusun penawaran dan laporan.' },
-]
+const POINT_ICONS = ['lock', 'layers', 'sparkles']
 
 /* Static flow drawing, shown when WebGL is unavailable. */
 const FALLBACK_SVG = `<svg class="auth-scene-fallback" viewBox="0 0 400 300" fill="none" aria-hidden="true" focusable="false">
@@ -70,6 +61,11 @@ function h(tag, attrs = {}, ...children) {
   return el
 }
 
+/** Text for a failed request: a translated client error, the server's message, or the fallback. */
+function errText(err, fallbackKey) {
+  return (err?.i18nKey && t(err.i18nKey)) || err?.message || t(fallbackKey)
+}
+
 function formatTime(s) {
   return `0:${String(s).padStart(2, '0')}`
 }
@@ -95,68 +91,68 @@ export function renderLoginPage(root, ctx = {}) {
 
   /* ================= Panel (left / top band) ================= */
   const sceneBox = h('div', { class: 'auth-scene', 'aria-hidden': 'true', html: FALLBACK_SVG })
-  const statusText = h('span', { class: 'auth-status-text', text: COPY.email.status })
-  const stagePanel = h('aside', { class: 'auth-stage', 'aria-label': 'Tentang Satu Alur' },
+  const statusText = h('span', { class: 'auth-status-text', text: copy('email').status })
+  const stagePanel = h('aside', { class: 'auth-stage', 'aria-label': t('auth.login.stageLabel') },
     h('div', { class: 'auth-stage-glow', 'aria-hidden': 'true' }),
     sceneBox,
     h('div', { class: 'auth-stage-top' },
       logoLink({ size: 32 }),
       h('p', { class: 'auth-status' },
         h('span', { class: 'pulse-dot', 'aria-hidden': 'true' }),
-        h('span', { class: 'sr-only' }, 'Status: '),
+        h('span', { class: 'sr-only' }, t('auth.login.statusPrefix')),
         statusText,
       ),
     ),
     h('div', { class: 'auth-stage-bottom' },
-      h('p', { class: 'auth-statement display' }, 'Selamat datang di ', h('em', {}, 'alur'), ' kerja Anda.'),
-      h('p', { class: 'auth-stage-lead' }, 'Permintaan, penawaran, penugasan, sampai laporan. Semuanya tertata dalam satu tempat.'),
+      h('p', { class: 'auth-statement display', html: t('auth.login.statement') }),
+      h('p', { class: 'auth-stage-lead' }, t('auth.login.lead')),
       h('ul', { class: 'auth-points' },
-        POINTS.map((p) => h('li', {},
-          h('span', { class: 'auth-point-icon', html: iconHTML(p.icon, { size: 16, stroke: 1.9 }) }),
-          h('span', {}, p.text),
+        POINT_ICONS.map((name) => h('li', {},
+          h('span', { class: 'auth-point-icon', html: iconHTML(name, { size: 16, stroke: 1.9 }) }),
+          h('span', {}, t(`auth.login.points.${name}`)),
         )),
       ),
     ),
   )
 
   /* ================= Top bar ================= */
-  const backLink = h('a', { href: '#/', class: 'auth-back' }, icon('arrowLeft', { size: 16 }), h('span', {}, 'Kembali ke beranda'))
+  const backLink = h('a', { href: '#/', class: 'auth-back' }, icon('arrowLeft', { size: 16 }), h('span', {}, t('auth.login.back')))
   backLink.addEventListener('click', (e) => {
     if (typeof ctx.navigate === 'function') { e.preventDefault(); ctx.navigate('/') }
   })
   const themeBtn = themeToggleButton()
-  const bar = h('header', { class: 'auth-bar' }, backLink, themeBtn)
+  const bar = h('header', { class: 'auth-bar' }, backLink, h('div', { class: 'auth-bar-actions' }, langToggleButton(), themeBtn))
 
   /* ================= Card ================= */
-  const title = h('h1', { class: 'auth-title display', id: 'auth-title', tabindex: '-1', html: COPY.email.title })
-  const helper = h('p', { class: 'auth-helper', text: COPY.email.helper })
+  const title = h('h1', { class: 'auth-title display', id: 'auth-title', tabindex: '-1', html: copy('email').title })
+  const helper = h('p', { class: 'auth-helper', text: copy('email').helper })
 
   const checkSVG = iconHTML('check', { size: 13, stroke: 3 })
   const stepEmailItem = h('li', { class: 'auth-step', 'data-step': 'email', 'aria-current': 'step' },
     h('span', { class: 'auth-step-n' }, h('span', { class: 'num' }, '1'), h('span', { class: 'ok', html: checkSVG })),
-    h('span', { class: 'auth-step-label' }, 'Email'),
+    h('span', { class: 'auth-step-label' }, t('auth.login.stepEmail')),
   )
   const stepCodeItem = h('li', { class: 'auth-step', 'data-step': 'code' },
     h('span', { class: 'auth-step-n' }, h('span', { class: 'num' }, '2'), h('span', { class: 'ok', html: checkSVG })),
-    h('span', { class: 'auth-step-label' }, 'Kode'),
+    h('span', { class: 'auth-step-label' }, t('auth.login.stepCode')),
   )
-  const stepper = h('ol', { class: 'auth-steps', 'aria-label': 'Langkah masuk' }, stepEmailItem, stepCodeItem)
+  const stepper = h('ol', { class: 'auth-steps', 'aria-label': t('auth.login.stepsLabel') }, stepEmailItem, stepCodeItem)
 
   /* ---- Step 1: email ---- */
   const emailInput = h('input', {
     id: 'auth-email', class: 'auth-input', type: 'email', name: 'email', autocomplete: 'email',
-    inputmode: 'email', autocapitalize: 'off', spellcheck: 'false', placeholder: 'nama@usaha.id', required: true,
+    inputmode: 'email', autocapitalize: 'off', spellcheck: 'false', placeholder: t('auth.login.emailPlaceholder'), required: true,
     'aria-describedby': 'auth-email-hint',
   })
-  const emailHint = h('p', { class: 'auth-field-hint', id: 'auth-email-hint', text: 'Kode berlaku sekali pakai.' })
+  const emailHint = h('p', { class: 'auth-field-hint', id: 'auth-email-hint', text: t('auth.login.emailHint') })
   const emailError = h('p', { class: 'auth-field-error', id: 'auth-email-error', hidden: true })
   const btnIcon = () => h('span', { class: 'auth-btn-icon', 'aria-hidden': 'true', html: iconHTML('arrowRight', { size: 18, stroke: 2 }) })
   const sendBtn = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
-    h('span', { class: 'auth-btn-label' }, 'Kirim kode'), btnIcon(),
+    h('span', { class: 'auth-btn-label' }, t('auth.login.send')), btnIcon(),
   )
   const emailForm = h('form', { class: 'auth-form auth-form-email', novalidate: true, 'aria-labelledby': 'auth-title' },
     h('div', { class: 'auth-field' },
-      h('label', { for: 'auth-email', class: 'auth-label' }, 'Alamat email'),
+      h('label', { for: 'auth-email', class: 'auth-label' }, t('auth.login.emailLabel')),
       h('div', { class: 'auth-input-wrap' }, h('span', { class: 'auth-input-icon', html: iconHTML('mail', { size: 18 }) }), emailInput),
       emailError,
       emailHint,
@@ -166,16 +162,16 @@ export function renderLoginPage(root, ctx = {}) {
 
   /* ---- Step 2: code ---- */
   const sentTo = h('strong', { class: 'auth-sent-to' })
-  const changeEmailBtn = h('button', { type: 'button', class: 'auth-link' }, 'Ganti email')
+  const changeEmailBtn = h('button', { type: 'button', class: 'auth-link' }, t('auth.login.changeEmail'))
   const sentLine = h('p', { class: 'auth-sent' },
     h('span', { class: 'auth-sent-icon', html: iconHTML('mail', { size: 16 }) }),
-    h('span', { class: 'auth-sent-text' }, 'Kode 6 digit dikirim ke ', sentTo, '. '),
+    h('span', { class: 'auth-sent-text' }, t('auth.login.sentBefore'), sentTo, t('auth.login.sentAfter')),
     changeEmailBtn,
   )
 
   const digits = Array.from({ length: CODE_LENGTH }, (_, i) => h('input', {
     class: 'auth-digit', type: 'text', inputmode: 'numeric', pattern: '[0-9]*', maxlength: '1',
-    autocomplete: i === 0 ? 'one-time-code' : 'off', 'aria-label': `Digit ${i + 1} dari ${CODE_LENGTH}`,
+    autocomplete: i === 0 ? 'one-time-code' : 'off', 'aria-label': t('auth.login.digitLabel', { n: i + 1, total: CODE_LENGTH }),
     name: i === 0 ? 'code' : null, enterkeyhint: i === CODE_LENGTH - 1 ? 'go' : 'next',
   }))
   digits.forEach((d, i) => d.style.setProperty('--k', String(i)))
@@ -184,30 +180,30 @@ export function renderLoginPage(root, ctx = {}) {
   )
 
   const demoDigits = h('span', { class: 'auth-demo-code tnum', 'aria-label': '' })
-  const fillBtn = h('button', { type: 'button', class: 'btn btn-accent btn-sm auth-demo-fill' }, 'Isi otomatis')
+  const fillBtn = h('button', { type: 'button', class: 'btn btn-accent btn-sm auth-demo-fill' }, t('auth.login.fill'))
   const demoBox = h('div', { class: 'auth-demo', hidden: true },
     h('span', { class: 'auth-demo-icon', 'aria-hidden': 'true', html: iconHTML('info', { size: 18 }) }),
     h('div', { class: 'auth-demo-main' },
-      h('p', { class: 'auth-demo-note' }, h('strong', {}, 'Mode demo.'), ' Email tidak dikirim. Kode Anda:'),
+      h('p', { class: 'auth-demo-note' }, h('strong', {}, t('auth.login.demoNoteStrong')), t('auth.login.demoNote')),
       h('div', { class: 'auth-demo-body' }, demoDigits, fillBtn),
     ),
   )
 
   const verifyBtn = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
-    h('span', { class: 'auth-btn-label' }, 'Masuk'), btnIcon(),
+    h('span', { class: 'auth-btn-label' }, t('auth.login.verify')), btnIcon(),
   )
-  const resendBtn = h('button', { type: 'button', class: 'auth-link auth-resend', disabled: true }, 'Kirim ulang')
+  const resendBtn = h('button', { type: 'button', class: 'auth-link auth-resend', disabled: true }, t('auth.login.resend'))
   const codeForm = h('form', { class: 'auth-form auth-form-code', novalidate: true, hidden: true, 'aria-labelledby': 'auth-title' },
     sentLine,
     h('div', { class: 'auth-field' },
-      h('span', { class: 'auth-label', id: 'auth-code-label' }, 'Kode verifikasi'),
+      h('span', { class: 'auth-label', id: 'auth-code-label' }, t('auth.login.codeLabel')),
       otpGroup,
     ),
     demoBox,
     verifyBtn,
     h('div', { class: 'auth-row' },
       resendBtn,
-      h('span', { class: 'auth-row-note' }, 'Tidak masuk? Cek folder spam.'),
+      h('span', { class: 'auth-row-note' }, t('auth.login.spam')),
     ),
   )
 
@@ -215,27 +211,27 @@ export function renderLoginPage(root, ctx = {}) {
 
   /* ---- Mode switch: Live (email + OTP) or Demo (seeded accounts) ---- */
   const modeLive = h('button', { type: 'button', class: 'auth-mode-btn', role: 'tab', 'aria-selected': 'true', id: 'auth-mode-live', 'aria-controls': 'auth-live' },
-    h('span', { class: 'auth-mode-icon', html: iconHTML('mail', { size: 16 }) }), h('span', {}, 'Live'))
+    h('span', { class: 'auth-mode-icon', html: iconHTML('mail', { size: 16 }) }), h('span', {}, t('auth.login.modeLive')))
   const modeDemo = h('button', { type: 'button', class: 'auth-mode-btn', role: 'tab', 'aria-selected': 'false', id: 'auth-mode-demo', 'aria-controls': 'auth-demo-form', tabindex: '-1' },
-    h('span', { class: 'auth-mode-icon', html: iconHTML('sparkles', { size: 16 }) }), h('span', {}, 'Akun demo'))
+    h('span', { class: 'auth-mode-icon', html: iconHTML('sparkles', { size: 16 }) }), h('span', {}, t('auth.login.modeDemo')))
   const modeThumb = h('span', { class: 'auth-mode-thumb', 'aria-hidden': 'true' })
-  const modeSwitch = h('div', { class: 'auth-mode', role: 'tablist', 'aria-label': 'Cara masuk' }, modeThumb, modeLive, modeDemo)
+  const modeSwitch = h('div', { class: 'auth-mode', role: 'tablist', 'aria-label': t('auth.login.modeLabel') }, modeThumb, modeLive, modeDemo)
 
   const scaleSel = h('select', { id: 'auth-demo-scale', class: 'auth-select', name: 'scale' },
-    DEMO_SCALES.map((sc) => h('option', { value: sc.value }, sc.label)))
+    DEMO_SCALES.map((sc) => h('option', { value: sc.value }, t(`auth.demo.scale.${sc.value}`))))
   const acctSel = h('select', { id: 'auth-demo-account', class: 'auth-select', name: 'account' })
   const demoPreview = h('div', { class: 'auth-demo-preview', 'aria-live': 'polite' })
   const demoBtn = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
-    h('span', { class: 'auth-btn-label' }, 'Masuk ke mode demo'), btnIcon(),
+    h('span', { class: 'auth-btn-label' }, t('auth.demo.submit')), btnIcon(),
   )
   const demoForm = h('form', { class: 'auth-form auth-form-demo', id: 'auth-demo-form', novalidate: true, hidden: true, role: 'tabpanel', 'aria-labelledby': 'auth-mode-demo' },
     h('div', { class: 'auth-demo-grid' },
       h('div', { class: 'auth-field field' },
-        h('label', { for: 'auth-demo-scale', class: 'auth-label' }, 'Skala bisnis'),
+        h('label', { for: 'auth-demo-scale', class: 'auth-label' }, t('auth.demo.scaleLabel')),
         scaleSel,
       ),
       h('div', { class: 'auth-field field' },
-        h('label', { for: 'auth-demo-account', class: 'auth-label' }, 'Akun demo'),
+        h('label', { for: 'auth-demo-account', class: 'auth-label' }, t('auth.demo.accountLabel')),
         acctSel,
       ),
     ),
@@ -243,19 +239,19 @@ export function renderLoginPage(root, ctx = {}) {
     demoBtn,
     h('p', { class: 'auth-field-hint auth-demo-shared' },
       h('span', { html: iconHTML('info', { size: 14 }) }),
-      'Berisi data contoh 12 bulan. Akun demo dipakai bersama, jadi perubahan Anda bisa terlihat pengunjung lain.'),
+      t('auth.demo.shared')),
   )
 
-  const eyebrow = h('p', { class: 'eyebrow auth-eyebrow' }, 'Masuk atau daftar')
+  const eyebrow = h('p', { class: 'eyebrow auth-eyebrow' }, t('auth.login.eyebrow'))
   // "Masuk dengan Google": shown only when the server has Google configured (GET /api/auth/providers).
   const googleBtn = h('a', { class: 'btn btn-soft btn-lg auth-google', href: '/api/auth/google/start' },
-    h('span', { class: 'auth-google-mark', 'aria-hidden': 'true', html: GOOGLE_MARK }), h('span', { class: 'auth-btn-label' }, 'Masuk dengan Google'))
+    h('span', { class: 'auth-google-mark', 'aria-hidden': 'true', html: GOOGLE_MARK }), h('span', { class: 'auth-btn-label' }, t('auth.google.button')))
   // Google Identity Services renders the official button (FedCM where supported) into gisSlot;
   // the redirect link above stays as the fallback when GIS can't load.
-  const gisSlot = h('div', { class: 'auth-gis', role: 'group', 'aria-label': 'Masuk dengan Google' })
+  const gisSlot = h('div', { class: 'auth-gis', role: 'group', 'aria-label': t('auth.google.button') })
   // Google first (one tap for most people), then "atau", then the email code flow.
   const googleBox = h('div', { class: 'auth-google-box', hidden: true },
-    gisSlot, googleBtn, h('p', { class: 'auth-or', 'aria-hidden': 'true' }, h('span', {}, 'atau dengan email')))
+    gisSlot, googleBtn, h('p', { class: 'auth-or', 'aria-hidden': 'true' }, h('span', {}, t('auth.login.orEmail'))))
   const livePanel = h('div', { class: 'auth-live', id: 'auth-live', role: 'tabpanel', 'aria-labelledby': 'auth-mode-live' }, googleBox, stepper, emailForm, codeForm)
   const card = h('div', { class: 'auth-card surface' },
     modeSwitch,
@@ -267,12 +263,12 @@ export function renderLoginPage(root, ctx = {}) {
     message,
     h('p', { class: 'auth-privacy' },
       h('span', { html: iconHTML('shield', { size: 14 }) }),
-      'Email Anda hanya dipakai untuk masuk dan pemberitahuan akun.',
+      t('auth.login.privacy'),
     ),
   )
   const main = h('main', { class: 'auth-main', id: 'konten' }, card)
   const foot = h('footer', { class: 'auth-foot' },
-    h('p', {}, 'Tanpa kata sandi, tanpa spam.'),
+    h('p', {}, t('auth.login.footNote')),
     h('p', {}, '© 2026 Satu Alur'),
   )
 
@@ -301,7 +297,7 @@ export function renderLoginPage(root, ctx = {}) {
     if (notice) { sessionStorage.removeItem(AUTH_NOTICE_KEY); say(notice, 'error') }
     // Opened by Claude (OAuth consent #/izin-ai, see src/ui/app.js): say why we ask to sign in.
     else if (/^#\/izin-ai\?/.test(sessionStorage.getItem('satualur_after_login') || '')) {
-      say('Masuk ke Satu Alur untuk menghubungkan Claude. Setelah masuk, Anda akan diminta memberi izin.', 'info')
+      say(t('auth.login.claudeNotice'), 'info')
     }
   } catch { /* storage unavailable */ }
 
@@ -337,9 +333,9 @@ export function renderLoginPage(root, ctx = {}) {
     stepCodeItem.toggleAttribute('aria-current', next === 'code')
     if (next === 'code') stepCodeItem.setAttribute('aria-current', 'step')
     stepEmailItem.classList.toggle('is-done', next === 'code')
-    title.innerHTML = COPY[next].title
-    helper.textContent = COPY[next].helper
-    setStatus(COPY[next].status)
+    title.innerHTML = copy(next).title
+    helper.textContent = copy(next).helper
+    setStatus(copy(next).status)
     if (next === 'email') {
       setSceneState('idle')
       stopResend()
@@ -365,7 +361,7 @@ export function renderLoginPage(root, ctx = {}) {
     demoBox.hidden = !ok
     if (!ok) return
     demoDigits.replaceChildren(...demoCode.split('').map((d) => h('span', { text: d })))
-    demoDigits.setAttribute('aria-label', `Kode demo: ${demoCode.split('').join(' ')}`)
+    demoDigits.setAttribute('aria-label', t('auth.login.demoCodeLabel', { code: demoCode.split('').join(' ') }))
   }
   const onMockOtp = (e) => {
     const d = e.detail || {}
@@ -391,10 +387,10 @@ export function renderLoginPage(root, ctx = {}) {
     const paint = () => {
       if (resendLeft > 0) {
         resendBtn.disabled = true
-        resendBtn.innerHTML = `Kirim ulang dalam <span class="tnum">${formatTime(resendLeft)}</span>`
+        resendBtn.innerHTML = t('auth.login.resendIn', { time: formatTime(resendLeft) })
       } else {
         resendBtn.disabled = false
-        resendBtn.textContent = 'Kirim ulang kode'
+        resendBtn.textContent = t('auth.login.resendCode')
       }
     }
     paint()
@@ -413,12 +409,12 @@ export function renderLoginPage(root, ctx = {}) {
   async function requestCode({ resend = false } = {}) {
     const value = emailInput.value.trim()
     if (!value) {
-      showEmailError('Isi alamat email Anda terlebih dahulu.')
+      showEmailError(t('auth.login.errEmailEmpty'))
       emailInput.focus()
       return
     }
     if (!EMAIL_RE.test(value)) {
-      showEmailError('Format email belum benar, contoh: nama@usaha.id')
+      showEmailError(t('auth.login.errEmailFormat'))
       emailInput.focus()
       return
     }
@@ -431,11 +427,11 @@ export function renderLoginPage(root, ctx = {}) {
     if (resend) {
       busy = true
       resendBtn.disabled = true
-      resendBtn.textContent = 'Mengirim ulang…'
+      resendBtn.textContent = t('auth.login.resending')
     } else {
-      setBusy(sendBtn, true, 'Mengirim kode…')
+      setBusy(sendBtn, true, t('auth.login.sending'))
     }
-    setStatus('Mengirim kode')
+    setStatus(t('auth.login.statusSending'))
     setSceneState('sending')
     try {
       const res = await sendEmailCode(value)
@@ -444,27 +440,27 @@ export function renderLoginPage(root, ctx = {}) {
       clearDigits()
       if (!resend) goTo('code')
       else {
-        setStatus(COPY.code.status)
+        setStatus(copy('code').status)
         setSceneState('code')
         digits[0].focus()
       }
       renderDemo()
       startResend()
       say(res?.isExistingUser
-        ? 'Kode terkirim. Selamat datang kembali.'
-        : resend ? 'Kode baru terkirim.' : 'Kode terkirim. Akun baru akan dibuat setelah verifikasi.', 'ok')
+        ? t('auth.login.sentWelcomeBack')
+        : resend ? t('auth.login.sentNew') : t('auth.login.sentCreate'), 'ok')
     } catch (err) {
       if (disposed) return
       pendingEmail = resend ? pendingEmail : ''
-      setStatus(resend ? COPY.code.status : COPY.email.status)
+      setStatus(resend ? copy('code').status : copy('email').status)
       setSceneState('error')
       later(() => !disposed && setSceneState(resend ? 'code' : 'idle'), 600)
-      say(err?.message || 'Gagal mengirim kode. Coba lagi.', 'error')
-      if (resend) { resendBtn.disabled = false; resendBtn.textContent = 'Kirim ulang kode' }
+      say(errText(err, 'auth.login.sendFailed'), 'error')
+      if (resend) { resendBtn.disabled = false; resendBtn.textContent = t('auth.login.resendCode') }
     } finally {
       if (!disposed) {
         busy = false
-        if (btn === sendBtn) setBusy(sendBtn, false, 'Kirim kode')
+        if (btn === sendBtn) setBusy(sendBtn, false, t('auth.login.send'))
       }
     }
   }
@@ -562,16 +558,16 @@ export function renderLoginPage(root, ctx = {}) {
   async function verify() {
     const value = code()
     if (value.length < CODE_LENGTH) {
-      say(`Lengkapi ${CODE_LENGTH} digit kode terlebih dahulu.`, 'error')
+      say(t('auth.login.errCodeIncomplete', { n: CODE_LENGTH }), 'error')
       shake()
       digits[digits.findIndex((d) => !d.value)]?.focus()
       return
     }
     say('')
-    setBusy(verifyBtn, true, 'Memverifikasi…')
+    setBusy(verifyBtn, true, t('auth.login.verifying'))
     digits.forEach((d) => { d.readOnly = true })
     otpGroup.classList.add('is-busy')
-    setStatus('Memverifikasi')
+    setStatus(t('auth.login.statusVerifying'))
     setSceneState('verifying')
     try {
       const result = await submitEmailOtp(email, value)
@@ -580,12 +576,12 @@ export function renderLoginPage(root, ctx = {}) {
       page.classList.add('is-success')
       verifyBtn.classList.remove('is-loading')
       verifyBtn.classList.add('is-success')
-      verifyBtn.querySelector('.auth-btn-label').textContent = 'Berhasil masuk'
+      verifyBtn.querySelector('.auth-btn-label').textContent = t('auth.login.success')
       verifyBtn.querySelector('.auth-btn-icon').innerHTML = iconHTML('check', { size: 18, stroke: 2.5 })
       stepCodeItem.classList.add('is-done')
-      setStatus('Terverifikasi')
+      setStatus(t('auth.login.statusVerified'))
       setSceneState('success')
-      say('Berhasil. Membuka dasbor…', 'ok')
+      say(t('auth.login.openingDashboard'), 'ok')
       stopResend()
       successTimer = setTimeout(() => {
         if (!disposed) ctx.onSignedIn?.(result?.user)
@@ -593,12 +589,12 @@ export function renderLoginPage(root, ctx = {}) {
     } catch (err) {
       if (disposed) return
       otpGroup.classList.remove('is-busy')
-      setBusy(verifyBtn, false, 'Masuk')
+      setBusy(verifyBtn, false, t('auth.login.verify'))
       digits.forEach((d) => { d.readOnly = false })
-      setStatus(COPY.code.status)
+      setStatus(copy('code').status)
       setSceneState('error')
       later(() => !disposed && step === 'code' && setSceneState('code'), 600)
-      say(err?.message || 'Kode salah. Periksa lagi lalu coba ulang.', 'error')
+      say(errText(err, 'auth.login.wrongCode'), 'error')
       shake()
       digits.forEach((d) => { d.value = '' })
       digits.forEach((d) => d.classList.remove('is-filled'))
@@ -609,8 +605,8 @@ export function renderLoginPage(root, ctx = {}) {
   /* ---- Demo mode ---- */
   let mode = 'live'
   const DEMO_COPY = {
-    title: 'Coba <em>mode demo</em>.',
-    helper: 'Masuk ke salah satu dari 9 bisnis contoh dengan data 12 bulan. Tanpa email, tanpa kode.',
+    title: t('auth.demo.title'),
+    helper: t('auth.demo.helper'),
   }
 
   function fillAccounts() {
@@ -630,13 +626,13 @@ export function renderLoginPage(root, ctx = {}) {
         h('p', { class: 'auth-demo-meta' }, `${a.industry} · ${a.city}`),
         h('p', { class: 'auth-demo-email' }, a.email),
       ),
-      h('span', { class: 'tag tag-accent auth-demo-tag' }, sc?.target || ''),
+      h('span', { class: 'tag tag-accent auth-demo-tag' }, sc ? t(`auth.demo.target.${sc.value}`) : ''),
     )
   }
   scaleSel.addEventListener('change', fillAccounts)
   acctSel.addEventListener('change', renderPreview)
-  enhanceSelect(scaleSel, { searchPlaceholder: 'Cari skala…' })
-  enhanceSelect(acctSel, { searchPlaceholder: 'Cari bisnis atau kota…' })
+  enhanceSelect(scaleSel, { searchPlaceholder: t('auth.demo.searchScale') })
+  enhanceSelect(acctSel, { searchPlaceholder: t('auth.demo.searchAccount') })
   fillAccounts()
 
   function setMode(next, { focus = false } = {}) {
@@ -651,10 +647,10 @@ export function renderLoginPage(root, ctx = {}) {
     modeSwitch.classList.toggle('is-demo', demo)
     livePanel.hidden = demo
     demoForm.hidden = !demo
-    eyebrow.textContent = demo ? 'Mode demo' : 'Masuk atau daftar'
-    title.innerHTML = demo ? DEMO_COPY.title : COPY[step].title
-    helper.textContent = demo ? DEMO_COPY.helper : COPY[step].helper
-    setStatus(demo ? 'Mode demo' : COPY[step].status)
+    eyebrow.textContent = demo ? t('auth.demo.eyebrow') : t('auth.login.eyebrow')
+    title.innerHTML = demo ? DEMO_COPY.title : copy(step).title
+    helper.textContent = demo ? DEMO_COPY.helper : copy(step).helper
+    setStatus(demo ? t('auth.demo.eyebrow') : copy(step).status)
     say('')
     if (!reduced) {
       const active = demo ? demoForm : livePanel
@@ -678,10 +674,10 @@ export function renderLoginPage(root, ctx = {}) {
     e.preventDefault()
     if (busy) return
     const target = acctSel.value
-    if (!target) { say('Pilih akun demo terlebih dahulu.', 'error'); return }
+    if (!target) { say(t('auth.demo.pickFirst'), 'error'); return }
     say('')
-    setBusy(demoBtn, true, 'Membuka akun demo…')
-    setStatus('Membuka demo')
+    setBusy(demoBtn, true, t('auth.demo.opening'))
+    setStatus(t('auth.demo.statusOpening'))
     setSceneState('verifying')
     try {
       const result = await loginWithDemo(target)
@@ -689,21 +685,21 @@ export function renderLoginPage(root, ctx = {}) {
       page.classList.add('is-success')
       demoBtn.classList.remove('is-loading')
       demoBtn.classList.add('is-success')
-      demoBtn.querySelector('.auth-btn-label').textContent = 'Berhasil masuk'
+      demoBtn.querySelector('.auth-btn-label').textContent = t('auth.login.success')
       demoBtn.querySelector('.auth-btn-icon').innerHTML = iconHTML('check', { size: 18, stroke: 2.5 })
-      setStatus('Masuk mode demo')
+      setStatus(t('auth.demo.statusSignedIn'))
       setSceneState('success')
-      say('Berhasil. Membuka dasbor demo…', 'ok')
+      say(t('auth.demo.openingDashboard'), 'ok')
       successTimer = setTimeout(() => {
         if (!disposed) ctx.onSignedIn?.(result?.user)
       }, reduced ? 250 : 700)
     } catch (err) {
       if (disposed) return
-      setBusy(demoBtn, false, 'Masuk ke mode demo')
-      setStatus('Mode demo')
+      setBusy(demoBtn, false, t('auth.demo.submit'))
+      setStatus(t('auth.demo.eyebrow'))
       setSceneState('error')
       later(() => !disposed && setSceneState('idle'), 600)
-      say(err?.message || 'Gagal membuka akun demo. Coba lagi.', 'error')
+      say(errText(err, 'auth.demo.failed'), 'error')
     }
   })
 
@@ -713,12 +709,12 @@ export function renderLoginPage(root, ctx = {}) {
   let gis = null
   function onGoogleCredential(credential, nonce) {
     if (disposed) return
-    say('Memeriksa akun Google…', 'info')
+    say(t('auth.google.checking'), 'info')
     loginWithGoogleCredential(credential, nonce)
-      .then((result) => { if (!disposed) { say('Berhasil. Membuka dasbor…', 'ok'); ctx.onSignedIn?.(result?.user) } })
+      .then((result) => { if (!disposed) { say(t('auth.login.openingDashboard'), 'ok'); ctx.onSignedIn?.(result?.user) } })
       .catch((err) => {
         if (disposed) return
-        say(err?.message || 'Masuk dengan Google gagal. Coba lagi.', 'error')
+        say(errText(err, 'auth.google.failed'), 'error')
         gis?.retry().catch(() => {}) // the nonce is spent; get a fresh one for the next try
       })
   }
@@ -743,10 +739,10 @@ export function renderLoginPage(root, ctx = {}) {
   if (back.get('google')) {
     const code = back.get('google')
     history.replaceState(null, '', '#/masuk') // single use: never leave the code in the address bar
-    say('Menyelesaikan masuk dengan Google…', 'info')
+    say(t('auth.google.finishing'), 'info')
     finishGoogleLogin(code)
-      .then((result) => { if (!disposed) { say('Berhasil. Membuka dasbor…', 'ok'); ctx.onSignedIn?.(result?.user) } })
-      .catch((err) => { if (!disposed) say(err?.message || 'Masuk dengan Google gagal. Coba lagi.', 'error') })
+      .then((result) => { if (!disposed) { say(t('auth.login.openingDashboard'), 'ok'); ctx.onSignedIn?.(result?.user) } })
+      .catch((err) => { if (!disposed) say(errText(err, 'auth.google.failed'), 'error') })
   }
 
   codeForm.addEventListener('submit', (e) => {

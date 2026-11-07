@@ -8,6 +8,7 @@ import * as C from '../ui/components.js'
 import { geocode, searchLeads } from './api.js'
 import { loadLeaflet, OSM_TILES, OSM_ATTRIBUTION } from './leaflet.js'
 import { pickedFields, otherContacts } from './pick.js'
+import { t } from '../i18n/index.js'
 
 export { pickedFields }
 
@@ -16,23 +17,23 @@ let seq = 0
 
 export function openMapPicker({ opener, onPick, initialArea = '' }) {
   const n = ++seq
-  const keyword = C.field({ label: 'Nama atau jenis usaha', id: `mp-kw-${n}`, placeholder: 'mis. hotel, laundry, PT Maju', attrs: { maxlength: '60', autocomplete: 'off' } })
-  const area = C.field({ label: 'Kota atau area', id: `mp-area-${n}`, value: initialArea, placeholder: 'mis. Bekasi Barat', attrs: { maxlength: '80', autocomplete: 'address-level2' } })
-  const go = C.button({ label: 'Cari', icon: 'search', variant: 'primary', type: 'submit' })
+  const keyword = C.field({ label: t('leads.picker.keyword'), id: `mp-kw-${n}`, placeholder: t('leads.picker.keywordPlaceholder'), attrs: { maxlength: '60', autocomplete: 'off' } })
+  const area = C.field({ label: t('leads.picker.area'), id: `mp-area-${n}`, value: initialArea, placeholder: t('leads.picker.areaPlaceholder'), attrs: { maxlength: '80', autocomplete: 'address-level2' } })
+  const go = C.button({ label: t('leads.picker.search'), icon: 'search', variant: 'primary', type: 'submit' })
   const form = el('form', { className: 'mp-form', noValidate: true, role: 'search' }, keyword.wrap, area.wrap, el('div', { className: 'mp-go' }, go))
-  const mapEl = el('div', { className: 'mp-map', role: 'region', 'aria-label': 'Peta hasil pencarian' })
-  const note = el('p', { className: 'muted small mp-note' }, 'Data dari peta terbuka (OpenStreetMap) sering belum lengkap: banyak usaha tidak mencantumkan email, jam buka, atau kontak lain. Periksa lagi sebelum menghubungi.')
+  const mapEl = el('div', { className: 'mp-map', role: 'region', 'aria-label': t('leads.picker.mapLabel') })
+  const note = el('p', { className: 'muted small mp-note' }, t('leads.picker.note'))
   const status = C.message()
   const list = el('ul', { className: 'mp-list', 'aria-live': 'polite' })
-  const close = C.button({ label: 'Tutup', variant: 'ghost' })
+  const close = C.button({ label: t('leads.picker.close'), variant: 'ghost' })
   close.dataset.dismiss = ''
   // The only control left enabled while a search runs.
-  const stop = C.button({ label: 'Batalkan pencarian', icon: 'x', variant: 'ghost', size: 'sm' })
+  const stop = C.button({ label: t('leads.picker.stop'), icon: 'x', variant: 'ghost', size: 'sm' })
   stop.classList.add('mp-stop')
   stop.hidden = true
   const m = C.modal({
-    title: 'Cari pelanggan dari peta',
-    description: 'Ketik nama atau jenis usaha dan areanya, lalu pilih salah satu hasil.',
+    title: t('leads.picker.title'),
+    description: t('leads.picker.description'),
     children: [form, status, mapEl, note, list], actions: [stop, close], opener, wide: true,
   })
   m.dialog.classList.add('mp-dialog')
@@ -91,22 +92,22 @@ export function openMapPicker({ opener, onPick, initialArea = '' }) {
     layer?.clearLayers()
     markers.clear()
     if (!results.length) {
-      list.replaceChildren(el('li', {}, C.emptyState({ title: 'Tidak ada hasil', body: 'Coba kata lain atau area yang lebih luas.', iconName: 'mapPin' })))
+      list.replaceChildren(el('li', {}, C.emptyState({ title: t('leads.picker.noResults'), body: t('leads.picker.noResultsBody'), iconName: 'mapPin' })))
       return
     }
     const bounds = []
     list.replaceChildren(...results.slice(0, 30).map((r, i) => {
-      const pick = C.button({ label: 'Pilih', variant: 'soft', size: 'sm' })
-      pick.setAttribute('aria-label', `Pilih ${r.name}`)
+      const pick = C.button({ label: t('leads.picker.pick'), variant: 'soft', size: 'sm' })
+      pick.setAttribute('aria-label', t('leads.picker.pickAria', { name: r.name }))
       pick.addEventListener('click', () => choose(r, areaLabel))
       const contacts = [r.phone, r.email, ...otherContacts(r)].filter(Boolean)
       const item = el('li', { className: 'mp-item', dataset: { i: String(i) } },
         el('span', { className: 'mp-item-main' },
           el('strong', {}, r.name),
-          el('span', { className: 'muted small mp-item-desc' }, r.description || r.category || 'Usaha'),
-          el('span', { className: 'muted small' }, r.address || 'Alamat belum tercatat'),
-          el('span', { className: 'small mp-item-contacts' }, contacts.length ? contacts.join(' · ') : 'Kontak belum tercatat di peta')),
-        el('span', { className: 'mp-item-side' }, Number.isFinite(r.distance_km) ? el('span', { className: 'muted small tnum' }, `${r.distance_km} km`) : null, r.demo ? C.tag('contoh', 'neutral') : null, pick))
+          el('span', { className: 'muted small mp-item-desc' }, r.description || r.category || t('leads.picker.business')),
+          el('span', { className: 'muted small' }, r.address || t('leads.picker.noAddress')),
+          el('span', { className: 'small mp-item-contacts' }, contacts.length ? contacts.join(' · ') : t('leads.picker.noContact'))),
+        el('span', { className: 'mp-item-side' }, Number.isFinite(r.distance_km) ? el('span', { className: 'muted small tnum' }, `${r.distance_km} km`) : null, r.demo ? C.tag(t('leads.picker.sample'), 'neutral') : null, pick))
       if (L && layer && Number.isFinite(r.lat) && Number.isFinite(r.lon)) {
         const mk = L.circleMarker([r.lat, r.lon], { radius: 7, weight: 2, color: '#16392E', fillColor: '#E7A13A', fillOpacity: 0.9 }).addTo(layer)
         mk.bindTooltip(r.name)
@@ -127,32 +128,32 @@ export function openMapPicker({ opener, onPick, initialArea = '' }) {
     status.hide?.()
     const kw = keyword.input.value.trim()
     const where = area.input.value.trim()
-    if (kw.length < 2) { status.show('warn', 'Isi nama atau jenis usaha (minimal 2 huruf).'); keyword.input.focus(); return }
-    if (where.length < 2) { status.show('warn', 'Isi kota atau area pencarian.'); area.input.focus(); return }
+    if (kw.length < 2) { status.show('warn', t('leads.picker.needKeyword')); keyword.input.focus(); return }
+    if (where.length < 2) { status.show('warn', t('leads.picker.needArea')); area.input.focus(); return }
     ctl?.abort()
     ctl = new AbortController()
     const { signal } = ctl
     const mine = ++searchSeq
     const stale = () => signal.aborted || mine !== searchSeq
     lock(true)
-    const restore = C.setBusy(go, 'Mencari…')
+    const restore = C.setBusy(go, t('leads.picker.searching'))
     list.replaceChildren(el('li', {}, C.skeletonRows(3)))
     try {
       const places = await geocode(where, { signal })
       if (stale()) return
-      if (!places?.length) { list.replaceChildren(); status.show('warn', 'Area tidak ditemukan. Coba nama kota atau kecamatan.'); return }
+      if (!places?.length) { list.replaceChildren(); status.show('warn', t('leads.picker.areaNotFound')); return }
       const center = places[0]
       await ensureMap(center)
       if (stale()) return
       const res = await searchLeads({ lat: center.lat, lon: center.lon, radiusKm: 5, keywords: [kw], signal })
       if (stale()) return
       render(res?.results || [], center.label)
-      if (res?.results?.some((r) => r.demo)) status.show('info', 'Hasil di bawah adalah usaha contoh (akun demo).')
+      if (res?.results?.some((r) => r.demo)) status.show('info', t('leads.picker.demo'))
     } catch (ex) {
       if (mine !== searchSeq) return
       list.replaceChildren()
-      if (ex.name === 'AbortError') status.show('info', 'Pencarian dibatalkan.')
-      else status.show('danger', ex.status === 429 ? 'Batas pencarian tercapai. Coba lagi beberapa menit lagi.' : ex.message)
+      if (ex.name === 'AbortError') status.show('info', t('leads.picker.cancelled'))
+      else status.show('danger', ex.status === 429 ? t('leads.picker.rateLimited') : ex.message)
     } finally {
       if (mine === searchSeq) {
         if (list.querySelector('.skel-rows')) list.replaceChildren()

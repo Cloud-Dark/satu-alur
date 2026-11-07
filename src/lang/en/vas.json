@@ -1,0 +1,225 @@
+{
+  "tabs": {
+    "peluang": "Opportunities",
+    "katalog": "Catalog",
+    "optimasi": "Optimization room"
+  },
+  "category": {
+    "perawatan": "Scheduled maintenance",
+    "perlindungan": "Protection & warranty",
+    "peningkatan": "Quality upgrades",
+    "kecepatan": "Speed & priority",
+    "paket": "Bundles & subscriptions",
+    "lain": "Other"
+  },
+  "status": {
+    "active": "Active",
+    "draft": "Draft",
+    "retired": "Retired"
+  },
+  "kind": {
+    "langganan": "Subscription",
+    "berkala": "Recurring",
+    "garansi": "Warranty",
+    "bundling": "Bundling",
+    "tertahan": "Stalled quotes",
+    "marginkatalog": "Catalog margin"
+  },
+  "owner": {
+    "Keuangan": "Finance",
+    "Operasional": "Operations",
+    "Marketing": "Marketing",
+    "Kreatif": "Creative"
+  },
+  "opp": {
+    "langganan": {
+      "title": "Monthly maintenance contracts for repeat customers",
+      "why": "{count} customers have ordered more than once. They rebook by hand — a monthly contract turns that into steady revenue and locks in the schedule.",
+      "basisItem": "{name} ({count} requests)"
+    },
+    "berkala": {
+      "title": "Follow-up service for jobs older than 30 days",
+      "why": "{count} jobs finished over a month ago and those customers haven't booked again. A scheduled service is a natural reason to get in touch.",
+      "basisItem": "{customer} — {service}, {age} days ago"
+    },
+    "garansi": {
+      "title": "Extended warranty for high-value jobs",
+      "why": "{count} jobs are worth more than average. At that size, customers will usually pay for peace of mind — and your claim cost is low because the work is new.",
+      "basis": "{count} jobs above {amount}"
+    },
+    "bundling": {
+      "title": "Add-on bundle for \"{type}\"",
+      "why": "\"{type}\" is your most requested service with no add-on attached. One small add-on on every quote raises the value without adding visits.",
+      "basis": "{count} \"{type}\" requests with no active VAS"
+    },
+    "tertahan": {
+      "title": "Revive stalled quotes with a small bonus",
+      "why": "{count} quotes haven't been answered for more than 3 days. A small conditional freebie often restarts a conversation that went quiet.",
+      "basis": "{count} quotes awaiting a reply"
+    },
+    "marginkatalog": {
+      "title": "Fix thin-margin VAS items",
+      "why": "{count} active items have a margin under 25%. Raising the price or cutting the cost of items that already sell is easier than finding new customers."
+    },
+    "price": "Suggested price",
+    "perMonth": "Customers/month",
+    "attach": "Attach rate",
+    "confidence": "Confidence",
+    "potential": "Potential/month",
+    "basis": "Basis: ",
+    "toCatalog": "Add to catalog",
+    "discuss": "Discuss with 5 teams",
+    "owner": "Owner: {owner}"
+  },
+  "tabsLabel": "Add-on services",
+  "page": {
+    "title": "Add-on revenue",
+    "em": "Add-on",
+    "newItem": "New item"
+  },
+  "kpi": {
+    "potential": "Monthly potential",
+    "potentialSub": "from detected opportunities",
+    "open": "Open opportunities",
+    "openSub": "calculated from your data",
+    "catalogMargin": "Catalog margin",
+    "activeItems": "{count} active items",
+    "share": "VAS share",
+    "shareSub": "of {amount} revenue"
+  },
+  "empty": {
+    "kicker": "No opportunities yet",
+    "title": "Log a few requests and completed jobs first",
+    "body": "Opportunities come from the jobs you have logged. Once there is some history, this page points to the customers and services ready for an add-on."
+  },
+  "section": {
+    "title": "Opportunities from your jobs",
+    "note": "Average catalog margin {pct}% · figures refresh every time the page opens"
+  },
+  "table": {
+    "caption": "Add-on service catalog",
+    "item": "Item",
+    "category": "Category",
+    "price": "Price",
+    "cost": "Cost",
+    "margin": "Margin",
+    "attachTo": "Attached to",
+    "allServices": "All services",
+    "attach": "Attach",
+    "status": "Status",
+    "edit": "Edit {name}",
+    "delete": "Delete {name}"
+  },
+  "catalog": {
+    "note": "{shown} of {total} items · {active} active · potential {amount}/month",
+    "noRows": "Nothing to export.",
+    "exported": "{count} items exported to CSV.",
+    "searchPlaceholder": "Search items, parent services or categories…",
+    "searchLabel": "Search catalog items",
+    "filterLabel": "Filter by item status",
+    "allStatuses": "All statuses",
+    "bulk": "Bulk import",
+    "export": "Export CSV",
+    "emptyKicker": "Empty catalog",
+    "emptyTitle": "No add-on services yet",
+    "emptyBody": "Add one item, or paste your whole price list with Bulk import.",
+    "addFirst": "Add the first item",
+    "emptyNote": "0 items · potential Rp0/month",
+    "pagerLabel": "add-on service catalog",
+    "noMatch": "No matching items. Change the search or the status filter."
+  },
+  "csv": {
+    "marginPct": "Margin percent",
+    "parent": "Parent service",
+    "created": "Created"
+  },
+  "facts": {
+    "revenue": "Recorded revenue",
+    "avgJob": "Average job",
+    "activeItems": "Active VAS items",
+    "catalogPotential": "Catalog potential",
+    "perMonth": "{amount}/mo",
+    "detected": "Detected opportunities"
+  },
+  "presets": {
+    "offer": {
+      "label": "Raise quote value",
+      "problem": "My quotes stop at the basic service. I want every quote to carry one relevant add-on without putting customers off."
+    },
+    "contract": {
+      "label": "Monthly maintenance contract",
+      "problem": "I want to turn repeat customers into monthly maintenance contracts so revenue is more predictable."
+    },
+    "margin": {
+      "label": "Fix catalog margins",
+      "problem": "Some of my add-ons are priced too low. I want to know which to reprice or retire."
+    }
+  },
+  "editor": {
+    "name": "Item name",
+    "namePlaceholder": "Example: 3-month AC maintenance",
+    "category": "Category",
+    "price": "Selling price (Rp)",
+    "cost": "Direct cost (Rp)",
+    "costHint": "Materials and time actually spent on this item.",
+    "attachTo": "Attached to service",
+    "attachPlaceholder": "Leave blank for all services",
+    "attachHint": "The service name exactly as in requests, e.g. AC cleaning.",
+    "rate": "Estimated attach rate (%)",
+    "rateHint": "The share of customers who usually take this item.",
+    "desc": "Short description",
+    "descPlaceholder": "One or two sentences your customers can read.",
+    "status": "Status",
+    "marginAuto": "Margin is calculated automatically.",
+    "margin": "Margin {amount} ({pct}%) per item",
+    "save": "Save changes",
+    "add": "Add item",
+    "editTitle": "Edit VAS item",
+    "newTitle": "New VAS item",
+    "description": "This item appears as an add-on in quotes and counts toward the catalog potential.",
+    "nameRequired": "Item name is required.",
+    "priceRequired": "Price must be more than zero.",
+    "updated": "Item updated.",
+    "added": "Item added."
+  },
+  "common": {
+    "cancel": "Cancel",
+    "saving": "Saving…"
+  },
+  "delete": {
+    "confirm": "Delete",
+    "title": "Delete this VAS item?",
+    "description": "\"{name}\" will be removed from the catalog. Revenue already recorded stays as it is.",
+    "irreversible": "This can't be undone.",
+    "busy": "Deleting…",
+    "done": "Item deleted."
+  },
+  "bulk": {
+    "label": "Paste data",
+    "hint": "Two formats are accepted: a JSON array, or one line per item separated by | — name | price | cost | category | service | attach rate.",
+    "placeholder": "3-month AC maintenance | 450000 | 120000 | perawatan | AC cleaning | 30\nExpress carpet wash | 250000 | 60000 | kecepatan | Sofa & carpet wash | 20",
+    "unreadable": "The file couldn't be read.",
+    "skip": "Skip items whose name is already in the catalog",
+    "dupes": " · {count} already exist{skipped}",
+    "andSkipped": " and will be skipped",
+    "preview": "{count} new items{extra}. Example: {name} — {price}",
+    "import": "Import",
+    "title": "Bulk import VAS items",
+    "description": "Paste from a spreadsheet or pick a JSON/CSV file. Any bad row rejects the whole import so the catalog is never half-done.",
+    "pickFile": "Choose file",
+    "allDupes": "Every row is already in the catalog. Nothing was imported.",
+    "importing": "Importing…",
+    "done": "{count} items imported{skipped}.",
+    "skippedCount": ", {count} skipped"
+  },
+  "parse": {
+    "empty": "There is no data to import.",
+    "badJson": "Invalid JSON. Check commas and quotes.",
+    "notArray": "The JSON must be a list of items.",
+    "line": "Line {line}: {error}"
+  },
+  "load": {
+    "retry": "Try again",
+    "failed": "Couldn't load data: {error}"
+  }
+}

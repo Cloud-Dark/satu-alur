@@ -6,6 +6,7 @@
 import { isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { INTEGRATIONS, INTEGRATION_KEYS, validateCredentials } from './rules.js'
+import { t } from '../i18n/index.js'
 
 const TOKEN_KEY = 'satualur_token'
 const DEMO_KEY = 'satualur_integrations_demo_v1'
@@ -21,7 +22,7 @@ async function call(path, { method = 'GET', body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('settings.common.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -68,7 +69,7 @@ export async function save(provider, fields) {
     const verified = !(provider === 'waconsole' && !v.meta.device_id)
     s[provider] = { hint: v.hint, meta: v.meta, verified_at: verified ? new Date().toISOString() : null }
     saveDemo(s)
-    return { provider, connected: true, hint: v.hint, verified, note: verified ? null : 'Kunci disimpan. Tambahkan ID perangkat agar status perangkat bisa diperiksa.' }
+    return { provider, connected: true, hint: v.hint, verified, note: verified ? null : t('settings.wa.keySavedNoDevice') }
   }
   return call(`/api/connectors/${encodeURIComponent(provider)}`, { method: 'PUT', body: { ...v.meta, ...v.secrets } })
 }

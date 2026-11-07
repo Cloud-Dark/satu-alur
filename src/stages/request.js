@@ -13,6 +13,7 @@ import { readPartialJson } from '../offer/partial-json.js'
 import { listTemplates } from '../offer/api.js'
 import { isQuotaError } from '../quota/errors.js'
 import { resolveModel } from './offer.js'
+import { t } from '../i18n/index.js'
 
 const { el } = C
 
@@ -20,19 +21,19 @@ export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
 
   /* ------------------------------------------------------------- Form */
-  const name = C.field({ label: 'Nama pelanggan', name: 'customer_name', required: true, placeholder: 'PT Maju Jaya', hint: 'Perusahaan atau perorangan yang meminta layanan.', attrs: { autocomplete: 'organization', maxlength: '120' } })
-  const location = C.field({ label: 'Lokasi', name: 'location', placeholder: 'Jakarta Selatan', attrs: { autocomplete: 'address-level2', maxlength: '120' } })
-  const phone = C.field({ label: 'Telepon', name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
-  const email = C.field({ label: 'Email', name: 'email', type: 'email', placeholder: 'info@contoh.id', hint: 'Opsional.', attrs: { autocomplete: 'email', inputmode: 'email', maxlength: '254' } })
-  const website = C.field({ label: 'Website / kontak lain', name: 'website', placeholder: 'contoh.id · IG @usaha · WA 0812…', hint: 'Opsional: website, Instagram, WhatsApp, dll.', attrs: { maxlength: '300' } })
-  const service = C.field({ label: 'Jenis layanan', name: 'service_type', required: true, placeholder: 'Pembersihan AC', hint: 'Satu layanan utama per permintaan.', attrs: { maxlength: '120' } })
-  const desc = C.textarea({ label: 'Deskripsi kebutuhan', name: 'description', rows: 5, placeholder: 'Jumlah unit, luas area, waktu yang diinginkan…', hint: 'Semakin rinci, semakin akurat penawaran AI di tahap 02.', attrs: { maxlength: '2000' } })
+  const name = C.field({ label: t('request.field.name'), name: 'customer_name', required: true, placeholder: t('request.field.namePh'), hint: t('request.field.nameHint'), attrs: { autocomplete: 'organization', maxlength: '120' } })
+  const location = C.field({ label: t('request.field.location'), name: 'location', placeholder: t('request.field.locationPh'), attrs: { autocomplete: 'address-level2', maxlength: '120' } })
+  const phone = C.field({ label: t('request.field.phone'), name: 'phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '32' } })
+  const email = C.field({ label: t('request.field.email'), name: 'email', type: 'email', placeholder: 'info@contoh.id', hint: t('request.field.optional'), attrs: { autocomplete: 'email', inputmode: 'email', maxlength: '254' } })
+  const website = C.field({ label: t('request.field.website'), name: 'website', placeholder: t('request.field.websitePh'), hint: t('request.field.websiteHint'), attrs: { maxlength: '300' } })
+  const service = C.field({ label: t('request.field.service'), name: 'service_type', required: true, placeholder: t('request.field.servicePh'), hint: t('request.field.serviceHint'), attrs: { maxlength: '120' } })
+  const desc = C.textarea({ label: t('request.field.desc'), name: 'description', rows: 5, placeholder: t('request.field.descPh'), hint: t('request.field.descHint'), attrs: { maxlength: '2000' } })
   const reviewBox = el('div', { className: 'proposal' })
 
   // Step 1 source: pick a business from the open map, or type it in by hand.
   let coords = null
-  const mapBtn = C.button({ label: 'Cari dari peta', icon: 'mapPin', variant: 'soft', size: 'sm' })
-  const manualBtn = C.button({ label: 'Isi manual', icon: 'edit', variant: 'ghost', size: 'sm' })
+  const mapBtn = C.button({ label: t('request.source.map'), icon: 'mapPin', variant: 'soft', size: 'sm' })
+  const manualBtn = C.button({ label: t('request.source.manual'), icon: 'edit', variant: 'ghost', size: 'sm' })
   const pickedNote = el('p', { className: 'muted small req-picked', hidden: true })
   mapBtn.addEventListener('click', () => openMapPicker({
     opener: mapBtn,
@@ -46,7 +47,7 @@ export async function render(container, ctx = {}) {
       // Business description only seeds an empty "Deskripsi kebutuhan"; the user edits it in step 2.
       if (f.description && !desc.input.value.trim()) { desc.input.value = f.description; desc.input.dispatchEvent(new Event('input', { bubbles: true })) }
       coords = f.lat !== null && f.lng !== null ? { lat: f.lat, lng: f.lng } : null
-      pickedNote.textContent = `Diisi dari peta: ${f.customer_name}. Periksa dan ubah bila perlu.`
+      pickedNote.textContent = t('request.source.picked', { name: f.customer_name })
       pickedNote.hidden = false
       ;[name, location, phone, email, website].forEach((x) => x.input.dispatchEvent(new Event('input', { bubbles: true })))
       name.input.focus()
@@ -74,18 +75,18 @@ export async function render(container, ctx = {}) {
   const customerErrors = () => {
     const d = values()
     const errs = []
-    if (!d.customer_name) errs.push({ text: 'Nama pelanggan wajib diisi.', input: name.input })
-    if (d.phone && !PHONE_RE.test(d.phone)) errs.push({ text: 'Nomor telepon hanya boleh berisi angka, spasi, +, -, dan tanda kurung.', input: phone.input })
-    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) errs.push({ text: 'Format email belum benar, contoh: info@contoh.id.', input: email.input })
+    if (!d.customer_name) errs.push({ text: t('request.error.name'), input: name.input })
+    if (d.phone && !PHONE_RE.test(d.phone)) errs.push({ text: t('request.error.phone'), input: phone.input })
+    if (d.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) errs.push({ text: t('request.error.email'), input: email.input })
     return errs
   }
   const needErrors = () => {
-    return values().service_type ? [] : [{ text: 'Jenis layanan wajib diisi.', input: service.input }]
+    return values().service_type ? [] : [{ text: t('request.error.service'), input: service.input }]
   }
 
   /* --------------------------------------------- AI autofill (step 2) */
-  const hint = C.textarea({ label: 'Petunjuk singkat', name: 'ai_hint', rows: 3, placeholder: 'Contoh: AC 3 unit bocor di ruang rapat, minta Sabtu pagi. Atau tempel chat WhatsApp pelanggan.', hint: 'AI mengisi jenis layanan dan deskripsi. Hasilnya tetap bisa Anda ubah.', attrs: { maxlength: '4000' } })
-  const fillBtn = C.button({ label: 'Isi otomatis dengan AI', icon: 'sparkles', variant: 'soft', size: 'sm' })
+  const hint = C.textarea({ label: t('request.ai.hint'), name: 'ai_hint', rows: 3, placeholder: t('request.ai.hintPh'), hint: t('request.ai.hintHint'), attrs: { maxlength: '4000' } })
+  const fillBtn = C.button({ label: t('request.ai.fill'), icon: 'sparkles', variant: 'soft', size: 'sm' })
   const fillStatus = el('p', { className: 'muted small ai-fill-status', role: 'status', 'aria-live': 'polite' })
   const aiFill = el('div', { className: 'ai-fill' }, hint.wrap, el('div', { className: 'ai-fill-actions' }, fillBtn, fillStatus))
   let fillCtl = null
@@ -97,18 +98,18 @@ export async function render(container, ctx = {}) {
   fillBtn.addEventListener('click', async () => {
     if (fillCtl) { fillCtl.abort(); return }
     const text = hint.input.value.trim()
-    if (!text) { fillStatus.textContent = 'Tulis petunjuk singkat dulu, misalnya "AC 3 unit bocor".'; hint.input.focus(); return }
+    if (!text) { fillStatus.textContent = t('request.ai.needHint'); hint.input.focus(); return }
     const ac = new AbortController()
     fillCtl = ac
     ctx.signal?.addEventListener('abort', () => ac.abort(), { once: true })
     const label = fillBtn.querySelector('.btn-label')
-    if (label) label.textContent = 'Hentikan'
-    fillStatus.textContent = 'AI sedang menulis…'
+    if (label) label.textContent = t('request.ai.stop')
+    fillStatus.textContent = t('request.ai.writing')
     service.input.closest('.field')?.classList.add('is-filling')
     desc.input.closest('.field')?.classList.add('is-filling')
     try {
       const mdl = await resolveModel()
-      if (!mdl) throw new Error('AI sedang tidak tersedia.')
+      if (!mdl) throw new Error(t('request.ai.unavailable'))
       const result = await autofillRequest({
         customer: values(),
         hint: text,
@@ -124,40 +125,40 @@ export async function render(container, ctx = {}) {
       if (result.service_type) service.input.value = result.service_type
       if (result.description) desc.input.value = result.description
       ;[service, desc].forEach((f) => f.input.dispatchEvent(new Event('input', { bubbles: true })))
-      fillStatus.textContent = 'Terisi. Periksa dan ubah bila perlu.'
+      fillStatus.textContent = t('request.ai.filled')
     } catch (err) {
-      fillStatus.textContent = err.name === 'AbortError' ? 'Dihentikan.' : isQuotaError(err) ? err.message : (err.message || 'Gagal mengisi otomatis.')
+      fillStatus.textContent = err.name === 'AbortError' ? t('request.ai.stopped') : isQuotaError(err) ? err.message : (err.message || t('request.ai.failed'))
     } finally {
       fillCtl = null
-      if (label) label.textContent = 'Isi otomatis dengan AI'
+      if (label) label.textContent = t('request.ai.fill')
       service.input.closest('.field')?.classList.remove('is-filling')
       desc.input.closest('.field')?.classList.remove('is-filling')
     }
   })
 
   const wiz = C.wizard({
-    label: 'Permintaan baru',
+    label: t('request.title'),
     steps: [
       {
         key: 'customer',
-        title: 'Pelanggan',
-        description: 'Siapa yang meminta, dan di mana.',
+        title: t('request.wiz.customer'),
+        description: t('request.wiz.customerDesc'),
         content: [sourceRow, pickedNote, name.wrap, el('div', { className: 'form-row keep-row' }, location.wrap, phone.wrap), el('div', { className: 'form-row' }, email.wrap, website.wrap)],
         validate: customerErrors,
       },
       {
         key: 'need',
-        title: 'Kebutuhan',
-        description: 'Layanan yang diminta dan rinciannya.',
+        title: t('request.wiz.need'),
+        description: t('request.wiz.needDesc'),
         content: [aiFill, service.wrap, desc.wrap],
         validate: needErrors,
       },
       {
         key: 'review',
-        title: 'Tinjau',
-        description: 'Periksa sebelum disimpan.',
+        title: t('request.wiz.review'),
+        description: t('request.wiz.reviewDesc'),
         content: reviewBox,
-        primary: { label: 'Simpan permintaan', icon: 'save', iconRight: undefined },
+        primary: { label: t('request.wiz.save'), icon: 'save', iconRight: undefined },
         validate: () => {
           const errs = [...customerErrors(), ...needErrors()]
           return errs.map((e) => e.text)
@@ -178,7 +179,7 @@ export async function render(container, ctx = {}) {
   }
 
   container.replaceChildren(
-    C.pageHeader({ title: 'Permintaan baru' }),
+    C.pageHeader({ title: t('request.title') }),
     solo(wiz.root, workflowLink(navigate)),
   )
 
@@ -188,23 +189,23 @@ export async function render(container, ctx = {}) {
       C.miniPreview({
         title: d.customer_name || '—',
         chips: [
-          { icon: 'layers', text: d.service_type || '—', title: `Layanan: ${d.service_type || '—'}` },
-          d.location ? { icon: 'mapPin', text: d.location, title: `Lokasi: ${d.location}` } : null,
-          d.phone ? { icon: 'phone', text: d.phone, title: `Telepon: ${d.phone}` } : null,
-          d.email ? { icon: 'mail', text: d.email, title: `Email: ${d.email}` } : null,
-          d.website ? { icon: 'compass', text: d.website, title: `Website / kontak lain: ${d.website}` } : null,
+          { icon: 'layers', text: d.service_type || '—', title: t('request.review.service', { value: d.service_type || '—' }) },
+          d.location ? { icon: 'mapPin', text: d.location, title: t('request.review.location', { value: d.location }) } : null,
+          d.phone ? { icon: 'phone', text: d.phone, title: t('request.review.phone', { value: d.phone }) } : null,
+          d.email ? { icon: 'mail', text: d.email, title: t('request.review.email', { value: d.email }) } : null,
+          d.website ? { icon: 'compass', text: d.website, title: t('request.review.website', { value: d.website }) } : null,
         ],
-        note: d.description || 'Tanpa deskripsi kebutuhan.',
+        note: d.description || t('request.review.noDesc'),
         noteLines: 4,
       }),
-      d.description ? null : el('p', { className: 'wiz-pane-desc' }, 'Tip: deskripsi yang rinci membuat penawaran AI lebih akurat.'),
+      d.description ? null : el('p', { className: 'wiz-pane-desc' }, t('request.review.tip')),
     ].filter(Boolean))
   }
 
   async function save() {
     const data = values()
     if (coords) Object.assign(data, coords)
-    const restore = wiz.busy('Menyimpan…')
+    const restore = wiz.busy(t('request.saving'))
     try {
       const { data: created, error } = await getCloud().database.from('requests').insert(data)
       if (error) throw new Error(error.message)
@@ -212,11 +213,11 @@ export async function render(container, ctx = {}) {
       restore()
       const actions = []
       if (row?.id != null) {
-        const next = C.button({ label: 'Buat penawaran', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+        const next = C.button({ label: t('request.done.offer'), iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
         next.addEventListener('click', () => navigate('offer', { requestId: row.id }))
         actions.push(next)
       }
-      const again = C.button({ label: 'Catat permintaan lain', icon: 'plus', size: 'sm', variant: 'soft' })
+      const again = C.button({ label: t('request.done.another'), icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
         for (const f of [name, location, phone, email, website, service, desc, hint]) f.input.value = ''
         fillStatus.textContent = ''
@@ -226,13 +227,13 @@ export async function render(container, ctx = {}) {
         wiz.reset()
       })
       actions.push(again)
-      wiz.complete({ text: `Permintaan ${data.customer_name} tersimpan. Lanjutkan dengan membuat penawaran.`, actions })
-      showToast('Permintaan baru tersimpan.', 'success')
+      wiz.complete({ text: t('request.done.text', { name: data.customer_name }), actions })
+      showToast(t('request.done.toast'), 'success')
       notifyDataChanged()
       await loadModel()
     } catch (err) {
       restore()
-      msg.show('danger', `Gagal menyimpan: ${err.message}`)
+      msg.show('danger', t('request.saveError', { error: err.message }))
     }
   }
 

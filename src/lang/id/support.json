@@ -1,0 +1,38 @@
+{
+  "status": {
+    "open": "Terbuka",
+    "in_progress": "Diproses",
+    "resolved": "Selesai",
+    "closed": "Ditutup"
+  },
+  "reply": "Balasan",
+  "sendReply": "Kirim balasan",
+  "sending": "Mengirim…",
+  "back": "Kembali ke daftar tiket",
+  "category": {
+    "label": "Kategori",
+    "teknis": "Teknis",
+    "tagihan": "Tagihan",
+    "akun": "Akun",
+    "lainnya": "Lainnya"
+  },
+  "subject": "Subjek",
+  "message": "Pesan",
+  "sendTicket": "Kirim tiket",
+  "cancel": "Batal",
+  "create": "Buat tiket",
+  "createDesc": "Ceritakan kendalanya. Tim Satu Alur membalas di halaman ini.",
+  "sent": "Tiket terkirim.",
+  "title": "Bantuan",
+  "desc": "Ada kendala teknis, tagihan, atau akun? Buat tiket dan ikuti balasan tim Satu Alur di sini.",
+  "mine": "Tiket saya",
+  "retry": "Coba lagi",
+  "pagerLabel": "tiket bantuan",
+  "empty": "Belum ada tiket",
+  "emptyBody": "Buat tiket bila ada kendala teknis, tagihan, atau akun.",
+  "closed": "Tiket ditutup. Buat tiket baru bila masih butuh bantuan.",
+  "replySent": "Balasan terkirim.",
+  "leave": "Tiket belum dikirim. Tutup tanpa mengirim?",
+  "replyLeave": "Balasan belum dikirim. Tinggalkan tiket ini?",
+  "updatedAt": "Diperbarui {when}"
+}

@@ -1,0 +1,38 @@
+{
+  "heading": "Hubungi kami",
+  "docTitle": "Kontak",
+  "lede": "Pertanyaan soal paket, kerja sama, atau Enterprise? Tulis di sini dan tim Satu Alur akan membalas lewat email.",
+  "points": {
+    "reply": "Balasan dikirim ke email yang Anda tulis di formulir ini.",
+    "topics": "Untuk pertanyaan paket, kerja sama, atau kebutuhan Enterprise.",
+    "privacy": "Data hanya dipakai untuk membalas pesan Anda, tidak untuk hal lain."
+  },
+  "cardTitle": "Kirim pesan",
+  "cardNote": "Kolom bertanda Wajib harus diisi.",
+  "fields": {
+    "name": "Nama",
+    "email": "Email",
+    "phone": "Telepon",
+    "phoneOptional": "Telepon (opsional)",
+    "subject": "Subjek",
+    "message": "Pesan",
+    "website": "Situs web"
+  },
+  "placeholders": {
+    "name": "Nama lengkap Anda",
+    "email": "nama@perusahaan.id",
+    "subject": "Misalnya: tanya paket UKM",
+    "message": "Ceritakan kebutuhan Anda — jenis jasa, jumlah tim, atau pertanyaan spesifik."
+  },
+  "send": "Kirim pesan",
+  "sendAnother": "Kirim pesan lain",
+  "sending": "Mengirim…",
+  "actionsNote": "Kami membalas lewat email. Tidak ada langganan otomatis.",
+  "sent": "Pesan terkirim. Tim Satu Alur akan membalas lewat email.",
+  "errors": {
+    "required": "{field} wajib diisi.",
+    "tooLong": "{field} maksimal {max} karakter.",
+    "email": "Email tidak valid.",
+    "limit": "Terlalu banyak pesan. Coba lagi nanti."
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "common": {
+    "network": "Jaringan bermasalah. Periksa koneksi lalu coba lagi."
+  },
+  "test": {
+    "endpoint": "URL endpoint",
+    "credentials": "kredensial",
+    "missing": "Lengkapi {fields} terlebih dahulu.",
+    "bridge": "Koneksi database langsung memerlukan agen jembatan (bridge agent) di jaringan Anda.",
+    "ok": "Konfigurasi valid (mode demo, tanpa panggilan jaringan)."
+  },
+  "preview": {
+    "required": "{field}: wajib diisi",
+    "unknown": "{field}: \"{value}\" tidak dikenal"
+  }
+}

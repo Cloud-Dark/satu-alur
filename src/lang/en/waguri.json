@@ -1,0 +1,158 @@
+{
+  "fab": "Ask Waguri",
+  "fabClose": "Close Ask Waguri",
+  "subtitle": "Satu Alur's AI assistant",
+  "head": {
+    "viewFull": "View Waguri full-size",
+    "viewTitle": "View Waguri",
+    "clear": "Clear chat",
+    "close": "Close Waguri",
+    "closeTitle": "Close (Esc)"
+  },
+  "consent": {
+    "agree": "Agree and start chatting",
+    "chip": "Private chat",
+    "title": "Let's start with what you need.",
+    "ledeApp": "I can check where customer projects stand, explain menus, summarize your finances, and draft messages from your own business data.",
+    "ledePublic": "I can explain Satu Alur, its plans and pricing, and how to get started.",
+    "point1": "Waguri answers one thing per turn, so ask one question at a time.",
+    "point2": "Waguri can point you to the right page or data to open.",
+    "point3": "You can close or clear the chat at any time.",
+    "note": "Chat history is stored on this device only.",
+    "noteQuota": "AI answers use your AI Advisor quota."
+  },
+  "chat": {
+    "log": "Conversation with Waguri",
+    "skills": "Waguri's skills",
+    "input": "Write a question for Waguri",
+    "send": "Send",
+    "try": "Try asking",
+    "typing": "Waguri is typing",
+    "loadError": "Sorry, the data couldn't be loaded: {message}",
+    "tryLater": "please try again shortly."
+  },
+  "card": {
+    "allDone": "All steps done",
+    "step": "Step {n} of {total}: {stage}",
+    "done": "Done"
+  },
+  "copy": {
+    "copy": "Copy message",
+    "copied": "Copied",
+    "failed": "Copy failed"
+  },
+  "full": {
+    "back": "Back to chat",
+    "close": "Close full view",
+    "label": "Waguri, full-size view",
+    "alt": "Illustration of Waguri, Satu Alur's office assistant, standing and smiling"
+  },
+  "end": {
+    "cancel": "Cancel",
+    "confirm": "End chat",
+    "title": "End this chat?",
+    "body": "Your entire chat history with Waguri on this device will be deleted."
+  },
+  "greeting": {
+    "hi": "Hi!",
+    "hiName": "Hi, {name}!",
+    "app": "I'm Waguri. Pick a skill above, then ask anything: where a customer project stands, how to use a menu, a finance summary, or a follow-up message draft.",
+    "public": "I'm Waguri, Satu Alur's AI assistant. Ask me anything about Satu Alur, plan pricing, or how to get started."
+  },
+  "steps": {
+    "request": "Request",
+    "offer": "Offer",
+    "assign": "Assignment",
+    "complete": "Completion",
+    "bookkeeping": "Bookkeeping"
+  },
+  "actions": {
+    "openWorkflow": "Open Workflow",
+    "openHelp": "Open Help",
+    "openReport": "Open Reports",
+    "openBookkeeping": "Open Bookkeeping",
+    "openInWorkflow": "Open in Workflow",
+    "bookNow": "Book it now",
+    "logRequest": "Log a request",
+    "contactUs": "Contact us"
+  },
+  "ai": {
+    "noModel": "No AI model is available right now.",
+    "network": "Network problem.",
+    "empty": "The AI response was empty.",
+    "quota": "This month's AI quota is used up, so I'm answering from your data only.",
+    "rateLimit": "That's a lot of questions at once. Try again in a few minutes."
+  },
+  "skills": {
+    "progress": {
+      "label": "Check project progress",
+      "hint": "Name a customer and I'll check where they are in the Workflow.",
+      "placeholder": "E.g. how far along is the PT Maju Jaya project?",
+      "suggestions": [
+        "How far along is the PT Maju Jaya project?",
+        "Which job has been waiting the longest?",
+        "Hotel Grand Lestari progress"
+      ]
+    },
+    "guide": {
+      "label": "Satu Alur guide",
+      "hint": "Ask how to use any menu in Satu Alur.",
+      "placeholder": "E.g. how do I create an invoice?",
+      "suggestions": [
+        "How do I create an invoice?",
+        "What is the Position column in the Workflow?",
+        "Where can I see my remaining AI quota?"
+      ]
+    },
+    "finance": {
+      "label": "Finance summary",
+      "hint": "Revenue, costs, and profit from your ledger.",
+      "placeholder": "E.g. what's my profit this month?",
+      "suggestions": [
+        "Summarize my finances",
+        "What's my profit this month?",
+        "Any unpaid invoices?"
+      ]
+    },
+    "message": {
+      "label": "Help write a message",
+      "hint": "Draft a WhatsApp or follow-up email to a customer.",
+      "placeholder": "E.g. write a WhatsApp follow-up for Apartemen GreenView",
+      "suggestions": [
+        "Write a WhatsApp follow-up for Apartemen GreenView",
+        "Draft a schedule confirmation email for PT Sinar Abadi",
+        "A thank-you message for Rumah Bapak Surya"
+      ]
+    },
+    "about": {
+      "label": "About Satu Alur",
+      "hint": "What Satu Alur is and what it does.",
+      "placeholder": "E.g. what kind of business is Satu Alur for?",
+      "suggestions": [
+        "What kind of app is Satu Alur?",
+        "What AI features are there?",
+        "Is my data safe?"
+      ]
+    },
+    "pricing": {
+      "label": "Pricing & plans",
+      "hint": "Plans, prices, and limits.",
+      "placeholder": "E.g. is there a free plan?",
+      "suggestions": [
+        "How much are the plans?",
+        "What are the free plan's limits?",
+        "Which plan suits a team of 5?"
+      ]
+    },
+    "start": {
+      "label": "Getting started",
+      "hint": "Your first steps with Satu Alur.",
+      "placeholder": "E.g. how do I sign up?",
+      "suggestions": [
+        "How do I get started?",
+        "Do I need a password?",
+        "What should I do first after signing in?"
+      ]
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "errors": {
+    "team": "This team couldn't answer.",
+    "leadEmpty": "The optimization lead returned no answer.",
+    "merge": "Merging the proposals failed."
+  },
+  "scope": {
+    "vas": "Value-added services (VAS)",
+    "waste": "Zero waste"
+  },
+  "teams": {
+    "kreatif": {
+      "name": "Creative Team",
+      "role": "Naming, packaging, story"
+    },
+    "pemasaran": {
+      "name": "Marketing Team",
+      "role": "Demand & channels"
+    },
+    "keuangan": {
+      "name": "Finance Team",
+      "role": "Pricing, margin, cash flow"
+    },
+    "operasional": {
+      "name": "Operations Team",
+      "role": "Capacity & execution"
+    },
+    "riset": {
+      "name": "Research & Data Team",
+      "role": "Evidence & assumptions"
+    }
+  },
+  "lead": {
+    "name": "Optimization Lead",
+    "role": "Brings the five teams together"
+  }
+}

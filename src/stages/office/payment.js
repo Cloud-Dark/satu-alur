@@ -3,11 +3,11 @@ import { showToast } from '../../ui/animations.js'
 import { adminGetPayment, adminSavePayment, adminTestPayment } from '../../business/api.js'
 import { validatePaymentSettings } from '../../business/payment.js'
 import { stampLine } from './site-landing.js'
+import { t } from '../../i18n/index.js'
 
 const { el } = C
-const PROVIDERS = [{ value: 'none', label: 'Tidak ada' }, { value: 'midtrans', label: 'Midtrans' }, { value: 'xendit', label: 'Xendit' }]
-const MODES = [{ value: 'sandbox', label: 'Sandbox' }, { value: 'production', label: 'Produksi' }]
-const KEEP = 'Kosongkan untuk tetap memakai yang lama.'
+const PROVIDERS = () => [{ value: 'none', label: t('office.payment.none') }, { value: 'midtrans', label: 'Midtrans' }, { value: 'xendit', label: 'Xendit' }]
+const MODES = () => [{ value: 'sandbox', label: 'Sandbox' }, { value: 'production', label: t('office.payment.production') }]
 let seq = 0
 
 export async function draw(host, ctx, setDirty) {
@@ -15,7 +15,7 @@ export async function draw(host, ctx, setDirty) {
   let row
   try { row = await adminGetPayment() } catch (ex) {
     if (ctx.signal.aborted) return
-    const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
+    const again = C.button({ label: t('office.common.retry'), variant: 'soft', size: 'sm' })
     again.addEventListener('click', () => draw(host, ctx, setDirty))
     host.replaceChildren(C.errorState(ex.message), again)
     return
@@ -27,24 +27,24 @@ export async function draw(host, ctx, setDirty) {
 function render(host, ctx, setDirty, row) {
   const id = ++seq
   const radios = (legend, key, options) => C.choiceGroup({ legend, type: 'radio', name: `of-pay-${key}-${id}`, options: options.map((o) => ({ ...o, checked: o.value === row[key] })) })
-  const provider = radios('Penyedia', 'provider', PROVIDERS)
-  const mode = radios('Mode', 'mode', MODES)
+  const provider = radios(t('office.payment.provider'), 'provider', PROVIDERS())
+  const mode = radios(t('office.payment.mode'), 'mode', MODES())
   const warn = C.message()
   const off = { autocomplete: 'off', maxlength: '200', spellcheck: 'false' }
   const secret = { ...off, autocomplete: 'new-password', 'data-1p-ignore': '', 'data-lpignore': 'true' }
-  const client = C.field({ label: 'Client key', id: `of-pay-client-${id}`, value: row.client_key, hint: 'Kunci publik dari dashboard penyedia.', attrs: off })
+  const client = C.field({ label: 'Client key', id: `of-pay-client-${id}`, value: row.client_key, hint: t('office.payment.clientHint'), attrs: off })
   const server = C.field({ label: 'Server key', id: `of-pay-server-${id}`, type: 'password', attrs: secret,
-    placeholder: row.server_key_set ? `Tersimpan (…${row.server_key_last4}). ${KEEP}` : undefined, hint: 'Disimpan terenkripsi dan tidak pernah ditampilkan lagi.' })
-  const clear = row.server_key_set ? C.choiceGroup({ legend: 'Server key tersimpan', name: `of-pay-clear-${id}`, options: [{ value: 'on', label: 'Hapus server key' }] }) : null
+    placeholder: row.server_key_set ? t('office.payment.savedLast4', { last4: row.server_key_last4 }) : undefined, hint: t('office.common.secretHint') })
+  const clear = row.server_key_set ? C.choiceGroup({ legend: t('office.payment.serverKeySaved'), name: `of-pay-clear-${id}`, options: [{ value: 'on', label: t('office.payment.clearServerKey') }] }) : null
   const hook = C.field({ label: 'Webhook token', id: `of-pay-hook-${id}`, type: 'password', attrs: secret,
-    placeholder: row.webhook_token_set ? `Tersimpan. ${KEEP}` : undefined, hint: 'Dipakai Xendit untuk memverifikasi callback.' })
+    placeholder: row.webhook_token_set ? t('office.payment.savedKeep') : undefined, hint: t('office.payment.hookHint') })
 
   const stamp = el('p', { className: 'muted small', role: 'status' }, stampLine(row))
   const err = el('p', { className: 'field-error', role: 'alert' })
-  const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary', type: 'submit' })
+  const save = C.button({ label: t('office.common.save'), icon: 'save', variant: 'primary', type: 'submit' })
   const hintId = `of-pay-tes-hint-${id}`
-  const tes = C.button({ label: 'Tes koneksi', variant: 'soft', 'aria-describedby': hintId })
-  const tesHint = el('p', { className: 'muted small', id: hintId, hidden: true }, 'Simpan dulu untuk menguji pengaturan ini.')
+  const tes = C.button({ label: t('office.payment.test'), variant: 'soft', 'aria-describedby': hintId })
+  const tesHint = el('p', { className: 'muted small', id: hintId, hidden: true }, t('office.payment.saveFirst'))
   const result = C.message()
 
   const pick = (g) => Object.values(g.inputs).find((i) => i.checked)?.value
@@ -59,7 +59,7 @@ function render(host, ctx, setDirty, row) {
     setDirty(dirty)
     tes.disabled = dirty || busy
     tesHint.hidden = !dirty
-    if (pick(mode) === 'production') warn.show('warn', 'Mode produksi memproses pembayaran sungguhan.')
+    if (pick(mode) === 'production') warn.show('warn', t('office.payment.prodWarn'))
     else warn.hide()
   }
 
@@ -73,25 +73,25 @@ function render(host, ctx, setDirty, row) {
     err.textContent = ''
     let clean
     try { clean = validatePaymentSettings(gather()) } catch (ex) { err.textContent = ex.message; return }
-    const restore = C.setBusy(save, 'Menyimpan…')
+    const restore = C.setBusy(save, t('office.common.saving'))
     try {
       const next = await adminSavePayment(clean)
       if (ctx.signal.aborted) return
       render(host, ctx, setDirty, next)
       host.querySelector('button[type=submit]')?.focus()
-      showToast('Pengaturan pembayaran tersimpan.', 'success')
+      showToast(t('office.payment.saved'), 'success')
     } catch (ex) { err.textContent = ex.message; restore() }
   })
   tes.addEventListener('click', async () => {
     result.hide()
     busy = true
-    const restore = C.setBusy(tes, 'Menguji…')
+    const restore = C.setBusy(tes, t('office.common.testing'))
     try {
       const r = await adminTestPayment()
       result.show(r.ok ? 'ok' : 'danger', r.message)
     } catch (ex) { result.show('danger', ex.message) } finally { busy = false; restore(); sync() }
   })
 
-  host.replaceChildren(C.panel({ title: 'Payment gateway', meta: 'Midtrans atau Xendit' }, form))
+  host.replaceChildren(C.panel({ title: t('office.menu.gateway'), meta: t('office.payment.meta') }, form))
   sync()
 }

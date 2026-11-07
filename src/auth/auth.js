@@ -1,5 +1,9 @@
 import { getCloud } from '../cloud.js'
 
+// The Indonesian message stays the Error text (tests and logs match it); the login page shows
+// the translation of i18nKey.
+const uiError = (message, i18nKey) => Object.assign(new Error(message), { i18nKey })
+
 let pendingEmailOtp = null
 
 export async function sendEmailCode(email) {
@@ -19,7 +23,7 @@ export async function sendEmailCode(email) {
 export async function submitEmailOtp(email, verificationCode) {
   const pending = pendingEmailOtp
   if (!pending || pending.email !== email) {
-    throw new Error('Minta kode OTP untuk email ini terlebih dahulu.')
+    throw uiError('Minta kode OTP untuk email ini terlebih dahulu.', 'auth.errors.requestOtpFirst')
   }
   const cloud = getCloud()
   const completed = await cloud.auth.verifyOtp({
@@ -97,14 +101,14 @@ export async function restoreAuth() {
   }
   const provider = url.searchParams.get('provider')
   if (provider !== 'workbuddy' && provider !== 'wechat') {
-    throw new Error('Callback login tidak valid.')
+    throw uiError('Callback login tidak valid.', 'auth.errors.badCallback')
   }
   const cloud = getCloud()
   const handleCallback = provider === 'workbuddy'
     ? cloud.auth.handleWorkBuddyCallback
     : cloud.auth.handleWechatWebCallback
   if (typeof handleCallback !== 'function') {
-    throw new Error('Metode login belum tersedia.')
+    throw uiError('Metode login belum tersedia.', 'auth.errors.methodUnavailable')
   }
   const { data: session, error } = await handleCallback.call(cloud.auth)
   if (error) throw new Error(error.message)

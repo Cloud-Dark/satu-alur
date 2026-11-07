@@ -24,13 +24,35 @@ import { filterRows, debounce, toCsv } from '../business/list-view.js'
 import { validateVasItem, vasKey, splitDuplicates, assertImportSize } from '../pendapatan/rules.js'
 import { downloadText, datedName } from '../ui/download.js'
 import { renderOptimasi } from './optimasi-panel.js'
+import { t, locale } from '../i18n/index.js'
 
 const { el } = C
-const TABS = [
-  { value: 'peluang', label: 'Peluang' },
-  { value: 'katalog', label: 'Katalog' },
-  { value: 'optimasi', label: 'Ruang optimasi' },
-]
+const TAB_KEYS = ['peluang', 'katalog', 'optimasi']
+const tabOptions = () => TAB_KEYS.map((value) => ({ value, label: t(`vas.tabs.${value}`) }))
+
+// Labels for stable keys from the shared engine/rules, worded in the viewer's language.
+const catLabel = (v) => (VAS_CATEGORIES.some((c) => c.value === v) ? t(`vas.category.${v}`) : categoryLabel(v))
+const stLabel = (v) => (VAS_STATUSES.some((s) => s.value === v) ? t(`vas.status.${v}`) : statusLabel(v))
+const catOptions = () => VAS_CATEGORIES.map((c) => ({ value: c.value, label: catLabel(c.value) }))
+const stOptions = () => VAS_STATUSES.map((s) => ({ value: s.value, label: stLabel(s.value) }))
+const OWNERS = ['Keuangan', 'Operasional', 'Marketing', 'Kreatif']
+const ownerLabel = (owner) => String(owner || '').split(' + ').map((o) => (OWNERS.includes(o) ? t(`vas.owner.${o}`) : o)).join(' + ')
+
+/** Title, reason and evidence of an engine opportunity, worded from its raw figures. */
+function oppText(o) {
+  const v = o.vars
+  if (!v) return { title: o.title, why: o.why, basis: o.basis }
+  const k = `vas.opp.${o.kind}`
+  switch (o.kind) {
+    case 'langganan': return { title: t(`${k}.title`), why: t(`${k}.why`, v), basis: v.items.map((i) => t(`${k}.basisItem`, i)).join(', ') }
+    case 'berkala': return { title: t(`${k}.title`), why: t(`${k}.why`, v), basis: v.items.map((i) => t(`${k}.basisItem`, i)).join('; ') }
+    case 'garansi': return { title: t(`${k}.title`), why: t(`${k}.why`, v), basis: t(`${k}.basis`, { count: v.count, amount: `Rp${v.threshold.toLocaleString(locale())}` }) }
+    case 'bundling': return { title: t(`${k}.title`, v), why: t(`${k}.why`, v), basis: t(`${k}.basis`, v) }
+    case 'tertahan': return { title: t(`${k}.title`), why: t(`${k}.why`, v), basis: t(`${k}.basis`, v) }
+    case 'marginkatalog': return { title: t(`${k}.title`), why: t(`${k}.why`, v), basis: o.basis }
+    default: return { title: o.title, why: o.why, basis: o.basis }
+  }
+}
 let currentTab = 'peluang'
 // Kept outside render() so switching tabs does not reset what the user typed.
 let catalogQuery = ''
@@ -78,13 +100,13 @@ async function removeItem(id) {
  */
 function parseBulk(text) {
   const raw = String(text || '').trim()
-  if (!raw) throw new Error('Tidak ada data untuk diimpor.')
+  if (!raw) throw new Error(t('vas.parse.empty'))
   const clean = (v) => String(v ?? '').trim().replace(/^["']|["']$/g, '')
 
   if (raw.startsWith('[')) {
     let rows
-    try { rows = JSON.parse(raw) } catch { throw new Error('JSON tidak valid. Periksa koma dan tanda kutip.') }
-    if (!Array.isArray(rows)) throw new Error('JSON harus berupa daftar item.')
+    try { rows = JSON.parse(raw) } catch { throw new Error(t('vas.parse.badJson')) }
+    if (!Array.isArray(rows)) throw new Error(t('vas.parse.notArray'))
     const parsed = rows.map((r, i) => normalizeRow(r, i + 1, clean))
     assertImportSize(parsed.length)
     return parsed
@@ -119,7 +141,7 @@ function normalizeRow(r, lineNo, clean) {
       status: clean(r.status) || 'active',
     })
   } catch (err) {
-    throw new Error(`Baris ${lineNo}: ${err.message}`)
+    throw new Error(t('vas.parse.line', { line: lineNo, error: err.message }))
   }
 }
 
@@ -133,14 +155,14 @@ export async function render(container, ctx = {}) {
 
   const host = el('div')
   const tabs = C.segmented({
-    options: TABS, value: currentTab, label: 'Layanan tambahan',
+    options: tabOptions(), value: currentTab, label: t('vas.tabsLabel'),
     onChange: (value) => { currentTab = value; status.hide(); draw() },
   })
   tabs.classList.add('workspace-tabs')
 
   const head = C.pageHeader({
-    title: 'Pendapatan tambahan', em: 'tambahan',
-    actions: C.button({ label: 'Item baru', icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
+    title: t('vas.page.title'), em: t('vas.page.em'),
+    actions: C.button({ label: t('vas.page.newItem'), icon: 'plus', variant: 'primary', size: 'sm', onClick: () => openEditor(null) }),
   })
   // The tabs share the header row with the page action (one row instead of two).
   head.insertBefore(tabs, head.querySelector('.page-head-actions'))
@@ -164,71 +186,72 @@ export async function render(container, ctx = {}) {
       : 0
 
     const kpis = el('div', { className: 'vas-kpis' },
-      C.kpi({ label: 'Potensi bulanan', value: C.rupiah(potential), sub: 'dari peluang yang terdeteksi', iconName: 'trendingUp', hero: true }),
-      C.kpi({ label: 'Peluang terbuka', value: String(opportunities.length), sub: 'dihitung dari data Anda', iconName: 'radar' }),
-      C.kpi({ label: 'Margin katalog', value: C.rupiah(cat.monthly), sub: `${cat.active} item aktif`, iconName: 'wallet' }),
-      C.kpi({ label: 'Porsi VAS', value: `${share.share.toFixed(1)}%`, sub: `dari ${C.rupiah(share.revenue)} pendapatan`, iconName: 'chart' }),
+      C.kpi({ label: t('vas.kpi.potential'), value: C.rupiah(potential), sub: t('vas.kpi.potentialSub'), iconName: 'trendingUp', hero: true }),
+      C.kpi({ label: t('vas.kpi.open'), value: String(opportunities.length), sub: t('vas.kpi.openSub'), iconName: 'radar' }),
+      C.kpi({ label: t('vas.kpi.catalogMargin'), value: C.rupiah(cat.monthly), sub: t('vas.kpi.activeItems', { count: cat.active }), iconName: 'wallet' }),
+      C.kpi({ label: t('vas.kpi.share'), value: `${share.share.toFixed(1)}%`, sub: t('vas.kpi.shareSub', { amount: C.rupiah(share.revenue) }), iconName: 'chart' }),
     )
 
     const list = opportunities.length
       ? el('div', { className: 'vas-opps' }, opportunities.map(oppCard))
       : C.emptyState({
-        kicker: 'Belum ada peluang',
-        title: 'Catat beberapa permintaan dan penyelesaian dulu',
-        body: 'Peluang dihitung dari pekerjaan yang sudah Anda catat. Setelah ada riwayat, halaman ini akan menunjuk pelanggan dan layanan yang siap ditawari tambahan.',
+        kicker: t('vas.empty.kicker'),
+        title: t('vas.empty.title'),
+        body: t('vas.empty.body'),
         iconName: 'radar',
       })
 
     host.replaceChildren(
       kpis,
       el('div', { className: 'vas-section-head' },
-        el('h2', { className: 'vas-section-title' }, 'Peluang dari pekerjaan Anda'),
-        el('span', { className: 'vas-section-note' }, `Margin rata-rata katalog ${avgMargin.toFixed(0)}% · angka diperbarui setiap halaman dibuka`),
+        el('h2', { className: 'vas-section-title' }, t('vas.section.title')),
+        el('span', { className: 'vas-section-note' }, t('vas.section.note', { pct: avgMargin.toFixed(0) })),
       ),
       list,
     )
   }
 
   function oppCard(o) {
+    const text = oppText(o)
     const facts = [
-      ['Harga saran', C.rupiah(o.price)],
-      ['Pelanggan/bulan', String(o.jobsPerMonth)],
-      ['Tingkat pasang', `${Math.round(o.attachRate * 100)}%`],
-      ['Keyakinan', `${Math.round(o.confidence * 100)}%`],
+      [t('vas.opp.price'), C.rupiah(o.price)],
+      [t('vas.opp.perMonth'), String(o.jobsPerMonth)],
+      [t('vas.opp.attach'), `${Math.round(o.attachRate * 100)}%`],
+      [t('vas.opp.confidence'), `${Math.round(o.confidence * 100)}%`],
     ]
     return el('article', { className: 'vas-opp' },
       el('div', { className: 'vas-opp-top' },
         el('div', { className: 'vas-opp-id' },
           el('span', { className: 'vas-opp-kicker' }, C.tag(kindLabel(o.kind), KIND_TONE[o.kind] || 'neutral')),
-          el('h3', { className: 'vas-opp-title' }, o.title),
+          el('h3', { className: 'vas-opp-title' }, text.title),
         ),
         el('div', { className: 'vas-opp-money' },
-          el('span', { className: 'vas-opp-money-label' }, 'Potensi/bulan'),
+          el('span', { className: 'vas-opp-money-label' }, t('vas.opp.potential')),
           el('span', { className: 'vas-opp-money-value tnum' }, C.rupiah(o.potential)),
         ),
       ),
-      el('p', { className: 'vas-opp-why' }, o.why),
+      el('p', { className: 'vas-opp-why' }, text.why),
       el('dl', { className: 'vas-opp-facts' },
         facts.map(([k, v]) => el('div', { className: 'vas-opp-fact' },
           el('dt', {}, k), el('dd', { className: 'tnum' }, v)))),
-      el('p', { className: 'vas-opp-basis' }, el('strong', {}, 'Dasar: '), o.basis),
+      el('p', { className: 'vas-opp-basis' }, el('strong', {}, t('vas.opp.basis')), text.basis),
       el('div', { className: 'vas-opp-actions' },
         C.button({
-          label: 'Jadikan item katalog', icon: 'plus', size: 'sm', variant: 'soft',
+          label: t('vas.opp.toCatalog'), icon: 'plus', size: 'sm', variant: 'soft',
           onClick: () => openEditor(null, {
-            name: o.title, price: o.price, cost: Math.round(o.price * 0.2),
+            name: text.title, price: o.price, cost: Math.round(o.price * 0.2),
             category: KIND_TO_CATEGORY[o.kind] || 'lain', attach_rate: Math.round(o.attachRate * 100),
-            description: o.why,
+            description: text.why,
           }),
         }),
         C.button({
-          label: 'Bahas 5 tim', icon: 'zap', size: 'sm', variant: 'ghost',
+          label: t('vas.opp.discuss'), icon: 'zap', size: 'sm', variant: 'ghost',
           onClick: () => {
             currentTab = 'optimasi'
             tabs.querySelector('[data-value="optimasi"]')?.click()
           },
         }),
-        el('span', { className: 'vas-opp-owner' }, `Pemilik: ${o.owner}`),
+        el('span', { className: 'vas-opp-owner' }, t('vas.opp.owner', { owner: ownerLabel(o.owner) })),
       ),
     )
   }
@@ -246,14 +269,14 @@ export async function render(container, ctx = {}) {
 
   function catalogTable(rows) {
     return C.dataTable({
-      caption: 'Katalog layanan tambahan',
+      caption: t('vas.table.caption'),
       columns: [
-        { key: 'name', label: 'Item', render: (r) => C.cellStack(r.name, el('span', { className: 'vas-clamp' }, r.description || categoryLabel(r.category))) },
-        { key: 'category', label: 'Kategori', render: (r) => categoryLabel(r.category) },
-        { key: 'price', label: 'Harga', align: 'right', render: (r) => C.rupiah(r.price) },
-        { key: 'cost', label: 'Biaya', align: 'right', render: (r) => C.rupiah(r.cost) },
+        { key: 'name', label: t('vas.table.item'), render: (r) => C.cellStack(r.name, el('span', { className: 'vas-clamp' }, r.description || catLabel(r.category))) },
+        { key: 'category', label: t('vas.table.category'), render: (r) => catLabel(r.category) },
+        { key: 'price', label: t('vas.table.price'), align: 'right', render: (r) => C.rupiah(r.price) },
+        { key: 'cost', label: t('vas.table.cost'), align: 'right', render: (r) => C.rupiah(r.cost) },
         {
-          key: 'margin', label: 'Margin', align: 'right',
+          key: 'margin', label: t('vas.table.margin'), align: 'right',
           render: (r) => {
             const e = itemEconomics(r)
             return el('span', { className: `vas-margin ${e.marginPct < 25 ? 'is-thin' : ''}` },
@@ -261,14 +284,14 @@ export async function render(container, ctx = {}) {
               el('span', { className: 'tnum' }, C.rupiah(e.margin)))
           },
         },
-        { key: 'attach_to', label: 'Menempel pada', render: (r) => r.attach_to || el('span', { className: 'muted' }, 'Semua layanan') },
-        { key: 'attach_rate', label: 'Pasang', align: 'right', render: (r) => `${Math.round(attachRate(r) * 100)}%` },
-        { key: 'status', label: 'Status', render: (r) => C.tag(statusLabel(r.status), r.status === 'active' ? 'ok' : r.status === 'draft' ? 'warn' : 'neutral') },
+        { key: 'attach_to', label: t('vas.table.attachTo'), render: (r) => r.attach_to || el('span', { className: 'muted' }, t('vas.table.allServices')) },
+        { key: 'attach_rate', label: t('vas.table.attach'), align: 'right', render: (r) => `${Math.round(attachRate(r) * 100)}%` },
+        { key: 'status', label: t('vas.table.status'), render: (r) => C.tag(stLabel(r.status), r.status === 'active' ? 'ok' : r.status === 'draft' ? 'warn' : 'neutral') },
         {
           key: 'act', label: '', className: 'vas-row-actions',
           render: (r) => el('div', { className: 'vas-row-actions-in' },
-            C.iconButton({ iconName: 'pencil', label: `Ubah ${r.name}`, onClick: () => openEditor(r) }),
-            C.iconButton({ iconName: 'trash', label: `Hapus ${r.name}`, onClick: () => confirmDelete(r) })),
+            C.iconButton({ iconName: 'pencil', label: t('vas.table.edit', { name: r.name }), onClick: () => openEditor(r) }),
+            C.iconButton({ iconName: 'trash', label: t('vas.table.delete', { name: r.name }), onClick: () => confirmDelete(r) })),
         },
       ],
       rows,
@@ -282,25 +305,25 @@ export async function render(container, ctx = {}) {
     catalogList.update(rows, { resetKey: `${catalogQuery}|${catalogStatus}` })
     const active = items.filter((i) => i.status === 'active').length
     const cat = catalogPotential(items)
-    catalogNote.textContent = `${rows.length} dari ${items.length} item · ${active} aktif · potensi ${C.rupiah(cat.monthly)}/bulan`
+    catalogNote.textContent = t('vas.catalog.note', { shown: rows.length, total: items.length, active, amount: C.rupiah(cat.monthly) })
   }
 
   function exportCatalog() {
     const rows = filteredItems()
-    if (!rows.length) { showToast('Tidak ada baris untuk diekspor.', 'warn'); return }
+    if (!rows.length) { showToast(t('vas.catalog.noRows'), 'warn'); return }
     downloadText(datedName('katalog-vas'), toCsv([
-      { label: 'Item', value: (r) => r.name },
-      { label: 'Kategori', value: (r) => categoryLabel(r.category) },
-      { label: 'Harga', key: 'price' },
-      { label: 'Biaya', key: 'cost' },
-      { label: 'Margin', value: (r) => itemEconomics(r).margin },
-      { label: 'Margin persen', value: (r) => Math.round(itemEconomics(r).marginPct) },
-      { label: 'Layanan induk', value: (r) => r.attach_to || '' },
-      { label: 'Tingkat pasang', key: 'attach_rate' },
-      { label: 'Status', value: (r) => statusLabel(r.status) },
-      { label: 'Dibuat', value: (r) => r.created_at || '' },
+      { label: t('vas.table.item'), value: (r) => r.name },
+      { label: t('vas.table.category'), value: (r) => catLabel(r.category) },
+      { label: t('vas.table.price'), key: 'price' },
+      { label: t('vas.table.cost'), key: 'cost' },
+      { label: t('vas.table.margin'), value: (r) => itemEconomics(r).margin },
+      { label: t('vas.csv.marginPct'), value: (r) => Math.round(itemEconomics(r).marginPct) },
+      { label: t('vas.csv.parent'), value: (r) => r.attach_to || '' },
+      { label: t('vas.opp.attach'), key: 'attach_rate' },
+      { label: t('vas.table.status'), value: (r) => stLabel(r.status) },
+      { label: t('vas.csv.created'), value: (r) => r.created_at || '' },
     ], rows))
-    showToast(`${rows.length} item diekspor ke CSV.`, 'success')
+    showToast(t('vas.catalog.exported', { count: rows.length }), 'success')
   }
 
   function drawKatalog() {
@@ -308,13 +331,13 @@ export async function render(container, ctx = {}) {
       type: 'search',
       className: 'pd-search',
       value: catalogQuery,
-      placeholder: 'Cari item, layanan induk, atau kategori…',
-      'aria-label': 'Cari item katalog',
+      placeholder: t('vas.catalog.searchPlaceholder'),
+      'aria-label': t('vas.catalog.searchLabel'),
     })
     search.addEventListener('input', debounce(() => { catalogQuery = search.value; refreshCatalog() }, 150))
 
-    const statusFilter = el('select', { className: 'pd-filter', 'aria-label': 'Saring status item' },
-      [{ value: 'all', label: 'Semua status' }, ...VAS_STATUSES].map((o) => el('option', { value: o.value }, o.label)))
+    const statusFilter = el('select', { className: 'pd-filter', 'aria-label': t('vas.catalog.filterLabel') },
+      [{ value: 'all', label: t('vas.catalog.allStatuses') }, ...stOptions()].map((o) => el('option', { value: o.value }, o.label)))
     statusFilter.value = catalogStatus
     statusFilter.addEventListener('change', () => { catalogStatus = statusFilter.value; refreshCatalog() })
 
@@ -322,32 +345,32 @@ export async function render(container, ctx = {}) {
 
     // "Item baru" lives in the page header; the toolbar only holds list tools.
     const toolbar = el('div', { className: 'vas-toolbar' },
-      C.button({ label: 'Impor massal', icon: 'layers', size: 'sm', onClick: openBulk }),
+      C.button({ label: t('vas.catalog.bulk'), icon: 'layers', size: 'sm', onClick: openBulk }),
       el('div', { className: 'pd-filters' }, search, statusFilter),
-      C.button({ label: 'Ekspor CSV', icon: 'file', size: 'sm', variant: 'ghost', onClick: exportCatalog }),
+      C.button({ label: t('vas.catalog.export'), icon: 'file', size: 'sm', variant: 'ghost', onClick: exportCatalog }),
       catalogNote,
     )
 
     if (!items.length) {
       catalogList = null
       host.replaceChildren(toolbar, C.emptyState({
-        kicker: 'Katalog kosong',
-        title: 'Belum ada layanan tambahan',
-        body: 'Tambahkan satu item, atau tempel daftar harga Anda sekaligus lewat Impor massal.',
+        kicker: t('vas.catalog.emptyKicker'),
+        title: t('vas.catalog.emptyTitle'),
+        body: t('vas.catalog.emptyBody'),
         iconName: 'layers',
-        action: C.button({ label: 'Tambah item pertama', icon: 'plus', variant: 'primary', onClick: () => openEditor(null) }),
+        action: C.button({ label: t('vas.catalog.addFirst'), icon: 'plus', variant: 'primary', onClick: () => openEditor(null) }),
       }))
-      catalogNote.textContent = '0 item · potensi Rp0/bulan'
+      catalogNote.textContent = t('vas.catalog.emptyNote')
       return
     }
 
     catalogList = C.paginate({
       key: 'vas-katalog',
-      label: 'katalog layanan tambahan',
+      label: t('vas.catalog.pagerLabel'),
       pageSize: 10,
       render: (rows) => (rows.length
         ? catalogTable(rows)
-        : el('p', { className: 'pd-none' }, 'Tidak ada item yang cocok. Ubah kata kunci atau saringan status.')),
+        : el('p', { className: 'pd-none' }, t('vas.catalog.noMatch'))),
     })
     host.replaceChildren(toolbar, catalogList.root)
     refreshCatalog()
@@ -379,27 +402,27 @@ export async function render(container, ctx = {}) {
     ].join('\n')
 
     const facts = [
-      { label: 'Pendapatan tercatat', value: C.rupiah(share.revenue) },
-      { label: 'Rata-rata pekerjaan', value: C.rupiah(avgJob) },
-      { label: 'Item VAS aktif', value: String(cat.active) },
-      { label: 'Potensi katalog', value: `${C.rupiah(cat.monthly)}/bln` },
-      { label: 'Peluang terdeteksi', value: String(opportunities.length) },
+      { label: t('vas.facts.revenue'), value: C.rupiah(share.revenue) },
+      { label: t('vas.facts.avgJob'), value: C.rupiah(avgJob) },
+      { label: t('vas.facts.activeItems'), value: String(cat.active) },
+      { label: t('vas.facts.catalogPotential'), value: t('vas.facts.perMonth', { amount: C.rupiah(cat.monthly) }) },
+      { label: t('vas.facts.detected'), value: String(opportunities.length) },
     ]
 
     const presets = [
       {
-        label: 'Naikkan nilai penawaran',
-        problem: 'Nilai penawaran saya berhenti di jasa dasar. Saya ingin setiap penawaran membawa satu layanan tambahan yang relevan tanpa membuat pelanggan menolak.',
+        label: t('vas.presets.offer.label'),
+        problem: t('vas.presets.offer.problem'),
         target: 2000000,
       },
       {
-        label: 'Kontrak perawatan bulanan',
-        problem: 'Saya ingin mengubah pelanggan berulang menjadi kontrak perawatan bulanan supaya pendapatan lebih pasti.',
+        label: t('vas.presets.contract.label'),
+        problem: t('vas.presets.contract.problem'),
         target: 3000000,
       },
       {
-        label: 'Perbaiki margin katalog',
-        problem: 'Beberapa item tambahan saya dijual terlalu murah. Saya ingin tahu mana yang harus dinaikkan harganya atau dihentikan.',
+        label: t('vas.presets.margin.label'),
+        problem: t('vas.presets.margin.problem'),
         target: 1000000,
       },
     ]
@@ -412,32 +435,32 @@ export async function render(container, ctx = {}) {
   function openEditor(existing, preset) {
     const seed = existing || preset || {}
     const isEdit = Boolean(existing)
-    const name = C.field({ label: 'Nama item', id: 'vas-name', required: true, value: seed.name || '', placeholder: 'Contoh: Perawatan AC 3 bulan' })
+    const name = C.field({ label: t('vas.editor.name'), id: 'vas-name', required: true, value: seed.name || '', placeholder: t('vas.editor.namePlaceholder') })
     const category = C.select({
-      label: 'Kategori', id: 'vas-cat', options: VAS_CATEGORIES, value: seed.category || 'perawatan',
+      label: t('vas.editor.category'), id: 'vas-cat', options: catOptions(), value: seed.category || 'perawatan',
     })
-    const price = C.field({ label: 'Harga jual (Rp)', id: 'vas-price', type: 'number', required: true, value: seed.price ?? '', attrs: { min: '0', step: '5000', inputmode: 'numeric' } })
-    const cost = C.field({ label: 'Biaya langsung (Rp)', id: 'vas-cost', type: 'number', value: seed.cost ?? 0, hint: 'Bahan dan waktu yang benar-benar keluar untuk item ini.', attrs: { min: '0', step: '5000', inputmode: 'numeric' } })
-    const attachTo = C.field({ label: 'Menempel pada layanan', id: 'vas-attach', value: seed.attach_to || '', placeholder: 'Kosongkan untuk semua layanan', hint: 'Nama layanan persis seperti di permintaan, mis. Pembersihan AC.' })
-    const rate = C.field({ label: 'Perkiraan tingkat pasang (%)', id: 'vas-rate', type: 'number', value: seed.attach_rate ?? 25, hint: 'Berapa persen pelanggan yang biasanya mengambil item ini.', attrs: { min: '0', max: '100', step: '5' } })
-    const desc = C.textarea({ label: 'Penjelasan singkat', id: 'vas-desc', rows: 3, value: seed.description || '', placeholder: 'Satu atau dua kalimat yang bisa dibaca pelanggan.' })
-    const statusSel = C.select({ label: 'Status', id: 'vas-status', options: VAS_STATUSES, value: seed.status || 'active' })
+    const price = C.field({ label: t('vas.editor.price'), id: 'vas-price', type: 'number', required: true, value: seed.price ?? '', attrs: { min: '0', step: '5000', inputmode: 'numeric' } })
+    const cost = C.field({ label: t('vas.editor.cost'), id: 'vas-cost', type: 'number', value: seed.cost ?? 0, hint: t('vas.editor.costHint'), attrs: { min: '0', step: '5000', inputmode: 'numeric' } })
+    const attachTo = C.field({ label: t('vas.editor.attachTo'), id: 'vas-attach', value: seed.attach_to || '', placeholder: t('vas.editor.attachPlaceholder'), hint: t('vas.editor.attachHint') })
+    const rate = C.field({ label: t('vas.editor.rate'), id: 'vas-rate', type: 'number', value: seed.attach_rate ?? 25, hint: t('vas.editor.rateHint'), attrs: { min: '0', max: '100', step: '5' } })
+    const desc = C.textarea({ label: t('vas.editor.desc'), id: 'vas-desc', rows: 3, value: seed.description || '', placeholder: t('vas.editor.descPlaceholder') })
+    const statusSel = C.select({ label: t('vas.editor.status'), id: 'vas-status', options: stOptions(), value: seed.status || 'active' })
 
-    const marginNote = el('p', { className: 'vas-margin-note' }, 'Margin dihitung otomatis.')
+    const marginNote = el('p', { className: 'vas-margin-note' }, t('vas.editor.marginAuto'))
     const recompute = () => {
       const e = itemEconomics({ price: price.input.value, cost: cost.input.value })
-      marginNote.textContent = `Margin ${C.rupiah(e.margin)} (${e.marginPct.toFixed(0)}%) per item`
+      marginNote.textContent = t('vas.editor.margin', { amount: C.rupiah(e.margin), pct: e.marginPct.toFixed(0) })
       marginNote.classList.toggle('is-thin', e.marginPct < 25)
     }
     price.input.addEventListener('input', recompute)
     cost.input.addEventListener('input', recompute)
     recompute()
 
-    const saveBtn = C.button({ label: isEdit ? 'Simpan perubahan' : 'Tambah item', variant: 'primary' })
+    const saveBtn = C.button({ label: isEdit ? t('vas.editor.save') : t('vas.editor.add'), variant: 'primary' })
     const modalNote = C.message()
     const dialog = C.modal({
-      title: isEdit ? 'Ubah item VAS' : 'Item VAS baru',
-      description: 'Item ini muncul sebagai tawaran tambahan di penawaran dan dihitung dalam potensi katalog.',
+      title: isEdit ? t('vas.editor.editTitle') : t('vas.editor.newTitle'),
+      description: t('vas.editor.description'),
       wide: true,
       children: [
         modalNote,
@@ -448,16 +471,16 @@ export async function render(container, ctx = {}) {
         desc.wrap,
         statusSel.wrap,
       ],
-      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), saveBtn],
+      actions: [C.button({ label: t('vas.common.cancel'), variant: 'ghost', dismiss: true }), saveBtn],
       opener: container,
     })
 
     saveBtn.addEventListener('click', async (e) => {
       e.preventDefault()
       modalNote.hide()
-      if (!name.input.value.trim()) { name.input.focus(); modalNote.show('warn', 'Nama item wajib diisi.'); return }
-      if (!(Number(price.input.value) > 0)) { price.input.focus(); modalNote.show('warn', 'Harga harus lebih dari nol.'); return }
-      const restore = C.setBusy(saveBtn, 'Menyimpan…')
+      if (!name.input.value.trim()) { name.input.focus(); modalNote.show('warn', t('vas.editor.nameRequired')); return }
+      if (!(Number(price.input.value) > 0)) { price.input.focus(); modalNote.show('warn', t('vas.editor.priceRequired')); return }
+      const restore = C.setBusy(saveBtn, t('vas.common.saving'))
       try {
         await saveItem({
           name: name.input.value, category: category.input.value, price: price.input.value,
@@ -466,7 +489,7 @@ export async function render(container, ctx = {}) {
         }, existing?.id)
         dialog.close()
         status.hide()
-        showToast(isEdit ? 'Item diperbarui.' : 'Item ditambahkan.', 'success')
+        showToast(isEdit ? t('vas.editor.updated') : t('vas.editor.added'), 'success')
         await reload()
       } catch (err) {
         modalNote.show('danger', err.message)
@@ -475,21 +498,21 @@ export async function render(container, ctx = {}) {
   }
 
   function confirmDelete(item) {
-    const delBtn = C.button({ label: 'Hapus', variant: 'danger' })
+    const delBtn = C.button({ label: t('vas.delete.confirm'), variant: 'danger' })
     const dialog = C.modal({
-      title: 'Hapus item VAS?',
-      description: `"${item.name}" akan dihapus dari katalog. Riwayat pendapatan yang sudah tercatat tidak berubah.`,
-      children: [el('p', { className: 'vas-muted' }, 'Tindakan ini tidak bisa dibatalkan.')],
-      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), delBtn],
+      title: t('vas.delete.title'),
+      description: t('vas.delete.description', { name: item.name }),
+      children: [el('p', { className: 'vas-muted' }, t('vas.delete.irreversible'))],
+      actions: [C.button({ label: t('vas.common.cancel'), variant: 'ghost', dismiss: true }), delBtn],
       opener: container,
     })
     delBtn.addEventListener('click', async (e) => {
       e.preventDefault()
-      const restore = C.setBusy(delBtn, 'Menghapus…')
+      const restore = C.setBusy(delBtn, t('vas.delete.busy'))
       try {
         await removeItem(item.id)
         dialog.close()
-        showToast('Item dihapus.', 'success')
+        showToast(t('vas.delete.done'), 'success')
         await reload()
       } catch (err) { status.show('danger', err.message) } finally { restore() }
     })
@@ -497,24 +520,24 @@ export async function render(container, ctx = {}) {
 
   function openBulk() {
     const ta = C.textarea({
-      label: 'Tempel data',
+      label: t('vas.bulk.label'),
       id: 'vas-bulk',
       rows: 10,
-      hint: 'Dua format diterima: JSON array, atau satu baris per item dengan pemisah | — nama | harga | biaya | kategori | layanan | tingkat pasang.',
-      placeholder: 'Perawatan AC 3 bulan | 450000 | 120000 | perawatan | Pembersihan AC | 30\nCuci karpet express | 250000 | 60000 | kecepatan | Cuci Sofa & Karpet | 20',
+      hint: t('vas.bulk.hint'),
+      placeholder: t('vas.bulk.placeholder'),
     })
     const fileInput = el('input', { type: 'file', accept: '.json,.csv,.txt', className: 'vas-file' })
     fileInput.addEventListener('change', async () => {
       const file = fileInput.files?.[0]
       if (!file) return
-      try { ta.input.value = await file.text() } catch { status.show('danger', 'Berkas tidak bisa dibaca.') }
+      try { ta.input.value = await file.text() } catch { status.show('danger', t('vas.bulk.unreadable')) }
     })
 
     const preview = el('div', { className: 'vas-bulk-preview' })
     const skip = el('input', { type: 'checkbox', id: 'vas-bulk-skip', checked: skipDuplicates })
     skip.addEventListener('change', () => { skipDuplicates = skip.checked; check() })
     const skipWrap = el('label', { className: 'pd-check', for: 'vas-bulk-skip' },
-      skip, el('span', {}, 'Lewati item yang namanya sudah ada di katalog'))
+      skip, el('span', {}, t('vas.bulk.skip')))
 
     const split = () => {
       const rows = parseBulk(ta.input.value)
@@ -525,8 +548,8 @@ export async function render(container, ctx = {}) {
       try {
         const { fresh, duplicates } = split()
         preview.className = 'vas-bulk-preview is-ok'
-        const extra = duplicates.length ? ` · ${duplicates.length} sudah ada${skip.checked ? ' dan dilewati' : ''}` : ''
-        preview.textContent = `${fresh.length} item baru${extra}. Contoh: ${fresh[0]?.name || duplicates[0]?.name} — ${C.rupiah(fresh[0]?.price || duplicates[0]?.price || 0)}`
+        const extra = duplicates.length ? t('vas.bulk.dupes', { count: duplicates.length, skipped: skip.checked ? t('vas.bulk.andSkipped') : '' }) : ''
+        preview.textContent = t('vas.bulk.preview', { count: fresh.length, extra, name: fresh[0]?.name || duplicates[0]?.name, price: C.rupiah(fresh[0]?.price || duplicates[0]?.price || 0) })
       } catch (err) {
         preview.className = 'vas-bulk-preview is-bad'
         preview.textContent = err.message
@@ -534,14 +557,14 @@ export async function render(container, ctx = {}) {
     }
     ta.input.addEventListener('input', check)
 
-    const importBtn = C.button({ label: 'Impor', variant: 'primary' })
+    const importBtn = C.button({ label: t('vas.bulk.import'), variant: 'primary' })
     const modalNote = C.message()
     const dialog = C.modal({
-      title: 'Impor massal item VAS',
-      description: 'Tempel dari spreadsheet, atau pilih berkas JSON/CSV. Baris yang salah akan ditolak seluruhnya agar katalog tidak setengah jadi.',
+      title: t('vas.bulk.title'),
+      description: t('vas.bulk.description'),
       wide: true,
-      children: [modalNote, el('div', { className: 'vas-bulk-file' }, el('span', {}, 'Pilih berkas'), fileInput), ta.wrap, skipWrap, preview],
-      actions: [C.button({ label: 'Batal', variant: 'ghost', dismiss: true }), importBtn],
+      children: [modalNote, el('div', { className: 'vas-bulk-file' }, el('span', {}, t('vas.bulk.pickFile')), fileInput), ta.wrap, skipWrap, preview],
+      actions: [C.button({ label: t('vas.common.cancel'), variant: 'ghost', dismiss: true }), importBtn],
       opener: container,
     })
 
@@ -552,13 +575,13 @@ export async function render(container, ctx = {}) {
       try { plan = split() } catch (err) { modalNote.show('warn', err.message); return }
       const rows = skip.checked ? plan.fresh : plan.rows
       const skipped = plan.rows.length - rows.length
-      if (!rows.length) { modalNote.show('warn', 'Semua baris sudah ada di katalog. Tidak ada yang diimpor.'); return }
-      const restore = C.setBusy(importBtn, 'Mengimpor…')
+      if (!rows.length) { modalNote.show('warn', t('vas.bulk.allDupes')); return }
+      const restore = C.setBusy(importBtn, t('vas.bulk.importing'))
       try {
         const { error } = await getCloud().database.from('vas_items').insert(rows)
         if (error) throw new Error(error.message)
         dialog.close()
-        showToast(`${rows.length} item diimpor${skipped ? `, ${skipped} dilewati` : ''}.`, 'success')
+        showToast(t('vas.bulk.done', { count: rows.length, skipped: skipped ? t('vas.bulk.skippedCount', { count: skipped }) : '' }), 'success')
         notifyDataChanged()
         await reload()
       } catch (err) { modalNote.show('danger', err.message) } finally { restore() }
@@ -571,7 +594,7 @@ export async function render(container, ctx = {}) {
   function errorView(message) {
     const box = C.errorState(message)
     const retry = C.button({
-      label: 'Coba lagi', icon: 'refresh', size: 'sm',
+      label: t('vas.load.retry'), icon: 'refresh', size: 'sm',
       onClick: () => { host.replaceChildren(C.skeletonRows(4)); reload() },
     })
     box.querySelector('.note-body')?.appendChild(el('div', { className: 'note-actions' }, retry))
@@ -587,7 +610,7 @@ export async function render(container, ctx = {}) {
     } catch (err) { loadError = err }
     if (ctx.signal?.aborted) return
     if (loadError) {
-      status.show('danger', `Gagal memuat data: ${loadError.message}`)
+      status.show('danger', t('vas.load.failed', { error: loadError.message }))
       host.replaceChildren(errorView(loadError.message))
       return
     }
@@ -599,8 +622,5 @@ export async function render(container, ctx = {}) {
 }
 
 function kindLabel(kind) {
-  return {
-    langganan: 'Langganan', berkala: 'Berkala', garansi: 'Garansi',
-    bundling: 'Bundling', tertahan: 'Penawaran tertahan', marginkatalog: 'Margin katalog',
-  }[kind] || kind
+  return KIND_TONE[kind] ? t(`vas.kind.${kind}`) : kind
 }

@@ -370,3 +370,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* Language switch (src/i18n/switcher.js): an icon button showing "ID" / "EN". */
+.lang-toggle { font: 700 12px/1 var(--font-sans, "Plus Jakarta Sans", sans-serif); letter-spacing: .04em; min-width: 36px; }
+.auth-bar-actions { display: inline-flex; align-items: center; gap: var(--s-2, 8px); }

@@ -1,0 +1,275 @@
+{
+  "tabs": {
+    "radar": "Radar",
+    "week": "This week",
+    "ai": "AI recommendations",
+    "predict": "Predictions"
+  },
+  "sorts": {
+    "score": "Highest score",
+    "value": "Largest value",
+    "recent": "Newest"
+  },
+  "types": {
+    "due": {
+      "label": "Recurring service",
+      "short": "Due"
+    },
+    "churn": {
+      "label": "Churn risk",
+      "short": "Churn risk"
+    },
+    "upsell": {
+      "label": "Contract upsell",
+      "short": "Upsell"
+    },
+    "cross": {
+      "label": "Cross-sell",
+      "short": "Cross-sell"
+    },
+    "pending": {
+      "label": "Pending quote",
+      "short": "Pending"
+    },
+    "reapproach": {
+      "label": "Re-offer",
+      "short": "Re-offer"
+    },
+    "season": {
+      "label": "Seasonal",
+      "short": "Seasonal"
+    }
+  },
+  "tier": {
+    "high": "High priority",
+    "mid": "Medium priority",
+    "low": "Low priority"
+  },
+  "factor": {
+    "chance": "Historical odds",
+    "value": "Value",
+    "frequency": "Frequency",
+    "confidence": "Data confidence",
+    "timing": "Timing",
+    "lift": "Last year's lift"
+  },
+  "header": {
+    "loading": "Loading data…",
+    "refresh": "Recalculate radar",
+    "title": "Opportunity radar",
+    "asOf": "Calculated {date} · {count} requests"
+  },
+  "tabsLabel": "Opportunity radar views",
+  "live": {
+    "recalculated": "Radar recalculated: {count} opportunities."
+  },
+  "load": {
+    "failed": "Couldn't load transaction data: {error}"
+  },
+  "kpi": {
+    "value": "Estimated opportunity value",
+    "valueSub": "From {count} customer opportunities; seasonal ones are not added.",
+    "valueNone": "No valued opportunities yet.",
+    "count": "Opportunities",
+    "countNone": "None detected yet.",
+    "high": "High priority",
+    "highSub": "Score {min} and up{top}",
+    "topScore": " · top {score}",
+    "week": "Needed this week",
+    "weekSub": "Due, pending, or seasonal prep.",
+    "weekNone": "Nothing urgent."
+  },
+  "empty": {
+    "kicker": "No data yet",
+    "title": "The radar needs transaction history.",
+    "body": "Opportunities come from your requests, quotes and bookkeeping. Log a few jobs first; the radar will find customers coming due, pending quotes and seasonal patterns.",
+    "action": "Log a request"
+  },
+  "filter": {
+    "label": "Filter by opportunity type",
+    "all": "All"
+  },
+  "sort": {
+    "label": "Sort by"
+  },
+  "search": {
+    "placeholder": "Search customers or services",
+    "label": "Search opportunities"
+  },
+  "hidden": {
+    "back": "Back to radar",
+    "show": "Hidden ({count})",
+    "note": "Opportunities already followed up, snoozed or dismissed. Restore one to show it on the radar again."
+  },
+  "states": {
+    "unavailable": "Follow-up status couldn't be loaded (the opportunity_states table isn't available). The radar still shows, but mark/dismiss won't be saved."
+  },
+  "list": {
+    "meta": "{count} opportunities{value}",
+    "estimate": " · est. {amount}",
+    "emptyKicker": "Empty",
+    "hiddenEmpty": "No hidden opportunities.",
+    "notFoundKicker": "Not found",
+    "notFoundTitle": "No matching opportunities.",
+    "notFoundBody": "Change the search or pick another type.",
+    "cleanKicker": "Radar clear",
+    "cleanTitle": "No opportunities detected yet.",
+    "cleanBody": "All regular customers are on schedule and no quotes are stalled. The radar recalculates whenever data changes."
+  },
+  "score": {
+    "aria": "Score {score} out of 100",
+    "title": "Score {score}/100",
+    "short": "Score {score}"
+  },
+  "ev": {
+    "season": "{name}: {count} requests last year vs ±{expected} usually",
+    "more": "+{count} more",
+    "label": "Evidence from history"
+  },
+  "factors": {
+    "neutral": "neutral",
+    "off": "not counted",
+    "calc": "{value} × weight {weight}% = {points} pts"
+  },
+  "card": {
+    "factors": "Score factors",
+    "detail": "Details",
+    "detailAria": "Opportunity details: {title}"
+  },
+  "state": {
+    "done": "Followed up {date}",
+    "snoozed": "Snoozed until {date}",
+    "dismissed": "Dismissed"
+  },
+  "week": {
+    "lead": "A to-do list drawn from the radar: services due within 7 days, regulars going quiet, stalled quotes and seasonal prep. These aren't automatic notifications; mark one done after you contact the customer.",
+    "emptyKicker": "This week",
+    "emptyTitle": "No urgent follow-ups.",
+    "emptyBody": "Check the Radar tab for other opportunities like recurring packages and cross-sell.",
+    "groupMeta": "{count} opportunities · {amount}",
+    "overdue": "Today or overdue",
+    "soon": "Within 7 days",
+    "done": "Done",
+    "doneAria": "Mark {title} as followed up"
+  },
+  "ai": {
+    "build": "Build recommendations",
+    "title": "AI recommendations",
+    "meta": "Summary of the top 5 opportunities",
+    "lead": "The AI reads the five highest-scoring opportunities and their evidence, then lays out this week's work order. It adds no numbers; every figure comes from the radar.",
+    "topMeta": "score {score}{value}",
+    "nothing": "No opportunities to summarize yet.",
+    "busy": "Writing…",
+    "noModel": "The AI model is unavailable. Check your connection and try again.",
+    "console": "Opportunity analyst",
+    "retry": "Connection lost, retrying…",
+    "empty": "The model returned an empty answer.",
+    "done": "Done",
+    "stopped": "Stopped",
+    "failed": "Failed",
+    "error": "The AI failed to answer: {error}"
+  },
+  "predict": {
+    "notEnough": "not enough data",
+    "sample": "Sample",
+    "success": "Won",
+    "rate": "Rate",
+    "range": "95% range",
+    "seg": {
+      "all": "All quotes",
+      "new": "New customers",
+      "returning": "Returning customers",
+      "same": "Returning customers, same service",
+      "newService": "Returning customers, new service"
+    },
+    "offerTitle": "Quotes approved",
+    "offerMeta": "Basis for pending-quote, re-offer and cross-sell predictions",
+    "offerCaption": "Quote approval rate by segment",
+    "segment": "Segment",
+    "svcTitle": "Approval by service",
+    "svcMeta": "{count} services",
+    "svcCaption": "Approval rate by service",
+    "service": "Service",
+    "svcEmpty": "No quotes decided yet.",
+    "repTitle": "Customers returning unprompted",
+    "repMeta": "Basis for recurring-service predictions",
+    "repLead": "For recurring services, how many visits were followed by another within 1.5× the usual gap. A low number means customers rarely come back on their own: that is where follow-up helps most.",
+    "repCaption": "Natural return rate by service",
+    "notDetected": "Not detected yet",
+    "repEmpty": "No service has proven to recur yet.",
+    "repEmptyBody": "Needs at least {min} assessable visits with {pct}% of them returning.",
+    "winback": "Back after a long gap",
+    "winbackHint": "Basis for churn-risk predictions",
+    "contract": "Frequent customers on contract",
+    "contractHint": "Basis for contract-upsell predictions",
+    "rejection": "Bought again after declining",
+    "rejectionHint": "Re-offer benchmark",
+    "patterns": "Customer patterns",
+    "patternsMeta": "From this account's history",
+    "pattern": "Pattern",
+    "noContract": "This account has no contract/subscription services yet, so contract upsell has no historical benchmark.",
+    "pairsTitle": "Services often bought together",
+    "pairsMeta": "{count} pairs",
+    "pairsBasis": "Cross-sell basis",
+    "pairsCaption": "Service pairs",
+    "ifBuys": "If they buy",
+    "alsoBuys": "Also buy",
+    "customers": "Customers",
+    "pairCount": "{both} of {total}",
+    "confidence": "Confidence",
+    "lift": "Lift",
+    "pairsEmpty": "No strong service pairs yet.",
+    "pairsEmptyBody": "Needs at least {min} customers buying both and {pct}% confidence.",
+    "note": "Success prediction = your own account's historical rate in similar situations. Below {min} samples no figure is shown. The 95% range (Wilson) shows the uncertainty; the less data, the wider it gets."
+  },
+  "drawer": {
+    "close": "Close details",
+    "prediction": "Success prediction",
+    "na": "Not applicable",
+    "notEnough": "Not enough data",
+    "unavailable": "Unavailable",
+    "seasonNote": "A seasonal opportunity isn't a single customer's transaction.",
+    "predEnough": "{k} of {n} {basis} (range {lo}–{hi}).",
+    "predFew": "{n} samples of {basis}; minimum {min}.",
+    "noHistory": "No comparable history.",
+    "score": "Opportunity score",
+    "evCaption": "Evidence from transaction history",
+    "date": "Date",
+    "service": "Service",
+    "requestRef": "Request #{id}{offer}",
+    "offerRef": " · quote #{id}",
+    "value": "Value",
+    "status": "Status",
+    "calendarOnly": "No transaction rows: this opportunity comes from the general calendar.",
+    "season": "{label}: {start}–{end} ({note}).{prev}",
+    "seasonPrev": " Compared with: {start}–{end}.",
+    "breakdown": "Score breakdown",
+    "evidence": "Evidence",
+    "markDone": "Mark followed up",
+    "snooze": "Dismiss for {days} days",
+    "restore": "Restore to radar",
+    "noTable": "Status table not available"
+  },
+  "fu": {
+    "title": "Follow-up message",
+    "hint": "Review and edit before sending. The AI uses only the evidence above.",
+    "copy": "Copy",
+    "openWa": "Open WhatsApp",
+    "copied": "Message copied.",
+    "copyManual": "Press Ctrl+C to copy.",
+    "build": "Write follow-up message"
+  },
+  "nav": {
+    "social": "Prepare promo content",
+    "review": "Review quote",
+    "create": "Create quote",
+    "requestTitle": "Open the request form prefilled with customer data"
+  },
+  "toast": {
+    "done": "{title} marked as followed up.",
+    "snoozed": "{title} hidden until {date}.",
+    "saveFailed": "Couldn't save: {error}",
+    "restored": "{title} is back on the radar.",
+    "restoreFailed": "Couldn't restore: {error}"
+  }
+}

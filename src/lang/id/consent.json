@@ -1,0 +1,26 @@
+{
+  "heading": "Hubungkan Claude",
+  "docTitle": "Izin Akses AI",
+  "loading": "Memuat permintaan izin…",
+  "home": "Ke beranda",
+  "failedTitle": "Permintaan izin tidak bisa dibuka",
+  "failedHint": "Kembali ke Claude lalu hubungkan Satu Alur sekali lagi.",
+  "incompleteLink": "Tautan izin ini tidak lengkap.",
+  "allow": "Izinkan",
+  "deny": "Tolak",
+  "denyAndReturn": "Tolak dan kembali ke Claude",
+  "switchUser": "Bukan Anda? Masuk dengan akun lain",
+  "allowing": "Mengizinkan…",
+  "denying": "Menolak…",
+  "allowed": "Diizinkan. Mengembalikan Anda ke Claude…",
+  "denied": "Ditolak. Mengembalikan Anda ke Claude…",
+  "eyebrow": "Akses AI (MCP) · hanya baca",
+  "question": "Izinkan {client} mengakses data usaha Anda (hanya baca)?",
+  "signedInAs": "Masuk sebagai ",
+  "canRead": "Yang bisa dibaca {client}:",
+  "readOnlyNote": "{client} tidak bisa mengubah, menghapus, atau mengirim apa pun. Anda bisa memutuskan koneksi ini kapan saja di Pengaturan › Akses AI (MCP).",
+  "returnTo": "Setelah menjawab, Anda dikembalikan ke ",
+  "errors": {
+    "network": "Jaringan bermasalah. Periksa koneksi lalu coba lagi."
+  }
+}

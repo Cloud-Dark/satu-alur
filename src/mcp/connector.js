@@ -10,6 +10,7 @@
 import { isUsingMockCloud } from '../cloud.js'
 import { call } from './api.js'
 import { LIMITS, TRANSFORM_KEYS, applyTransforms, validateConnector, validateMigration, validateMapping } from './rules.js'
+import { t } from '../i18n/index.js'
 
 const CONNECTOR_KEY = 'satualur_mcp_connectors'
 const MAPPING_KEY = 'satualur_mcp_mappings'
@@ -169,22 +170,22 @@ export async function testConnection(id) {
     if (!connector) throw new Error('Konektor tidak ditemukan.')
     await new Promise((r) => setTimeout(r, 400))
     const missing = []
-    if (connector.type === 'rest' && !connector.config?.endpoint?.baseUrl) missing.push('URL endpoint')
-    if (connector.type === 'rest' && !connector.hasSecrets) missing.push('kredensial')
+    if (connector.type === 'rest' && !connector.config?.endpoint?.baseUrl) missing.push(t('erp.test.endpoint'))
+    if (connector.type === 'rest' && !connector.hasSecrets) missing.push(t('erp.test.credentials'))
     if (connector.type === 'database' && !connector.config?.connection?.host) missing.push('host')
     if (connector.type === 'webhook' && !connector.hasSecrets) missing.push('secret')
     if (missing.length) {
-      return { ok: false, code: 'CONFIG', message: `Lengkapi ${missing.join(', ')} terlebih dahulu.`, latencyMs: 0 }
+      return { ok: false, code: 'CONFIG', message: t('erp.test.missing', { fields: missing.join(', ') }), latencyMs: 0 }
     }
     if (connector.type === 'database') {
       return {
         ok: false,
         code: 'BRIDGE_REQUIRED',
-        message: 'Koneksi database langsung memerlukan agen jembatan (bridge agent) di jaringan Anda.',
+        message: t('erp.test.bridge'),
         latencyMs: 0,
       }
     }
-    return { ok: true, code: 'OK', message: 'Konfigurasi valid (mode demo, tanpa panggilan jaringan).', latencyMs: 400 }
+    return { ok: true, code: 'OK', message: t('erp.test.ok'), latencyMs: 400 }
   }
   return call(`/api/mcp/connectors/${encodeURIComponent(id)}/test`, { method: 'POST' })
 }

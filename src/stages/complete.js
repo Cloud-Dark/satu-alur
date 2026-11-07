@@ -7,6 +7,7 @@ import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 import { jobHeader, solo, pickFromWorkflow, workflowLink } from './job.js'
+import { t } from '../i18n/index.js'
 
 const { el } = C
 
@@ -14,37 +15,37 @@ export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
   const params = ctx.params || {}
   if (params.assignmentId == null) {
-    container.replaceChildren(C.pageHeader({ title: 'Penyelesaian pekerjaan' }),
-      pickFromWorkflow(navigate, { filter: 'work', body: 'Buka Alur kerja, lalu tekan "Tandai selesai" pada pekerjaan yang sedang dikerjakan.' }))
+    container.replaceChildren(C.pageHeader({ title: t('complete.title') }),
+      pickFromWorkflow(navigate, { filter: 'work', body: t('complete.pickBody') }))
     return
   }
 
-  const assignSel = C.select({ label: 'Penugasan aktif', name: 'assignment_id', required: true, options: [{ value: '', label: 'Memuat…' }] })
+  const assignSel = C.select({ label: t('complete.select.label'), name: 'assignment_id', required: true, options: [{ value: '', label: t('complete.loading') }] })
   const preview = el('div', { hidden: true })
   const ctxBox = el('div', {})
-  const notes = C.textarea({ label: 'Catatan hasil pekerjaan', name: 'notes', rows: 4, placeholder: 'Kondisi akhir, kendala, saran perawatan…', hint: 'Ikut tersimpan di riwayat dan membantu laporan.', attrs: { maxlength: '2000' } })
+  const notes = C.textarea({ label: t('complete.notes.label'), name: 'notes', rows: 4, placeholder: t('complete.notes.ph'), hint: t('complete.notes.hint'), attrs: { maxlength: '2000' } })
 
   let flow = null
   const selected = () => flow?.assignment(assignSel.input.value) || null
 
   const wiz = C.wizard({
-    label: 'Konfirmasi selesai',
+    label: t('complete.wiz.label'),
     steps: [
       {
         key: 'pick',
-        title: 'Pilih penugasan',
-        description: 'Pekerjaan mana yang sudah dikerjakan?',
+        title: t('complete.wiz.pick'),
+        description: t('complete.wiz.pickDesc'),
         content: [assignSel.wrap, preview],
-        validate: () => (selected() ? [] : [{ text: 'Pilih penugasan terlebih dahulu.', input: assignSel.input }]),
+        validate: () => (selected() ? [] : [{ text: t('complete.error.pick'), input: assignSel.input }]),
         primary: () => ({ disabled: !flow?.activeAssignments().length }),
       },
       {
         key: 'notes',
-        title: 'Catat hasil',
-        description: 'Tutup penugasan dengan catatan singkat.',
+        title: t('complete.wiz.notes'),
+        description: t('complete.wiz.notesDesc'),
         content: [ctxBox, notes.wrap],
-        primary: { label: 'Tandai selesai', icon: 'checkCircle', iconRight: undefined },
-        validate: () => (selected() ? [] : ['Pilih penugasan terlebih dahulu.']),
+        primary: { label: t('complete.wiz.markDone'), icon: 'checkCircle', iconRight: undefined },
+        validate: () => (selected() ? [] : [t('complete.error.pick')]),
         onPrimary: () => save(),
         onEnter: () => drawContext(),
       },
@@ -55,7 +56,7 @@ export async function render(container, ctx = {}) {
   const headSlot = el('div', {}, C.skeletonRows(1))
   const doneSlot = el('div', {})
   container.replaceChildren(
-    C.pageHeader({ title: 'Penyelesaian pekerjaan' }),
+    C.pageHeader({ title: t('complete.title') }),
     solo(headSlot, doneSlot, wiz.root, workflowLink(navigate)),
   )
 
@@ -66,8 +67,8 @@ export async function render(container, ctx = {}) {
       title: customerLabel(r),
       aside: C.rupiah(o?.validated_price),
       chips: [
-        { icon: 'users', text: a.worker_name || '—', title: `Pelaksana: ${a.worker_name || '—'}` },
-        { icon: 'calendar', text: C.formatDateTime(a.scheduled_at), title: 'Jadwal' },
+        { icon: 'users', text: a.worker_name || '—', title: t('complete.preview.worker', { name: a.worker_name || '—' }) },
+        { icon: 'calendar', text: C.formatDateTime(a.scheduled_at), title: t('complete.preview.schedule') },
         r?.location ? { icon: 'mapPin', text: r.location } : null,
       ],
     })
@@ -77,17 +78,17 @@ export async function render(container, ctx = {}) {
   function fillAssignments() {
     // Only this job's assignment, while it is still open.
     const active = flow.activeAssignments().filter((a) => String(a.id) === String(params.assignmentId))
-    const opts = [{ value: '', label: active.length ? 'Pilih penugasan' : 'Tidak ada penugasan aktif' }]
+    const opts = [{ value: '', label: active.length ? t('complete.select.pick') : t('complete.select.none') }]
     active.forEach((a) => {
       const r = flow.requestOfAssignment(a)
-      opts.push({ value: a.id, label: `${customerLabel(r)} — ${a.worker_name || 'tanpa nama'} · ${C.formatDate(a.scheduled_at)}` })
+      opts.push({ value: a.id, label: `${customerLabel(r)} — ${a.worker_name || t('complete.noName')} · ${C.formatDate(a.scheduled_at)}` })
     })
     const wanted = firstFill && params.assignmentId != null ? String(params.assignmentId) : ''
     const keep = [assignSel.input.value, wanted].find((v) => v && active.some((a) => String(a.id) === v)) || ''
     C.setOptions(assignSel.input, opts, keep)
     if (!active.length && wiz.index === 0 && !wiz.done) {
-      msg.show('info', 'Penugasan ini tidak ditemukan atau sudah ditutup.')
-      const go = C.button({ label: 'Ke alur kerja', iconRight: 'arrowRight', size: 'sm' })
+      msg.show('info', t('complete.notFound'))
+      const go = C.button({ label: t('complete.toWorkflow'), iconRight: 'arrowRight', size: 'sm' })
       go.addEventListener('click', () => navigate('workflow'))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
     }
@@ -112,7 +113,7 @@ export async function render(container, ctx = {}) {
 
   async function save() {
     const a = selected()
-    const restore = wiz.busy('Menyimpan…')
+    const restore = wiz.busy(t('complete.saving'))
     const db = getCloud().database
     try {
       const { data, error } = await db.from('completions').insert({
@@ -126,22 +127,22 @@ export async function render(container, ctx = {}) {
       if (!upd.error) await db.from('assignment_progress_log').insert({ assignment_id: Number(a.id), progress: 'selesai', note: notes.input.value.trim().slice(0, 500) || null })
       // The completion is the source of truth (activeAssignments skips assignments
       // that have one), so a failed status update can't cause a second completion.
-      if (upd.error) showToast(`Selesai tercatat, tetapi status penugasan belum diperbarui: ${upd.error.message}`, 'warning', 6000)
+      if (upd.error) showToast(t('complete.partial', { error: upd.error.message }), 'warning', 6000)
       const row = Array.isArray(data) ? data[0] : data
       restore()
-      const next = C.button({ label: 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+      const next = C.button({ label: t('complete.done.post'), iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       next.addEventListener('click', () => navigate('bookkeeping', { completionId: row?.id }))
-      const bill = C.button({ label: 'Buat invoice', icon: 'receipt', size: 'sm', variant: 'soft' })
+      const bill = C.button({ label: t('complete.done.invoice'), icon: 'receipt', size: 'sm', variant: 'soft' })
       bill.addEventListener('click', () => navigate('invoice', { completionId: row?.id }))
-      const again = C.button({ label: 'Pekerjaan lain', icon: 'activity', size: 'sm', variant: 'ghost' })
+      const again = C.button({ label: t('complete.done.other'), icon: 'activity', size: 'sm', variant: 'ghost' })
       again.addEventListener('click', () => navigate('workflow', { filter: 'work' }))
-      wiz.complete({ text: `Pekerjaan untuk ${customerLabel(flow.requestOfAssignment(a))} ditandai selesai. Siap dibukukan dan ditagih.`, actions: [next, bill, again] })
-      showToast('Pekerjaan ditandai selesai.', 'success')
+      wiz.complete({ text: t('complete.done.text', { name: customerLabel(flow.requestOfAssignment(a)) }), actions: [next, bill, again] })
+      showToast(t('complete.done.toast'), 'success')
       notifyDataChanged()
       await loadList()
     } catch (err) {
       restore()
-      msg.show('danger', `Gagal menyimpan: ${err.message}`)
+      msg.show('danger', t('complete.saveError', { error: err.message }))
     }
   }
 
@@ -149,7 +150,7 @@ export async function render(container, ctx = {}) {
     try {
       flow = await loadFlow()
     } catch (err) {
-      headSlot.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      headSlot.replaceChildren(C.errorState(t('complete.loadError', { error: err.message })))
       return
     }
     if (ctx.signal?.aborted) return
@@ -162,15 +163,15 @@ export async function render(container, ctx = {}) {
     const a = flow.assignment(params.assignmentId)
     const r = a ? flow.requestOfAssignment(a) : null
     const c = a ? flow.completionsOf(a.id)[0] : null
-    headSlot.replaceChildren(r ? jobHeader(r, { tag: c ? C.tag('Selesai', 'ok') : C.tag('Dikerjakan', 'warn'), note: `${a.worker_name || 'Tanpa petugas'} · ${C.formatDateTime(a.scheduled_at)}` }) : '')
+    headSlot.replaceChildren(r ? jobHeader(r, { tag: c ? C.tag(t('complete.tag.done'), 'ok') : C.tag(t('complete.tag.working'), 'warn'), note: `${a.worker_name || t('complete.noWorker')} · ${C.formatDateTime(a.scheduled_at)}` }) : '')
     if (!c || wiz.done) { doneSlot.replaceChildren(); return }
     wiz.root.hidden = true
-    const next = C.button({ label: flow.ledgerOf(c.id).length ? 'Lihat pembukuan' : 'Posting jurnal', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+    const next = C.button({ label: flow.ledgerOf(c.id).length ? t('complete.done.viewBooks') : t('complete.done.post'), iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
     next.addEventListener('click', () => navigate('bookkeeping', { completionId: c.id }))
-    const bill = C.button({ label: 'Invoice', icon: 'receipt', size: 'sm', variant: 'soft' })
+    const bill = C.button({ label: t('complete.done.invoiceShort'), icon: 'receipt', size: 'sm', variant: 'soft' })
     bill.addEventListener('click', () => navigate('invoice', { completionId: c.id }))
-    doneSlot.replaceChildren(C.panel({ title: 'Pekerjaan selesai', meta: C.formatDate(c.completed_at || c.created_at), raised: true },
-      C.defList([['Catatan hasil', c.notes || '—'], ['Selesai', C.formatDateTime(c.completed_at || c.created_at)]]),
+    doneSlot.replaceChildren(C.panel({ title: t('complete.panel.title'), meta: C.formatDate(c.completed_at || c.created_at), raised: true },
+      C.defList([[t('complete.panel.notes'), c.notes || '—'], [t('complete.panel.doneAt'), C.formatDateTime(c.completed_at || c.created_at)]]),
       el('div', { className: 'job-actions' }, next, bill)))
   }
 

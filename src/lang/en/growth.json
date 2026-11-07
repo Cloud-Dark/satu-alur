@@ -1,0 +1,116 @@
+{
+  "tabs": {
+    "radar": "Opportunity Radar",
+    "rekomendasi": "AI Recommendations",
+    "notifikasi": "Notifications",
+    "prediksi": "Success Predictions"
+  },
+  "level": {
+    "high": "High",
+    "mid": "Medium",
+    "low": "Low",
+    "good": "Good"
+  },
+  "type": {
+    "hot-lead": "Hot Lead",
+    "upsell": "Upsell",
+    "follow-up": "Follow-up",
+    "partnership": "Partnership",
+    "seasonal": "Seasonal",
+    "churn-risk": "Churn Risk"
+  },
+  "page": {
+    "title": "Business Growth",
+    "em": "Growth",
+    "description": "Find new opportunities, get AI recommendations and raise your chances of success."
+  },
+  "live": {
+    "panel": "Growth from your own data",
+    "kicker": "Your account",
+    "title": "Opportunities and recommendations are calculated from your transactions.",
+    "body": "There are no samples here: every number comes from this account's requests, quotes and bookkeeping. Start with a new request, then open the Opportunity radar and the AI advisor.",
+    "request": "New request",
+    "radar": "Opportunity radar",
+    "leads": "Lead finder",
+    "advisor": "AI advisor"
+  },
+  "tabsLabel": "Growth",
+  "demo": {
+    "badge": "Sample data (demo account). ",
+    "note": "The opportunities, notifications, predictions and assistant replies on this page are fixed samples, not an analysis of the account's data."
+  },
+  "radar": {
+    "score": "Score {score}",
+    "action": "💡 Action",
+    "roi": "💰 Expected ROI",
+    "probability": "📊 Probability",
+    "deadline": "⏰ Deadline",
+    "accept": "Accept & act",
+    "accepted": "Opportunity \"{title}\" accepted. Recommended action: {action}",
+    "snooze": "Snooze",
+    "snoozed": "Opportunity snoozed. The AI will remind you again.",
+    "dismiss": "Dismiss",
+    "dismissed": "Opportunity dismissed. The AI will learn from your preferences.",
+    "active": "Active Opportunities"
+  },
+  "kpi": {
+    "hotLeads": "Hot Leads",
+    "newOne": "+1 new",
+    "upsell": "Upsell",
+    "upsellSub": "Rp4.2M potential",
+    "churn": "Churn Risk",
+    "attention": "Needs attention",
+    "partnership": "Partnership",
+    "ready": "Ready to execute"
+  },
+  "chat": {
+    "placeholder": "Ask about opportunities, get advice, or take action...",
+    "send": "Send",
+    "quickHotel": "🏨 Send the hotel a quote",
+    "quickAnnual": "💰 Offer the annual plan",
+    "quickClinic": "📞 Call Klinik Sehat",
+    "quickBsd": "🤝 Contact BSD AC",
+    "title": "AI Growth Assistant",
+    "typing": "The Growth Assistant is analyzing...",
+    "assistant": "🤖 Growth Assistant: "
+  },
+  "notif": {
+    "all": "All ({count})",
+    "unread": "Unread ({count})",
+    "urgent": "Urgent",
+    "markAll": "Mark all as read",
+    "allRead": "All notifications marked as read.",
+    "title": "Notification Center",
+    "empty": "No notifications",
+    "markRead": "Mark as read",
+    "read": "Notification marked as read."
+  },
+  "pred": {
+    "success": "{pct}% Success",
+    "probability": "Probability",
+    "suggestion": "💡 AI suggestion:",
+    "expected": "Expected value:",
+    "run": "Run now",
+    "running": "Running \"{title}\". The AI will monitor progress and update the probability.",
+    "detail": "Details",
+    "detailToast": "The full analysis is in AI Superpowers → Growth Agent",
+    "avg": "Average Probability",
+    "avgSub": "+8% vs last month",
+    "total": "Total Expected Value",
+    "totalSub": "From 4 active opportunities",
+    "high": "High Odds (>80%)",
+    "highSub": "Top priority",
+    "attention": "Needs Attention (<70%)",
+    "attentionSub": "Clinic retention",
+    "title": "Success Predictions"
+  },
+  "api": {
+    "network": "Network problem. Check your connection and try again.",
+    "plansFailed": "Couldn't load plans. Try again.",
+    "plansFailedWith": "Couldn't load plans. {error}",
+    "planNotFound": "Plan not found.",
+    "slugTaken": "That slug is already in use.",
+    "paymentFailed": "Couldn't load payment settings. Try again.",
+    "paymentFailedWith": "Couldn't load payment settings. {error}"
+  }
+}

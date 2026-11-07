@@ -1,0 +1,56 @@
+{
+  "title": "Job completion",
+  "pickBody": "Open Workflow, then press \"Mark done\" on a job that is in progress.",
+  "loading": "Loading…",
+  "select": {
+    "label": "Active assignment",
+    "pick": "Choose an assignment",
+    "none": "No active assignments"
+  },
+  "notes": {
+    "label": "Work notes",
+    "ph": "Final condition, issues, maintenance tips…",
+    "hint": "Saved to the history and used in reports."
+  },
+  "wiz": {
+    "label": "Confirm completion",
+    "pick": "Choose assignment",
+    "pickDesc": "Which job has been done?",
+    "notes": "Record the result",
+    "notesDesc": "Close the assignment with a short note.",
+    "markDone": "Mark done"
+  },
+  "error": {
+    "pick": "Choose an assignment first."
+  },
+  "preview": {
+    "worker": "Crew: {name}",
+    "schedule": "Schedule"
+  },
+  "noName": "unnamed",
+  "noWorker": "No crew",
+  "notFound": "This assignment was not found or is already closed.",
+  "toWorkflow": "Go to workflow",
+  "saving": "Saving…",
+  "partial": "Completion saved, but the assignment status was not updated: {error}",
+  "done": {
+    "post": "Post entry",
+    "invoice": "Create invoice",
+    "invoiceShort": "Invoice",
+    "other": "Other jobs",
+    "viewBooks": "View bookkeeping",
+    "text": "The job for {name} is marked done. Ready to book and bill.",
+    "toast": "Job marked done."
+  },
+  "saveError": "Could not save: {error}",
+  "loadError": "Could not load: {error}",
+  "tag": {
+    "done": "Done",
+    "working": "In progress"
+  },
+  "panel": {
+    "title": "Job done",
+    "notes": "Work notes",
+    "doneAt": "Completed"
+  }
+}

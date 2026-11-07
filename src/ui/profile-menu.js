@@ -12,6 +12,10 @@ import { profileMenuItems, cleanProfileName } from '../auth/profile-rules.js'
 import { isDemoEmail } from '../auth/demo-accounts.js'
 import { getCloud } from '../cloud.js'
 import { getMyPlan } from '../quota/api.js'
+import { t } from '../i18n/index.js'
+
+// cleanProfileName (shared with the worker) throws Indonesian text; show it in the page language.
+const NAME_ERRORS = { 'Nama minimal 2 karakter.': 'ui.profile.nameTooShort', 'Nama maksimal 60 karakter.': 'ui.profile.nameTooLong' }
 
 let seq = 0
 
@@ -22,25 +26,25 @@ export function profileMenu({ user, initials, isAdmin = false, adminVia = null, 
   const avatarText = el('span', { className: 'avatar', 'aria-hidden': 'true' }, initials)
   const btn = el('button', {
     type: 'button', className: 'avatar-btn', 'aria-haspopup': 'menu', 'aria-expanded': 'false', 'aria-controls': id,
-    'aria-label': `Menu akun ${user.email || ''}`.trim(), title: user.email || 'Akun',
+    'aria-label': t('ui.profile.menuFor', { email: user.email || '' }).trim(), title: user.email || t('ui.profile.account'),
   }, avatarText)
 
-  const nameEl = el('span', { className: 'pm-name' }, (user.name && user.name.trim()) || 'Pengguna')
+  const nameEl = el('span', { className: 'pm-name' }, (user.name && user.name.trim()) || t('ui.profile.user'))
   const planEl = el('span', { className: 'pm-plan muted' })
   const head = el('div', { className: 'pm-head' },
     el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials),
     el('span', { className: 'pm-id' }, nameEl, el('span', { className: 'pm-email', title: user.email || '' }, user.email || ''),
-      el('span', { className: 'pm-meta' }, el('span', { className: `tag pm-badge pm-badge-${badge.toLowerCase()}` }, badge), planEl)))
+      el('span', { className: 'pm-meta' }, el('span', { className: `tag pm-badge pm-badge-${badge.toLowerCase()}` }, t(`ui.profile.badge.${badge}`)), planEl)))
 
-  const themeLabel = () => (getTheme() === 'dark' ? 'Mode terang' : 'Mode gelap')
+  const themeLabel = () => (getTheme() === 'dark' ? t('ui.profile.lightMode') : t('ui.profile.darkMode'))
   const defs = {
-    profile: { label: 'Profil saya', icon: 'users', run: openProfile },
-    plan: { label: 'Paket & kuota', icon: 'wallet', run: () => onPlan?.() },
-    settings: { label: 'Pengaturan', icon: 'settings', run: () => onSettings?.() },
-    office: { label: 'Kantor Satu Alur', icon: 'shield', run: () => onSwitchOffice?.() },
-    back: { label: 'Kembali ke usaha saya', icon: 'home', run: () => onSwitchOffice?.() },
+    profile: { label: t('ui.profile.myProfile'), icon: 'users', run: openProfile },
+    plan: { label: t('ui.profile.plan'), icon: 'wallet', run: () => onPlan?.() },
+    settings: { label: t('ui.profile.settings'), icon: 'settings', run: () => onSettings?.() },
+    office: { label: t('ui.profile.office'), icon: 'shield', run: () => onSwitchOffice?.() },
+    back: { label: t('ui.profile.back'), icon: 'home', run: () => onSwitchOffice?.() },
     theme: { label: themeLabel(), icon: getTheme() === 'dark' ? 'sun' : 'moon', run: () => { toggleTheme(); refreshTheme() }, keepOpen: true },
-    signout: { label: 'Keluar', icon: 'logout', run: () => onSignOut?.(), danger: true },
+    signout: { label: t('ui.profile.signOut'), icon: 'logout', run: () => onSignOut?.(), danger: true },
   }
   const itemEls = items.map((k) => {
     const d = defs[k]
@@ -57,7 +61,7 @@ export function profileMenu({ user, initials, isAdmin = false, adminVia = null, 
     themeBtn.replaceChildren(icon(getTheme() === 'dark' ? 'sun' : 'moon', { size: 16 }), el('span', { className: 'pm-item-label' }, themeLabel()))
   }
 
-  const menu = el('div', { className: 'pm', id, role: 'menu', 'aria-label': 'Menu akun', hidden: true }, head,
+  const menu = el('div', { className: 'pm', id, role: 'menu', 'aria-label': t('ui.profile.menu'), hidden: true }, head,
     el('div', { className: 'pm-list' }, itemEls.slice(0, -1)),
     el('div', { className: 'pm-sep', role: 'separator' }), itemEls[itemEls.length - 1])
   const wrap = el('div', { className: 'pm-wrap' }, btn, menu)
@@ -66,7 +70,7 @@ export function profileMenu({ user, initials, isAdmin = false, adminVia = null, 
   function loadPlan() {
     if (planLoaded || !items.includes('plan')) return
     planLoaded = true
-    getMyPlan().then((p) => { planEl.textContent = `Paket ${p?.plan?.name || 'Free'}` }).catch(() => { planLoaded = false })
+    getMyPlan().then((p) => { planEl.textContent = t('ui.profile.planName', { name: p?.plan?.name || 'Free' }) }).catch(() => { planLoaded = false })
   }
 
   const focusAt = (i) => itemEls[(i + itemEls.length) % itemEls.length].focus()
@@ -102,28 +106,28 @@ export function profileMenu({ user, initials, isAdmin = false, adminVia = null, 
   })
 
   function openProfile() {
-    const f = field({ label: 'Nama tampilan', id: `pm-name-${seq}`, value: (user.name || '').trim(), attrs: { maxlength: '60', autocomplete: 'name', ...(canEditProfile ? {} : { readonly: true }) } })
-    const email = field({ label: 'Email', id: `pm-email-${seq}`, type: 'email', value: user.email || '', hint: 'Email dipakai untuk masuk dan tidak bisa diubah.', attrs: { readonly: true } })
+    const f = field({ label: t('ui.profile.displayName'), id: `pm-name-${seq}`, value: (user.name || '').trim(), attrs: { maxlength: '60', autocomplete: 'name', ...(canEditProfile ? {} : { readonly: true }) } })
+    const email = field({ label: t('ui.profile.email'), id: `pm-email-${seq}`, type: 'email', value: user.email || '', hint: t('ui.profile.emailHint'), attrs: { readonly: true } })
     const err = el('p', { className: 'field-error', role: 'alert' })
-    const save = button({ label: 'Simpan', icon: 'save', variant: 'primary' })
-    const cancel = button({ label: canEditProfile ? 'Batal' : 'Tutup', variant: 'ghost' })
+    const save = button({ label: t('ui.profile.save'), icon: 'save', variant: 'primary' })
+    const cancel = button({ label: canEditProfile ? t('ui.profile.cancel') : t('ui.profile.close'), variant: 'ghost' })
     cancel.dataset.dismiss = ''
     const m = modal({
-      title: 'Profil saya',
-      description: canEditProfile ? 'Nama ini tampil di aplikasi dan di email yang Anda kirim.' : 'Akun demo memakai profil contoh dan tidak bisa diubah.',
+      title: t('ui.profile.myProfile'),
+      description: canEditProfile ? t('ui.profile.editDesc') : t('ui.profile.demoDesc'),
       children: [f.wrap, email.wrap, err], actions: canEditProfile ? [cancel, save] : [cancel], opener: btn,
     })
     save.addEventListener('click', async () => {
       err.textContent = ''
       let name
-      try { name = cleanProfileName(f.input.value) } catch (ex) { err.textContent = ex.message; f.input.focus(); return }
+      try { name = cleanProfileName(f.input.value) } catch (ex) { err.textContent = NAME_ERRORS[ex.message] ? t(NAME_ERRORS[ex.message]) : ex.message; f.input.focus(); return }
       save.disabled = true
       try {
         await getCloud().auth.updateProfile({ name })
         user.name = name
         nameEl.textContent = name
         document.querySelectorAll('.side-user-name').forEach((n) => { n.textContent = name })
-        showToast('Profil disimpan.', 'success')
+        showToast(t('ui.profile.saved'), 'success')
         m.close()
       } catch (ex) { err.textContent = ex.message } finally { save.disabled = false }
     })

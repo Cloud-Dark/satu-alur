@@ -3,8 +3,14 @@
  * internal review draft ("draf tinjauan"). Pure functions, unit-tested.
  */
 
+import { t, has, locale } from '../i18n/index.js'
+
 const DAY = 86400000
-const rp = (n) => `Rp${Math.round(Number(n) || 0).toLocaleString('id-ID')}`
+// Node tests import this module without the Vite dictionaries: then the Indonesian text below is used.
+const ready = () => has('offer.title')
+const tx = (key, id, vars = {}) => (ready() ? t(key, vars) : id.replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m)))
+const loc = () => (ready() ? locale() : 'id-ID')
+const rp = (n) => `Rp${Math.round(Number(n) || 0).toLocaleString(loc())}`
 
 /**
  * The client's requested time when it is still in the future; otherwise the
@@ -49,24 +55,24 @@ export function reviewDraft({ offer = {}, request = {}, history = null, template
   if (history) {
     const diff = (price - history.avg) / history.avg
     const pct = Math.round(Math.abs(diff) * 100)
-    if (pct <= 15) points.push({ tone: 'ok', text: `Harga sejalan dengan ${history.count} penawaran serupa (rata-rata ${rp(history.avg)}).` })
-    else if (diff > 0) points.push({ tone: 'warn', text: `Harga ${pct}% di atas rata-rata ${history.count} penawaran serupa (${rp(history.avg)}). Pastikan nilainya sepadan.` })
-    else points.push({ tone: 'warn', text: `Harga ${pct}% di bawah rata-rata ${history.count} penawaran serupa (${rp(history.avg)}). Periksa margin Anda.` })
+    if (pct <= 15) points.push({ tone: 'ok', text: tx('offer.reviewDraft.priceInLine', 'Harga sejalan dengan {count} penawaran serupa (rata-rata {avg}).', { count: history.count, avg: rp(history.avg) }) })
+    else if (diff > 0) points.push({ tone: 'warn', text: tx('offer.reviewDraft.priceAbove', 'Harga {pct}% di atas rata-rata {count} penawaran serupa ({avg}). Pastikan nilainya sepadan.', { pct, count: history.count, avg: rp(history.avg) }) })
+    else points.push({ tone: 'warn', text: tx('offer.reviewDraft.priceBelow', 'Harga {pct}% di bawah rata-rata {count} penawaran serupa ({avg}). Periksa margin Anda.', { pct, count: history.count, avg: rp(history.avg) }) })
   } else {
-    points.push({ tone: 'info', text: 'Belum ada penawaran serupa sebagai pembanding harga.' })
+    points.push({ tone: 'info', text: tx('offer.reviewDraft.noHistory', 'Belum ada penawaran serupa sebagai pembanding harga.') })
   }
   if (template && (template.price_hint_min || template.price_hint_max)) {
     const lo = template.price_hint_min || 0
     const hi = template.price_hint_max || Infinity
-    if (price < lo || price > hi) points.push({ tone: 'warn', text: `Harga di luar kisaran template "${template.name}".` })
-    else points.push({ tone: 'ok', text: `Harga dalam kisaran template "${template.name}".` })
+    if (price < lo || price > hi) points.push({ tone: 'warn', text: tx('offer.reviewDraft.outOfRange', 'Harga di luar kisaran template "{name}".', { name: template.name }) })
+    else points.push({ tone: 'ok', text: tx('offer.reviewDraft.inRange', 'Harga dalam kisaran template "{name}".', { name: template.name }) })
   }
-  if (!request.phone) points.push({ tone: 'warn', text: 'Nomor telepon pelanggan belum ada, jadi penawaran belum bisa dikirim lewat WhatsApp.' })
-  if (!schedule) points.push({ tone: 'warn', text: 'Jadwal pelaksanaan belum ditentukan.' })
-  if (String(request.description || '').trim().length < 30) points.push({ tone: 'info', text: 'Deskripsi kebutuhan singkat; harga bisa berubah setelah survei.' })
-  if (/survei|estimasi|perkiraan/i.test(String(offer.notes || ''))) points.push({ tone: 'info', text: 'Penawaran menyebut estimasi; jelaskan kapan harga final dikunci.' })
-  points.push({ tone: 'info', text: 'Cek ulang: ruang lingkup sesuai permintaan, ketentuan pembayaran, dan masa berlaku penawaran.' })
+  if (!request.phone) points.push({ tone: 'warn', text: tx('offer.reviewDraft.noPhone', 'Nomor telepon pelanggan belum ada, jadi penawaran belum bisa dikirim lewat WhatsApp.') })
+  if (!schedule) points.push({ tone: 'warn', text: tx('offer.reviewDraft.noSchedule', 'Jadwal pelaksanaan belum ditentukan.') })
+  if (String(request.description || '').trim().length < 30) points.push({ tone: 'info', text: tx('offer.reviewDraft.shortDesc', 'Deskripsi kebutuhan singkat; harga bisa berubah setelah survei.') })
+  if (/survei|estimasi|perkiraan/i.test(String(offer.notes || ''))) points.push({ tone: 'info', text: tx('offer.reviewDraft.estimate', 'Penawaran menyebut estimasi; jelaskan kapan harga final dikunci.') })
+  points.push({ tone: 'info', text: tx('offer.reviewDraft.recheck', 'Cek ulang: ruang lingkup sesuai permintaan, ketentuan pembayaran, dan masa berlaku penawaran.') })
   const warn = points.filter((p) => p.tone === 'warn').length
-  const summary = warn ? `${warn} hal perlu diperhatikan sebelum dikirim.` : 'Siap dikirim setelah Anda meninjau isinya.'
+  const summary = warn ? tx('offer.reviewDraft.warnSummary', '{count} hal perlu diperhatikan sebelum dikirim.', { count: warn }) : tx('offer.reviewDraft.readySummary', 'Siap dikirim setelah Anda meninjau isinya.')
   return { summary, points }
 }

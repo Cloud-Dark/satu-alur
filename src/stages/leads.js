@@ -20,7 +20,7 @@ import { loadFlow, notifyDataChanged } from './data.js'
 import { validateOffer } from '../domain/rules.js'
 import { PRESET_CHIPS, MAX_KEYWORDS, DEFAULT_RADIUS_KM, MAX_RADIUS_KM, normalizeKeyword, inIndonesia } from '../leads/osm.js'
 import {
-  serviceStats, serviceNames, scoreLead, estimateValue, sortLeads, SORTS,
+  serviceStats, serviceNames, scoreLead, estimateValue, sortLeads, SORTS, serviceKey,
   DEFAULT_CONVERSION, MIN_CONVERSION, MAX_CONVERSION,
 } from '../leads/scoring.js'
 import { getSources, geocode } from '../leads/api.js'
@@ -29,6 +29,7 @@ import {
   JOB_EVENT, startLeadJob, cancelLeadJob, getLeadJob, isJobRunning, setLeadsPageMounted,
   loadLeadsStore, saveLeadsStore, removeHistory, lastEntry,
 } from '../leads/job.js'
+import { t, locale } from '../i18n/index.js'
 
 const { el, icon } = C
 
@@ -45,16 +46,22 @@ export const LEAD_STATUSES = [
   { value: 'ditolak', label: 'Ditolak', tone: 'neutral' },
 ]
 const statusOf = (v) => LEAD_STATUSES.find((s) => s.value === v) || LEAD_STATUSES[0]
+const statusText = (s) => t(`leads.status.${s.value}`)
+// Written into the request description, so it stays in the account's working language (Indonesian).
 const SOURCE_LABEL = { osm: 'peta', google: 'Google', demo: 'data contoh' }
+const presetLabel = (c) => t(`leads.preset.${c.value.replace(/\s+/g, '_')}`)
+const sortOptions = () => SORTS.map((s) => ({ value: s.value, label: t(`leads.sort.${s.value}`) }))
 
 const store = {
   get(k, fallback = null) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback } catch { return fallback } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)) } catch { /* storage unavailable */ } },
 }
 
-const km = (n) => `${Number(n).toLocaleString('id-ID', { maximumFractionDigits: n < 10 ? 1 : 0 })} km`
+const km = (n) => `${Number(n).toLocaleString(locale(), { maximumFractionDigits: n < 10 ? 1 : 0 })} km`
+// The same km text, fixed to Indonesian, for data saved into the request.
+const kmId = (n) => `${Number(n).toLocaleString('id-ID', { maximumFractionDigits: n < 10 ? 1 : 0 })} km`
 const pct = (n) => `${Math.round(n * 100)}%`
-const fmtFactor = (n) => Number(n).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const fmtFactor = (n) => Number(n).toLocaleString(locale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 function parseMeta(v) {
   if (v && typeof v === 'object') return v
@@ -66,9 +73,9 @@ const cssVar = (name, fallback) => getComputedStyle(document.documentElement).ge
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(String(text || ''))
-    showToast('Disalin ke papan klip.', 'success')
+    showToast(t('leads.copy.done'), 'success')
   } catch {
-    showToast('Gagal menyalin. Salin teks secara manual.', 'error')
+    showToast(t('leads.copy.failed'), 'error')
   }
 }
 
@@ -110,6 +117,16 @@ export async function render(container, ctx = {}) {
     names = serviceNames(m)
     for (const s of stats) if (!names.some((n) => n.toLowerCase() === s.name.toLowerCase())) names.push(s.name)
   }).catch(() => { /* estimates fall back to the user's own number */ })
+  /** The estimate's explanation, worded from its basis (the scoring module writes Indonesian). */
+  const estNote = (est, service) => {
+    if (est.basis === 'layanan') {
+      const hit = stats.find((s) => s.key === serviceKey(service))
+      return hit ? t('leads.estimate.service', { count: hit.count, name: hit.name }) : est.note
+    }
+    if (est.basis === 'umum') return t('leads.estimate.overall', { count: stats.reduce((s, x) => s + x.count, 0) })
+    if (est.basis === 'perkiraan') return t('leads.estimate.manual')
+    return t('leads.estimate.none')
+  }
   const servicesForAI = () => {
     const byName = new Map(stats.map((s) => [s.key, s]))
     return names.map((n) => byName.get(n.trim().toLowerCase().replace(/\s+/g, ' ')) || { name: n, count: 0, avg: 0 })
@@ -122,30 +139,30 @@ export async function render(container, ctx = {}) {
   const sourcesReady = getSources({ signal }).then((s) => { sources = s || sources }).catch(() => {})
 
   /* ------------------------------------------------------------- Header */
-  const header = C.pageHeader({ title: 'Pencari prospek' })
+  const header = C.pageHeader({ title: t('leads.page.title') })
 
   /* --------------------------------------------------------------- Tabs */
   const TABS = [
-    { key: 'search', label: 'Cari prospek', icon: 'search' },
-    { key: 'saved', label: 'Prospek tersimpan', icon: 'bookmark' },
+    { key: 'search', label: t('leads.tabs.search'), icon: 'search' },
+    { key: 'saved', label: t('leads.tabs.saved'), icon: 'bookmark' },
   ]
-  const tablist = el('div', { className: 'ld-tabs', role: 'tablist', 'aria-label': 'Pencari prospek' })
+  const tablist = el('div', { className: 'ld-tabs', role: 'tablist', 'aria-label': t('leads.page.title') })
   const tabBtns = new Map()
   const tabPanels = new Map()
   const savedCount = el('span', { className: 'ld-tab-count tnum', hidden: true })
-  for (const t of TABS) {
+  for (const tab of TABS) {
     const b = el('button', {
-      type: 'button', role: 'tab', className: 'ld-tab', id: `ld-tab-${t.key}`, dataset: { tab: t.key },
-      'aria-controls': `ld-panel-${t.key}`, 'aria-selected': 'false', tabindex: '-1',
-    }, icon(t.icon, { size: 16 }), el('span', {}, t.label), t.key === 'saved' ? savedCount : null)
-    b.addEventListener('click', () => activate(t.key))
-    tabBtns.set(t.key, b)
+      type: 'button', role: 'tab', className: 'ld-tab', id: `ld-tab-${tab.key}`, dataset: { tab: tab.key },
+      'aria-controls': `ld-panel-${tab.key}`, 'aria-selected': 'false', tabindex: '-1',
+    }, icon(tab.icon, { size: 16 }), el('span', {}, tab.label), tab.key === 'saved' ? savedCount : null)
+    b.addEventListener('click', () => activate(tab.key))
+    tabBtns.set(tab.key, b)
     tablist.appendChild(b)
-    tabPanels.set(t.key, el('div', { className: 'ld-panel', role: 'tabpanel', id: `ld-panel-${t.key}`, 'aria-labelledby': `ld-tab-${t.key}`, hidden: true }))
+    tabPanels.set(tab.key, el('div', { className: 'ld-panel', role: 'tabpanel', id: `ld-panel-${tab.key}`, 'aria-labelledby': `ld-tab-${tab.key}`, hidden: true }))
   }
   tablist.addEventListener('keydown', (e) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
-    const keys = TABS.map((t) => t.key)
+    const keys = TABS.map((tab) => tab.key)
     const i = keys.indexOf(document.activeElement?.dataset?.tab)
     if (i < 0) return
     e.preventDefault()
@@ -169,17 +186,17 @@ export async function render(container, ctx = {}) {
 
   // --- Location: address search (combobox) ---
   const addrInput = el('input', {
-    id: 'ld-addr', className: 'input', type: 'search', autocomplete: 'off', placeholder: 'Contoh: Bekasi Barat, Jl. Ahmad Yani',
+    id: 'ld-addr', className: 'input', type: 'search', autocomplete: 'off', placeholder: t('leads.loc.placeholder'),
     role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': 'ld-addr-list', 'aria-describedby': 'ld-addr-hint',
   })
-  const addrList = el('ul', { id: 'ld-addr-list', className: 'ld-suggest', role: 'listbox', 'aria-label': 'Saran alamat', hidden: true })
+  const addrList = el('ul', { id: 'ld-addr-list', className: 'ld-suggest', role: 'listbox', 'aria-label': t('leads.loc.suggestLabel'), hidden: true })
   const addrStatus = el('span', { className: 'ld-suggest-status', role: 'status', 'aria-live': 'polite' })
-  const geoBtn = C.button({ label: 'Gunakan lokasi saya', icon: 'target', variant: 'soft', size: 'sm' })
+  const geoBtn = C.button({ label: t('leads.loc.useMine'), icon: 'target', variant: 'soft', size: 'sm' })
   const pointLine = el('p', { className: 'ld-point', 'aria-live': 'polite' })
   const locField = el('div', { className: 'field ld-loc' },
-    el('label', { className: 'field-label', htmlFor: 'ld-addr' }, el('span', {}, 'Titik pencarian')),
+    el('label', { className: 'field-label', htmlFor: 'ld-addr' }, el('span', {}, t('leads.loc.label'))),
     el('div', { className: 'ld-combo' }, icon('search', { size: 16 }), addrInput, addrList),
-    el('span', { className: 'field-hint', id: 'ld-addr-hint' }, 'Ketik alamat atau nama daerah, atau klik langsung di peta.'),
+    el('span', { className: 'field-hint', id: 'ld-addr-hint' }, t('leads.loc.hint')),
     addrStatus,
     el('div', { className: 'ld-loc-row' }, geoBtn),
     pointLine,
@@ -217,12 +234,12 @@ export async function render(container, ctx = {}) {
     if (gap > 0) await new Promise((r) => setTimeout(r, gap))
     if (ac.signal.aborted) return
     lastGeocodeAt = Date.now()
-    addrStatus.textContent = 'Mencari alamat…'
+    addrStatus.textContent = t('leads.loc.searching')
     try {
       addrItems = await geocode(q, { signal: ac.signal })
       if (ac.signal.aborted) return
       addrActive = addrItems.length ? 0 : -1
-      addrStatus.textContent = addrItems.length ? `${addrItems.length} saran alamat. Gunakan panah atas/bawah lalu Enter.` : 'Alamat tidak ditemukan. Coba nama kecamatan atau kota.'
+      addrStatus.textContent = addrItems.length ? t('leads.loc.found', { count: addrItems.length }) : t('leads.loc.notFound')
       drawSuggest()
     } catch (err) {
       if (err.name === 'AbortError') return
@@ -256,28 +273,28 @@ export async function render(container, ctx = {}) {
   }
 
   geoBtn.addEventListener('click', () => {
-    if (!navigator.geolocation) { formMsg.show('warn', 'Peramban ini tidak mendukung lokasi. Cari alamat atau klik peta.'); return }
-    const restore = C.setBusy(geoBtn, 'Mencari lokasi…')
+    if (!navigator.geolocation) { formMsg.show('warn', t('leads.loc.noGeo')); return }
+    const restore = C.setBusy(geoBtn, t('leads.loc.locating'))
     navigator.geolocation.getCurrentPosition((pos) => {
       restore()
       const p = { lat: pos.coords.latitude, lon: pos.coords.longitude }
-      if (!inIndonesia(p.lat, p.lon)) { formMsg.show('warn', 'Lokasi Anda di luar Indonesia. Pencarian prospek saat ini hanya untuk Indonesia.'); return }
-      setPoint(p, 'Lokasi Anda saat ini', { fly: true })
+      if (!inIndonesia(p.lat, p.lon)) { formMsg.show('warn', t('leads.loc.outside')); return }
+      setPoint(p, t('leads.loc.current'), { fly: true })
     }, (err) => {
       restore()
-      formMsg.show('warn', err.code === 1 ? 'Izin lokasi ditolak. Cari alamat atau klik peta.' : 'Lokasi tidak dapat dibaca. Cari alamat atau klik peta.')
+      formMsg.show('warn', err.code === 1 ? t('leads.loc.denied') : t('leads.loc.unreadable'))
     }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
   })
 
   function drawPointLine() {
     if (!state.point) {
-      pointLine.replaceChildren(icon('info', { size: 14 }), el('span', {}, 'Belum ada titik. Cari alamat, pakai lokasi Anda, atau klik peta.'))
+      pointLine.replaceChildren(icon('info', { size: 14 }), el('span', {}, t('leads.loc.none')))
       pointLine.classList.add('is-empty')
       return
     }
     pointLine.classList.remove('is-empty')
     pointLine.replaceChildren(icon('mapPin', { size: 14 }),
-      el('span', {}, el('b', {}, state.pointLabel || 'Titik di peta'), ' ',
+      el('span', {}, el('b', {}, state.pointLabel || t('leads.loc.mapPoint')), ' ',
         el('span', { className: 'tnum muted' }, `${state.point.lat.toFixed(4)}, ${state.point.lon.toFixed(4)}`)))
   }
 
@@ -285,10 +302,10 @@ export async function render(container, ctx = {}) {
   const radiusOut = el('output', { className: 'ld-radius-val tnum', htmlFor: 'ld-radius' }, km(state.radiusKm))
   const radiusInput = el('input', {
     id: 'ld-radius', type: 'range', className: 'ld-range', min: '1', max: String(MAX_RADIUS_KM), step: '1', value: String(state.radiusKm),
-    'aria-valuetext': `${state.radiusKm} kilometer`,
+    'aria-valuetext': t('leads.radius.valuetext', { km: state.radiusKm }),
   })
   const radiusField = el('div', { className: 'field' },
-    el('label', { className: 'field-label', htmlFor: 'ld-radius' }, el('span', {}, 'Radius'), radiusOut),
+    el('label', { className: 'field-label', htmlFor: 'ld-radius' }, el('span', {}, t('leads.radius.label')), radiusOut),
     radiusInput,
     el('span', { className: 'ld-range-scale', 'aria-hidden': 'true' }, el('span', {}, '1 km'), el('span', {}, `${MAX_RADIUS_KM} km`)),
   )
@@ -297,38 +314,38 @@ export async function render(container, ctx = {}) {
   radiusInput.addEventListener('input', () => {
     state.radiusKm = Number(radiusInput.value)
     radiusOut.textContent = km(state.radiusKm)
-    radiusInput.setAttribute('aria-valuetext', `${state.radiusKm} kilometer`)
+    radiusInput.setAttribute('aria-valuetext', t('leads.radius.valuetext', { km: state.radiusKm }))
     syncRadiusFill()
     drawCircle()
   })
   radiusInput.addEventListener('change', () => { persist(); fitCircle() })
 
   // --- Criteria chips ---
-  const chipsBox = el('div', { className: 'ld-chips', role: 'group', 'aria-label': 'Jenis usaha' })
-  const customBox = el('div', { className: 'ld-chips ld-chips-custom', 'aria-label': 'Kriteria tambahan', role: 'list' })
-  const kwInput = el('input', { id: 'ld-kw', className: 'input', placeholder: 'Contoh: toko pentol, percetakan', maxlength: '40', 'aria-describedby': 'ld-kw-hint' })
-  const kwAdd = C.button({ label: 'Tambah', icon: 'plus', variant: 'soft', size: 'sm' })
+  const chipsBox = el('div', { className: 'ld-chips', role: 'group', 'aria-label': t('leads.kw.groupLabel') })
+  const customBox = el('div', { className: 'ld-chips ld-chips-custom', 'aria-label': t('leads.kw.extraLabel'), role: 'list' })
+  const kwInput = el('input', { id: 'ld-kw', className: 'input', placeholder: t('leads.kw.placeholder'), maxlength: '40', 'aria-describedby': 'ld-kw-hint' })
+  const kwAdd = C.button({ label: t('leads.kw.add'), icon: 'plus', variant: 'soft', size: 'sm' })
   const kwCount = el('span', { className: 'ld-kw-count tnum' })
   const kwField = el('div', { className: 'field' },
-    el('div', { className: 'field-label' }, el('span', { id: 'ld-kw-label' }, 'Kriteria usaha'), kwCount),
+    el('div', { className: 'field-label' }, el('span', { id: 'ld-kw-label' }, t('leads.kw.label')), kwCount),
     chipsBox,
     customBox,
-    el('div', { className: 'ld-kw-row' }, el('label', { className: 'sr-only', htmlFor: 'ld-kw' }, 'Kriteria lain'), kwInput, kwAdd),
-    el('span', { className: 'field-hint', id: 'ld-kw-hint' }, `Pilih atau tambah sampai ${MAX_KEYWORDS} kriteria. Kata yang tidak dikenal dicari dari nama usaha.`),
+    el('div', { className: 'ld-kw-row' }, el('label', { className: 'sr-only', htmlFor: 'ld-kw' }, t('leads.kw.other')), kwInput, kwAdd),
+    el('span', { className: 'field-hint', id: 'ld-kw-hint' }, t('leads.kw.hint', { max: MAX_KEYWORDS })),
   )
   const presetKeys = new Set(PRESET_CHIPS.map((c) => c.value))
   function drawChips() {
     chipsBox.replaceChildren(...PRESET_CHIPS.map((c) => {
       const on = state.keywords.includes(c.value)
       const b = el('button', { type: 'button', className: 'ld-chip', 'aria-pressed': on ? 'true' : 'false' },
-        on ? icon('check', { size: 13 }) : null, c.label)
+        on ? icon('check', { size: 13 }) : null, presetLabel(c))
       b.addEventListener('click', () => toggleKeyword(c.value))
       return b
     }))
     const custom = state.keywords.filter((k) => !presetKeys.has(k))
     customBox.replaceChildren(...custom.map((k) => el('span', { className: 'ld-chip is-custom', role: 'listitem' },
       el('span', {}, k),
-      el('button', { type: 'button', className: 'ld-chip-x', 'aria-label': `Hapus kriteria ${k}`, title: 'Hapus', onClick: () => toggleKeyword(k) }, icon('x', { size: 12 })))))
+      el('button', { type: 'button', className: 'ld-chip-x', 'aria-label': t('leads.kw.remove', { kw: k }), title: t('leads.kw.removeTitle'), onClick: () => toggleKeyword(k) }, icon('x', { size: 12 })))))
     customBox.hidden = custom.length === 0
     kwCount.textContent = `${state.keywords.length}/${MAX_KEYWORDS}`
     kwAdd.disabled = state.keywords.length >= MAX_KEYWORDS
@@ -336,7 +353,7 @@ export async function render(container, ctx = {}) {
   function toggleKeyword(k) {
     if (state.keywords.includes(k)) state.keywords = state.keywords.filter((x) => x !== k)
     else if (state.keywords.length < MAX_KEYWORDS) state.keywords = [...state.keywords, k]
-    else { formMsg.show('warn', `Maksimal ${MAX_KEYWORDS} kriteria per pencarian.`); return }
+    else { formMsg.show('warn', t('leads.kw.max', { max: MAX_KEYWORDS })); return }
     formMsg.hide()
     persist()
     drawChips()
@@ -353,29 +370,29 @@ export async function render(container, ctx = {}) {
 
   // --- Value basis ---
   const valueBox = el('div', { className: 'ld-value' })
-  const fallbackInput = el('input', { id: 'ld-fallback', className: 'input', type: 'number', min: '0', step: '50000', inputmode: 'numeric', placeholder: 'Contoh: 1500000', value: state.fallbackAvg ? String(state.fallbackAvg) : '' })
+  const fallbackInput = el('input', { id: 'ld-fallback', className: 'input', type: 'number', min: '0', step: '50000', inputmode: 'numeric', placeholder: t('leads.value.fallbackPlaceholder'), value: state.fallbackAvg ? String(state.fallbackAvg) : '' })
   const convInput = el('input', { id: 'ld-conv', className: 'input ld-conv', type: 'number', min: String(MIN_CONVERSION * 100), max: String(MAX_CONVERSION * 100), step: '1', inputmode: 'numeric', value: String(Math.round(state.conversion * 100)), 'aria-describedby': 'ld-conv-hint' })
   const convField = el('div', { className: 'field' },
-    el('label', { className: 'field-label', htmlFor: 'ld-conv' }, el('span', {}, 'Asumsi peluang berhasil')),
+    el('label', { className: 'field-label', htmlFor: 'ld-conv' }, el('span', {}, t('leads.value.conv'))),
     el('div', { className: 'ld-suffix' }, convInput, el('span', { 'aria-hidden': 'true' }, '%')),
-    el('span', { className: 'field-hint', id: 'ld-conv-hint' }, 'Dipakai untuk nilai harapan: rata-rata nilai pekerjaan × peluang. Default 10% (konservatif).'),
+    el('span', { className: 'field-hint', id: 'ld-conv-hint' }, t('leads.value.convHint')),
   )
   function drawValueBox() {
     if (stats.length) {
       valueBox.replaceChildren(
-        el('span', { className: 'ld-value-title' }, icon('ledger', { size: 14 }), 'Nilai pekerjaan dari riwayat Anda'),
+        el('span', { className: 'ld-value-title' }, icon('ledger', { size: 14 }), t('leads.value.fromHistory')),
         el('ul', { className: 'ld-value-list' }, stats.slice(0, 4).map((s) => el('li', {},
           el('span', { className: 'ld-value-name' }, s.name),
           el('span', { className: 'tnum' }, C.rupiahCompact(s.avg)),
-          el('span', { className: 'ld-value-n tnum' }, `${s.count} pekerjaan`)))),
-        stats.length > 4 ? el('span', { className: 'field-hint' }, `+${stats.length - 4} layanan lain dipakai bila cocok.`) : '',
+          el('span', { className: 'ld-value-n tnum' }, t('leads.value.jobs', { count: s.count }))))),
+        stats.length > 4 ? el('span', { className: 'field-hint' }, t('leads.value.more', { count: stats.length - 4 })) : '',
       )
     } else {
       valueBox.replaceChildren(
         el('div', { className: 'field' },
-          el('label', { className: 'field-label', htmlFor: 'ld-fallback' }, el('span', {}, 'Perkiraan nilai per pekerjaan (Rp)')),
+          el('label', { className: 'field-label', htmlFor: 'ld-fallback' }, el('span', {}, t('leads.value.fallback'))),
           fallbackInput,
-          el('span', { className: 'field-hint' }, 'Belum ada pekerjaan bernilai di riwayat Anda, jadi nilai prospek memakai perkiraan ini.')),
+          el('span', { className: 'field-hint' }, t('leads.value.fallbackHint'))),
       )
     }
   }
@@ -393,44 +410,44 @@ export async function render(container, ctx = {}) {
   function drawSource() {
     if (ctx.isMock || sources.demo) {
       sourceBox.hidden = false
-      sourceBox.replaceChildren(el('span', { className: 'field-hint' }, 'Akun demo: hasil berupa data contoh di sekitar titik, bukan usaha sungguhan.'))
+      sourceBox.replaceChildren(el('span', { className: 'field-hint' }, t('leads.source.demo')))
       return
     }
     sourceBox.hidden = !sources.google
     if (!sources.google) { sourceBox.replaceChildren(); return }
-    sourceBox.replaceChildren(el('span', { className: 'field-label' }, el('span', {}, 'Sumber data')),
+    sourceBox.replaceChildren(el('span', { className: 'field-label' }, el('span', {}, t('leads.source.label'))),
       C.segmented({
-        label: 'Sumber data', value: state.source,
-        options: [{ value: 'osm', label: 'Peta terbuka' }, { value: 'google', label: 'Google' }],
+        label: t('leads.source.label'), value: state.source,
+        options: [{ value: 'osm', label: t('leads.source.osm') }, { value: 'google', label: 'Google' }],
         onChange: (v) => { state.source = v },
       }))
   }
 
   const formMsg = C.message()
-  const searchBtn = C.button({ label: 'Cari prospek', icon: 'search', variant: 'primary', type: 'submit', className: 'ld-search-btn' })
+  const searchBtn = C.button({ label: t('leads.form.search'), icon: 'search', variant: 'primary', type: 'submit', className: 'ld-search-btn' })
   // display: contents, so disabling it during a search locks every control.
   const controlsSet = el('fieldset', { className: 'ld-fieldset' },
     locField, radiusField, kwField, sourceBox,
     el('details', { className: 'ld-more' },
-      el('summary', {}, icon('chevronRight', { size: 14 }), 'Dasar perhitungan nilai'),
+      el('summary', {}, icon('chevronRight', { size: 14 }), t('leads.form.valueBasis')),
       el('div', { className: 'ld-more-body' }, valueBox, convField)),
   )
-  const controlsForm = el('form', { className: 'form ld-form', novalidate: true, 'aria-label': 'Kriteria pencarian prospek' },
+  const controlsForm = el('form', { className: 'form ld-form', novalidate: true, 'aria-label': t('leads.form.label') },
     controlsSet,
     formMsg,
     el('div', { className: 'form-actions' }, searchBtn),
   )
   controlsForm.addEventListener('submit', (e) => { e.preventDefault(); if (!locked) runSearch() })
-  const controlsPanel = C.panel({ title: 'Area & kriteria', meta: 'Titik, radius, jenis usaha', raised: true, className: 'form-panel ld-controls' }, controlsForm)
+  const controlsPanel = C.panel({ title: t('leads.form.panelTitle'), meta: t('leads.form.panelMeta'), raised: true, className: 'form-panel ld-controls' }, controlsForm)
 
   /* ================================================================ Map */
-  const mapEl = el('div', { className: 'ld-map', role: 'region', 'aria-label': 'Peta prospek. Klik peta untuk memilih titik pencarian.' })
-  const mapNote = el('div', { className: 'ld-map-note', 'aria-hidden': 'true' }, icon('mapPin', { size: 14 }), 'Klik peta untuk memilih titik')
+  const mapEl = el('div', { className: 'ld-map', role: 'region', 'aria-label': t('leads.map.label') })
+  const mapNote = el('div', { className: 'ld-map-note', 'aria-hidden': 'true' }, icon('mapPin', { size: 14 }), t('leads.map.note'))
   const mapBusy = el('div', { className: 'ld-map-busy', hidden: true },
-    el('span', { className: 'ld-map-busy-pill' }, el('span', { className: 'ld-spinner', 'aria-hidden': 'true' }), 'Mengambil data…'))
+    el('span', { className: 'ld-map-busy-pill' }, el('span', { className: 'ld-spinner', 'aria-hidden': 'true' }), t('leads.map.loading')))
   const mapWrap = el('div', { className: 'ld-map-wrap', 'aria-busy': 'false' }, mapEl, mapNote, mapBusy)
   const mapFallback = el('div', { className: 'ld-map-fallback', hidden: true })
-  const mapPanel = el('section', { className: 'panel ld-map-panel', 'aria-label': 'Peta' }, mapWrap, mapFallback)
+  const mapPanel = el('section', { className: 'panel ld-map-panel', 'aria-label': t('leads.map.region') }, mapWrap, mapFallback)
 
   let L = null
   let map = null
@@ -445,7 +462,7 @@ export async function render(container, ctx = {}) {
     } catch {
       mapWrap.hidden = true
       mapFallback.hidden = false
-      mapFallback.replaceChildren(C.errorState('Peta gagal dimuat. Anda tetap bisa mencari dengan alamat; hasil tampil sebagai daftar.'))
+      mapFallback.replaceChildren(C.errorState(t('leads.map.failed')))
       return
     }
     if (signal?.aborted) return
@@ -463,8 +480,8 @@ export async function render(container, ctx = {}) {
     map.on('click', (e) => {
       if (locked) return
       const p = { lat: e.latlng.lat, lon: e.latlng.lng }
-      if (!inIndonesia(p.lat, p.lon)) { formMsg.show('warn', 'Titik di luar Indonesia. Pilih titik di wilayah Indonesia.'); return }
-      setPoint(p, 'Titik di peta')
+      if (!inIndonesia(p.lat, p.lon)) { formMsg.show('warn', t('leads.map.outside')); return }
+      setPoint(p, t('leads.loc.mapPoint'))
     })
     // Stop pan/zoom animations first: removing a map mid-animation makes
     // Leaflet's pending transition callbacks read positions of removed panes.
@@ -494,7 +511,7 @@ export async function render(container, ctx = {}) {
     if (!centerMarker) {
       centerMarker = L.marker(ll, {
         icon: L.divIcon({ className: 'ld-center-icon', html: '<span class="ld-center"><span class="ld-center-dot"></span></span>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-        title: 'Titik pencarian', keyboard: false, interactive: false,
+        title: t('leads.loc.label'), keyboard: false, interactive: false,
       }).addTo(map)
     } else centerMarker.setLatLng(ll)
   }
@@ -556,19 +573,19 @@ export async function render(container, ctx = {}) {
   }
 
   /* ============================================================ Results */
-  const resultsMeta = el('span', { className: 'panel-meta' }, 'Belum ada pencarian')
-  const sortSeg = C.segmented({ label: 'Urutkan prospek', value: state.sort, options: SORTS, onChange: (v) => { state.sort = v; drawResults() } })
+  const resultsMeta = el('span', { className: 'panel-meta' }, t('leads.results.none'))
+  const sortSeg = C.segmented({ label: t('leads.results.sortLabel'), value: state.sort, options: sortOptions(), onChange: (v) => { state.sort = v; drawResults() } })
   const statusSlot = el('div', { className: 'ld-status' })
   const resultsInfo = el('div', { className: 'ld-info' })
-  const resultsList = el('ol', { className: 'ld-list', 'aria-label': 'Daftar prospek' })
+  const resultsList = el('ol', { className: 'ld-list', 'aria-label': t('leads.results.listLabel') })
   const hiddenToggle = el('button', { type: 'button', className: 'link-btn ld-hidden-toggle', hidden: true, 'aria-expanded': 'false' })
   hiddenToggle.addEventListener('click', () => { state.showHidden = !state.showHidden; drawResults() })
   const resultsBody = el('div', { className: 'ld-results-body' }, statusSlot, resultsInfo, resultsList, hiddenToggle)
-  const resultsPager = C.pager({ key: 'leads-results', label: 'hasil prospek', pageSize: PAGE_SIZE, sizes: [PAGE_SIZE, PAGE_SIZE * 2, PAGE_SIZE * 4], className: 'is-plain', onChange: () => drawResults(), scrollTarget: () => resultsPanel })
+  const resultsPager = C.pager({ key: 'leads-results', label: t('leads.results.pagerLabel'), pageSize: PAGE_SIZE, sizes: [PAGE_SIZE, PAGE_SIZE * 2, PAGE_SIZE * 4], className: 'is-plain', onChange: () => drawResults(), scrollTarget: () => resultsPanel })
   resultsBody.insertBefore(resultsPager.root, hiddenToggle)
   const resultsPanel = el('section', { className: 'panel list-panel ld-results', 'aria-labelledby': 'ld-results-title' },
     el('div', { className: 'panel-head' },
-      el('div', { className: 'panel-head-text' }, el('h2', { className: 'panel-title', id: 'ld-results-title' }, 'Hasil prospek'), resultsMeta),
+      el('div', { className: 'panel-head-text' }, el('h2', { className: 'panel-title', id: 'ld-results-title' }, t('leads.results.title')), resultsMeta),
       el('div', { className: 'panel-actions ld-sort' }, sortSeg)),
     el('div', { className: 'panel-body' }, resultsBody),
   )
@@ -577,9 +594,9 @@ export async function render(container, ctx = {}) {
   function emptyResults() {
     resultsList.replaceChildren()
     resultsInfo.replaceChildren(C.emptyState({
-      kicker: 'Belum ada hasil', iconName: 'mapPin',
-      title: 'Pilih titik dan kriteria, lalu cari.',
-      body: 'Contoh: titik di Bekasi, radius 5 km, kriteria hotel dan restoran. Hasil muncul di peta dan di daftar ini.',
+      kicker: t('leads.results.emptyKicker'), iconName: 'mapPin',
+      title: t('leads.results.emptyTitle'),
+      body: t('leads.results.emptyBody'),
     }))
   }
 
@@ -605,19 +622,19 @@ export async function render(container, ctx = {}) {
     const src = state.search?.source
     sortSeg.hidden = vis.length < 2
     resultsMeta.textContent = state.search
-      ? `${vis.length} prospek${hid.length ? ` · ${hid.length} disaring` : ''}${src === 'demo' ? ' · data contoh' : ''}`
-      : 'Belum ada pencarian'
+      ? t('leads.results.meta', { count: vis.length, filtered: hid.length ? t('leads.results.filtered', { count: hid.length }) : '', demo: src === 'demo' ? t('leads.results.demo') : '' })
+      : t('leads.results.none')
     drawInfo()
     const shown = resultsPager.slice(vis, { resetKey: state.sort, focusIndex })
     const offset = resultsPager.start
     resultsList.replaceChildren(...shown.map((l, i) => leadCard(l, offset + i + 1)))
     if (state.showHidden && hid.length && resultsPager.page >= resultsPager.pages) {
-      resultsList.append(el('li', { className: 'ld-list-sep', 'aria-hidden': 'true' }, 'Disaring AI (duplikat atau kurang relevan)'),
+      resultsList.append(el('li', { className: 'ld-list-sep', 'aria-hidden': 'true' }, t('leads.results.sep')),
         ...hid.map((l) => leadCard(l, null)))
     }
     hiddenToggle.hidden = hid.length === 0
     hiddenToggle.setAttribute('aria-expanded', state.showHidden ? 'true' : 'false')
-    hiddenToggle.textContent = state.showHidden ? 'Sembunyikan hasil yang disaring' : `Tampilkan ${hid.length} hasil yang disaring`
+    hiddenToggle.textContent = state.showHidden ? t('leads.results.hideFiltered') : t('leads.results.showFiltered', { count: hid.length })
     drawMarkers()
   }
 
@@ -627,37 +644,37 @@ export async function render(container, ctx = {}) {
     const nodes = []
     if (src === 'demo') {
       nodes.push(el('div', { className: 'note note-warn' }, icon('alert'), el('div', { className: 'note-body' },
-        el('p', {}, el('b', {}, 'Data contoh (akun demo). '), 'Nama, lokasi, dan kontak di bawah dibuat acak di sekitar titik Anda, bukan usaha sungguhan.'))))
+        el('p', {}, el('b', {}, t('leads.info.demoBadge')), t('leads.info.demo')))))
     } else if (src === 'osm') {
       nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }),
-        el('span', {}, `Data usaha di peta belum lengkap dan kontak sering kosong; periksa ulang sebelum menghubungi.${state.search.truncated ? ' Hasil dibatasi 150 terdekat; perkecil radius untuk area padat.' : ''}`)))
+        el('span', {}, t('leads.info.osm', { truncated: state.search.truncated ? t('leads.info.truncated') : '' }))))
     } else if (src === 'google') {
-      nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, 'Data dari Google. Simpan hanya prospek yang Anda pilih.')))
+      nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, t('leads.info.google'))))
     }
     if (state.rankBasis === 'heuristik') {
-      nodes.push(el('p', { className: 'ld-fine' }, icon('alert', { size: 14 }), el('span', {}, 'Penilaian AI tidak tersedia; relevansi memakai kecocokan jenis usaha dengan layanan Anda.')))
+      nodes.push(el('p', { className: 'ld-fine' }, icon('alert', { size: 14 }), el('span', {}, t('leads.info.heuristic'))))
     } else if (state.rankBasis === 'mixed') {
-      nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, `AI menilai ${Math.min(AI_RANK_LIMIT, state.leads.length)} prospek terdekat; sisanya dinilai dengan aturan sederhana.`)))
+      nodes.push(el('p', { className: 'ld-fine' }, icon('info', { size: 14 }), el('span', {}, t('leads.info.mixed', { count: Math.min(AI_RANK_LIMIT, state.leads.length) }))))
     }
     resultsInfo.replaceChildren(...nodes)
   }
 
   function completenessChips(l) {
-    const item = (ok, iconName, text) => el('li', { className: `ld-mini ${ok ? 'is-ok' : 'is-missing'}` }, icon(ok ? iconName : 'minus', { size: 12 }), el('span', {}, text), el('span', { className: 'sr-only' }, ok ? ' tersedia' : ' tidak tersedia'))
-    return el('ul', { className: 'ld-minis', 'aria-label': 'Kelengkapan data' },
-      item(Boolean(l.phone), 'phone', 'Telepon'), item(Boolean(l.website), 'arrowUpRight', 'Situs'), item(Boolean(l.address), 'mapPin', 'Alamat'))
+    const item = (ok, iconName, text) => el('li', { className: `ld-mini ${ok ? 'is-ok' : 'is-missing'}` }, icon(ok ? iconName : 'minus', { size: 12 }), el('span', {}, text), el('span', { className: 'sr-only' }, ok ? t('leads.chips.available') : t('leads.chips.missing')))
+    return el('ul', { className: 'ld-minis', 'aria-label': t('leads.chips.label') },
+      item(Boolean(l.phone), 'phone', t('leads.chips.phone')), item(Boolean(l.website), 'arrowUpRight', t('leads.chips.site')), item(Boolean(l.address), 'mapPin', t('leads.chips.address')))
   }
 
   function leadCard(l, rank) {
     const savedRow = savedBySource.get(`${l.source}|${l.source_id}`)
-    const saveBtn = C.button({ label: savedRow ? 'Tersimpan' : 'Simpan', icon: savedRow ? 'check' : 'bookmark', size: 'sm', variant: 'soft', 'aria-label': savedRow ? `${l.name} sudah tersimpan` : `Simpan prospek ${l.name}`, title: 'Simpan prospek' })
+    const saveBtn = C.button({ label: savedRow ? t('leads.card.saved') : t('leads.card.save'), icon: savedRow ? 'check' : 'bookmark', size: 'sm', variant: 'soft', 'aria-label': savedRow ? t('leads.card.alreadySaved', { name: l.name }) : t('leads.card.saveAria', { name: l.name }), title: t('leads.card.saveTitle') })
     if (savedRow) { saveBtn.disabled = true; saveBtn.classList.add('is-saved') }
     saveBtn.addEventListener('click', () => saveLead(l, saveBtn))
-    const offerBtn = C.button({ label: 'Susun penawaran', icon: 'sparkles', size: 'sm', variant: 'primary', 'aria-label': `Susun penawaran untuk ${l.name}` })
+    const offerBtn = C.button({ label: t('leads.card.offer'), icon: 'sparkles', size: 'sm', variant: 'primary', 'aria-label': t('leads.card.offerAria', { name: l.name }) })
     offerBtn.addEventListener('click', () => openOffer(l, offerBtn))
     const est = l.estimate
     const relClass = l.ai.relevance >= 70 ? 'is-high' : l.ai.relevance >= 45 ? 'is-mid' : 'is-low'
-    const titleBtn = el('button', { type: 'button', className: 'ld-card-title', title: 'Tampilkan di peta' }, l.name)
+    const titleBtn = el('button', { type: 'button', className: 'ld-card-title', title: t('leads.card.showOnMap') }, l.name)
     titleBtn.addEventListener('click', () => focusLead(l.id))
     const links = []
     if (l.phone) links.push(el('a', { className: 'ld-link tnum', href: `tel:${l.phone}` }, icon('phone', { size: 13 }), l.phone))
@@ -665,40 +682,40 @@ export async function render(container, ctx = {}) {
 
     return el('li', { className: `ld-card ${l.ai.keep ? '' : 'is-hidden-lead'} ${l.id === state.focusId ? 'is-focus' : ''}`.trim(), dataset: { id: l.id } },
       el('div', { className: 'ld-card-head' },
-        rank ? el('span', { className: `ld-rank tnum ${rank <= 3 ? 'is-top' : ''}`, 'aria-label': `Peringkat ${rank}` }, String(rank)) : el('span', { className: 'ld-rank is-muted', 'aria-hidden': 'true' }, icon('minus', { size: 12 })),
+        rank ? el('span', { className: `ld-rank tnum ${rank <= 3 ? 'is-top' : ''}`, 'aria-label': t('leads.card.rank', { rank }) }, String(rank)) : el('span', { className: 'ld-rank is-muted', 'aria-hidden': 'true' }, icon('minus', { size: 12 })),
         el('div', { className: 'ld-card-name' },
           titleBtn,
           el('div', { className: 'ld-card-sub' },
             el('span', {}, l.category),
             el('span', { 'aria-hidden': 'true' }, '·'),
             el('span', { className: 'tnum' }, km(l.distance_km)),
-            l.source === 'demo' ? el('span', { className: 'tag status status-live', title: 'Usaha fiktif untuk akun demo' }, 'contoh') : null,
+            l.source === 'demo' ? el('span', { className: 'tag status status-live', title: t('leads.card.fictional') }, t('leads.card.sample')) : null,
             l.address ? el('span', { className: 'ld-addr', title: l.address }, l.address) : null)),
-        el('div', { className: 'ld-score', title: 'Skor peluang 0–100' },
+        el('div', { className: 'ld-score', title: t('leads.card.scoreTitle') },
           el('span', { className: 'ld-score-num tnum' }, String(l.score)),
-          el('span', { className: 'ld-score-label' }, 'skor')),
+          el('span', { className: 'ld-score-label' }, t('leads.card.score'))),
       ),
       el('div', { className: 'ld-card-body' },
         el('div', { className: 'ld-rel' },
           el('div', { className: 'ld-rel-top' },
-            el('span', { className: 'ld-rel-label' }, l.ai.basis === 'ai' ? 'Relevansi AI' : 'Relevansi (aturan)'),
+            el('span', { className: 'ld-rel-label' }, l.ai.basis === 'ai' ? t('leads.card.relAi') : t('leads.card.relRule')),
             el('span', { className: 'ld-rel-val tnum' }, `${l.ai.relevance}/100`)),
-          el('span', { className: `ld-bar ${relClass}`, role: 'img', 'aria-label': `Relevansi ${l.ai.relevance} dari 100` }, el('i', { style: `width:${l.ai.relevance}%` })),
+          el('span', { className: `ld-bar ${relClass}`, role: 'img', 'aria-label': t('leads.card.relAria', { value: l.ai.relevance }) }, el('i', { style: `width:${l.ai.relevance}%` })),
           el('p', { className: 'ld-reason' }, l.ai.reason),
-          !l.ai.keep && l.ai.duplicate_of ? el('p', { className: 'ld-dup' }, 'Kemungkinan duplikat dari hasil lain.') : null),
+          !l.ai.keep && l.ai.duplicate_of ? el('p', { className: 'ld-dup' }, t('leads.card.dup')) : null),
         el('dl', { className: 'ld-facts' },
-          el('div', { className: 'is-wide' }, el('dt', {}, 'Layanan cocok'), el('dd', {}, l.ai.suggested_service || 'Belum jelas')),
-          el('div', {}, el('dt', {}, 'Potensi jika berhasil'), el('dd', { className: 'tnum' }, est.basis ? C.rupiah(est.potential) : '—')),
-          el('div', {}, el('dt', {}, 'Nilai harapan'), el('dd', { className: 'tnum ld-expected' }, est.basis ? C.rupiah(est.expected) : '—')),
+          el('div', { className: 'is-wide' }, el('dt', {}, t('leads.card.service')), el('dd', {}, l.ai.suggested_service || t('leads.card.unclear'))),
+          el('div', {}, el('dt', {}, t('leads.card.potential')), el('dd', { className: 'tnum' }, est.basis ? C.rupiah(est.potential) : '—')),
+          el('div', {}, el('dt', {}, t('leads.card.expected')), el('dd', { className: 'tnum ld-expected' }, est.basis ? C.rupiah(est.expected) : '—')),
         ),
         completenessChips(l),
         links.length ? el('div', { className: 'ld-links' }, links) : null,
         el('details', { className: 'ld-how' },
-          el('summary', {}, icon('chevronRight', { size: 13 }), 'Cara hitung'),
-          el('p', {}, `Skor ${l.score} = relevansi ${l.ai.relevance} × jarak ${fmtFactor(l.proximity)} × kelengkapan data ${fmtFactor(l.completeness)}.`),
+          el('summary', {}, icon('chevronRight', { size: 13 }), t('leads.card.how')),
+          el('p', {}, t('leads.card.howScore', { score: l.score, rel: l.ai.relevance, prox: fmtFactor(l.proximity), comp: fmtFactor(l.completeness) })),
           el('p', {}, est.basis
-            ? `Nilai harapan = ${C.rupiah(est.potential)} (${est.note}) × asumsi peluang ${pct(est.conversion)} = ${C.rupiah(est.expected)}. Ini perkiraan, bukan janji pendapatan.`
-            : est.note)),
+            ? t('leads.card.howValue', { potential: C.rupiah(est.potential), note: estNote(est, l.ai.suggested_service), pct: pct(est.conversion), expected: C.rupiah(est.expected) })
+            : estNote(est, l.ai.suggested_service))),
       ),
       el('div', { className: 'ld-card-actions' }, saveBtn, offerBtn),
     )
@@ -714,8 +731,8 @@ export async function render(container, ctx = {}) {
   function runSearch() {
     formMsg.hide()
     const errs = []
-    if (!state.point) errs.push('Pilih titik pencarian: cari alamat, pakai lokasi Anda, atau klik peta.')
-    if (!state.keywords.length) errs.push('Pilih minimal satu kriteria usaha.')
+    if (!state.point) errs.push(t('leads.search.needPoint'))
+    if (!state.keywords.length) errs.push(t('leads.search.needKw'))
     if (errs.length) { formMsg.show('danger', errs[0], errs.length > 1 ? errs.slice(1) : undefined); return }
     state.focusId = null
     state.showHidden = false
@@ -742,15 +759,15 @@ export async function render(container, ctx = {}) {
     activeEntryId = entry.id
     statusSlot.replaceChildren()
     if (!state.leads.length) {
-      resultsMeta.textContent = '0 prospek'
+      resultsMeta.textContent = t('leads.search.zero')
       resultsList.replaceChildren()
       sortSeg.hidden = true
       hiddenToggle.hidden = true
       drawMarkers()
       resultsInfo.replaceChildren(C.emptyState({
-        kicker: 'Tidak ada hasil', iconName: 'search',
-        title: 'Tidak ada usaha yang cocok di area ini.',
-        body: 'Peta belum mencakup semua usaha. Perbesar radius, pindahkan titik ke pusat keramaian, atau coba kriteria lain.',
+        kicker: t('leads.search.noneKicker'), iconName: 'search',
+        title: t('leads.search.noneTitle'),
+        body: t('leads.search.noneBody'),
       }))
     } else {
       drawResults()
@@ -776,9 +793,9 @@ export async function render(container, ctx = {}) {
       sortSeg.hidden = true
       resultsInfo.replaceChildren()
       drawMarkers()
-      const stop = C.button({ label: 'Batalkan', icon: 'x', size: 'sm', variant: 'ghost', onClick: () => cancelLeadJob() })
-      statusSlot.replaceChildren(el('div', { className: 'ld-status-row' }, statusLine(`Mencari ${j.criteria.keywords.join(', ')} dalam ${km(j.criteria.radiusKm)}…`), stop), C.skeletonRows(3))
-      resultsMeta.textContent = 'Mencari…'
+      const stop = C.button({ label: t('leads.search.cancel'), icon: 'x', size: 'sm', variant: 'ghost', onClick: () => cancelLeadJob() })
+      statusSlot.replaceChildren(el('div', { className: 'ld-status-row' }, statusLine(t('leads.search.fetching', { keywords: j.criteria.keywords.join(', '), km: km(j.criteria.radiusKm) })), stop), C.skeletonRows(3))
+      resultsMeta.textContent = t('leads.search.busy')
       return
     }
     if (j.status === 'ranking') {
@@ -788,9 +805,9 @@ export async function render(container, ctx = {}) {
         state.leads = scoreAll(j.leads)
         drawResults()
         if (map && circle) fitCircle()
-        consoleUI = C.aiConsole({ model: 'Penilai prospek' })
+        consoleUI = C.aiConsole({ model: t('leads.search.rater') })
         consoleUI.onStop(() => cancelLeadJob())
-        consoleUI.setStatus(`Menilai ${Math.min(AI_RANK_LIMIT, j.aiTotal)} prospek…`, true)
+        consoleUI.setStatus(t('leads.search.rating', { count: Math.min(AI_RANK_LIMIT, j.aiTotal) }), true)
         consoleUI.root.classList.add('ld-console')
         statusSlot.replaceChildren(consoleUI.root)
       }
@@ -804,21 +821,21 @@ export async function render(container, ctx = {}) {
       const ui = consoleUI
       showEntry(j.entry)
       if (ui) {
-        ui.setStatus(j.aiCount > 0 ? `${j.aiCount} dinilai AI` : 'Penilaian AI tidak tersedia', false)
+        ui.setStatus(j.aiCount > 0 ? t('leads.search.rated', { count: j.aiCount }) : t('leads.search.noAi'), false)
         ui.root.classList.add('is-folded')
         statusSlot.replaceChildren(ui.root)
       }
       if (j.error) showToast(j.error, 'error')
     } else if (j.status === 'error') {
       statusSlot.replaceChildren()
-      resultsMeta.textContent = 'Pencarian gagal'
-      resultsInfo.replaceChildren(C.errorState(j.error || 'Pencarian gagal.'))
+      resultsMeta.textContent = t('leads.search.failed')
+      resultsInfo.replaceChildren(C.errorState(j.error || t('leads.search.failedFull')))
     } else if (j.status === 'cancelled') {
       statusSlot.replaceChildren()
       const prev = lastEntry(stored)
       if (prev) showEntry(prev)
-      else { resultsMeta.textContent = 'Pencarian dibatalkan'; state.leads = []; state.search = null; emptyResults(); drawMarkers() }
-      showToast('Pencarian dibatalkan.', 'info')
+      else { resultsMeta.textContent = t('leads.search.cancelledMeta'); state.leads = []; state.search = null; emptyResults(); drawMarkers() }
+      showToast(t('leads.search.cancelled'), 'info')
     }
     consoleUI = null
   }
@@ -827,14 +844,14 @@ export async function render(container, ctx = {}) {
   let activeEntryId = null
   const historyList = el('ul', { className: 'ld-history-list' })
   const historyBox = el('div', { className: 'ld-history', hidden: true },
-    el('span', { className: 'field-label' }, el('span', {}, 'Pencarian terakhir')),
+    el('span', { className: 'field-label' }, el('span', {}, t('leads.history.title'))),
     historyList)
   const ago = (iso) => {
     const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-    if (!Number.isFinite(m) || m < 1) return 'baru saja'
-    if (m < 60) return `${m} mnt lalu`
+    if (!Number.isFinite(m) || m < 1) return t('leads.history.now')
+    if (m < 60) return t('leads.history.min', { n: m })
     const h = Math.round(m / 60)
-    if (h < 24) return `${h} jam lalu`
+    if (h < 24) return t('leads.history.hour', { n: h })
     return C.formatDate(iso)
   }
   function drawHistory() {
@@ -845,15 +862,15 @@ export async function render(container, ctx = {}) {
       const open = el('button', {
         type: 'button', className: `ld-history-item ${e.id === activeEntryId ? 'is-active' : ''}`.trim(),
         'aria-current': e.id === activeEntryId ? 'true' : 'false',
-        title: 'Tampilkan hasil ini lagi',
+        title: t('leads.history.open'),
       },
         icon('clock', { size: 14 }),
         el('span', { className: 'ld-history-text' },
           el('b', {}, e.criteria.keywords.join(', ')),
-          el('span', { className: 'muted' }, `${km(e.criteria.radiusKm)} · ${e.criteria.pointLabel || 'Titik di peta'} · ${ago(e.at)}`)),
+          el('span', { className: 'muted' }, `${km(e.criteria.radiusKm)} · ${e.criteria.pointLabel || t('leads.loc.mapPoint')} · ${ago(e.at)}`)),
         el('span', { className: 'ld-history-n tnum' }, String(n)))
       open.addEventListener('click', () => restoreEntry(e))
-      const del = el('button', { type: 'button', className: 'ld-chip-x', 'aria-label': `Hapus riwayat ${e.criteria.keywords.join(', ')}`, title: 'Hapus dari riwayat' }, icon('x', { size: 12 }))
+      const del = el('button', { type: 'button', className: 'ld-chip-x', 'aria-label': t('leads.history.remove', { keywords: e.criteria.keywords.join(', ') }), title: t('leads.history.removeTitle') }, icon('x', { size: 12 }))
       del.addEventListener('click', () => {
         stored = saveLeadsStore(owner, removeHistory(stored, e.id))
         drawHistory()
@@ -892,7 +909,7 @@ export async function render(container, ctx = {}) {
     if (on === locked) return
     locked = on
     controlsSet.disabled = on
-    if (on) restoreBtn = C.setBusy(searchBtn, 'Mencari…')
+    if (on) restoreBtn = C.setBusy(searchBtn, t('leads.search.busy'))
     else { restoreBtn?.(); restoreBtn = null }
     mapBusy.hidden = !on
     mapWrap.setAttribute('aria-busy', on ? 'true' : 'false')
@@ -913,20 +930,20 @@ export async function render(container, ctx = {}) {
   let savedError = null
   const savedBySource = new Map()
   const savedBody = el('div', { className: 'ld-saved-body' }, C.skeletonRows(3))
-  const savedMeta = el('span', { className: 'panel-meta' }, 'memuat…')
+  const savedMeta = el('span', { className: 'panel-meta' }, t('leads.saved.loading'))
   const savedFilter = { status: 'semua' }
   const savedSeg = C.segmented({
-    label: 'Saring status', value: 'semua',
-    options: [{ value: 'semua', label: 'Semua' }, ...LEAD_STATUSES.map((s) => ({ value: s.value, label: s.label }))],
+    label: t('leads.saved.filter'), value: 'semua',
+    options: [{ value: 'semua', label: t('leads.saved.all') }, ...LEAD_STATUSES.map((s) => ({ value: s.value, label: statusText(s) }))],
     onChange: (v) => { savedFilter.status = v; drawSaved() },
   })
   const savedPanel = el('section', { className: 'panel list-panel ld-saved', 'aria-labelledby': 'ld-saved-title' },
     el('div', { className: 'panel-head' },
-      el('div', { className: 'panel-head-text' }, el('h2', { className: 'panel-title', id: 'ld-saved-title' }, 'Prospek tersimpan'), savedMeta),
+      el('div', { className: 'panel-head-text' }, el('h2', { className: 'panel-title', id: 'ld-saved-title' }, t('leads.tabs.saved')), savedMeta),
       el('div', { className: 'panel-actions ld-saved-filter' }, savedSeg)),
     el('div', { className: 'panel-body' }, savedBody),
   )
-  const savedPager = C.pager({ key: 'leads-saved', label: 'prospek tersimpan', className: 'is-plain', onChange: () => drawSaved(), scrollTarget: savedPanel })
+  const savedPager = C.pager({ key: 'leads-saved', label: t('leads.saved.pagerLabel'), className: 'is-plain', onChange: () => drawSaved(), scrollTarget: savedPanel })
 
   async function loadSaved() {
     try {
@@ -948,24 +965,24 @@ export async function render(container, ctx = {}) {
   function drawSaved() {
     if (saved === null) return
     if (savedError) {
-      savedMeta.textContent = 'Gagal memuat'
+      savedMeta.textContent = t('leads.saved.failedMeta')
       savedBody.replaceChildren(C.errorState(/tabel|table|leads/i.test(savedError)
-        ? `Tabel prospek belum tersedia (${savedError}). Jalankan migrasi 0006_leads.sql.`
-        : `Gagal memuat prospek tersimpan: ${savedError}`))
+        ? t('leads.saved.noTable', { error: savedError })
+        : t('leads.saved.failed', { error: savedError })))
       return
     }
     const rows = savedFilter.status === 'semua' ? saved : saved.filter((r) => (r.status || 'baru') === savedFilter.status)
-    const counts = LEAD_STATUSES.map((s) => `${saved.filter((r) => (r.status || 'baru') === s.value).length} ${s.label.toLowerCase()}`)
-    savedMeta.textContent = saved.length ? `${saved.length} prospek · ${counts.join(' · ')}` : 'Belum ada'
+    const counts = LEAD_STATUSES.map((s) => `${saved.filter((r) => (r.status || 'baru') === s.value).length} ${statusText(s).toLowerCase()}`)
+    savedMeta.textContent = saved.length ? t('leads.saved.meta', { count: saved.length, breakdown: counts.join(' · ') }) : t('leads.saved.none')
     savedSeg.hidden = saved.length < 2
     if (!saved.length) {
-      const go = C.button({ label: 'Cari prospek', icon: 'search', variant: 'primary', size: 'sm' })
+      const go = C.button({ label: t('leads.form.search'), icon: 'search', variant: 'primary', size: 'sm' })
       go.addEventListener('click', () => { activate('search'); tabBtns.get('search').focus() })
-      savedBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', iconName: 'bookmark', title: 'Belum ada prospek tersimpan.', body: 'Cari prospek di sekitar Anda, lalu tekan Simpan prospek pada hasil yang menarik.', action: go }))
+      savedBody.replaceChildren(C.emptyState({ kicker: t('leads.saved.emptyKicker'), iconName: 'bookmark', title: t('leads.saved.emptyTitle'), body: t('leads.saved.emptyBody'), action: go }))
       return
     }
     if (!rows.length) {
-      savedBody.replaceChildren(el('p', { className: 'muted small ld-saved-empty' }, 'Tidak ada prospek dengan status ini.'))
+      savedBody.replaceChildren(el('p', { className: 'muted small ld-saved-empty' }, t('leads.saved.noStatus')))
       return
     }
     savedBody.replaceChildren(el('ul', { className: 'ld-saved-list' }, savedPager.slice(rows, { resetKey: savedFilter.status }).map(savedRow)), savedPager.root)
@@ -973,8 +990,8 @@ export async function render(container, ctx = {}) {
 
   function savedRow(r) {
     const st = statusOf(r.status)
-    const sel = el('select', { className: 'input ld-status-sel', 'aria-label': `Status ${r.name}` },
-      LEAD_STATUSES.map((s) => el('option', { value: s.value }, s.label)))
+    const sel = el('select', { className: 'input ld-status-sel', 'aria-label': t('leads.saved.statusAria', { name: r.name }) },
+      LEAD_STATUSES.map((s) => el('option', { value: s.value }, statusText(s))))
     sel.value = st.value
     sel.addEventListener('change', async () => {
       sel.disabled = true
@@ -982,55 +999,55 @@ export async function render(container, ctx = {}) {
         const { error } = await getCloud().database.from('leads').update({ status: sel.value }).eq('id', r.id)
         if (error) throw new Error(error.message)
         r.status = sel.value
-        showToast(`Status diubah ke ${statusOf(sel.value).label}.`, 'success')
+        showToast(t('leads.saved.statusChanged', { status: statusText(statusOf(sel.value)) }), 'success')
         drawSaved()
       } catch (err) {
         sel.value = r.status || 'baru'
-        showToast(`Gagal mengubah status: ${err.message}`, 'error')
+        showToast(t('leads.saved.statusFailed', { error: err.message }), 'error')
       } finally { sel.disabled = false }
     })
-    const offerBtn = C.button({ label: 'Susun penawaran', icon: 'sparkles', size: 'sm', variant: 'soft' })
+    const offerBtn = C.button({ label: t('leads.card.offer'), icon: 'sparkles', size: 'sm', variant: 'soft' })
     offerBtn.addEventListener('click', () => openOffer(savedToLead(r), offerBtn))
     const actions = [offerBtn]
     if (r.meta?.offer_id || r.meta?.request_id) {
-      const open = C.button({ label: 'Buka di alur', iconRight: 'arrowRight', size: 'sm', variant: 'ghost' })
+      const open = C.button({ label: t('leads.saved.openFlow'), iconRight: 'arrowRight', size: 'sm', variant: 'ghost' })
       open.addEventListener('click', () => navigate('offer', r.meta.offer_id ? { offerId: r.meta.offer_id } : { requestId: r.meta.request_id }))
       actions.push(open)
     }
-    const del = C.button({ label: 'Hapus', icon: 'trash', size: 'sm', variant: 'ghost', className: 'ld-del' })
+    const del = C.button({ label: t('leads.saved.delete'), icon: 'trash', size: 'sm', variant: 'ghost', className: 'ld-del' })
     let armed = null
     del.addEventListener('click', async () => {
       if (!armed) {
-        del.querySelector('.btn-label').textContent = 'Yakin hapus?'
+        del.querySelector('.btn-label').textContent = t('leads.saved.confirm')
         del.classList.add('is-armed')
-        armed = setTimeout(() => { armed = null; del.classList.remove('is-armed'); del.querySelector('.btn-label').textContent = 'Hapus' }, 4000)
+        armed = setTimeout(() => { armed = null; del.classList.remove('is-armed'); del.querySelector('.btn-label').textContent = t('leads.saved.delete') }, 4000)
         return
       }
       clearTimeout(armed)
-      const restore = C.setBusy(del, 'Menghapus…')
+      const restore = C.setBusy(del, t('leads.saved.deleting'))
       try {
         const { error } = await getCloud().database.from('leads').delete().eq('id', r.id)
         if (error) throw new Error(error.message)
-        showToast('Prospek dihapus.', 'success')
+        showToast(t('leads.saved.deleted'), 'success')
         await loadSaved()
         drawResults()
       } catch (err) {
         restore()
-        showToast(`Gagal menghapus: ${err.message}`, 'error')
+        showToast(t('leads.saved.deleteFailed', { error: err.message }), 'error')
       }
     })
     actions.push(del)
     const facts = [
       r.category,
       r.distance_km != null ? km(r.distance_km) : null,
-      r.meta?.suggested_service ? `Cocok: ${r.meta.suggested_service}` : null,
+      r.meta?.suggested_service ? t('leads.saved.fits', { service: r.meta.suggested_service }) : null,
     ].filter(Boolean)
     return el('li', { className: 'ld-saved-item' },
       el('div', { className: 'ld-saved-main' },
         el('div', { className: 'ld-saved-top' },
           el('span', { className: 'ld-saved-name' }, r.name),
-          C.tag(st.label, st.tone),
-          r.source === 'demo' ? el('span', { className: 'tag status status-live' }, 'contoh') : null),
+          C.tag(statusText(st), st.tone),
+          r.source === 'demo' ? el('span', { className: 'tag status status-live' }, t('leads.card.sample')) : null),
         el('p', { className: 'ld-saved-sub' }, facts.join(' · ')),
         r.address ? el('p', { className: 'ld-saved-sub' }, r.address) : null,
         el('div', { className: 'ld-links' },
@@ -1038,9 +1055,9 @@ export async function render(container, ctx = {}) {
           r.website ? el('a', { className: 'ld-link', href: r.website, target: '_blank', rel: 'noopener noreferrer' }, icon('arrowUpRight', { size: 13 }), String(r.website).replace(/^https?:\/\/(www\.)?/, '').slice(0, 40)) : null),
       ),
       el('div', { className: 'ld-saved-nums' },
-        el('span', { className: 'ld-saved-num' }, el('b', { className: 'tnum' }, r.score != null ? String(r.score) : '—'), el('span', {}, 'skor')),
-        el('span', { className: 'ld-saved-num' }, el('b', { className: 'tnum' }, r.est_value ? C.rupiahCompact(r.est_value) : '—'), el('span', {}, 'nilai harapan')),
-        el('time', { className: 'ld-saved-date tnum', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, `Disimpan ${C.relativeTime(r.created_at)}`)),
+        el('span', { className: 'ld-saved-num' }, el('b', { className: 'tnum' }, r.score != null ? String(r.score) : '—'), el('span', {}, t('leads.card.score'))),
+        el('span', { className: 'ld-saved-num' }, el('b', { className: 'tnum' }, r.est_value ? C.rupiahCompact(r.est_value) : '—'), el('span', {}, t('leads.saved.expected'))),
+        el('time', { className: 'ld-saved-date tnum', datetime: r.created_at, title: C.formatDateTime(r.created_at) }, t('leads.saved.at', { when: C.relativeTime(r.created_at) }))),
       el('div', { className: 'ld-saved-actions' }, sel, ...actions),
     )
   }
@@ -1073,21 +1090,21 @@ export async function render(container, ctx = {}) {
   }
 
   async function saveLead(l, btn) {
-    const restore = C.setBusy(btn, 'Menyimpan…')
+    const restore = C.setBusy(btn, t('leads.common.saving'))
     try {
       const { error } = await getCloud().database.from('leads').insert(leadRow(l))
       if (error) throw new Error(error.message)
       restore()
       btn.disabled = true
       btn.classList.add('is-saved')
-      btn.querySelector('.btn-label').textContent = 'Tersimpan'
-      btn.setAttribute('aria-label', `${l.name} sudah tersimpan`)
+      btn.querySelector('.btn-label').textContent = t('leads.card.saved')
+      btn.setAttribute('aria-label', t('leads.card.alreadySaved', { name: l.name }))
       btn.querySelector('svg')?.replaceWith(icon('check'))
-      showToast(`${l.name} disimpan ke prospek.`, 'success')
+      showToast(t('leads.save.done', { name: l.name }), 'success')
       await loadSaved()
     } catch (err) {
       restore()
-      showToast(`Gagal menyimpan: ${err.message}`, 'error')
+      showToast(t('leads.save.failed', { error: err.message }), 'error')
     }
   }
 
@@ -1104,18 +1121,18 @@ export async function render(container, ctx = {}) {
   function offerModal(lead, opener) {
     const svcOptions = [...new Set([lead.ai.suggested_service, ...names].filter(Boolean))]
     const svcSel = C.select({
-      label: 'Layanan yang ditawarkan', name: 'service', required: true,
-      options: svcOptions.length ? svcOptions.map((n) => ({ value: n, label: n })) : [{ value: '', label: 'Belum ada layanan di riwayat' }],
+      label: t('leads.offer.service'), name: 'service', required: true,
+      options: svcOptions.length ? svcOptions.map((n) => ({ value: n, label: n })) : [{ value: '', label: t('leads.offer.noServices') }],
       value: lead.ai.suggested_service || svcOptions[0] || '',
     })
-    const svcFree = C.field({ label: 'Atau tulis layanan', name: 'service_free', placeholder: 'Contoh: Perawatan AC berkala', hint: svcOptions.length ? 'Opsional. Diisi = menggantikan pilihan di atas.' : 'Belum ada layanan di riwayat Anda, tulis layanan yang ingin ditawarkan.' })
-    const extra = C.textarea({ label: 'Catatan untuk AI', name: 'extra', rows: 3, placeholder: 'Opsional. Contoh: tawarkan kontrak 3 bulan, survei gratis.' })
+    const svcFree = C.field({ label: t('leads.offer.free'), name: 'service_free', placeholder: t('leads.offer.freePlaceholder'), hint: svcOptions.length ? t('leads.offer.freeHint') : t('leads.offer.freeHintEmpty') })
+    const extra = C.textarea({ label: t('leads.offer.extra'), name: 'extra', rows: 3, placeholder: t('leads.offer.extraPlaceholder') })
     const estBox = el('div', { className: 'ld-est-box' })
     const service = () => svcFree.input.value.trim() || svcSel.input.value || ''
     const estimate = () => estimateValue({ service: service(), stats, fallbackAvg: state.fallbackAvg, conversion: state.conversion })
     const drawEst = () => {
       const e = estimate()
-      estBox.replaceChildren(icon('ledger', { size: 14 }), el('span', {}, e.basis ? `Acuan nilai: ${C.rupiah(e.potential)} · ${e.note}.` : e.note))
+      estBox.replaceChildren(icon('ledger', { size: 14 }), el('span', {}, e.basis ? t('leads.offer.estimate', { amount: C.rupiah(e.potential), note: estNote(e, service()) }) : estNote(e, service())))
     }
     svcSel.input.addEventListener('change', drawEst)
     svcFree.input.addEventListener('input', drawEst)
@@ -1139,29 +1156,29 @@ export async function render(container, ctx = {}) {
     })
 
     const wiz = C.wizard({
-      label: 'Susun penawaran prospek',
+      label: t('leads.offer.wizard'),
       className: 'ld-wiz',
       steps: [
         {
-          key: 'service', title: 'Layanan', description: 'Layanan apa yang ingin ditawarkan ke prospek ini?',
+          key: 'service', title: t('leads.offer.step1'), description: t('leads.offer.step1Desc'),
           content: [leadSummary, svcSel.wrap, svcFree.wrap, estBox, extra.wrap],
-          validate: () => (service() ? [] : [{ text: 'Pilih atau tulis layanan yang ditawarkan.', input: svcFree.input }]),
+          validate: () => (service() ? [] : [{ text: t('leads.offer.needService'), input: svcFree.input }]),
         },
         {
-          key: 'compose', title: 'Susun dengan AI', description: 'AI menulis pesan pembuka, ruang lingkup, dan perkiraan harga.',
+          key: 'compose', title: t('leads.offer.step2'), description: t('leads.offer.step2Desc'),
           content: [aiSlot],
-          primary: () => (draft && !current ? { label: 'Lanjut', iconRight: 'arrowRight' } : { label: lastError ? 'Coba lagi' : 'Susun draf', icon: lastError ? 'refresh' : 'sparkles', iconRight: undefined }),
+          primary: () => (draft && !current ? { label: t('leads.offer.next'), iconRight: 'arrowRight' } : { label: lastError ? t('leads.offer.retry') : t('leads.offer.draft'), icon: lastError ? 'refresh' : 'sparkles', iconRight: undefined }),
           onPrimary: async () => { if (draft) wiz.next(); else await generate() },
           onEnter: () => {
             if (current) return
-            if (draft) aiSlot.replaceChildren(el('div', { className: 'note note-ok' }, icon('checkCircle'), el('div', { className: 'note-body' }, el('p', {}, 'Draf siap ditinjau.'))))
-            else if (!lastError) aiSlot.replaceChildren(el('div', { className: 'ai-placeholder' }, icon('sparkles', { size: 18 }), el('span', {}, 'Tekan Susun draf. Hasil AI mengalir di sini dan bisa dihentikan.')))
+            if (draft) aiSlot.replaceChildren(el('div', { className: 'note note-ok' }, icon('checkCircle'), el('div', { className: 'note-body' }, el('p', {}, t('leads.offer.ready')))))
+            else if (!lastError) aiSlot.replaceChildren(el('div', { className: 'ai-placeholder' }, icon('sparkles', { size: 18 }), el('span', {}, t('leads.offer.placeholder'))))
           },
         },
         {
-          key: 'review', title: 'Tinjau & simpan', description: 'Edit seperlunya. Tidak ada pesan yang dikirim otomatis.',
+          key: 'review', title: t('leads.offer.step3'), description: t('leads.offer.step3Desc'),
           content: [reviewBox],
-          primary: { label: 'Simpan ke alur', icon: 'save', iconRight: undefined },
+          primary: { label: t('leads.offer.saveFlow'), icon: 'save', iconRight: undefined },
           onPrimary: () => saveToFlow(),
           onEnter: () => drawReview(),
         },
@@ -1171,13 +1188,13 @@ export async function render(container, ctx = {}) {
     async function generate() {
       wiz.msg.hide()
       if (!model) { try { await modelReady } catch { /* below */ } }
-      if (!model) { wiz.msg.show('danger', 'Model AI belum tersedia. Periksa koneksi lalu muat ulang halaman.'); return }
+      if (!model) { wiz.msg.show('danger', t('leads.offer.noModel')); return }
       const ac = new AbortController()
       current = ac
-      const restore = wiz.busy('Menyusun…')
-      const ui = C.aiConsole({ model: 'Penyusun penawaran' })
+      const restore = wiz.busy(t('leads.offer.composing'))
+      const ui = C.aiConsole({ model: t('leads.offer.composer') })
       ui.onStop(() => ac.abort())
-      ui.setStatus('Menulis…', true)
+      ui.setStatus(t('leads.offer.writing'), true)
       ui.write('')
       aiSlot.replaceChildren(ui.root)
       let ok = false
@@ -1187,18 +1204,18 @@ export async function render(container, ctx = {}) {
           modelId: model.id, signal: ac.signal, onChunk: (_d, full) => { if (!ac.signal.aborted) ui.write(full) },
         }), ac.signal)
         ui.done()
-        if (!res.data) throw new Error('Jawaban AI bukan format yang bisa dibaca. Coba lagi.')
+        if (!res.data) throw new Error(t('leads.offer.badFormat'))
         if (!(res.data.price > 0) && estimate().potential) res.data.price = estimate().potential
         draft = { ...res.data, raw: res.raw }
         fields = null
         lastError = false
-        ui.setStatus('Selesai', false)
+        ui.setStatus(t('leads.offer.done'), false)
         ok = true
       } catch (err) {
         ui.done()
         lastError = true
-        ui.setStatus(err.name === 'AbortError' ? 'Dihentikan' : 'Gagal', false)
-        wiz.msg.show(err.name === 'AbortError' ? 'info' : 'danger', err.name === 'AbortError' ? 'Penyusunan dihentikan. Tidak ada yang disimpan.' : err.message)
+        ui.setStatus(err.name === 'AbortError' ? t('leads.offer.stopped') : t('leads.offer.failed'), false)
+        wiz.msg.show(err.name === 'AbortError' ? 'info' : 'danger', err.name === 'AbortError' ? t('leads.offer.stoppedMsg') : err.message)
       } finally {
         current = null
         restore()
@@ -1209,21 +1226,21 @@ export async function render(container, ctx = {}) {
     function drawReview() {
       if (!draft) { wiz.go('compose', { focus: false }); return }
       if (fields) return
-      const subject = C.field({ label: 'Judul', name: 'subject', value: draft.subject })
-      const pitch = C.textarea({ label: 'Pesan pembuka', name: 'pitch', rows: 6, value: draft.pitch, hint: 'Salin dan kirim sendiri lewat saluran Anda. Satu Alur tidak mengirim pesan.' })
-      const copyBtn = C.button({ label: 'Salin pesan', icon: 'copy', size: 'sm', variant: 'soft' })
+      const subject = C.field({ label: t('leads.offer.subject'), name: 'subject', value: draft.subject })
+      const pitch = C.textarea({ label: t('leads.offer.pitch'), name: 'pitch', rows: 6, value: draft.pitch, hint: t('leads.offer.pitchHint') })
+      const copyBtn = C.button({ label: t('leads.offer.copy'), icon: 'copy', size: 'sm', variant: 'soft' })
       copyBtn.addEventListener('click', () => copyText(pitch.input.value))
       pitch.wrap.appendChild(el('div', { className: 'form-actions' }, copyBtn))
-      const scope = C.textarea({ label: 'Ruang lingkup', name: 'scope', rows: 3, value: draft.scope })
-      const price = C.field({ label: 'Perkiraan harga (Rp)', name: 'price', type: 'number', value: String(draft.price || ''), attrs: { min: '0', step: '1000', inputmode: 'numeric' } })
-      const terms = C.textarea({ label: 'Ketentuan', name: 'terms', rows: 2, value: draft.terms })
-      const notes = C.textarea({ label: 'Catatan & asumsi', name: 'notes', rows: 2, value: draft.notes })
+      const scope = C.textarea({ label: t('leads.offer.scope'), name: 'scope', rows: 3, value: draft.scope })
+      const price = C.field({ label: t('leads.offer.price'), name: 'price', type: 'number', value: String(draft.price || ''), attrs: { min: '0', step: '1000', inputmode: 'numeric' } })
+      const terms = C.textarea({ label: t('leads.offer.terms'), name: 'terms', rows: 2, value: draft.terms })
+      const notes = C.textarea({ label: t('leads.offer.notes'), name: 'notes', rows: 2, value: draft.notes })
       const withOffer = el('input', { type: 'checkbox', id: 'ld-with-offer', checked: true })
       const checkRow = el('label', { className: 'ld-check', htmlFor: 'ld-with-offer' }, withOffer,
-        el('span', {}, el('b', {}, 'Buat juga draf penawaran'), el('span', { className: 'field-hint' }, 'Permintaan baru dibuat untuk prospek ini; penawaran disimpan sebagai draf untuk Anda setujui di tahap Penawaran.')))
+        el('span', {}, el('b', {}, t('leads.offer.withOffer')), el('span', { className: 'field-hint' }, t('leads.offer.withOfferHint'))))
       fields = { subject, pitch, scope, price, terms, notes, withOffer }
       reviewBox.replaceChildren(
-        el('div', { className: 'proposal-top' }, el('span', { className: 'tag tag-accent' }, icon('sparkles', { size: 14 }), 'Draf AI'), el('span', { className: 'proposal-for' }, `${lead.name} — ${service()}`)),
+        el('div', { className: 'proposal-top' }, el('span', { className: 'tag tag-accent' }, icon('sparkles', { size: 14 }), t('leads.offer.aiDraft')), el('span', { className: 'proposal-for' }, `${lead.name} — ${service()}`)),
         subject.wrap, pitch.wrap, scope.wrap, price.wrap, terms.wrap, notes.wrap, checkRow,
       )
     }
@@ -1246,12 +1263,12 @@ export async function render(container, ctx = {}) {
           return
         }
       }
-      const restore = wiz.busy('Menyimpan…')
+      const restore = wiz.busy(t('leads.common.saving'))
       const db = getCloud().database
       try {
         const svc = service()
         const description = [
-          `Prospek dari Pencari prospek (${SOURCE_LABEL[lead.source] || lead.source}): ${lead.category}, ${km(lead.distance_km)} dari titik pencarian.`,
+          `Prospek dari Pencari prospek (${SOURCE_LABEL[lead.source] || lead.source}): ${lead.category}, ${kmId(lead.distance_km)} dari titik pencarian.`,
           o.scope ? `Usulan: ${o.scope}` : '',
           lead.website ? `Situs: ${lead.website}` : '',
         ].filter(Boolean).join('\n')
@@ -1273,7 +1290,7 @@ export async function render(container, ctx = {}) {
             validated_scope: o.scope,
             status: 'draft',
           })
-          if (offErr) throw new Error(`Permintaan tersimpan, tetapi draf penawaran gagal: ${offErr.message}`)
+          if (offErr) throw new Error(t('leads.offer.offerFailed', { error: offErr.message }))
           offerRow = Array.isArray(offRows) ? offRows[0] : offRows
         }
         // Keep the lead in sync (save it if it was not saved yet).
@@ -1292,33 +1309,33 @@ export async function render(container, ctx = {}) {
         notifyDataChanged()
         await loadSaved()
         drawResults()
-        const go = C.button({ label: offerRow ? 'Buka draf penawaran' : 'Lanjut ke penawaran', iconRight: 'arrowRight', variant: 'primary', size: 'sm' })
+        const go = C.button({ label: offerRow ? t('leads.offer.openDraft') : t('leads.offer.toOffer'), iconRight: 'arrowRight', variant: 'primary', size: 'sm' })
         go.addEventListener('click', () => {
           modal?.close({ restore: false })
           navigate('offer', offerRow ? { offerId: offerRow.id } : { requestId: reqRow?.id })
         })
-        const stay = C.button({ label: 'Tetap di sini', variant: 'soft', size: 'sm' })
+        const stay = C.button({ label: t('leads.offer.stay'), variant: 'soft', size: 'sm' })
         stay.addEventListener('click', () => modal?.close())
         wiz.complete({
           text: offerRow
-            ? `Permintaan untuk ${lead.name} dibuat dan draf penawaran ${C.rupiah(o.price)} siap disetujui di tahap Penawaran.`
-            : `Permintaan untuk ${lead.name} dibuat. Lanjutkan ke tahap Penawaran untuk menyusun harga.`,
+            ? t('leads.offer.doneWithOffer', { name: lead.name, price: C.rupiah(o.price) })
+            : t('leads.offer.doneRequest', { name: lead.name }),
           actions: [go, stay],
         })
-        showToast('Disimpan ke alur.', 'success')
+        showToast(t('leads.offer.savedFlow'), 'success')
       } catch (err) {
         restore()
-        wiz.msg.show('danger', `Gagal menyimpan: ${err.message}`)
+        wiz.msg.show('danger', t('leads.save.failed', { error: err.message }))
       }
     }
 
     /* Dialog chrome */
-    const closeBtn = el('button', { type: 'button', className: 'icon-btn', 'aria-label': 'Tutup', title: 'Tutup (Esc)' }, icon('x'))
+    const closeBtn = el('button', { type: 'button', className: 'icon-btn', 'aria-label': t('leads.modal.close'), title: t('leads.modal.closeTitle') }, icon('x'))
     const dialog = el('div', { className: 'ld-modal', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ld-modal-title' },
       el('div', { className: 'ld-modal-head' },
         el('div', {},
-          el('span', { className: 'drawer-pre' }, 'Draf penawaran prospek'),
-          el('h2', { className: 'ld-modal-title display', id: 'ld-modal-title' }, 'Susun ', el('em', {}, 'penawaran'))),
+          el('span', { className: 'drawer-pre' }, t('leads.modal.pre')),
+          el('h2', { className: 'ld-modal-title display', id: 'ld-modal-title' }, t('leads.modal.titleStart'), el('em', {}, t('leads.modal.titleEm')))),
         closeBtn),
       el('div', { className: 'ld-modal-body' }, wiz.root),
     )

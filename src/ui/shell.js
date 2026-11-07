@@ -8,6 +8,8 @@
  */
 import { logoLink } from './brand.js'
 import { themeToggleButton } from './theme.js'
+import { langToggleButton } from '../i18n/switcher.js'
+import { t } from '../i18n/index.js'
 import { profileMenu } from './profile-menu.js'
 import { icon } from './icons.js'
 import { el, button, infoTip } from './components.js'
@@ -41,69 +43,69 @@ import * as StagePlan from '../quota/page.js'
 import { mountUpsell } from '../quota/upsell.js'
 
 export const STAGES = [
-  { key: 'dashboard', num: '00', label: 'Ringkasan', icon: 'home',
-    hint: 'Ringkasan alur kerja dan keuangan, dihitung langsung dari data Anda.', module: StageDashboard,
-    action: { label: 'Alur kerja', iconRight: 'arrowRight', to: 'workflow', primary: true } },
+  { key: 'dashboard', num: '00', label: t('shell.stages.dashboard.label'), icon: 'home',
+    hint: t('shell.stages.dashboard.hint'), module: StageDashboard,
+    action: { label: t('shell.stages.dashboard.action'), iconRight: 'arrowRight', to: 'workflow', primary: true } },
   // One menu for the whole job flow: a table with one row per job. The five stage
   // pages below are opened from that table (parent: 'workflow') and stay out of the sidebar.
-  { key: 'workflow', group: 'main', label: 'Alur kerja', sub: 'Semua pekerjaan', icon: 'activity',
-    hint: 'Satu baris untuk satu pekerjaan pelanggan, dari permintaan sampai pembukuan. Kolom Posisi menunjukkan sudah sampai mana; tombol Langkah berikutnya membuka tahap yang perlu dikerjakan.',
+  { key: 'workflow', group: 'main', label: t('shell.stages.workflow.label'), sub: t('shell.stages.workflow.sub'), icon: 'activity',
+    hint: t('shell.stages.workflow.hint'),
     module: StageWorkflow,
-    action: { label: 'Permintaan baru', icon: 'plus', to: 'request', primary: true } },
-  { key: 'request', parent: 'workflow', num: '01', label: 'Permintaan', icon: 'inbox',
-    hint: 'Catat kebutuhan pelanggan. Statusnya ikut bergerak sesuai tahap alur.', module: StageRequest,
-    action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'offer', parent: 'workflow', num: '02', label: 'Penawaran', icon: 'sparkles',
-    hint: 'AI menyusun ruang lingkup dan harga, lalu aturan bisnis memeriksanya sebelum disimpan.', module: StageOffer,
-    action: { label: 'Ke penugasan', iconRight: 'arrowRight', to: 'assign' } },
-  { key: 'assign', parent: 'workflow', num: '03', label: 'Penugasan', icon: 'users',
-    hint: 'Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.', module: StageAssign,
-    action: { label: 'Ke penyelesaian', iconRight: 'arrowRight', to: 'complete' } },
-  { key: 'complete', parent: 'workflow', num: '04', label: 'Penyelesaian', icon: 'checkCircle',
-    hint: 'Tutup penugasan yang sudah dikerjakan agar siap dibukukan.', module: StageComplete,
-    action: { label: 'Ke pembukuan', iconRight: 'arrowRight', to: 'bookkeeping' } },
-  { key: 'bookkeeping', parent: 'workflow', num: '05', label: 'Pembukuan', icon: 'ledger',
-    hint: 'Catat pendapatan dan biaya tiap pekerjaan. Saldo dihitung berjalan.', module: StageBookkeeping,
-    action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
-  { key: 'report', group: 'main', label: 'Laporan', sub: 'Untung & rugi', icon: 'chart',
-    hint: 'Angka periode terpilih dari buku besar, plus penjelasan AI.', module: StageReport,
-    action: { label: 'Permintaan baru', icon: 'plus', to: 'request' } },
-  { key: 'invoice', group: 'income', label: 'Invoice', sub: 'Tagihan pelanggan', icon: 'receipt',
-    hint: 'Buat invoice dari pekerjaan selesai, kirim lewat email atau WhatsApp, lalu tandai lunas. Pendapatannya otomatis masuk Pembukuan.',
-    module: StageInvoice, action: { label: 'Lihat laporan', iconRight: 'arrowRight', to: 'report' } },
-  { key: 'vas', group: 'income', label: 'Layanan tambahan', sub: 'VAS & katalog', icon: 'layers',
-    hint: 'Dua cara menambah pendapatan: jual layanan tambahan ke pekerjaan yang sudah ada, dan hentikan kebocoran biaya. Di sini Anda menemukan peluang VAS, mengelola katalognya, lalu membahas rencananya bersama lima tim AI.',
+    action: { label: t('shell.stages.workflow.action'), icon: 'plus', to: 'request', primary: true } },
+  { key: 'request', parent: 'workflow', num: '01', label: t('shell.stages.request.label'), icon: 'inbox',
+    hint: t('shell.stages.request.hint'), module: StageRequest,
+    action: { label: t('shell.stages.request.action'), iconRight: 'arrowRight', to: 'offer' } },
+  { key: 'offer', parent: 'workflow', num: '02', label: t('shell.stages.offer.label'), icon: 'sparkles',
+    hint: t('shell.stages.offer.hint'), module: StageOffer,
+    action: { label: t('shell.stages.offer.action'), iconRight: 'arrowRight', to: 'assign' } },
+  { key: 'assign', parent: 'workflow', num: '03', label: t('shell.stages.assign.label'), icon: 'users',
+    hint: t('shell.stages.assign.hint'), module: StageAssign,
+    action: { label: t('shell.stages.assign.action'), iconRight: 'arrowRight', to: 'complete' } },
+  { key: 'complete', parent: 'workflow', num: '04', label: t('shell.stages.complete.label'), icon: 'checkCircle',
+    hint: t('shell.stages.complete.hint'), module: StageComplete,
+    action: { label: t('shell.stages.complete.action'), iconRight: 'arrowRight', to: 'bookkeeping' } },
+  { key: 'bookkeeping', parent: 'workflow', num: '05', label: t('shell.stages.bookkeeping.label'), icon: 'ledger',
+    hint: t('shell.stages.bookkeeping.hint'), module: StageBookkeeping,
+    action: { label: t('shell.stages.bookkeeping.action'), iconRight: 'arrowRight', to: 'report' } },
+  { key: 'report', group: 'main', label: t('shell.stages.report.label'), sub: t('shell.stages.report.sub'), icon: 'chart',
+    hint: t('shell.stages.report.hint'), module: StageReport,
+    action: { label: t('shell.stages.report.action'), icon: 'plus', to: 'request' } },
+  { key: 'invoice', group: 'income', label: t('shell.stages.invoice.label'), sub: t('shell.stages.invoice.sub'), icon: 'receipt',
+    hint: t('shell.stages.invoice.hint'),
+    module: StageInvoice, action: { label: t('shell.stages.invoice.action'), iconRight: 'arrowRight', to: 'report' } },
+  { key: 'vas', group: 'income', label: t('shell.stages.vas.label'), sub: t('shell.stages.vas.sub'), icon: 'layers',
+    hint: t('shell.stages.vas.hint'),
     module: StageVas,
-    action: { label: 'Cek kebocoran', iconRight: 'arrowRight', to: 'zero-waste' } },
-  { key: 'zero-waste', group: 'income', label: 'Tanpa limbah', sub: 'Lima sumber pemborosan', icon: 'sprout',
-    hint: 'Ukur waktu menganggur, perjalanan, bahan, pekerjaan ulang, serta air dan kimia dalam Rupiah. Catat temuan, jalankan tindakannya, dan lihat seberapa dekat Anda ke nol kerugian.',
+    action: { label: t('shell.stages.vas.action'), iconRight: 'arrowRight', to: 'zero-waste' } },
+  { key: 'zero-waste', group: 'income', label: t('shell.stages.zeroWaste.label'), sub: t('shell.stages.zeroWaste.sub'), icon: 'sprout',
+    hint: t('shell.stages.zeroWaste.hint'),
     module: StageZeroWaste,
-    action: { label: 'Tambah pendapatan', iconRight: 'arrowRight', to: 'vas' } },
-  { key: 'radar', group: 'growth', label: 'Radar peluang', sub: 'Peluang dari transaksi', icon: 'radar',
-    hint: 'Peluang dari transaksi Anda sendiri: layanan rutin jatuh tempo, pelanggan yang menghilang, penawaran tertahan, dan musim ramai.', module: StageRadar,
-    action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
-  { key: 'leads', group: 'growth', label: 'Pencari prospek', sub: 'Peta & radius', icon: 'mapPin',
-    hint: 'Pilih titik dan radius, tentukan jenis usaha. AI menilai kecocokannya dan membantu menyusun penawaran. Tidak ada pesan yang dikirim otomatis.', module: StageLeads,
-    action: { label: 'Ke penawaran', iconRight: 'arrowRight', to: 'offer' } },
-  { key: 'social-media', group: 'growth', label: 'Media Sosial', sub: 'Konten & jadwal', icon: 'megaphone',
-    hint: 'Hubungkan Facebook dan Instagram, tulis konten dengan AI, jadwalkan tayang, dan ajukan iklan atau kolaborasi.', module: StageSocialMedia,
-    action: { label: 'Tanya penasihat', icon: 'bot', to: 'advisor' } },
-  { key: 'advisor', group: 'growth', label: 'Penasihat AI', sub: 'Multi-agen bisnis', icon: 'bot',
-    hint: 'Penasihat AI yang membaca angka bisnis Anda. Percakapan tersimpan di perangkat ini.', module: StageAdvisor,
-    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
+    action: { label: t('shell.stages.zeroWaste.action'), iconRight: 'arrowRight', to: 'vas' } },
+  { key: 'radar', group: 'growth', label: t('shell.stages.radar.label'), sub: t('shell.stages.radar.sub'), icon: 'radar',
+    hint: t('shell.stages.radar.hint'), module: StageRadar,
+    action: { label: t('shell.stages.radar.action'), icon: 'bot', to: 'advisor' } },
+  { key: 'leads', group: 'growth', label: t('shell.stages.leads.label'), sub: t('shell.stages.leads.sub'), icon: 'mapPin',
+    hint: t('shell.stages.leads.hint'), module: StageLeads,
+    action: { label: t('shell.stages.leads.action'), iconRight: 'arrowRight', to: 'offer' } },
+  { key: 'social-media', group: 'growth', label: t('shell.stages.socialMedia.label'), sub: t('shell.stages.socialMedia.sub'), icon: 'megaphone',
+    hint: t('shell.stages.socialMedia.hint'), module: StageSocialMedia,
+    action: { label: t('shell.stages.socialMedia.action'), icon: 'bot', to: 'advisor' } },
+  { key: 'advisor', group: 'growth', label: t('shell.stages.advisor.label'), sub: t('shell.stages.advisor.sub'), icon: 'bot',
+    hint: t('shell.stages.advisor.hint'), module: StageAdvisor,
+    action: { label: t('shell.stages.advisor.action'), icon: 'home', to: 'dashboard' } },
 
-  { key: 'ai-assistant', group: 'growth', label: 'AI Superpowers', sub: 'Asisten & tool', icon: 'bot',
-    hint: 'Asisten AI dengan tool kalkulator, data bisnis, dan format rupiah. Percakapan tersimpan di memori sesi.', module: StageAIAssistant,
-    action: { label: 'Media Sosial', icon: 'megaphone', to: 'social-media' } },
-  { key: 'pertumbuhan', group: 'growth', label: 'Pertumbuhan', icon: 'trendingUp', module: StagePertumbuhan,
-    action: { label: 'AI Superpowers', icon: 'bot', to: 'ai-assistant' } },
-  { key: 'plan', group: 'help', label: 'Paket & kuota', sub: 'Kuota AI & voucher', icon: 'wallet',
-    hint: 'Paket Anda, sisa kuota AI bulan ini, saldo AI, dan tukar voucher.', module: StagePlan,
-    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
+  { key: 'ai-assistant', group: 'growth', label: t('shell.stages.aiAssistant.label'), sub: t('shell.stages.aiAssistant.sub'), icon: 'bot',
+    hint: t('shell.stages.aiAssistant.hint'), module: StageAIAssistant,
+    action: { label: t('shell.stages.aiAssistant.action'), icon: 'megaphone', to: 'social-media' } },
+  { key: 'pertumbuhan', group: 'growth', label: t('shell.stages.pertumbuhan.label'), icon: 'trendingUp', module: StagePertumbuhan,
+    action: { label: t('shell.stages.pertumbuhan.action'), icon: 'bot', to: 'ai-assistant' } },
+  { key: 'plan', group: 'help', label: t('shell.stages.plan.label'), sub: t('shell.stages.plan.sub'), icon: 'wallet',
+    hint: t('shell.stages.plan.hint'), module: StagePlan,
+    action: { label: t('shell.stages.plan.action'), icon: 'home', to: 'dashboard' } },
   // Every signed-in user (staff too, harmless); drawn last in the nav, just above Pengaturan.
-  { key: 'support', group: 'help', label: 'Bantuan', sub: 'Tiket ke tim Satu Alur', icon: 'message',
-    hint: 'Kirim pertanyaan atau keluhan ke tim Satu Alur dan ikuti balasannya di sini.', module: StageSupport,
-    action: { label: 'Ke ringkasan', icon: 'home', to: 'dashboard' } },
+  { key: 'support', group: 'help', label: t('shell.stages.support.label'), sub: t('shell.stages.support.sub'), icon: 'message',
+    hint: t('shell.stages.support.hint'), module: StageSupport,
+    action: { label: t('shell.stages.support.action'), icon: 'home', to: 'dashboard' } },
 ]
 
 // Staff (admin sessions) see only the office sections, one sidebar item each.
@@ -173,12 +175,12 @@ export function renderShell(root, ctx) {
   const navItem = (s) => {
     const count = el('span', { className: 'flow-count tnum', hidden: true })
     const isStage = s.key !== 'dashboard' && !s.group
-    const sub = isStage ? `Tahap ${s.num}` : s.sub
+    const sub = isStage ? t('shell.nav.stage', { num: s.num }) : s.sub
     const b = el('button', {
       type: 'button',
       className: `flow-item ${isStage ? 'is-stage' : ''}`.trim(),
       dataset: { stage: s.key },
-      title: isStage ? `Tahap ${s.num} · ${s.label}` : s.label,
+      title: isStage ? t('shell.nav.stageTitle', { num: s.num, label: s.label }) : s.label,
     },
       el('span', { className: 'flow-node', 'aria-hidden': 'true' }, icon(s.icon, { size: 16 })),
       el('span', { className: 'flow-label' },
@@ -195,22 +197,22 @@ export function renderShell(root, ctx) {
   }
 
   const collapseBtn = el('button', {
-    type: 'button', className: 'icon-btn side-collapse', 'aria-label': 'Ciutkan sidebar', title: 'Ciutkan sidebar',
+    type: 'button', className: 'icon-btn side-collapse', 'aria-label': t('shell.nav.collapse'), title: t('shell.nav.collapse'),
   }, icon('panelLeft'))
   const closeDrawerBtn = el('button', {
-    type: 'button', className: 'icon-btn side-close', 'aria-label': 'Tutup menu', title: 'Tutup menu',
+    type: 'button', className: 'icon-btn side-close', 'aria-label': t('shell.nav.closeMenu'), title: t('shell.nav.closeMenu'),
   }, icon('x'))
 
-  const settingsBtn = el('button', { type: 'button', className: 'side-row', title: 'Pengaturan' },
-    icon('settings'), el('span', { className: 'side-row-label' }, 'Pengaturan'))
+  const settingsBtn = el('button', { type: 'button', className: 'side-row', title: t('shell.nav.settings') },
+    icon('settings'), el('span', { className: 'side-row-label' }, t('shell.nav.settings')))
 
   const officeSwitch = emailAdmin
-    ? el('button', { type: 'button', className: 'side-row side-row-office', title: staff ? 'Kembali ke usaha saya' : 'Kantor Satu Alur' },
-      icon(staff ? 'home' : 'shield'), el('span', { className: 'side-row-label' }, staff ? 'Kembali ke usaha saya' : 'Kantor Satu Alur'))
+    ? el('button', { type: 'button', className: 'side-row side-row-office', title: staff ? t('shell.nav.backToBusiness') : t('shell.nav.office') },
+      icon(staff ? 'home' : 'shield'), el('span', { className: 'side-row-label' }, staff ? t('shell.nav.backToBusiness') : t('shell.nav.office')))
     : null
   officeSwitch?.addEventListener('click', () => switchOffice())
 
-  const signOutBtn = el('button', { type: 'button', className: 'icon-btn', 'aria-label': 'Keluar', title: 'Keluar' }, icon('logout'))
+  const signOutBtn = el('button', { type: 'button', className: 'icon-btn', 'aria-label': t('shell.nav.signOut'), title: t('shell.nav.signOut') }, icon('logout'))
   signOutBtn.addEventListener('click', async () => {
     signOutBtn.disabled = true
     try { await ctx.signOut() } finally { signOutBtn.disabled = false }
@@ -227,21 +229,21 @@ export function renderShell(root, ctx) {
       el('ol', { className: 'flow-list' }, stages.filter((s) => s.group === g.title).map(navItem))])
     : [
       el('ol', { className: 'flow-list flow-list-top' }, navItem(dash), main.map(navItem)),
-      el('div', { className: 'side-label' }, el('span', {}, 'Pendapatan'), el('span', { className: 'side-label-count tnum' }, '2 cara')),
+      el('div', { className: 'side-label' }, el('span', {}, t('shell.nav.income')), el('span', { className: 'side-label-count tnum' }, t('shell.nav.incomeCount'))),
       el('ol', { className: 'flow-list flow-list-income' }, income.map(navItem)),
-      el('div', { className: 'side-label' }, el('span', {}, 'Pertumbuhan'), el('span', { className: 'side-label-count tnum' }, 'AI')),
+      el('div', { className: 'side-label' }, el('span', {}, t('shell.nav.growth')), el('span', { className: 'side-label-count tnum' }, t('shell.nav.growthCount'))),
       el('ol', { className: 'flow-list flow-list-growth' }, growth.map(navItem)),
       el('ol', { className: 'flow-list flow-list-help' }, help.map(navItem))]
-  const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': staff ? 'Menu Kantor Satu Alur' : 'Navigasi alur' },
+  const sidebar = el('aside', { className: 'side', id: 'app-sidebar', 'aria-label': staff ? t('shell.nav.officeMenu') : t('shell.nav.flowNav') },
     el('div', { className: 'side-head' }, logoLink({ size: 28, href: '#/' }), collapseBtn, closeDrawerBtn),
-    el('nav', { className: 'side-nav', 'aria-label': staff ? 'Bagian Kantor Satu Alur' : 'Tahap alur' }, ...navLists.flat()),
+    el('nav', { className: 'side-nav', 'aria-label': staff ? t('shell.nav.officeSections') : t('shell.nav.flowStages') }, ...navLists.flat()),
     el('div', { className: 'side-foot' },
       officeSwitch,
       staff ? null : settingsBtn,
       el('div', { className: 'side-user' },
         el('span', { className: 'avatar avatar-sm', 'aria-hidden': 'true' }, initials(user)),
         el('span', { className: 'side-user-text' },
-          el('span', { className: 'side-user-name' }, (user.name && user.name.trim()) || 'Pengguna'),
+          el('span', { className: 'side-user-name' }, (user.name && user.name.trim()) || t('shell.nav.user')),
           el('span', { className: 'side-user-email', title: user.email || '' }, user.email || ''),
         ),
         signOutBtn,
@@ -254,7 +256,7 @@ export function renderShell(root, ctx) {
   /* ------------------------------------------------------------- Topbar */
 
   const menuBtn = el('button', {
-    type: 'button', className: 'icon-btn topbar-menu', 'aria-label': 'Buka menu', 'aria-controls': 'app-sidebar', 'aria-expanded': 'false',
+    type: 'button', className: 'icon-btn topbar-menu', 'aria-label': t('shell.nav.openMenu'), 'aria-controls': 'app-sidebar', 'aria-expanded': 'false',
   }, icon('menu'))
   const crumbNum = el('span', { className: 'crumb-pre' })
   const crumbTitle = el('span', { className: 'crumb-title' })
@@ -277,7 +279,7 @@ export function renderShell(root, ctx) {
   const topbar = el('header', { className: 'topbar' },
     menuBtn,
     el('div', { className: 'crumb' }, crumbNum, el('span', { className: 'crumb-sep', 'aria-hidden': 'true' }, icon('chevronRight', { size: 14 })), crumbTitle, crumbTip),
-    el('div', { className: 'topbar-right' }, themeToggleButton(), actionSlot, avatar),
+    el('div', { className: 'topbar-right' }, langToggleButton(), themeToggleButton(), actionSlot, avatar),
   )
 
   const host = el('main', { className: 'stage-host', id: 'main', tabindex: '-1' })
@@ -285,21 +287,21 @@ export function renderShell(root, ctx) {
   /* ------------------------------------------------------ Settings drawer */
 
   const drawerBody = el('div', { className: 'drawer-body' })
-  const drawerClose = el('button', { type: 'button', className: 'icon-btn', 'aria-label': 'Tutup pengaturan', title: 'Tutup (Esc)' }, icon('x'))
+  const drawerClose = el('button', { type: 'button', className: 'icon-btn', 'aria-label': t('shell.drawer.close'), title: t('shell.drawer.closeTitle') }, icon('x'))
   const drawer = el('div', {
     className: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'drawer-title', hidden: true,
   },
     el('div', { className: 'drawer-head' },
       el('div', {},
-        el('span', { className: 'drawer-pre' }, 'Konfigurasi ruang kerja'),
-        el('h2', { id: 'drawer-title', className: 'drawer-title display' }, 'Peng', el('em', {}, 'aturan')),
+        el('span', { className: 'drawer-pre' }, t('shell.drawer.pre')),
+        el('h2', { id: 'drawer-title', className: 'drawer-title display', html: t('shell.drawer.title') }),
       ),
       drawerClose,
     ),
     drawerBody,
     el('div', { className: 'drawer-foot' },
-      el('span', { className: 'drawer-foot-note' }, icon('save', { size: 14 }), 'Perubahan tersimpan otomatis di browser ini.'),
-      button({ label: 'Selesai', variant: 'primary', size: 'sm', onClick: () => closeSettings() }),
+      el('span', { className: 'drawer-foot-note' }, icon('save', { size: 14 }), t('shell.drawer.note')),
+      button({ label: t('shell.drawer.done'), variant: 'primary', size: 'sm', onClick: () => closeSettings() }),
     ),
   )
   const drawerScrim = el('div', { className: 'scrim scrim-drawer', hidden: true })
@@ -307,7 +309,7 @@ export function renderShell(root, ctx) {
   /* ------------------------------------------------------------- Layout */
 
   const shell = el('div', { className: 'app-shell' },
-    el('a', { className: 'skip-link', href: '#main', onClick: (e) => { e.preventDefault(); host.focus() } }, 'Lewati ke konten'),
+    el('a', { className: 'skip-link', href: '#main', onClick: (e) => { e.preventDefault(); host.focus() } }, t('shell.nav.skip')),
     el('div', { className: 'side-rail' }, sidebar),
     scrim,
     el('div', { className: 'main-col' }, topbar, host),
@@ -322,7 +324,7 @@ export function renderShell(root, ctx) {
 
   function syncCollapseLabel() {
     const collapsed = shell.classList.contains('is-collapsed')
-    const label = collapsed ? 'Lebarkan sidebar' : 'Ciutkan sidebar'
+    const label = collapsed ? t('shell.nav.expand') : t('shell.nav.collapse')
     collapseBtn.setAttribute('aria-label', label)
     collapseBtn.title = label
     collapseBtn.setAttribute('aria-pressed', collapsed ? 'true' : 'false')
@@ -452,7 +454,7 @@ export function renderShell(root, ctx) {
         countEl.hidden = n === 0
         countEl.textContent = String(n)
         navButtons.get(k).classList.toggle('has-pending', n > 0)
-        countEl.title = n ? (staff ? Office.BADGE_TITLES[k](n) : `${n} menunggu tindakan`) : ''
+        countEl.title = n ? (staff ? Office.BADGE_TITLES[k](n) : t('shell.nav.pending', { n })) : ''
         // The count is a bare number; staff items also announce what it counts.
         if (staff) {
           const btn = navButtons.get(k)
@@ -467,12 +469,12 @@ export function renderShell(root, ctx) {
   /* -------------------------------------------------------- Stage switch */
 
   function setTopbar(stage) {
-    const groupLabel = { main: 'Satu Alur', income: 'Pendapatan', growth: 'Pertumbuhan', help: 'Satu Alur' }[stage.group]
-    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' ? 'Satu Alur' : stage.parent ? 'Alur kerja' : groupLabel || 'Satu Alur'
+    const groupLabel = { main: t('shell.crumb.home'), income: t('shell.nav.income'), growth: t('shell.nav.growth'), help: t('shell.crumb.home') }[stage.group]
+    crumbNum.textContent = staff ? stage.group : stage.key === 'dashboard' ? t('shell.crumb.home') : stage.parent ? t('shell.crumb.workflow') : groupLabel || t('shell.crumb.home')
     crumbTitle.textContent = stage.label
-    crumbTip.replaceChildren(stage.hint ? infoTip(stage.hint, { label: `Tentang ${stage.label}` }) : '')
+    crumbTip.replaceChildren(stage.hint ? infoTip(stage.hint, { label: t('shell.crumb.about', { label: stage.label }) }) : '')
     // A stage page opened from the Alur kerja table leads back to it.
-    const a = stage.parent ? { label: 'Kembali ke alur kerja', icon: 'arrowLeft', to: stage.parent } : stage.action
+    const a = stage.parent ? { label: t('shell.crumb.backToWorkflow'), icon: 'arrowLeft', to: stage.parent } : stage.action
     if (!a) { actionSlot.replaceChildren(); return }
     const b = button({
       label: a.label, icon: a.icon, iconRight: a.iconRight, size: 'sm',
@@ -569,7 +571,7 @@ export function renderShell(root, ctx) {
       if (signal.aborted) return
       console.error(err)
       view.replaceChildren(el('div', { className: 'note note-danger' }, icon('alert'),
-        el('div', { className: 'note-body' }, el('p', {}, `Gagal memuat tahap ${stage.label}: ${err.message}`))))
+        el('div', { className: 'note-body' }, el('p', {}, t('shell.loadFailed', { label: stage.label, error: err.message })))))
     }
     if (focus && !signal.aborted) {
       const h = staff ? null : view.querySelector('.page-title, h1')

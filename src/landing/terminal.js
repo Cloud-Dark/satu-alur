@@ -11,17 +11,18 @@
  */
 import { prefersReducedMotion } from '../ui/reveal.js'
 import { iconHTML } from '../ui/icons.js'
+import { t } from '../i18n/index.js'
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
 
 function build(body, demo) {
   body.innerHTML = `
     <div class="lp-chat-msg lp-chat-user" data-step>
-      <span class="lp-chat-who">Permintaan masuk</span>
+      <span class="lp-chat-who">${t('body.agent.incoming')}</span>
       <p class="lp-chat-bubble">${esc(demo.request)}</p>
     </div>
     <div class="lp-chat-msg lp-chat-ai" data-step>
-      <span class="lp-chat-who"><span class="lp-chat-avatar">${iconHTML('sparkles', { size: 14, stroke: 2 })}</span>Agen penawaran</span>
+      <span class="lp-chat-who"><span class="lp-chat-avatar">${iconHTML('sparkles', { size: 14, stroke: 2 })}</span>${t('body.agent.name')}</span>
       <div class="lp-chat-card">
         <span class="lp-chat-typing" data-typing aria-hidden="true"><i></i><i></i><i></i></span>
         <dl class="lp-offer">
@@ -36,7 +37,7 @@ function build(body, demo) {
         </ul>
         <div class="lp-chat-status" data-step>
           <span class="lp-chat-status-dot" aria-hidden="true"></span>${esc(demo.status)}
-          <span class="lp-chat-actions" aria-hidden="true"><span>Ubah</span><span class="is-primary">Setujui</span></span>
+          <span class="lp-chat-actions" aria-hidden="true"><span>${t('body.agent.edit')}</span><span class="is-primary">${t('body.agent.approve')}</span></span>
         </div>
       </div>
     </div>`

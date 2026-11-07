@@ -1,0 +1,172 @@
+{
+  "steps": {
+    "request": {
+      "label": "Permintaan",
+      "desc": "Catat kebutuhan pelanggan."
+    },
+    "offer": {
+      "label": "Penawaran",
+      "desc": "AI menyusun, aturan memvalidasi."
+    },
+    "assign": {
+      "label": "Penugasan",
+      "desc": "Jadwalkan tenaga pelaksana."
+    },
+    "complete": {
+      "label": "Penyelesaian",
+      "desc": "Catat hasil pekerjaan."
+    },
+    "bookkeeping": {
+      "label": "Pembukuan",
+      "desc": "Posting pendapatan dan biaya."
+    },
+    "report": {
+      "label": "Laporan",
+      "desc": "AI menjelaskan angka Anda."
+    }
+  },
+  "greeting": {
+    "morning": "Selamat pagi",
+    "afternoon": "Selamat siang",
+    "evening": "Selamat sore",
+    "night": "Selamat malam"
+  },
+  "loading": "Memuat…",
+  "refresh": "Muat ulang",
+  "updatedAt": "Diperbarui {time}",
+  "noName": "Tanpa nama",
+  "word": {
+    "revenue": "Pendapatan",
+    "cost": "Biaya"
+  },
+  "kpi": {
+    "aria": "Indikator utama",
+    "vsPrev7": "vs 7 hari sebelumnya",
+    "last7": "{amount} dalam 7 hari terakhir",
+    "noLedger": "Belum ada jurnal",
+    "noTx7": "Tidak ada transaksi 7 hari terakhir",
+    "profit": "Laba sebelum pajak",
+    "marginNone": "Margin — (belum ada pendapatan)",
+    "margin": "Margin {pct}%",
+    "completionRate": "Tingkat penyelesaian",
+    "doneOf": "{done} dari {total} penugasan selesai",
+    "noAssignments": "Belum ada penugasan"
+  },
+  "pipeline": {
+    "title": "Alur kerja",
+    "meta": "{count} permintaan · konversi per tahap",
+    "rowAria": "{num} {label}: {count}. {pct}% permintaan mencapai tahap ini. Buka di Alur kerja.",
+    "sub": {
+      "request": "{count} masuk 7 hari terakhir",
+      "offer": "{count} disetujui",
+      "assign": "{count} aktif",
+      "complete": "{count} belum dibukukan",
+      "bookkeeping": "{amount} pendapatan",
+      "report": "periode bulanan"
+    }
+  },
+  "chart": {
+    "title": "Pendapatan vs biaya",
+    "cumulative": "akumulasi harian",
+    "rangeLabel": "Rentang grafik",
+    "days": "{n} hari",
+    "lastDays": "{n} hari terakhir",
+    "emptyTitle": "Belum ada jurnal di rentang ini.",
+    "emptyBody": "Posting pendapatan dan biaya di tahap Pembukuan agar grafik terisi.",
+    "summary": "{n} hari terakhir: pendapatan {revenue}, biaya {cost}, laba {profit}.",
+    "today": "Hari ini",
+    "profitToday": "Laba hari ini",
+    "cumProfit": "Akumulasi laba",
+    "tableCaption": "Pendapatan dan biaya per hari",
+    "date": "Tanggal"
+  },
+  "actions": {
+    "overdue": "Lewat jadwal",
+    "overdueDays": {
+      "one": "Lewat {count} hari",
+      "other": "Lewat {count} hari"
+    },
+    "service": "Layanan",
+    "pageLabel": "perlu tindakan",
+    "stage": "Tahap {num}",
+    "emptyKicker": "Antrian bersih",
+    "emptyTitle": "Tidak ada yang menunggu.",
+    "emptyBody": "Semua permintaan sudah diproses sampai pembukuan.",
+    "type": {
+      "bookkeeping": "Pembukuan",
+      "complete": "Penyelesaian",
+      "assign": "Penugasan",
+      "approval": "Persetujuan",
+      "offer": "Penawaran"
+    },
+    "title": {
+      "panel": "Perlu tindakan",
+      "bookkeeping": "Posting jurnal: {name}",
+      "complete": "Konfirmasi selesai: {name}",
+      "assign": "Tugaskan pekerja: {name}",
+      "review": "Tinjau penawaran draf: {name}",
+      "offer": "Buat penawaran: {name}"
+    },
+    "meta": {
+      "panel": "{count} item · paling mendesak dulu",
+      "empty": "kosong",
+      "done": "Selesai {time}",
+      "assign": "{worker} · jadwal {date}",
+      "approved": "{price} · disetujui {time}",
+      "created": "{price} · dibuat {time}",
+      "received": "{service} · masuk {time}"
+    },
+    "cta": {
+      "bookkeeping": "Posting",
+      "complete": "Tandai",
+      "assign": "Tugaskan",
+      "review": "Tinjau",
+      "offer": "Buat"
+    }
+  },
+  "activity": {
+    "title": "Aktivitas terbaru",
+    "meta": "{count} peristiwa · terbaru dulu",
+    "pageLabel": "aktivitas terbaru",
+    "service": "layanan",
+    "request": "Permintaan masuk",
+    "offerApproved": "Penawaran disetujui",
+    "offerDraft": "Penawaran draf",
+    "assigned": "Pekerja ditugaskan",
+    "done": "Pekerjaan selesai",
+    "revenuePosted": "Pendapatan diposting",
+    "costPosted": "Biaya diposting"
+  },
+  "composition": {
+    "title": "Komposisi buku besar",
+    "meta": "{count} jurnal",
+    "costShare": "Biaya = {pct}% dari pendapatan",
+    "noRevenue": "Belum ada pendapatan tercatat",
+    "emptyKicker": "Pembukuan",
+    "emptyTitle": "Belum ada jurnal.",
+    "emptyBody": "Komposisi muncul setelah jurnal pertama diposting."
+  },
+  "mix": {
+    "title": "Posisi permintaan",
+    "meta": "{count} permintaan",
+    "emptyKicker": "Kosong",
+    "emptyTitle": "Belum ada permintaan.",
+    "ofTotal": " dari {total}.",
+    "new": "Baru",
+    "draft": "Draf penawaran",
+    "rejected": "Ditolak",
+    "offered": "Ditawarkan",
+    "assigned": "Ditugaskan",
+    "done": "Selesai",
+    "booked": "Terbukukan"
+  },
+  "onboard": {
+    "cta": "Buat permintaan pertama",
+    "tag": "Akun baru",
+    "titleBefore": "Alur Anda masih ",
+    "titleEm": "kosong",
+    "titleAfter": ".",
+    "body": "Semua angka di halaman ini dihitung dari data Anda sendiri. Mulai dengan satu permintaan pelanggan, lalu bawa sampai ke laporan. Setiap tahap membuka tahap berikutnya.",
+    "start": "Mulai di sini"
+  }
+}

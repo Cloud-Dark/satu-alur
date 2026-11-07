@@ -19,6 +19,7 @@ import {
   TICKET_LIMIT_MESSAGE, TICKET_NOT_FOUND,
 } from '../support/rules.js'
 import { adminListPlans } from '../business/api.js'
+import { t } from '../i18n/index.js'
 
 export const PAGE_SIZE = 50
 const DEMO_KEY = 'satualur_customers_demo_v1'
@@ -39,7 +40,7 @@ async function call(path, { method = 'GET', body, cache } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('office.common.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -85,20 +86,20 @@ async function mockPage({ q, page }, fields, failMessage) {
 export async function adminListCustomers({ q = '', page = 1 } = {}) {
   if (isUsingMockCloud()) {
     const accounts = loadAccounts()
-    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name, accounts[u.id]?.company], 'Gagal memuat pelanggan. Coba lagi.')
+    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name, accounts[u.id]?.company], t('office.errors.loadCustomersRetry'))
     return { items: await withPlans(rows), total, page }
   }
   try {
     return await call(`/api/office/admin/customers?q=${encodeURIComponent(q)}&page=${page}`, { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat pelanggan. ${e.message}`)
+    throw new Error(t('office.errors.loadCustomers', { error: e.message }))
   }
 }
 
 /** One customer, fresh from the server (shows who changed it last). */
 export async function adminGetCustomer(id) {
   if (isUsingMockCloud()) {
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pelanggan. Coba lagi.')
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(t('office.errors.loadCustomersRetry'))
     const u = mockUsers().find((x) => x.id === id) // mockUsers() already drops staff
     if (!u) throw new Error('Pelanggan tidak ditemukan.')
     return (await withPlans([u]))[0]
@@ -106,7 +107,7 @@ export async function adminGetCustomer(id) {
   try {
     return await call(`/api/office/admin/customers/${encodeURIComponent(id)}`, { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat pelanggan. ${e.message}`)
+    throw new Error(t('office.errors.loadCustomers', { error: e.message }))
   }
 }
 
@@ -139,7 +140,7 @@ async function saveFlag(id, change) {
 /** { items: [{ id, email, name, created_at, active_sessions, suspended, reason, last_session_at, demo }], total, page } */
 export async function adminListUsers({ q = '', page = 1 } = {}) {
   if (isUsingMockCloud()) {
-    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name], 'Gagal memuat pengguna. Coba lagi.')
+    const { rows, total } = await mockPage({ q, page }, (u) => [u.email, u.name], t('office.errors.loadUsersRetry'))
     const flags = loadFlags()
     // ponytail: mock sessions live in each page's memory, so the mock can't count them; always 0 here.
     const items = rows.map((u) => ({
@@ -151,7 +152,7 @@ export async function adminListUsers({ q = '', page = 1 } = {}) {
   try {
     return await call(`/api/office/admin/users?q=${encodeURIComponent(q)}&page=${page}`, { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat pengguna. ${e.message}`)
+    throw new Error(t('office.errors.loadUsers', { error: e.message }))
   }
 }
 
@@ -202,7 +203,7 @@ export async function adminListContact({ status = 'new', page = 1 } = {}) {
   if (isUsingMockCloud()) {
     const wait = Number(localStorage.getItem('satualur_customers_delay')) || 0
     if (wait) await new Promise((r) => setTimeout(r, wait))
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pesan. Coba lagi.')
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(t('office.errors.loadMessagesRetry'))
     const all = (read(DEMO_KEY, {}).contact || []).filter((r) => status === 'all' || r.status === status)
       .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)) || b.id - a.id)
     return { items: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), total: all.length, page }
@@ -210,7 +211,7 @@ export async function adminListContact({ status = 'new', page = 1 } = {}) {
   try {
     return await call(`/api/office/admin/contact?status=${encodeURIComponent(status)}&page=${page}`, { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat pesan. ${e.message}`)
+    throw new Error(t('office.errors.loadMessages', { error: e.message }))
   }
 }
 
@@ -310,14 +311,14 @@ export async function replyTicket(id, body) {
 /** Staff: { items (with email, user_name, company), total, page }; status = a ticket status or 'all'. */
 export async function adminListTickets({ status = 'all', page = 1 } = {}) {
   if (isUsingMockCloud()) {
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat tiket. Coba lagi.')
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(t('office.errors.loadTicketsRetry'))
     const all = (read(DEMO_KEY, {}).tickets || []).filter((t) => status === 'all' || t.status === status).sort(byUpdated)
     return { items: all.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(withOwner), total: all.length, page }
   }
   try {
     return await call(`/api/office/admin/support?status=${encodeURIComponent(status)}&page=${page}`, { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat tiket. ${e.message}`)
+    throw new Error(t('office.errors.loadTickets', { error: e.message }))
   }
 }
 

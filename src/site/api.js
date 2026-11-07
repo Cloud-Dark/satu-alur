@@ -6,6 +6,7 @@
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { validateSiteContent } from './content-rules.js'
+import { t } from '../i18n/index.js'
 
 const DEMO_KEY = 'satualur_site_demo_v1'
 const FAIL_KEY = 'satualur_site_fail'
@@ -25,7 +26,7 @@ async function call(path, { method = 'GET', body, cache } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('legal.errors.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -41,7 +42,7 @@ export async function loadSite(key) {
     // test seam: localStorage satualur_site_delay = ms to wait before loading (demo mode)
     const wait = Number(localStorage.getItem('satualur_site_delay')) || 0
     if (wait) await new Promise((r) => setTimeout(r, wait))
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat konten. Coba lagi.')
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(t('legal.errors.loadRetry'))
     const row = loadDemo()[key]
     return { value: row?.value ?? null, updated_at: row?.updated_at ?? null, updated_by: row?.updated_by ?? null }
   }
@@ -49,7 +50,7 @@ export async function loadSite(key) {
     const row = await call(`/api/site/${encodeURIComponent(key)}`, { cache: 'no-store' })
     return row && typeof row === 'object' ? row : { value: null }
   } catch (e) {
-    throw new Error(`Gagal memuat konten. ${e.message}`)
+    throw new Error(t('legal.errors.load', { message: e.message }))
   }
 }
 

@@ -2,7 +2,27 @@
  * Landing page copy (Bahasa Indonesia). Product facts follow README.md and
  * docs/01_PRD.md — no invented customers, metrics, or testimonials.
  * Any number shown in a product preview is illustrative and labelled "Contoh".
+ *
+ * The constants below are the Indonesian structure (icons, ids, numbers) and stay the
+ * staff editor's defaults. localizedContent() overlays the text from
+ * src/lang/<lang>/body.json (content.*) and header.json (nav.*) at render time.
  */
+import { t, tv } from '../i18n/index.js'
+
+/** Replaces every string in `base` with the string at the same place in `tr` (same shape). */
+function overlay(base, tr) {
+  if (tr == null) return base
+  if (typeof base === 'string') return typeof tr === 'string' ? tr : base
+  if (Array.isArray(base)) return base.map((b, i) => overlay(b, Array.isArray(tr) ? tr[i] : undefined))
+  if (base && typeof base === 'object') {
+    const out = { ...base }
+    for (const k of Object.keys(base)) out[k] = overlay(base[k], tr[k])
+    return out
+  }
+  return base
+}
+
+const camel = (s) => s.replace(/-(\w)/g, (_, c) => c.toUpperCase())
 
 export const NAV = [
   { id: 'alur', label: 'Alur kerja' },
@@ -358,4 +378,28 @@ export const AGENT_DEMO = {
     'Ketentuan minimal 10 karakter',
   ],
   status: 'Draf · menunggu persetujuan Anda',
+}
+
+/** Every landing constant with its text in the current language. */
+export function localizedContent() {
+  const c = (key, base) => overlay(base, tv(`body.content.${key}`))
+  return {
+    NAV: NAV.map((n) => ({ ...n, label: t(`header.nav.${camel(n.id)}`) })),
+    HERO: c('hero', HERO),
+    HERO_POINTS: c('heroPoints', HERO_POINTS),
+    STAGES: c('stages', STAGES),
+    TICKER: c('ticker', TICKER),
+    FEATURES: c('features', FEATURES),
+    INCOME: c('income', INCOME),
+    GROWTH: c('growth', GROWTH),
+    INTEGRATION: c('integration', INTEGRATION),
+    ROADMAP: c('roadmap', ROADMAP),
+    FAQS: c('faqs', FAQS),
+    AGENT_DEMO: c('agentDemo', AGENT_DEMO),
+  }
+}
+
+/** Pricing tiers (src/landing/pricing.js, shared with the worker) with their text in the current language. */
+export function localizedTiers(tiers) {
+  return tiers.map((tier) => overlay(tier, tv(`body.pricing.tiers.${camel(tier.id)}`)))
 }

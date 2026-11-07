@@ -1,0 +1,158 @@
+{
+  "fab": "Tanya Waguri",
+  "fabClose": "Tutup Tanya Waguri",
+  "subtitle": "Asisten AI Satu Alur",
+  "head": {
+    "viewFull": "Lihat Waguri seluruh badan",
+    "viewTitle": "Lihat Waguri",
+    "clear": "Hapus obrolan",
+    "close": "Tutup Waguri",
+    "closeTitle": "Tutup (Esc)"
+  },
+  "consent": {
+    "agree": "Setuju, mulai ngobrol",
+    "chip": "Obrolan pribadi",
+    "title": "Yuk, mulai dari kebutuhanmu.",
+    "ledeApp": "Aku bisa mengecek posisi proyek pelanggan, menjelaskan menu, meringkas keuangan, dan menyiapkan draf pesan dari data usahamu sendiri.",
+    "ledePublic": "Aku bisa menjelaskan Satu Alur, paket dan harganya, serta cara mulai memakainya.",
+    "point1": "Waguri menjawab satu hal per giliran, jadi tanyakan satu per satu.",
+    "point2": "Waguri bisa menunjukkan halaman atau data yang cocok untuk dibuka.",
+    "point3": "Kamu bebas menutup atau menghapus obrolan kapan saja.",
+    "note": "Riwayat obrolan disimpan di perangkat ini saja.",
+    "noteQuota": "Jawaban dari AI memakai kuota Penasihat AI."
+  },
+  "chat": {
+    "log": "Percakapan dengan Waguri",
+    "skills": "Keahlian Waguri",
+    "input": "Tulis pertanyaan untuk Waguri",
+    "send": "Kirim",
+    "try": "Coba tanyakan",
+    "typing": "Waguri sedang mengetik",
+    "loadError": "Maaf, data belum bisa dimuat: {message}",
+    "tryLater": "coba lagi sebentar lagi."
+  },
+  "card": {
+    "allDone": "Semua tahap selesai",
+    "step": "Tahap {n} dari {total}: {stage}",
+    "done": "Selesai"
+  },
+  "copy": {
+    "copy": "Salin pesan",
+    "copied": "Tersalin",
+    "failed": "Gagal menyalin"
+  },
+  "full": {
+    "back": "Kembali ke chat",
+    "close": "Tutup tampilan penuh",
+    "label": "Waguri, tampilan seluruh badan",
+    "alt": "Ilustrasi Waguri, asisten kantor Satu Alur, berdiri tersenyum"
+  },
+  "end": {
+    "cancel": "Batal",
+    "confirm": "Akhiri",
+    "title": "Akhiri obrolan ini?",
+    "body": "Seluruh riwayat obrolan dengan Waguri di perangkat ini akan dihapus."
+  },
+  "greeting": {
+    "hi": "Halo!",
+    "hiName": "Halo, {name}!",
+    "app": "Aku Waguri. Pilih keahlian di atas, lalu tanya apa saja: posisi proyek pelanggan, cara memakai menu, ringkasan keuangan, atau draf pesan follow-up.",
+    "public": "Aku Waguri, asisten AI Satu Alur. Tanya apa saja tentang Satu Alur, harga paket, atau cara mulai."
+  },
+  "steps": {
+    "request": "Permintaan",
+    "offer": "Penawaran",
+    "assign": "Penugasan",
+    "complete": "Penyelesaian",
+    "bookkeeping": "Pembukuan"
+  },
+  "actions": {
+    "openWorkflow": "Buka Alur kerja",
+    "openHelp": "Buka Bantuan",
+    "openReport": "Buka Laporan",
+    "openBookkeeping": "Buka Pembukuan",
+    "openInWorkflow": "Buka di Alur kerja",
+    "bookNow": "Bukukan sekarang",
+    "logRequest": "Catat permintaan",
+    "contactUs": "Hubungi kami"
+  },
+  "ai": {
+    "noModel": "Tidak ada model AI yang tersedia saat ini.",
+    "network": "Jaringan bermasalah.",
+    "empty": "Respons AI kosong.",
+    "quota": "Kuota AI bulan ini sudah habis, jadi saya menjawab dari data saja.",
+    "rateLimit": "Banyak sekali pertanyaan barusan. Coba lagi beberapa menit lagi."
+  },
+  "skills": {
+    "progress": {
+      "label": "Cek progres proyek",
+      "hint": "Sebut nama pelanggan, saya cek posisinya di Alur kerja.",
+      "placeholder": "Contoh: proyek dengan PT Maju Jaya sudah sampai mana?",
+      "suggestions": [
+        "Proyek dengan PT Maju Jaya sudah sampai mana?",
+        "Pekerjaan mana yang paling lama menunggu?",
+        "Progres Hotel Grand Lestari"
+      ]
+    },
+    "guide": {
+      "label": "Panduan Satu Alur",
+      "hint": "Tanya cara memakai menu apa pun di Satu Alur.",
+      "placeholder": "Contoh: bagaimana cara membuat invoice?",
+      "suggestions": [
+        "Bagaimana cara membuat invoice?",
+        "Apa itu kolom Posisi di Alur kerja?",
+        "Di mana saya melihat sisa kuota AI?"
+      ]
+    },
+    "finance": {
+      "label": "Ringkas keuangan",
+      "hint": "Pendapatan, biaya, dan laba dari buku besar Anda.",
+      "placeholder": "Contoh: berapa laba bulan ini?",
+      "suggestions": [
+        "Ringkas keuangan saya",
+        "Berapa laba bulan ini?",
+        "Ada tagihan yang belum lunas?"
+      ]
+    },
+    "message": {
+      "label": "Bantu tulis pesan",
+      "hint": "Draf WhatsApp atau email follow-up untuk pelanggan.",
+      "placeholder": "Contoh: tulis WA follow-up untuk Apartemen GreenView",
+      "suggestions": [
+        "Tulis WA follow-up untuk Apartemen GreenView",
+        "Draf email konfirmasi jadwal untuk PT Sinar Abadi",
+        "Pesan terima kasih untuk Rumah Bapak Surya"
+      ]
+    },
+    "about": {
+      "label": "Tentang Satu Alur",
+      "hint": "Apa itu Satu Alur dan apa saja fiturnya.",
+      "placeholder": "Contoh: Satu Alur itu untuk usaha apa?",
+      "suggestions": [
+        "Satu Alur itu aplikasi apa?",
+        "Fitur AI apa saja yang ada?",
+        "Apakah data saya aman?"
+      ]
+    },
+    "pricing": {
+      "label": "Harga & paket",
+      "hint": "Paket, harga, dan batasnya.",
+      "placeholder": "Contoh: ada paket gratis?",
+      "suggestions": [
+        "Berapa harga paketnya?",
+        "Apa batasan paket gratis?",
+        "Paket mana yang cocok untuk tim 5 orang?"
+      ]
+    },
+    "start": {
+      "label": "Cara mulai",
+      "hint": "Langkah pertama memakai Satu Alur.",
+      "placeholder": "Contoh: bagaimana cara daftar?",
+      "suggestions": [
+        "Bagaimana cara mulai?",
+        "Apakah perlu kata sandi?",
+        "Setelah masuk, apa yang pertama dikerjakan?"
+      ]
+    }
+  }
+}

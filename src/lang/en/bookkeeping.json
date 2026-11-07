@@ -1,0 +1,92 @@
+{
+  "title": "Bookkeeping",
+  "pickBody": "Open Workflow, then press \"Book it\" on a finished job. Totals for all jobs are in Reports.",
+  "loading": "Loading…",
+  "category": {
+    "pendapatan": "Revenue",
+    "biaya_tenaga": "Labor cost",
+    "biaya_bahan": "Materials",
+    "biaya_transport": "Transport",
+    "biaya_lain": "Other costs"
+  },
+  "form": {
+    "job": "Finished job",
+    "jobHint": "A job can have several entries: its revenue and its costs.",
+    "chooseJob": "Choose a job",
+    "noJobs": "No finished jobs yet",
+    "category": "Category",
+    "chooseCategory": "Choose a category",
+    "amount": "Amount (Rp)",
+    "vas": "Add-on service (optional)",
+    "vasHint": "Mark this if the revenue comes from an item in the Add-on services menu.",
+    "notVas": "Not an add-on service",
+    "vasError": "Could not load add-on services: {error}",
+    "fillOffer": "Use quote value {price}"
+  },
+  "wiz": {
+    "label": "Post entry",
+    "pick": "Choose job",
+    "pickDesc": "The finished job to book.",
+    "entry": "Entry",
+    "entryDesc": "Revenue or cost, and the amount.",
+    "review": "Review",
+    "reviewDesc": "Check the entry before posting."
+  },
+  "error": {
+    "pick": "Choose a finished job.",
+    "category": "Choose a category.",
+    "amount": "The amount must be a number above zero.",
+    "revenueTakenLong": "Revenue for this job is already posted. Choose a cost category, or another job.",
+    "revenueTaken": "Revenue for this job is already posted."
+  },
+  "preview": {
+    "doneDate": "Completion date"
+  },
+  "entries": {
+    "one": "{count} entry",
+    "other": "{count} entries"
+  },
+  "booked": "Booked",
+  "notBooked": "Not booked yet",
+  "offerValueNote": "Quote value {price}",
+  "review": {
+    "job": "Job",
+    "offerValue": "Quote value",
+    "previous": "Earlier entries"
+  },
+  "notFound": "This finished job was not found.",
+  "toWorkflow": "Go to workflow",
+  "posting": "Posting…",
+  "done": {
+    "more": "Add entry",
+    "other": "Other jobs",
+    "report": "View report",
+    "invoice": "Create invoice",
+    "text": "{category} {amount} for {name} posted.",
+    "toast": "Entry posted."
+  },
+  "postError": "Could not post: {error}",
+  "loadError": "Could not load: {error}",
+  "kpi": {
+    "revenue": "Revenue",
+    "cost": "Costs",
+    "profit": "Profit",
+    "loss": "Loss",
+    "margin": "Margin {pct}%",
+    "marginNone": "Margin —"
+  },
+  "list": {
+    "title": "Entries for this job",
+    "loading": "loading…",
+    "emptyKicker": "No data yet",
+    "emptyTitle": "This job is not booked yet.",
+    "emptyBody": "Its revenue and cost entries show up here with a running balance."
+  },
+  "col": {
+    "date": "Date",
+    "desc": "Description",
+    "in": "In",
+    "out": "Out",
+    "balance": "Balance"
+  }
+}

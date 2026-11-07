@@ -4,6 +4,8 @@
  * browser's print dialog, where "Simpan sebagai PDF" produces the file.
  */
 
+import { getLang } from '../i18n/index.js'
+
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
 const BASE_CSS = `
@@ -34,7 +36,7 @@ p { margin: 0 0 2.5mm; white-space: pre-wrap; }
 
 /** A full HTML page for `html` (already escaped by the caller). */
 export function printableDocument({ title, html }) {
-  return `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${BASE_CSS}</style></head><body><div class="doc">${html}</div></body></html>`
+  return `<!doctype html><html lang="${getLang()}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${BASE_CSS}</style></head><body><div class="doc">${html}</div></body></html>`
 }
 
 /**

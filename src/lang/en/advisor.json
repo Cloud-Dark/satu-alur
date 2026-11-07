@@ -1,0 +1,238 @@
+{
+  "auto": {
+    "name": "Automatic",
+    "role": "Picks the right adviser for each question",
+    "routed": "Questions go to the best-matched adviser",
+    "suggestions": [
+      "How do I grow 2% next month?",
+      "Which costs can I cut the most?",
+      "How do I get customers to come back?",
+      "Which jobs have been stuck the longest?"
+    ]
+  },
+  "growTwo": "How do I grow 2% next month?",
+  "route": {
+    "keyword": "Picked automatically from the words \"{words}\"",
+    "followUp": "Continuing the previous conversation",
+    "default": "Picked automatically as the general adviser"
+  },
+  "emptyAnswer": "Empty answer. Try asking again.",
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "seconds": "{n} s",
+  "aiUnavailable": "AI is currently unavailable",
+  "title": "Business adviser",
+  "picker": {
+    "choose": "Choose an adviser",
+    "change": "Change adviser",
+    "kicker": "Adviser",
+    "autoHint": "Picks automatically based on your question",
+    "aria": "Adviser: {name}. Change adviser"
+  },
+  "loading": "Loading…",
+  "calc": {
+    "targetAria": "Monthly growth target",
+    "otherTarget": "Other target",
+    "targetPctAria": "Monthly growth target in percent",
+    "base": "Monthly revenue",
+    "job": "Value per job",
+    "ask": "Ask how to get there",
+    "target": "Monthly target",
+    "askWithBase": "How can I reach {pct} monthly growth from {base} monthly revenue?",
+    "askPlain": "How can I reach {pct} monthly growth?",
+    "chartAria": "12-month projection: from {from} to {to} per month at a {pct} monthly target. Thin lines compare 1, 2, 5, and 10 percent targets.",
+    "table": "12-month projection table",
+    "actual": "Your actual growth: ",
+    "perMonth": "{value} per month",
+    "aboveTarget": ", already above this target.",
+    "needMore": ", {pct} points short.",
+    "emptyBase": "Enter your base monthly revenue to see the projection and how many jobs you need.",
+    "month12": "Month 12",
+    "perYear": "per month · equal to {pct} per year",
+    "nextMonth": "Next month",
+    "equalJobs": "equal to {n} jobs",
+    "now": "Now",
+    "months": "{n} mo",
+    "caption": "Revenue projection at a {pct} monthly target",
+    "colMonth": "Month",
+    "colRevenue": "Revenue/mo",
+    "colJobs": "Jobs/mo",
+    "colExtra": "Extra",
+    "nth": "#{n}",
+    "cumulative": "Cumulative extra revenue over 12 months: ",
+    "jobNote": ". Jobs are counted at an average value of {job}.",
+    "jobEmpty": ". Enter an average job value to count jobs.",
+    "baseFrom": "From {source}. You can change it.",
+    "baseLastMonth": "last month ({month})",
+    "baseLast30": "the last 30 days",
+    "baseTotal": "the recorded total",
+    "baseNone": "No revenue recorded yet. Enter your estimate.",
+    "jobFrom": "From {n} booked jobs.",
+    "jobNone": "Enter an estimated value for one job."
+  },
+  "tier": {
+    "empty": "Enter a monthly growth target.",
+    "realistic": "Realistic for sole traders and small businesses (1–2% per month).",
+    "aboveAverage": "Above the small-business average: needs consistent marketing effort.",
+    "aggressive": "Aggressive, on par with enterprise targets (5–10% per month): needs investment in marketing and team capacity.",
+    "veryAggressive": "Very aggressive: make sure capacity, cash, and quality can keep up."
+  },
+  "tabs": {
+    "snapshot": "Snapshot",
+    "snapshotMeta": "Business numbers the AI reads as context",
+    "calc": "Calculator",
+    "calcMeta": "Compound monthly growth target",
+    "stats": "Stats",
+    "statsMeta": "From the history saved in your account",
+    "aria": "Adviser data and tools"
+  },
+  "side": "Snapshot, calculator, and stats",
+  "jump": "Data & calculator",
+  "clear": {
+    "label": "Clear conversation",
+    "confirm": "Click again to clear",
+    "busy": "Clearing…",
+    "allDone": "All adviser conversations cleared.",
+    "oneDone": "{name} conversation cleared.",
+    "failed": "Couldn't clear: {message}"
+  },
+  "log": "Conversation with the adviser",
+  "chipsAria": "Suggested questions",
+  "input": {
+    "placeholder": "Ask about strategy or targets…",
+    "aria": "Question for the adviser",
+    "send": "Send question",
+    "sendTitle": "Send (Enter)",
+    "stop": "Stop",
+    "kbdSend": "send",
+    "kbdNewline": "new line"
+  },
+  "waitOrStop": "Wait for the answer to finish or stop it first.",
+  "questions": {
+    "one": "{count} question",
+    "other": "{count} questions"
+  },
+  "answeredBy": "Answered by {name}",
+  "autoPicked": "Adviser picked automatically",
+  "willAnswer": "Will be answered by: {name}",
+  "empty": {
+    "autoTitle": "What do you want to grow?",
+    "autoEm": "grow",
+    "agentTitle": "Ask {name}",
+    "noData": "You don't have business data yet, so early advice is general. Once requests and journal entries are recorded, answers will use your numbers.",
+    "withData": "Answers use your business snapshot: revenue, costs, conversion, and pending work. Conversations are saved on this device."
+  },
+  "answerOf": "Answer from {name}",
+  "composing": "Writing an answer",
+  "stopped": "Stopped",
+  "cutOff": "Cut off",
+  "retry": "Try again",
+  "failed": "The adviser couldn't answer.",
+  "older": {
+    "label": "Load earlier messages",
+    "nOf": "{n} of {total} more",
+    "n": "{n} more",
+    "loaded": "{n} earlier messages loaded."
+  },
+  "status": {
+    "composing": "{name} is writing an answer.",
+    "done": "{name} has finished answering.",
+    "stopped": "Answer stopped."
+  },
+  "noModel": "AI is currently unavailable. Check your connection, then reload the page.",
+  "retrying": "Connection lost, trying once more",
+  "notSaved": "The conversation couldn't be saved on this device.",
+  "snap": {
+    "logRequest": "Log a request",
+    "emptyKicker": "No data yet",
+    "emptyTitle": "The snapshot fills itself in.",
+    "emptyBody": "The adviser can still give general advice. Log requests and journal entries so advice uses your numbers.",
+    "fromTo": "{from} to {to}",
+    "average": "average {pct}",
+    "vs30": "30 days vs the previous 30 days",
+    "needTwo": "Needs two periods of data",
+    "revenue30": "30-day revenue",
+    "vsPrev": "{pct} vs previous",
+    "prev": "Previously {amount}",
+    "noLedger": "No journal entries yet",
+    "growth": "Growth",
+    "avgJob": "Average job value",
+    "jobsBooked": "{n} booked jobs",
+    "margin": "Margin",
+    "profit": "Profit {amount}",
+    "barsAria": "Six-month revenue: {list}",
+    "partial": "(in progress)",
+    "topService": "Top service",
+    "requests": "{n} requests",
+    "topCost": "Largest cost",
+    "ofRevenue": "{pct} of revenue",
+    "conversion": "Offer conversion",
+    "offered": "{pct} of requests got an offer",
+    "repeat": "Repeat customers",
+    "nOf": "{n} of {total}",
+    "pending": "Pending work",
+    "items": "{n} items",
+    "draft": "drafts {amount}",
+    "none": "None",
+    "context": "See the context sent to the AI",
+    "revenue6": "6-month revenue",
+    "asOf": "Calculated as of {date} from {requests} requests and {ledger} journal entries."
+  },
+  "stats": {
+    "empty": "No saved answers yet. Stats appear after you ask something.",
+    "answers": "Answers",
+    "avgTime": "Average time",
+    "failed": "Failed",
+    "perAgent": "Answers per adviser",
+    "stopped": "{n} answers stopped manually (not counted as failed)."
+  },
+  "historyError": "Couldn't load conversation history: {message}",
+  "dataError": "Couldn't load business data: {message}",
+  "agents": {
+    "konsultan": {
+      "name": "Business consultant",
+      "role": "The big picture and priorities",
+      "suggestions": [
+        "What are my business priorities this month?",
+        "Where is my workflow weakest?",
+        "Summarize my business in 5 points"
+      ]
+    },
+    "keuangan": {
+      "name": "Financial analyst",
+      "role": "Margin, costs, pricing, cash flow",
+      "suggestions": [
+        "Which costs can I cut the most?",
+        "Are my prices healthy?",
+        "What's an ideal margin for my services?"
+      ]
+    },
+    "pertumbuhan": {
+      "name": "Growth strategy",
+      "role": "Targets, projections, capacity",
+      "suggestions": [
+        "How do I grow 2% next month?",
+        "Is 10% monthly growth realistic?",
+        "How many extra jobs do I need?"
+      ]
+    },
+    "pemasaran": {
+      "name": "Marketing",
+      "role": "New and repeat customers",
+      "suggestions": [
+        "How do I get customers to come back?",
+        "What low-cost promotion fits this month?",
+        "Which service should I promote?"
+      ]
+    },
+    "operasional": {
+      "name": "Operations",
+      "role": "Scheduling, team, quality",
+      "suggestions": [
+        "Which jobs have been stuck the longest?",
+        "How can I add capacity without hiring?",
+        "Write a short SOP for the field team"
+      ]
+    }
+  }
+}

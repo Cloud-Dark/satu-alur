@@ -5,18 +5,21 @@ import { explainReport } from '../ai/agent.js'
 import { showToast } from '../ui/animations.js'
 import { resolveModel, abortable } from './offer.js'
 import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel, customerKey, localDate } from './data.js'
+import { t, has, locale } from '../i18n/index.js'
+
+const catLabel = (c) => (has(`bookkeeping.category.${c}`) ? t(`bookkeeping.category.${c}`) : categoryLabel(c))
 
 const { el } = C
 const DAY = 86400000
 
 const PERIODS = [
-  { value: '30d', label: '30 hari' },
-  { value: 'month', label: 'Bulan ini' },
-  { value: 'prev', label: 'Bulan lalu' },
-  { value: 'all', label: 'Semua' },
+  { value: '30d' },
+  { value: 'month' },
+  { value: 'prev' },
+  { value: 'all' },
 ]
 
-const monthName = (d) => d.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+const monthName = (d) => d.toLocaleDateString(locale(), { month: 'long', year: 'numeric' })
 
 /** Returns { from, to, label, prev: {from,to,label}|null } as Date objects. */
 export function periodRange(kind, now = new Date(), ledger = []) {
@@ -25,7 +28,7 @@ export function periodRange(kind, now = new Date(), ledger = []) {
   if (kind === '30d') {
     const from = new Date(tomorrow.getTime() - 30 * DAY)
     const pf = new Date(from.getTime() - 30 * DAY)
-    return { from, to: tomorrow, label: `${C.formatDate(from)} – ${C.formatDate(startToday)}`, prev: { from: pf, to: from, label: '30 hari sebelumnya' } }
+    return { from, to: tomorrow, label: `${C.formatDate(from)} – ${C.formatDate(startToday)}`, prev: { from: pf, to: from, label: t('report.period.prev30') } }
   }
   if (kind === 'month' || kind === 'prev') {
     const offset = kind === 'month' ? 0 : -1
@@ -36,7 +39,7 @@ export function periodRange(kind, now = new Date(), ledger = []) {
   }
   const dates = ledger.map((l) => C.toDate(ledgerDate(l))).filter(Boolean).sort((a, b) => a - b)
   const from = dates[0] || startToday
-  return { from, to: tomorrow, label: dates.length ? `${C.formatDate(from)} – ${C.formatDate(dates[dates.length - 1])}` : 'Belum ada data', prev: null }
+  return { from, to: tomorrow, label: dates.length ? `${C.formatDate(from)} – ${C.formatDate(dates[dates.length - 1])}` : t('report.period.noData'), prev: null }
 }
 
 const inRange = (l, r) => { const t = C.toDate(ledgerDate(l))?.getTime(); return t != null && t >= r.from.getTime() && t < r.to.getTime() }
@@ -45,29 +48,29 @@ export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
   let period = '30d'
 
-  const seg = C.segmented({ label: 'Periode laporan', value: period, options: PERIODS, onChange: (v) => { period = v; draw() } })
-  const periodLine = el('p', { className: 'period-line' }, C.icon('calendar', { size: 15 }), el('span', {}, 'Memuat…'))
+  const seg = C.segmented({ label: t('report.period.aria'), value: period, options: PERIODS.map((p) => ({ ...p, label: t(`report.period.${p.value}`) })), onChange: (v) => { period = v; draw() } })
+  const periodLine = el('p', { className: 'period-line' }, C.icon('calendar', { size: 15 }), el('span', {}, t('report.loading')))
   const kpis = el('div', { className: 'kpis' }, [0, 1, 2, 3].map((i) => el('div', { className: `kpi ${i === 0 ? 'is-hero' : ''}`.trim() }, C.skeleton({ lines: 2 }))))
   const catBody = el('div', {}, C.skeletonRows(4))
   const custBody = el('div', {}, C.skeletonRows(4))
-  const catPanel = C.panel({ title: 'Rincian kategori', meta: '—', className: 'span-7' }, catBody)
-  const custPanel = C.panel({ title: 'Pelanggan teratas', meta: 'berdasarkan pendapatan', className: 'span-5' }, custBody)
+  const catPanel = C.panel({ title: t('report.cat.title'), meta: '—', className: 'span-7' }, catBody)
+  const custPanel = C.panel({ title: t('report.cust.title'), meta: t('report.cust.meta'), className: 'span-5' }, custBody)
 
-  const explainBtn = C.button({ label: 'Jelaskan dengan AI', icon: 'sparkles', variant: 'primary' })
-  const mailBtn = C.button({ label: 'Kirim ke email saya', icon: 'mail', variant: 'soft', disabled: true })
+  const explainBtn = C.button({ label: t('report.ai.explain'), icon: 'sparkles', variant: 'primary' })
+  const mailBtn = C.button({ label: t('report.mail.button'), icon: 'mail', variant: 'soft', disabled: true })
   let lastExplanation = ''
   const modelNote = el('span', { className: 'model-note', hidden: true })
   const msg = C.message()
   const aiOut = el('div', { className: 'report-ai-out' })
-  const aiPanel = C.panel({ title: 'Penjelasan AI', meta: 'Bahasa Indonesia · HTML tersanitasi', raised: true, className: 'ai-panel' },
-    el('p', { className: 'panel-lead' }, 'AI membaca angka periode terpilih, membandingkannya dengan periode sebelumnya, lalu memberi ringkasan dan rekomendasi. Angka di atas tetap menjadi acuan.'),
+  const aiPanel = C.panel({ title: t('report.ai.title'), meta: t('report.ai.meta'), raised: true, className: 'ai-panel' },
+    el('p', { className: 'panel-lead' }, t('report.ai.lead')),
     el('div', { className: 'form-actions' }, explainBtn, mailBtn, modelNote),
     msg,
     aiOut,
   )
 
   container.replaceChildren(
-    C.pageHeader({ title: 'Laporan keuangan', actions: seg }),
+    C.pageHeader({ title: t('report.title'), actions: seg }),
     periodLine,
     kpis,
     el('div', { className: 'dash-grid is-stretch' }, catPanel, custPanel),
@@ -76,14 +79,14 @@ export async function render(container, ctx = {}) {
 
   let model = null
   const modelReady = resolveModel()
-    .then((m) => { model = m; if (!m) { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false } })
-    .catch((err) => { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false })
+    .then((m) => { model = m; if (!m) { modelNote.textContent = t('report.ai.unavailableShort'); modelNote.hidden = false } })
+    .catch((err) => { modelNote.textContent = t('report.ai.unavailableShort'); modelNote.hidden = false })
 
   let flow
   try {
     flow = await loadFlow()
   } catch (err) {
-    kpis.replaceChildren(C.errorState(`Gagal memuat buku besar: ${err.message}`))
+    kpis.replaceChildren(C.errorState(t('report.loadError', { error: err.message })))
     return
   }
   if (ctx.signal?.aborted) return
@@ -93,26 +96,26 @@ export async function render(container, ctx = {}) {
   function draw() {
     const r = periodRange(period, new Date(), flow.ledger)
     const entries = flow.ledger.filter((l) => inRange(l, r))
-    const t = totals(entries)
+    const tot = totals(entries)
     const prevT = r.prev ? totals(flow.ledger.filter((l) => inRange(l, r.prev))) : null
-    const margin = t.revenue > 0 ? (t.profit / t.revenue) * 100 : null
+    const margin = tot.revenue > 0 ? (tot.profit / tot.revenue) * 100 : null
 
-    periodLine.lastChild.textContent = `Periode ${r.label} · ${entries.length} jurnal${r.prev ? ` · pembanding: ${r.prev.label}` : ''}`
+    periodLine.lastChild.textContent = t('report.period.line', { label: r.label, count: entries.length }) + (r.prev ? t('report.period.compare', { label: r.prev.label }) : '')
 
     const cmp = (cur, prev, invert = false) => {
       if (!prevT || !(prev > 0)) return { sub: prevT ? `${r.prev.label}: ${C.rupiah(prev || 0)}` : null, tone: null }
       const pct = ((cur - prev) / prev) * 100
       const good = invert ? pct < 0 : pct > 0
-      return { sub: `${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct).toLocaleString('id-ID', { maximumFractionDigits: 1 })}% vs ${r.prev.label}`, tone: pct === 0 ? null : good ? 'ok' : 'danger' }
+      return { sub: `${pct > 0 ? '+' : pct < 0 ? '−' : '±'}${Math.abs(pct).toLocaleString(locale(), { maximumFractionDigits: 1 })}% vs ${r.prev.label}`, tone: pct === 0 ? null : good ? 'ok' : 'danger' }
     }
-    const cRev = cmp(t.revenue, prevT?.revenue)
-    const cCost = cmp(t.cost, prevT?.cost, true)
-    const cProfit = cmp(t.profit, prevT?.profit)
+    const cRev = cmp(tot.revenue, prevT?.revenue)
+    const cCost = cmp(tot.cost, prevT?.cost, true)
+    const cProfit = cmp(tot.profit, prevT?.profit)
     kpis.replaceChildren(
-      C.kpi({ label: 'Laba sebelum pajak', hero: true, iconName: 'sprout', value: C.rupiah(t.profit), countTo: t.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
-      C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue), countTo: t.revenue, format: C.rupiah, sub: cRev.sub, tone: cRev.tone }),
-      C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost), countTo: t.cost, format: C.rupiah, sub: cCost.sub, tone: cCost.tone }),
-      C.kpi({ label: 'Margin', iconName: 'activity', value: margin == null ? '—' : `${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, sub: margin == null ? 'Belum ada pendapatan' : `Biaya ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan` }),
+      C.kpi({ label: t('report.kpi.profit'), hero: true, iconName: 'sprout', value: C.rupiah(tot.profit), countTo: tot.profit, format: C.rupiah, sub: cProfit.sub, tone: cProfit.tone }),
+      C.kpi({ label: t('report.kpi.revenue'), iconName: 'wallet', value: C.rupiah(tot.revenue), countTo: tot.revenue, format: C.rupiah, sub: cRev.sub, tone: cRev.tone }),
+      C.kpi({ label: t('report.kpi.cost'), iconName: 'receipt', value: C.rupiah(tot.cost), countTo: tot.cost, format: C.rupiah, sub: cCost.sub, tone: cCost.tone }),
+      C.kpi({ label: t('report.kpi.margin'), iconName: 'activity', value: margin == null ? '—' : `${margin.toLocaleString(locale(), { maximumFractionDigits: 1 })}%`, sub: margin == null ? t('report.kpi.noRevenue') : t('report.kpi.costShare', { pct: Math.round((tot.cost / tot.revenue) * 100) }) }),
     )
 
     // Categories
@@ -124,17 +127,17 @@ export async function render(container, ctx = {}) {
       byCat.set(l.category, cur)
     }
     const cats = [...byCat.entries()].map(([cat, v]) => ({ cat, ...v })).sort((a, b) => (a.cat === 'pendapatan' ? -1 : b.cat === 'pendapatan' ? 1 : b.amount - a.amount))
-    catPanel.querySelector('.panel-meta').textContent = `${cats.length} kategori`
+    catPanel.querySelector('.panel-meta').textContent = t('report.cat.count', { count: cats.length })
     const max = Math.max(1, ...cats.map((c) => c.amount))
     catBody.replaceChildren(cats.length
       ? C.dataTable({
-          caption: 'Rincian kategori',
+          caption: t('report.cat.title'),
           rows: cats,
           columns: [
-            { label: 'Kategori', render: (c) => el('span', { className: c.cat === 'pendapatan' ? 'strong' : '' }, categoryLabel(c.cat)) },
-            { label: 'Jurnal', align: 'right', render: (c) => el('span', { className: 'tnum' }, String(c.n)) },
-            { label: 'Porsi', className: 'col-bar', render: (c) => el('span', { className: `bars-track ${c.cat === 'pendapatan' ? 'is-rev' : ''}` }, el('span', { className: 'bars-fill', style: `width:${(c.amount / max) * 100}%` })) },
-            { label: 'Jumlah', align: 'right', render: (c) => el('span', { className: 'tnum' }, C.rupiah(c.amount)) },
+            { label: t('report.cat.category'), render: (c) => el('span', { className: c.cat === 'pendapatan' ? 'strong' : '' }, catLabel(c.cat)) },
+            { label: t('report.cat.entries'), align: 'right', render: (c) => el('span', { className: 'tnum' }, String(c.n)) },
+            { label: t('report.cat.share'), className: 'col-bar', render: (c) => el('span', { className: `bars-track ${c.cat === 'pendapatan' ? 'is-rev' : ''}` }, el('span', { className: 'bars-fill', style: `width:${(c.amount / max) * 100}%` })) },
+            { label: t('report.cat.amount'), align: 'right', render: (c) => el('span', { className: 'tnum' }, C.rupiah(c.amount)) },
           ],
         })
       : emptyForPeriod())
@@ -157,15 +160,15 @@ export async function render(container, ctx = {}) {
           C.cellStack(c.name, c.service),
           el('span', { className: 'tnum strong' }, C.rupiah(c.amount)),
         )))
-      : C.emptyState({ kicker: 'Kosong', title: 'Belum ada pendapatan di periode ini.' }))
+      : C.emptyState({ kicker: t('report.cust.emptyKicker'), title: t('report.cust.emptyTitle') }))
 
     report = {
       period: r.label,
       period_start: localDate(r.from),
       period_end: localDate(r.to.getTime() - 1),
-      total_revenue: t.revenue,
-      total_cost: t.cost,
-      net_profit: t.profit,
+      total_revenue: tot.revenue,
+      total_cost: tot.cost,
+      net_profit: tot.profit,
       margin_pct: margin == null ? null : Number(margin.toFixed(1)),
       previous_period: prevT ? { label: r.prev.label, total_revenue: prevT.revenue, total_cost: prevT.cost, net_profit: prevT.profit } : null,
       by_category: cats.map((c) => ({ category: c.cat, label: categoryLabel(c.cat), amount: c.amount, entries: c.n })),
@@ -175,14 +178,14 @@ export async function render(container, ctx = {}) {
     explainBtn.disabled = entries.length === 0
     mailBtn.disabled = entries.length === 0
     lastExplanation = ''
-    if (!entries.length) msg.show('info', 'Tidak ada jurnal di periode ini, jadi belum ada yang bisa dijelaskan.')
+    if (!entries.length) msg.show('info', t('report.ai.nothing'))
     else msg.hide()
   }
 
   function emptyForPeriod() {
-    const box = C.emptyState({ kicker: 'Periode kosong', title: 'Tidak ada jurnal di periode ini.', body: flow.ledger.length ? 'Coba periode lain, atau posting jurnal baru.' : 'Posting jurnal di tahap 05 agar laporan terisi.' })
+    const box = C.emptyState({ kicker: t('report.empty.kicker'), title: t('report.empty.title'), body: flow.ledger.length ? t('report.empty.tryOther') : t('report.empty.post') })
     if (!flow.ledger.length) {
-      const go = C.button({ label: 'Pekerjaan siap dibukukan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+      const go = C.button({ label: t('report.empty.toBook'), iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
       go.addEventListener('click', () => navigate('workflow', { filter: 'book' }))
       box.appendChild(go)
     }
@@ -196,15 +199,15 @@ export async function render(container, ctx = {}) {
   explainBtn.addEventListener('click', async () => {
     msg.hide()
     if (!model) { try { await modelReady } catch { /* reported below */ } }
-    if (!model) { msg.show('danger', 'Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.'); return }
+    if (!model) { msg.show('danger', t('report.ai.unavailable')); return }
     if (!report) return
     current?.abort()
     const ac = new AbortController()
     current = ac
-    const restore = C.setBusy(explainBtn, 'Menganalisis…')
-    const ui = C.aiConsole({ model: 'Analis laporan' })
+    const restore = C.setBusy(explainBtn, t('report.ai.analyzing'))
+    const ui = C.aiConsole({ model: t('report.ai.model') })
     ui.onStop(() => ac.abort())
-    ui.setStatus('Menulis…', true)
+    ui.setStatus(t('report.ai.writing'), true)
     ui.write('')
     aiOut.replaceChildren(ui.root)
     try {
@@ -216,15 +219,15 @@ export async function render(container, ctx = {}) {
       }), ac.signal)
       ui.writeHTML(C.sanitizeHTML(html), { caretOn: false })
       lastExplanation = ui.body?.textContent || ''
-      ui.setStatus('Selesai', false)
-      showToast('Penjelasan laporan selesai.', 'success')
+      ui.setStatus(t('report.ai.done'), false)
+      showToast(t('report.ai.doneToast'), 'success')
     } catch (err) {
       ui.done()
       if (err.name === 'AbortError') {
-        ui.setStatus('Dihentikan', false)
-        msg.show('info', 'Penjelasan dihentikan.')
+        ui.setStatus(t('report.ai.stopped'), false)
+        msg.show('info', t('report.ai.stoppedMsg'))
       } else {
-        ui.setStatus('Gagal', false)
+        ui.setStatus(t('report.ai.failed'), false)
         msg.show('danger', err.message)
       }
     } finally {
@@ -238,18 +241,18 @@ export async function render(container, ctx = {}) {
   mailBtn.addEventListener('click', async () => {
     if (!report) return
     const lines = [
-      `Laporan keuangan ${report.period}`,
+      t('report.mail.heading', { period: report.period }),
       '',
-      `Pendapatan: ${C.rupiah(report.total_revenue)}`,
-      `Biaya: ${C.rupiah(report.total_cost)}`,
-      `Laba sebelum pajak: ${C.rupiah(report.net_profit)}${report.margin_pct == null ? '' : ` (margin ${report.margin_pct}%)`}`,
-      report.previous_period ? `Pembanding ${report.previous_period.label}: laba ${C.rupiah(report.previous_period.net_profit)}` : null,
-      lastExplanation ? `\nPenjelasan AI:\n${lastExplanation.trim()}` : null,
+      t('report.mail.revenue', { amount: C.rupiah(report.total_revenue) }),
+      t('report.mail.cost', { amount: C.rupiah(report.total_cost) }),
+      t('report.mail.profit', { amount: C.rupiah(report.net_profit) }) + (report.margin_pct == null ? '' : t('report.mail.margin', { pct: report.margin_pct })),
+      report.previous_period ? t('report.mail.compare', { label: report.previous_period.label, amount: C.rupiah(report.previous_period.net_profit) }) : null,
+      lastExplanation ? `\n${t('report.mail.ai')}\n${lastExplanation.trim()}` : null,
     ].filter((l) => l !== null)
-    const restore = C.setBusy(mailBtn, 'Mengirim…')
+    const restore = C.setBusy(mailBtn, t('report.mail.sending'))
     try {
-      const r = await sendBusinessEmail({ kind: 'report', subject: `Laporan ${report.period}`, body: lines.join('\n') })
-      showToast(r.simulated ? 'Simulasi: email tidak dikirim dari akun demo.' : `Laporan terkirim ke ${r.to}.`, 'success')
+      const r = await sendBusinessEmail({ kind: 'report', subject: t('report.mail.subject', { period: report.period }), body: lines.join('\n') })
+      showToast(r.simulated ? t('report.mail.simulated') : t('report.mail.sent', { to: r.to }), 'success')
     } catch (err) { msg.show('danger', err.message) } finally { restore() }
   })
 

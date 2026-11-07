@@ -1,0 +1,219 @@
+{
+  "title": "Penugasan Pintar",
+  "tabs": {
+    "aria": "Penugasan",
+    "assign": "Tugaskan",
+    "team": "Tim",
+    "map": "Peta",
+    "performance": "Performa"
+  },
+  "loading": "Memuat…",
+  "saving": "Menyimpan…",
+  "save": "Simpan",
+  "cancel": "Batal",
+  "add": "Tambah",
+  "noWorker": "Tanpa petugas",
+  "loadError": "Gagal memuat data: {error}",
+  "saveError": "Gagal menyimpan: {error}",
+  "pickBody": "Penugasan dibuat untuk satu pekerjaan. Buka Alur kerja, lalu tekan \"Tugaskan petugas\" pada pekerjaan yang penawarannya sudah disetujui.",
+  "offerNotFound": "Penawaran tidak ditemukan.",
+  "offerNotFoundBody": "Pilih pekerjaan lain dari Alur kerja.",
+  "progress": {
+    "belum": "Belum dikerjakan",
+    "dikerjakan": "Sedang dikerjakan",
+    "ditunda": "Ditunda",
+    "selesai": "Selesai",
+    "overdue": "Lewat jadwal"
+  },
+  "plan": {
+    "unknown": "Status progres tidak dikenal.",
+    "finished": "Pekerjaan ini sudah selesai.",
+    "unchanged": "Status tidak berubah."
+  },
+  "reason": {
+    "Keahlian cocok": "Keahlian cocok",
+    "Keahlian tidak cocok": "Keahlian tidak cocok",
+    "Keahlian umum": "Keahlian umum",
+    "Bentrok: ada tugas di hari yang sama": "Bentrok: ada tugas di hari yang sama",
+    "Tidak bentrok": "Tidak bentrok"
+  },
+  "form": {
+    "title": "Tugaskan petugas",
+    "meta": "Rekomendasi otomatis",
+    "offer": "Penawaran disetujui",
+    "offerHint": "Pilih penawaran untuk lihat rekomendasi petugas.",
+    "chooseOffer": "Pilih penawaran",
+    "allAssigned": "Semua penawaran sudah ditugaskan",
+    "noApproved": "Belum ada penawaran disetujui",
+    "schedule": "Jadwal pelaksanaan",
+    "scheduleHint": "Waktu lokal perangkat Anda.",
+    "submit": "Tugaskan",
+    "count": "Jumlah",
+    "recommend": "Pilih rekomendasi",
+    "workers": "Petugas"
+  },
+  "noActive": "Belum ada petugas aktif",
+  "noActiveBody": "Tambahkan petugas di tab Tim untuk mulai menugaskan.",
+  "toTeam": "Ke tab Tim",
+  "teamPanel": "Tim pekerjaan ini",
+  "assignmentsCount": {
+    "one": "{count} penugasan",
+    "other": "{count} penugasan"
+  },
+  "notAssigned": "Belum ditugaskan",
+  "offerNote": "Penawaran #{id} · {price}",
+  "openOffer": "Buka penawaran",
+  "notApproved": "Penawaran pekerjaan ini belum disetujui. Setujui dulu, lalu tugaskan petugas.",
+  "pickOfferFirst": "Pilih penawaran terlebih dahulu.",
+  "clash": "Bentrok",
+  "warn": {
+    "clash": "Ada petugas yang bentrok di hari yang sama.",
+    "skill": "Tidak ada petugas terpilih yang memiliki keahlian yang dibutuhkan."
+  },
+  "summary": {
+    "team": "Tim: ",
+    "skills": "Keahlian: "
+  },
+  "alreadyAssigned": "Pekerjaan ini sudah ditugaskan.",
+  "noApprovedNote": "Belum ada penawaran yang disetujui. Simpan penawaran di tahap 02 terlebih dahulu.",
+  "toOffers": "Ke penawaran",
+  "preview": {
+    "customer": "Pelanggan",
+    "scope": "Lingkup",
+    "value": "Nilai"
+  },
+  "error": {
+    "offer": "Pilih penawaran.",
+    "team": "Pilih minimal satu petugas.",
+    "schedule": "Isi jadwal pelaksanaan yang valid.",
+    "check": "Periksa kembali isian berikut."
+  },
+  "saved": {
+    "text": "{team} ditugaskan untuk {name}, {date}.",
+    "toast": "Penugasan tersimpan.",
+    "hint": "Tandai selesai di bawah setelah pekerjaannya rampung."
+  },
+  "markDone": "Tandai selesai",
+  "table": {
+    "caption": "Penugasan pekerjaan ini",
+    "workerSchedule": "Petugas · jadwal",
+    "progress": "Progres",
+    "action": "Aksi"
+  },
+  "progressDlg": {
+    "change": "Ubah progres",
+    "chipAria": "Progres: {label}. Ubah progres",
+    "aria": "Progres pekerjaan",
+    "doneHint": "Selesai dicatat di tahap Penyelesaian (catatan hasil), supaya tidak tercatat dua kali.",
+    "note": "Catatan (opsional)",
+    "notePh": "Mis. menunggu sparepart, pelanggan minta jadwal ulang…",
+    "loadingHistory": "Memuat riwayat…",
+    "save": "Simpan progres",
+    "history": "Riwayat",
+    "noHistory": "Belum ada perubahan progres.",
+    "historyError": "Riwayat tidak bisa dimuat.",
+    "toast": "Progres: {label}."
+  },
+  "state": {
+    "available": "Tersedia",
+    "on_job": "Dalam tugas",
+    "inactive": "Nonaktif"
+  },
+  "worker": {
+    "name": "Nama",
+    "phone": "No. HP",
+    "address": "Alamat",
+    "addressHint": "Dipakai untuk menentukan zona dan jarak.",
+    "status": "Status",
+    "active": "Aktif",
+    "saveChanges": "Simpan perubahan",
+    "add": "Tambah petugas",
+    "edit": "Edit petugas",
+    "editShort": "Edit",
+    "nameRequired": "Nama wajib diisi.",
+    "phoneInvalid": "Nomor HP tidak valid.",
+    "updated": "{name} diperbarui.",
+    "added": "{name} ditambahkan.",
+    "deactivate": "Nonaktifkan",
+    "delete": "Hapus",
+    "confirm": "{verb} {name}?",
+    "failed": "{verb} gagal",
+    "deactivated": "{name} dinonaktifkan.",
+    "deleted": "{name} dihapus.",
+    "noContact": "Belum ada kontak",
+    "jobsDone": {
+      "one": "{count} job selesai",
+      "other": "{count} job selesai"
+    },
+    "activate": "Aktifkan",
+    "activateFailed": "Aktifkan gagal",
+    "activated": "{name} diaktifkan."
+  },
+  "skills": {
+    "title": "Keahlian",
+    "count": {
+      "one": "{count} keahlian",
+      "other": "{count} keahlian"
+    },
+    "newPh": "Keahlian baru, mis. Instalasi CCTV",
+    "newAria": "Nama keahlian baru",
+    "hint": "Ketuk untuk memilih. Ubah nama atau hapus keahlian di panel Keahlian.",
+    "used": {
+      "one": "{count} petugas",
+      "other": "{count} petugas"
+    },
+    "unused": "Belum dipakai",
+    "rename": "Ubah",
+    "renameAria": "Nama baru untuk {name}",
+    "renameFailed": "Ubah keahlian gagal",
+    "renamed": "Keahlian diganti menjadi {name}.",
+    "confirmUsed": {
+      "one": "Hapus keahlian \"{name}\"? Keahlian ini juga dilepas dari {count} petugas.",
+      "other": "Hapus keahlian \"{name}\"? Keahlian ini juga dilepas dari {count} petugas."
+    },
+    "confirm": "Hapus keahlian \"{name}\"?",
+    "deleteFailed": "Hapus keahlian gagal",
+    "deleted": "Keahlian {name} dihapus.",
+    "addFailed": "Tambah keahlian gagal",
+    "added": "Keahlian {name} ditambahkan."
+  },
+  "team": {
+    "title": "Tim petugas",
+    "active": {
+      "one": "{count} aktif",
+      "other": "{count} aktif"
+    },
+    "emptyBody": "Tambahkan petugas untuk mulai menugaskan pekerjaan.",
+    "workers": {
+      "one": "{count} petugas",
+      "other": "{count} petugas"
+    }
+  },
+  "map": {
+    "aria": "Peta lokasi petugas",
+    "jobToday": "Lokasi job hari ini",
+    "noWorkers": "Belum ada petugas",
+    "noWorkersBody": "Tambahkan petugas di tab Tim, lalu isi alamatnya.",
+    "noLocations": "Belum ada lokasi petugas",
+    "noLocationsBody": "Isi alamat petugas di tab Tim untuk menampilkannya di peta.",
+    "title": "Lokasi petugas",
+    "loading": "Memuat peta…",
+    "error": "Peta gagal dimuat. Periksa koneksi lalu buka tab ini lagi.",
+    "unavailable": "Peta tidak tersedia",
+    "meta": "{n} dari {total} petugas punya lokasi",
+    "missing": "Belum di peta: {names}. {hint}",
+    "fillAddress": "Isi alamatnya di tab Tim.",
+    "refineAddress": "Alamatnya belum ditemukan; perjelas alamat (kelurahan, kota).",
+    "openTasks": "Tugas terbuka: {list}"
+  },
+  "perf": {
+    "active": "Petugas aktif",
+    "jobsDone": "Job selesai",
+    "onJobToday": "Dalam tugas hari ini",
+    "progress": "Progres pekerjaan",
+    "ranking": "Peringkat petugas",
+    "rankingMeta": "Berdasarkan job selesai",
+    "caption": "Peringkat petugas berdasarkan job selesai",
+    "emptyBody": "Tambahkan petugas di tab Tim."
+  }
+}

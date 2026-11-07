@@ -10,21 +10,26 @@ import { TEMPLATE_CATEGORIES, FIELD_TYPES, validateTemplate } from '../../offer/
 import { OFFICE_PAGE_SIZE } from '../../office/paging.js'
 import { LEAVE_MSG } from './site-doc.js'
 import '../../styles/offer-flow.css'
+import { t } from '../../i18n/index.js'
 
 const { el } = C
 let seq = 0
-const catLabel = (v) => TEMPLATE_CATEGORIES.find((c) => c.value === v)?.label || v
-const priceRange = (t) => (t.price_hint_min || t.price_hint_max
-  ? `${t.price_hint_min ? C.rupiah(t.price_hint_min) : '…'} – ${t.price_hint_max ? C.rupiah(t.price_hint_max) : '…'}`
-  : 'Tanpa kisaran harga')
+// Categories and field types come from offer/templates.js (shared with the Worker): translate by value.
+const catLabel = (v) => (TEMPLATE_CATEGORIES.some((c) => c.value === v) ? t(`office.templates.category.${v}`) : v)
+const catOptions = () => TEMPLATE_CATEGORIES.map((c) => ({ value: c.value, label: catLabel(c.value) }))
+const typeLabel = (v) => (FIELD_TYPES.some((x) => x.value === v) ? t(`office.templates.fieldType.${v}`) : v)
+const typeOptions = () => FIELD_TYPES.map((x) => ({ value: x.value, label: typeLabel(x.value) }))
+const priceRange = (tp) => (tp.price_hint_min || tp.price_hint_max
+  ? `${tp.price_hint_min ? C.rupiah(tp.price_hint_min) : '…'} – ${tp.price_hint_max ? C.rupiah(tp.price_hint_max) : '…'}`
+  : t('office.templates.noPriceRange'))
 
 function fieldRow(f = {}, onChange) {
   const id = ++seq
-  const label = C.field({ label: 'Pertanyaan', id: `ot-f-l-${id}`, value: f.label || '', attrs: { maxlength: '80', 'data-k': 'label' } })
-  const type = C.select({ label: 'Jenis isian', id: `ot-f-t-${id}`, value: f.type || 'text', options: FIELD_TYPES, attrs: { 'data-k': 'type' } })
-  const opts = C.textarea({ label: 'Opsi (satu per baris)', id: `ot-f-o-${id}`, rows: 3, value: (f.options || []).join('\n'), attrs: { 'data-k': 'options' } })
-  const req = el('label', { className: 'check-inline' }, el('input', { type: 'checkbox', 'data-k': 'required', checked: Boolean(f.required) }), el('span', {}, 'Wajib diisi'))
-  const rm = C.button({ label: 'Hapus', icon: 'trash', variant: 'ghost', size: 'sm' })
+  const label = C.field({ label: t('office.templates.question'), id: `ot-f-l-${id}`, value: f.label || '', attrs: { maxlength: '80', 'data-k': 'label' } })
+  const type = C.select({ label: t('office.templates.fieldTypeLabel'), id: `ot-f-t-${id}`, value: f.type || 'text', options: typeOptions(), attrs: { 'data-k': 'type' } })
+  const opts = C.textarea({ label: t('office.templates.options'), id: `ot-f-o-${id}`, rows: 3, value: (f.options || []).join('\n'), attrs: { 'data-k': 'options' } })
+  const req = el('label', { className: 'check-inline' }, el('input', { type: 'checkbox', 'data-k': 'required', checked: Boolean(f.required) }), el('span', {}, t('office.templates.required')))
+  const rm = C.button({ label: t('office.common.delete'), icon: 'trash', variant: 'ghost', size: 'sm' })
   const row = el('div', { className: 'ot-field' }, el('div', { className: 'form-row keep-row' }, label.wrap, type.wrap), opts.wrap, el('div', { className: 'ot-field-foot' }, req, rm))
   row.dataset.key = f.key || ''
   const syncOpts = () => { opts.wrap.hidden = type.input.value !== 'select' }
@@ -41,24 +46,24 @@ function fieldRow(f = {}, onChange) {
   return row
 }
 
-function previewNode(t) {
-  if (!t.fields.length) return el('p', { className: 'muted small' }, 'Template tanpa pertanyaan tambahan.')
+function previewNode(tp) {
+  if (!tp.fields.length) return el('p', { className: 'muted small' }, t('office.templates.noQuestions'))
   return el('ul', { className: 'ot-preview' }, ...t.fields.map((f) => el('li', {},
-    el('strong', {}, f.label), f.required ? ' *' : '', el('span', { className: 'muted small' }, ` · ${FIELD_TYPES.find((x) => x.value === f.type)?.label}${f.type === 'select' ? `: ${f.options.join(', ')}` : ''}`))))
+    el('strong', {}, f.label), f.required ? ' *' : '', el('span', { className: 'muted small' }, ` · ${typeLabel(f.type)}${f.type === 'select' ? `: ${f.options.join(', ')}` : ''}`))))
 }
 
 function templateDialog(ctx, tpl, opener, onSaved, setDirty) {
   const id = ++seq
   const v = tpl || { category: 'jasa', fields: [], active: 1 }
-  const name = C.field({ label: 'Nama template', id: `ot-name-${id}`, value: v.name || '', required: true, attrs: { maxlength: '80' } })
-  const cat = C.select({ label: 'Kategori', id: `ot-cat-${id}`, value: v.category, options: TEMPLATE_CATEGORIES })
-  const desc = C.textarea({ label: 'Deskripsi singkat', id: `ot-desc-${id}`, rows: 2, value: v.description || '', attrs: { maxlength: '400' } })
-  const hint = C.textarea({ label: 'Arahan untuk AI', id: `ot-hint-${id}`, rows: 3, value: v.prompt_hint || '', hint: 'Apa saja yang harus dirinci AI di penawaran.', attrs: { maxlength: '1000' } })
-  const terms = C.textarea({ label: 'Ketentuan bawaan', id: `ot-terms-${id}`, rows: 2, value: v.default_terms || '', attrs: { maxlength: '600' } })
-  const min = C.field({ label: 'Harga minimum (Rp)', id: `ot-min-${id}`, type: 'number', value: v.price_hint_min ?? '', attrs: { min: '0', step: '1000' } })
-  const max = C.field({ label: 'Harga maksimum (Rp)', id: `ot-max-${id}`, type: 'number', value: v.price_hint_max ?? '', attrs: { min: '0', step: '1000' } })
-  const sort = C.field({ label: 'Urutan', id: `ot-sort-${id}`, type: 'number', value: v.sort ?? 0, attrs: { step: '1' } })
-  const vis = C.choiceGroup({ legend: 'Status', name: `ot-active-${id}`, options: [{ value: 'on', label: 'Aktif (bisa dipilih bisnis)', checked: v.active !== 0 }] })
+  const name = C.field({ label: t('office.templates.name'), id: `ot-name-${id}`, value: v.name || '', required: true, attrs: { maxlength: '80' } })
+  const cat = C.select({ label: t('office.templates.categoryLabel'), id: `ot-cat-${id}`, value: v.category, options: catOptions() })
+  const desc = C.textarea({ label: t('office.templates.desc'), id: `ot-desc-${id}`, rows: 2, value: v.description || '', attrs: { maxlength: '400' } })
+  const hint = C.textarea({ label: t('office.templates.hint'), id: `ot-hint-${id}`, rows: 3, value: v.prompt_hint || '', hint: t('office.templates.hintHint'), attrs: { maxlength: '1000' } })
+  const terms = C.textarea({ label: t('office.templates.terms'), id: `ot-terms-${id}`, rows: 2, value: v.default_terms || '', attrs: { maxlength: '600' } })
+  const min = C.field({ label: t('office.templates.min'), id: `ot-min-${id}`, type: 'number', value: v.price_hint_min ?? '', attrs: { min: '0', step: '1000' } })
+  const max = C.field({ label: t('office.templates.max'), id: `ot-max-${id}`, type: 'number', value: v.price_hint_max ?? '', attrs: { min: '0', step: '1000' } })
+  const sort = C.field({ label: t('office.templates.sort'), id: `ot-sort-${id}`, type: 'number', value: v.sort ?? 0, attrs: { step: '1' } })
+  const vis = C.choiceGroup({ legend: t('office.common.status'), name: `ot-active-${id}`, options: [{ value: 'on', label: t('office.templates.activeLabel'), checked: v.active !== 0 }] })
   const fieldsBox = el('div', { className: 'ot-fields' })
   const preview = el('div', { className: 'ot-preview-box' })
   const err = el('p', { className: 'field-error', role: 'alert' })
@@ -69,27 +74,27 @@ function templateDialog(ctx, tpl, opener, onSaved, setDirty) {
     fields: [...fieldsBox.children].map((r) => r.read()),
   })
   const drawPreview = () => {
-    try { preview.replaceChildren(el('span', { className: 'proposal-label' }, 'Pratinjau pertanyaan'), previewNode(validateTemplate(gather()))) } catch (ex) { preview.replaceChildren(el('p', { className: 'muted small' }, ex.message)) }
+    try { preview.replaceChildren(el('span', { className: 'proposal-label' }, t('office.templates.preview')), previewNode(validateTemplate(gather()))) } catch (ex) { preview.replaceChildren(el('p', { className: 'muted small' }, ex.message)) }
   }
   let base = null
   const touch = () => { drawPreview(); if (base !== null) setDirty(JSON.stringify(gather()) !== base) }
   ;(v.fields || []).forEach((f) => fieldsBox.append(fieldRow(f, touch)))
-  const addField = C.button({ label: 'Tambah pertanyaan', icon: 'plus', variant: 'soft', size: 'sm' })
+  const addField = C.button({ label: t('office.templates.addQuestion'), icon: 'plus', variant: 'soft', size: 'sm' })
   addField.addEventListener('click', () => {
-    if (fieldsBox.children.length >= 12) { err.textContent = 'Maksimal 12 pertanyaan.'; return }
+    if (fieldsBox.children.length >= 12) { err.textContent = t('office.templates.maxQuestions'); return }
     const r = fieldRow({}, touch)
     fieldsBox.append(r); touch()
     r.querySelector('input').focus()
   })
-  const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary', type: 'submit' })
-  const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
+  const save = C.button({ label: t('office.common.save'), icon: 'save', variant: 'primary', type: 'submit' })
+  const cancel = C.button({ label: t('office.common.cancel'), variant: 'ghost', type: 'button' })
   const { dialog, form, close } = C.modal({
-    title: tpl ? `Ubah ${tpl.name}` : 'Tambah template',
-    description: 'Bisnis memilih template ini di tahap Penawaran, lalu menjawab pertanyaannya sebelum AI menyusun penawaran.',
+    title: tpl ? t('office.common.editName', { name: tpl.name }) : t('office.templates.add'),
+    description: t('office.templates.dialogDesc'),
     wide: true,
     children: [name.wrap, el('div', { className: 'form-row' }, cat.wrap, sort.wrap), desc.wrap,
-      el('h3', { className: 'field-label' }, 'Pertanyaan untuk klien'), fieldsBox, addField, preview,
-      el('h3', { className: 'field-label' }, 'Panduan AI'), hint.wrap, terms.wrap, el('div', { className: 'form-row' }, min.wrap, max.wrap), vis.wrap, err],
+      el('h3', { className: 'field-label' }, t('office.templates.clientQuestions')), fieldsBox, addField, preview,
+      el('h3', { className: 'field-label' }, t('office.templates.aiGuide')), hint.wrap, terms.wrap, el('div', { className: 'form-row' }, min.wrap, max.wrap), vis.wrap, err],
     actions: [cancel, save], opener,
   })
   base = JSON.stringify(gather())
@@ -105,13 +110,13 @@ function templateDialog(ctx, tpl, opener, onSaved, setDirty) {
     err.textContent = ''
     let body
     try { body = validateTemplate(gather()) } catch (ex) { err.textContent = ex.message; return }
-    const restore = C.setBusy(save, 'Menyimpan…')
+    const restore = C.setBusy(save, t('office.common.saving'))
     try {
       if (tpl) await adminUpdateTemplate(tpl.id, body)
       else await adminCreateTemplate(body)
       base = null
       close()
-      showToast('Template tersimpan.', 'success')
+      showToast(t('office.templates.saved'), 'success')
       if (!ctx.signal.aborted) onSaved()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
@@ -121,9 +126,9 @@ export function draw(host, ctx, setDirty) {
   const list = el('div', { className: 'ot-list' })
   let run = 0
   let q = ''
-  const pg = C.pager({ label: 'template penawaran', pageSize: OFFICE_PAGE_SIZE, sizes: [OFFICE_PAGE_SIZE], hideSize: true, onChange: () => load(pg.page), scrollTarget: () => list })
-  const add = C.button({ label: 'Tambah template', icon: 'plus', variant: 'primary', size: 'sm' })
-  const search = el('input', { type: 'search', className: 'input input-sm', placeholder: 'Cari template', 'aria-label': 'Cari template' })
+  const pg = C.pager({ label: t('office.templates.pagerLabel'), pageSize: OFFICE_PAGE_SIZE, sizes: [OFFICE_PAGE_SIZE], hideSize: true, onChange: () => load(pg.page), scrollTarget: () => list })
+  const add = C.button({ label: t('office.templates.add'), icon: 'plus', variant: 'primary', size: 'sm' })
+  const search = el('input', { type: 'search', className: 'input input-sm', placeholder: t('office.templates.search'), 'aria-label': t('office.templates.search') })
   let timer = null
   search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { q = search.value; load(1) }, 250) })
   let meta = null
@@ -140,35 +145,35 @@ export function draw(host, ctx, setDirty) {
     if (page === 1) pg.reset()
     pg.slice(new Array(data.total))
     if (!data.items.length && data.total && pg.page !== page) return load(pg.page)
-    if (meta) meta.textContent = `${data.total} template`
+    if (meta) meta.textContent = t('office.templates.count', { count: data.total })
     const reload = () => load(pg.page)
-    list.replaceChildren(...(data.items.length ? data.items.map((t) => {
-      const edit = C.button({ label: 'Ubah', variant: 'soft', size: 'sm' })
-      edit.setAttribute('aria-label', `Ubah ${t.name}`)
-      edit.addEventListener('click', () => templateDialog(ctx, t, edit, reload, setDirty))
-      const toggle = C.button({ label: t.active ? 'Nonaktifkan' : 'Aktifkan', variant: 'ghost', size: 'sm' })
-      toggle.setAttribute('aria-label', `${t.active ? 'Nonaktifkan' : 'Aktifkan'} ${t.name}`)
+    list.replaceChildren(...(data.items.length ? data.items.map((tp) => {
+      const edit = C.button({ label: t('office.common.edit'), variant: 'soft', size: 'sm' })
+      edit.setAttribute('aria-label', t('office.common.editName', { name: tp.name }))
+      edit.addEventListener('click', () => templateDialog(ctx, tp, edit, reload, setDirty))
+      const toggle = C.button({ label: tp.active ? t('office.common.deactivate') : t('office.common.activate'), variant: 'ghost', size: 'sm' })
+      toggle.setAttribute('aria-label', `${tp.active ? t('office.common.deactivate') : t('office.common.activate')} ${tp.name}`)
       toggle.addEventListener('click', async () => {
-        const restore = C.setBusy(toggle, 'Menyimpan…')
-        try { await adminUpdateTemplate(t.id, { active: !t.active }); showToast(t.active ? 'Template dinonaktifkan.' : 'Template diaktifkan.', 'success'); reload() } catch (ex) { restore(); showToast(ex.message, 'error') }
+        const restore = C.setBusy(toggle, t('office.common.saving'))
+        try { await adminUpdateTemplate(tp.id, { active: !tp.active }); showToast(tp.active ? t('office.templates.deactivated') : t('office.templates.activated'), 'success'); reload() } catch (ex) { restore(); showToast(ex.message, 'error') }
       })
-      const del = C.button({ label: 'Hapus', icon: 'trash', variant: 'ghost', size: 'sm' })
-      del.setAttribute('aria-label', `Hapus ${t.name}`)
+      const del = C.button({ label: t('office.common.delete'), icon: 'trash', variant: 'ghost', size: 'sm' })
+      del.setAttribute('aria-label', t('office.common.deleteName', { name: tp.name }))
       del.addEventListener('click', async () => {
-        if (!confirm(`Hapus template "${t.name}"? Penawaran yang sudah memakainya tidak berubah.`)) return
-        const restore = C.setBusy(del, 'Menghapus…')
-        try { await adminDeleteTemplate(t.id); showToast('Template dihapus.', 'success'); reload() } catch (ex) { restore(); showToast(ex.message, 'error') }
+        if (!confirm(t('office.templates.confirmDelete', { name: tp.name }))) return
+        const restore = C.setBusy(del, t('office.common.deleting'))
+        try { await adminDeleteTemplate(tp.id); showToast(t('office.templates.deleted'), 'success'); reload() } catch (ex) { restore(); showToast(ex.message, 'error') }
       })
-      return el('article', { className: 'workspace-entry ot-entry', dataset: { id: String(t.id) } },
-        el('div', { className: 'workspace-entry-head' }, el('strong', {}, t.name), C.tag(catLabel(t.category), 'neutral'), t.active ? C.tag('Aktif', 'ok') : C.tag('Nonaktif', 'neutral')),
-        t.description ? el('p', { className: 'muted small' }, t.description) : null,
-        el('p', { className: 'small' }, `${t.fields.length} pertanyaan · ${priceRange(t)}`),
+      return el('article', { className: 'workspace-entry ot-entry', dataset: { id: String(tp.id) } },
+        el('div', { className: 'workspace-entry-head' }, el('strong', {}, tp.name), C.tag(catLabel(tp.category), 'neutral'), tp.active ? C.tag(t('office.common.active'), 'ok') : C.tag(t('office.common.inactive'), 'neutral')),
+        tp.description ? el('p', { className: 'muted small' }, tp.description) : null,
+        el('p', { className: 'small' }, `${t('office.templates.questions', { count: tp.fields.length })} · ${priceRange(tp)}`),
         el('div', { className: 'of-row-actions' }, edit, toggle, del))
-    }) : [C.emptyState({ title: q ? 'Tidak ada template yang cocok' : 'Belum ada template', iconName: 'fileText' })]))
+    }) : [C.emptyState({ title: q ? t('office.templates.noMatch') : t('office.templates.empty'), iconName: 'fileText' })]))
   }
   add.addEventListener('click', () => templateDialog(ctx, null, add, () => load(1), setDirty))
-  host.replaceChildren(C.panel({ title: 'Template penawaran', meta: 'memuat…', actions: el('div', { className: 'ot-actions' }, el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search), add) },
-    el('p', { className: 'muted small' }, 'Bisnis memakai template ini saat membuat penawaran. Hanya tim Satu Alur yang bisa mengubahnya.'), list, pg.root))
+  host.replaceChildren(C.panel({ title: t('office.menu.offerTemplates'), meta: t('office.common.loadingLower'), actions: el('div', { className: 'ot-actions' }, el('label', { className: 'search-box' }, C.icon('search', { size: 16 }), search), add) },
+    el('p', { className: 'muted small' }, t('office.templates.lead')), list, pg.root))
   meta = host.querySelector('.panel-meta')
   load(1)
 }

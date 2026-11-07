@@ -1,0 +1,66 @@
+{
+  "agentLabel": "Assistant",
+  "modelLabel": "AI model",
+  "modelLoading": "Loading models…",
+  "logLabel": "AI conversation",
+  "messageLabel": "Your message",
+  "messagePlaceholder": "What do you want to work on?",
+  "messageHint": "Enter to send · Shift + Enter for a new line.",
+  "send": "Send message",
+  "stop": "Stop",
+  "reset": "Reset",
+  "title": "An assistant for your business",
+  "titleEm": "business",
+  "description": "Pick a specialist, pick up the conversation, and use your operating data to decide what to do next.",
+  "panels": {
+    "superpowers": "AI Superpowers",
+    "superpowersMeta": "One specialist per conversation",
+    "activity": "AI activity",
+    "activityMeta": "Last 100 interactions",
+    "conversation": "Conversation"
+  },
+  "privacyHint": "History is stored in this browser. Don't enter secrets or sensitive data.",
+  "stats": {
+    "conversations": "Conversations",
+    "success": "Succeeded",
+    "avgResponse": "Average response"
+  },
+  "you": "You",
+  "empty": {
+    "kicker": "Start a conversation",
+    "title": "What would you like to discuss?",
+    "body": "Ask about your workflow, prepare an offer, or request a business summary."
+  },
+  "modelUnavailable": "Model unavailable: {message}",
+  "preparing": "Preparing an answer…",
+  "answering": "Answering…",
+  "noAnswer": "The AI returned no answer. Please try again.",
+  "stopped": "Conversation stopped.",
+  "notAvailable": "No answer yet.",
+  "agents": {
+    "offer": {
+      "name": "Offer Agent",
+      "description": "Writes professional offer proposals"
+    },
+    "report": {
+      "name": "Report Analyst",
+      "description": "Analyses and explains financial reports"
+    },
+    "general": {
+      "name": "General Assistant",
+      "description": "AI assistant for general questions about Satu Alur"
+    },
+    "analyst": {
+      "name": "Business Analyst",
+      "description": "Business data analyst that queries your database"
+    },
+    "social": {
+      "name": "Social Media Expert",
+      "description": "Social media content and digital marketing expert"
+    },
+    "pertumbuhan": {
+      "name": "Growth Assistant",
+      "description": "AI business development — find opportunities and grow your business"
+    }
+  }
+}

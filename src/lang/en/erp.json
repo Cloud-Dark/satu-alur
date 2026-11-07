@@ -1,0 +1,16 @@
+{
+  "common": {
+    "network": "Network problem. Check your connection and try again."
+  },
+  "test": {
+    "endpoint": "endpoint URL",
+    "credentials": "credentials",
+    "missing": "Fill in {fields} first.",
+    "bridge": "A direct database connection needs a bridge agent on your network.",
+    "ok": "Configuration is valid (demo mode, no network call)."
+  },
+  "preview": {
+    "required": "{field}: required",
+    "unknown": "{field}: \"{value}\" is not recognised"
+  }
+}

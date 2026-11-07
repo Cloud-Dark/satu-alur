@@ -13,6 +13,7 @@ import {
   normalizeCode, generateCode, validateVoucher, redeemProblem, planAfterVoucher,
 } from './rules.js'
 import { QuotaError } from './errors.js'
+import { t } from '../i18n/index.js'
 
 export { QuotaError, isQuotaError, announceQuota, QUOTA_EVENT } from './errors.js'
 
@@ -34,7 +35,7 @@ async function call(path, { method = 'GET', body, cache } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('plan.common.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -105,7 +106,7 @@ export async function getMyPlan() {
   try {
     return await call('/api/me/plan', { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat paket. ${e.message}`)
+    throw new Error(t('plan.errors.loadPlan', { error: e.message }))
   }
 }
 
@@ -115,7 +116,7 @@ export async function redeemVoucher(code) {
   const user = await sessionUser()
   if (!user) throw new Error('Belum masuk.')
   const c = normalizeCode(code)
-  if (!c) throw new Error('Masukkan kode voucher.')
+  if (!c) throw new Error(t('plan.voucher.enter'))
   const db = loadStore()
   const today = todayWib()
   const v = db.vouchers.find((x) => x.code === c) || null
@@ -145,7 +146,7 @@ export async function adminListVouchers() {
   try {
     return (await call('/api/office/admin/vouchers', { cache: 'no-store' })) || []
   } catch (e) {
-    throw new Error(`Gagal memuat voucher. ${e.message}`)
+    throw new Error(t('plan.errors.loadVouchers', { error: e.message }))
   }
 }
 
@@ -195,7 +196,7 @@ export async function adminListRedemptions(voucherId) {
   try {
     return (await call(`/api/office/admin/vouchers/redemptions${voucherId !== undefined ? `?voucher_id=${voucherId}` : ''}`, { cache: 'no-store' })) || []
   } catch (e) {
-    throw new Error(`Gagal memuat penukaran. ${e.message}`)
+    throw new Error(t('plan.errors.loadRedemptions', { error: e.message }))
   }
 }
 

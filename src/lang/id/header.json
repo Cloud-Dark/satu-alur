@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "alur": "Alur kerja",
+    "pendapatan": "Pendapatan",
+    "pertumbuhan": "Pertumbuhan",
+    "fiturAi": "Fitur AI",
+    "harga": "Harga",
+    "faq": "FAQ"
+  },
+  "navLabel": "Navigasi utama",
+  "mobileNavLabel": "Navigasi seluler",
+  "menuLabel": "Menu navigasi",
+  "menuOpen": "Buka menu",
+  "menuClose": "Tutup menu",
+  "signIn": "Masuk",
+  "startFree": "Mulai gratis",
+  "openDashboard": "Buka Dashboard",
+  "skip": "Langsung ke konten"
+}

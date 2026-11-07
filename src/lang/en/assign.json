@@ -1,0 +1,219 @@
+{
+  "title": "Smart Assignment",
+  "tabs": {
+    "aria": "Assignment",
+    "assign": "Assign",
+    "team": "Team",
+    "map": "Map",
+    "performance": "Performance"
+  },
+  "loading": "Loading…",
+  "saving": "Saving…",
+  "save": "Save",
+  "cancel": "Cancel",
+  "add": "Add",
+  "noWorker": "No crew",
+  "loadError": "Could not load data: {error}",
+  "saveError": "Could not save: {error}",
+  "pickBody": "An assignment is made for one job. Open Workflow, then press \"Assign crew\" on a job whose quote is approved.",
+  "offerNotFound": "Quote not found.",
+  "offerNotFoundBody": "Pick another job from Workflow.",
+  "progress": {
+    "belum": "Not started",
+    "dikerjakan": "In progress",
+    "ditunda": "On hold",
+    "selesai": "Done",
+    "overdue": "Past schedule"
+  },
+  "plan": {
+    "unknown": "Unknown progress status.",
+    "finished": "This job is already done.",
+    "unchanged": "The status did not change."
+  },
+  "reason": {
+    "Keahlian cocok": "Skills match",
+    "Keahlian tidak cocok": "Skills don’t match",
+    "Keahlian umum": "General skills",
+    "Bentrok: ada tugas di hari yang sama": "Clash: another job that day",
+    "Tidak bentrok": "No clash"
+  },
+  "form": {
+    "title": "Assign crew",
+    "meta": "Automatic suggestions",
+    "offer": "Approved quote",
+    "offerHint": "Pick a quote to see suggested crew.",
+    "chooseOffer": "Choose a quote",
+    "allAssigned": "All quotes are already assigned",
+    "noApproved": "No approved quotes yet",
+    "schedule": "Scheduled for",
+    "scheduleHint": "Your device’s local time.",
+    "submit": "Assign",
+    "count": "How many",
+    "recommend": "Pick suggested",
+    "workers": "Crew"
+  },
+  "noActive": "No active crew yet",
+  "noActiveBody": "Add crew members in the Team tab to start assigning.",
+  "toTeam": "Go to Team",
+  "teamPanel": "Crew on this job",
+  "assignmentsCount": {
+    "one": "{count} assignment",
+    "other": "{count} assignments"
+  },
+  "notAssigned": "Not assigned yet",
+  "offerNote": "Quote #{id} · {price}",
+  "openOffer": "Open quote",
+  "notApproved": "This job’s quote is not approved yet. Approve it first, then assign crew.",
+  "pickOfferFirst": "Choose a quote first.",
+  "clash": "Clash",
+  "warn": {
+    "clash": "Someone on the crew already has a job that day.",
+    "skill": "Nobody selected has the required skill."
+  },
+  "summary": {
+    "team": "Crew: ",
+    "skills": "Skills: "
+  },
+  "alreadyAssigned": "This job is already assigned.",
+  "noApprovedNote": "No approved quotes yet. Save a quote in step 02 first.",
+  "toOffers": "Go to quotes",
+  "preview": {
+    "customer": "Customer",
+    "scope": "Scope",
+    "value": "Value"
+  },
+  "error": {
+    "offer": "Choose a quote.",
+    "team": "Pick at least one crew member.",
+    "schedule": "Enter a valid date and time.",
+    "check": "Please check the following."
+  },
+  "saved": {
+    "text": "{team} assigned to {name}, {date}.",
+    "toast": "Assignment saved.",
+    "hint": "Mark it done below once the work is finished."
+  },
+  "markDone": "Mark done",
+  "table": {
+    "caption": "Assignments for this job",
+    "workerSchedule": "Crew · schedule",
+    "progress": "Progress",
+    "action": "Action"
+  },
+  "progressDlg": {
+    "change": "Update progress",
+    "chipAria": "Progress: {label}. Update progress",
+    "aria": "Job progress",
+    "doneHint": "Done is recorded in Completion (with work notes), so it isn’t logged twice.",
+    "note": "Note (optional)",
+    "notePh": "E.g. waiting for parts, customer asked to reschedule…",
+    "loadingHistory": "Loading history…",
+    "save": "Save progress",
+    "history": "History",
+    "noHistory": "No progress changes yet.",
+    "historyError": "Could not load the history.",
+    "toast": "Progress: {label}."
+  },
+  "state": {
+    "available": "Available",
+    "on_job": "On a job",
+    "inactive": "Inactive"
+  },
+  "worker": {
+    "name": "Name",
+    "phone": "Mobile no.",
+    "address": "Address",
+    "addressHint": "Used to work out zone and distance.",
+    "status": "Status",
+    "active": "Active",
+    "saveChanges": "Save changes",
+    "add": "Add crew member",
+    "edit": "Edit crew member",
+    "editShort": "Edit",
+    "nameRequired": "Name is required.",
+    "phoneInvalid": "Invalid mobile number.",
+    "updated": "{name} updated.",
+    "added": "{name} added.",
+    "deactivate": "Deactivate",
+    "delete": "Delete",
+    "confirm": "{verb} {name}?",
+    "failed": "{verb} failed",
+    "deactivated": "{name} deactivated.",
+    "deleted": "{name} deleted.",
+    "noContact": "No contact yet",
+    "jobsDone": {
+      "one": "{count} job done",
+      "other": "{count} jobs done"
+    },
+    "activate": "Activate",
+    "activateFailed": "Activate failed",
+    "activated": "{name} activated."
+  },
+  "skills": {
+    "title": "Skills",
+    "count": {
+      "one": "{count} skill",
+      "other": "{count} skills"
+    },
+    "newPh": "New skill, e.g. CCTV installation",
+    "newAria": "New skill name",
+    "hint": "Tap to select. Rename or delete skills in the Skills panel.",
+    "used": {
+      "one": "{count} crew member",
+      "other": "{count} crew members"
+    },
+    "unused": "Not used yet",
+    "rename": "Rename",
+    "renameAria": "New name for {name}",
+    "renameFailed": "Rename failed",
+    "renamed": "Skill renamed to {name}.",
+    "confirmUsed": {
+      "one": "Delete skill \"{name}\"? It will also be removed from {count} crew member.",
+      "other": "Delete skill \"{name}\"? It will also be removed from {count} crew members."
+    },
+    "confirm": "Delete skill \"{name}\"?",
+    "deleteFailed": "Delete failed",
+    "deleted": "Skill {name} deleted.",
+    "addFailed": "Add failed",
+    "added": "Skill {name} added."
+  },
+  "team": {
+    "title": "Crew",
+    "active": {
+      "one": "{count} active",
+      "other": "{count} active"
+    },
+    "emptyBody": "Add crew members to start assigning jobs.",
+    "workers": {
+      "one": "{count} crew member",
+      "other": "{count} crew members"
+    }
+  },
+  "map": {
+    "aria": "Crew location map",
+    "jobToday": "Today’s job locations",
+    "noWorkers": "No crew yet",
+    "noWorkersBody": "Add crew in the Team tab, then fill in their address.",
+    "noLocations": "No crew locations yet",
+    "noLocationsBody": "Fill in crew addresses in the Team tab to show them on the map.",
+    "title": "Crew locations",
+    "loading": "Loading map…",
+    "error": "The map failed to load. Check your connection and open this tab again.",
+    "unavailable": "Map unavailable",
+    "meta": "{n} of {total} crew members have a location",
+    "missing": "Not on the map: {names}. {hint}",
+    "fillAddress": "Fill in their address in the Team tab.",
+    "refineAddress": "Address not found; make it more specific (district, city).",
+    "openTasks": "Open jobs: {list}"
+  },
+  "perf": {
+    "active": "Active crew",
+    "jobsDone": "Jobs done",
+    "onJobToday": "On a job today",
+    "progress": "Job progress",
+    "ranking": "Crew ranking",
+    "rankingMeta": "By jobs done",
+    "caption": "Crew ranking by jobs done",
+    "emptyBody": "Add crew in the Team tab."
+  }
+}

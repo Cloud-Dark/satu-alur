@@ -9,10 +9,11 @@ import { getIntegrations, saveEmailIntegration, saveAiIntegration, testEmailInte
 import { modelPicker } from '../ui/model-picker.js'
 import { SMTP_PORTS_LIST } from '../admin/constants.js'
 import { ANTHROPIC_DEFAULT_BASE } from '../admin/rules.js'
+import { t } from '../i18n/index.js'
 
 const { el } = C
 let seq = 0
-const KEEP = 'Tersimpan. Kosongkan untuk tetap memakai yang lama.'
+const KEEP = () => t('settings.integrations.keep')
 
 function radios(legend, name, options, value) {
   const g = C.choiceGroup({ legend, type: 'radio', name, options: options.map((o) => ({ ...o, checked: o.value === value })) })
@@ -24,7 +25,7 @@ export async function renderIntegrationsTab(container) {
   container.replaceChildren(C.skeletonRows(4))
   let data
   try { data = await getIntegrations() } catch (ex) {
-    const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
+    const again = C.button({ label: t('settings.common.retry'), variant: 'soft', size: 'sm' })
     again.addEventListener('click', () => renderIntegrationsTab(container))
     container.replaceChildren(C.errorState(ex.message), again)
     return
@@ -33,7 +34,7 @@ export async function renderIntegrationsTab(container) {
   if (data.options.demo) {
     // Demo is 100% demo: sample data and simulated AI; nothing here can be changed.
     const note = C.message()
-    note.show('info', 'Akun demo memakai data dan AI contoh. Pengaturan email dan mesin AI hanya bisa diubah di akun sungguhan.')
+    note.show('info', t('settings.integrations.demoNote'))
     parts.forEach((p) => p.querySelectorAll('input, select, textarea, button').forEach((x) => { x.disabled = true }))
     parts.unshift(note)
   }
@@ -52,45 +53,45 @@ function emailSection(data, container) {
   const e = data.email
   const opt = data.options
   const smtpOff = !opt.custom_smtp_allowed || !opt.secrets_enabled
-  const mode = radios('Kirim email lewat', `set-email-mode-${id}`, [
-    { value: 'platform', label: 'Layanan email Satu Alur', hint: 'Paling mudah. Dikirim dari alamat Satu Alur dengan nama usaha Anda.' },
-    { value: 'smtp', label: 'Server email saya sendiri (SMTP)', hint: smtpOff ? (opt.custom_smtp_allowed ? 'Belum tersedia di server ini.' : 'Dimatikan oleh admin Satu Alur.') : 'Mis. Gmail, Zoho, atau email domain usaha Anda.', disabled: smtpOff },
+  const mode = radios(t('settings.integrations.sendVia'), `set-email-mode-${id}`, [
+    { value: 'platform', label: t('settings.integrations.platform'), hint: t('settings.integrations.platformHint') },
+    { value: 'smtp', label: t('settings.integrations.ownSmtp'), hint: smtpOff ? (opt.custom_smtp_allowed ? t('settings.integrations.notAvailable') : t('settings.integrations.disabledByAdmin')) : t('settings.integrations.smtpHint'), disabled: smtpOff },
   ], e.mode)
   const off = { autocomplete: 'off', spellcheck: 'false', maxlength: '200' }
-  const host = C.field({ label: 'Host SMTP', id: `set-smtp-host-${id}`, value: e.smtp_host, placeholder: 'smtp.gmail.com', attrs: off })
+  const host = C.field({ label: t('settings.integrations.smtpHost'), id: `set-smtp-host-${id}`, value: e.smtp_host, placeholder: 'smtp.gmail.com', attrs: off })
   const port = C.select({ label: 'Port', id: `set-smtp-port-${id}`, options: SMTP_PORTS_LIST.map((p) => ({ value: String(p), label: [465, 2465].includes(p) ? `${p} (SSL/TLS)` : `${p} (STARTTLS)` })), value: String(e.smtp_port || 465) })
   const user = C.field({ label: 'Username', id: `set-smtp-user-${id}`, value: e.smtp_user, attrs: off })
-  const pass = C.field({ label: 'Password / app password', id: `set-smtp-pass-${id}`, type: 'password', placeholder: e.has_password ? KEEP : undefined,
-    hint: 'Disimpan terenkripsi dan tidak pernah ditampilkan lagi.', attrs: { ...off, autocomplete: 'new-password' } })
-  const fromEmail = C.field({ label: 'Email pengirim', id: `set-smtp-from-${id}`, type: 'email', value: e.smtp_from_email, attrs: off })
-  const fromName = C.field({ label: 'Nama pengirim', id: `set-smtp-name-${id}`, value: e.smtp_from_name, attrs: { maxlength: '60' } })
+  const pass = C.field({ label: t('settings.integrations.appPassword'), id: `set-smtp-pass-${id}`, type: 'password', placeholder: e.has_password ? KEEP() : undefined,
+    hint: t('settings.integrations.secretHint'), attrs: { ...off, autocomplete: 'new-password' } })
+  const fromEmail = C.field({ label: t('settings.email.fromEmail'), id: `set-smtp-from-${id}`, type: 'email', value: e.smtp_from_email, attrs: off })
+  const fromName = C.field({ label: t('settings.email.fromName'), id: `set-smtp-name-${id}`, value: e.smtp_from_name, attrs: { maxlength: '60' } })
   const smtpBox = el('div', { className: 'set-subgrid' }, host.wrap, port.wrap, user.wrap, pass.wrap, fromEmail.wrap, fromName.wrap)
   const sync = () => { smtpBox.hidden = mode.value() !== 'smtp' }
   mode.wrap.addEventListener('change', sync)
   sync()
 
   const out = C.message()
-  const save = C.button({ label: 'Simpan email', icon: 'save', variant: 'primary', size: 'sm' })
-  const test = C.button({ label: 'Kirim email uji', icon: 'mail', variant: 'soft', size: 'sm' })
+  const save = C.button({ label: t('settings.integrations.saveEmail'), icon: 'save', variant: 'primary', size: 'sm' })
+  const test = C.button({ label: t('settings.integrations.sendTestEmail'), icon: 'mail', variant: 'soft', size: 'sm' })
   save.addEventListener('click', async () => {
-    const restore = C.setBusy(save, 'Menyimpan…')
+    const restore = C.setBusy(save, t('settings.common.saving'))
     try {
       await saveEmailIntegration({
         email_mode: mode.value(), smtp_host: host.input.value, smtp_port: Number(port.input.value), smtp_user: user.input.value,
         smtp_pass: pass.input.value, smtp_from_email: fromEmail.input.value, smtp_from_name: fromName.input.value,
       })
-      showToast('Pengaturan email disimpan.', 'success')
+      showToast(t('settings.integrations.emailSaved'), 'success')
       renderIntegrationsTab(container)
     } catch (ex) { out.show('danger', ex.message) } finally { restore() }
   })
   test.addEventListener('click', async () => {
-    const restore = C.setBusy(test, 'Mengirim…')
+    const restore = C.setBusy(test, t('settings.common.sending'))
     try {
       const r = await testEmailIntegration()
-      out.show('ok', r.simulated ? 'Simulasi: di akun demo email tidak benar-benar dikirim.' : `Email uji terkirim ke ${r.to}.`)
+      out.show('ok', r.simulated ? t('settings.integrations.emailSimulated') : t('settings.integrations.emailSent', { to: r.to }))
     } catch (ex) { out.show('danger', ex.message) } finally { restore() }
   })
-  return section('Email · 01', 'Pengiriman email', 'Dipakai untuk mengirim penawaran ke pelanggan dan laporan ke Anda.',
+  return section(t('settings.integrations.emailNum'), t('settings.integrations.emailTitle'), t('settings.integrations.emailDesc'),
     mode.wrap, smtpBox, el('div', { className: 'form-actions' }, save, test), out)
 }
 
@@ -99,21 +100,21 @@ function aiSection(data, container) {
   const a = data.ai
   const opt = data.options
   const customOff = !opt.custom_ai_allowed || !opt.secrets_enabled
-  const why = opt.custom_ai_allowed ? 'Belum tersedia di server ini.' : 'Dimatikan oleh admin Satu Alur.'
-  const mode = radios('Mesin AI', `set-ai-mode-${id}`, [
-    { value: 'builtin', label: 'Mesin AI Satu Alur (bawaan)', hint: 'Termasuk kuota paket Anda.' },
-    { value: 'openai', label: 'OpenAI-compatible', hint: customOff ? why : 'OpenAI, OpenRouter, Groq, Together, atau server lain yang kompatibel. Memakai API key Anda sendiri.', disabled: customOff },
-    { value: 'anthropic', label: 'Anthropic-compatible', hint: customOff ? why : 'Claude atau server lain yang kompatibel. Memakai API key Anda sendiri.', disabled: customOff },
+  const why = opt.custom_ai_allowed ? t('settings.integrations.notAvailable') : t('settings.integrations.disabledByAdmin')
+  const mode = radios(t('settings.integrations.aiEngine'), `set-ai-mode-${id}`, [
+    { value: 'builtin', label: t('settings.integrations.builtin'), hint: t('settings.integrations.builtinHint') },
+    { value: 'openai', label: 'OpenAI-compatible', hint: customOff ? why : t('settings.integrations.openaiHint'), disabled: customOff },
+    { value: 'anthropic', label: 'Anthropic-compatible', hint: customOff ? why : t('settings.integrations.anthropicHint'), disabled: customOff },
   ], a.mode)
   const off = { autocomplete: 'off', spellcheck: 'false', maxlength: '300' }
-  const base = C.field({ label: 'Alamat API', id: `set-ai-base-${id}`, value: a.base_url, placeholder: 'https://api.openai.com/v1', attrs: off })
+  const base = C.field({ label: t('settings.integrations.apiBase'), id: `set-ai-base-${id}`, value: a.base_url, placeholder: 'https://api.openai.com/v1', attrs: off })
   const formValues = () => ({ ai_mode: mode.value(), ai_base_url: base.input.value, ai_model: model.input.value, ai_key: key.input.value })
   const picker = modelPicker({ id: `set-ai-model-${id}`, value: a.model, placeholder: 'gpt-4o-mini', fetchModels: () => listAiModels(formValues()) })
   const model = { input: picker.input, wrap: picker.wrap }
-  const key = C.field({ label: 'API key', id: `set-ai-key-${id}`, type: 'password', placeholder: a.has_key ? KEEP : undefined,
-    hint: 'Disimpan terenkripsi dan tidak pernah ditampilkan lagi.', attrs: { ...off, autocomplete: 'new-password' } })
+  const key = C.field({ label: 'API key', id: `set-ai-key-${id}`, type: 'password', placeholder: a.has_key ? KEEP() : undefined,
+    hint: t('settings.integrations.secretHint'), attrs: { ...off, autocomplete: 'new-password' } })
   const box = el('div', { className: 'set-subgrid' }, base.wrap, model.wrap, key.wrap)
-  const note = el('p', { className: 'muted small' }, 'Dengan penyedia sendiri, biaya AI ditagih penyedia Anda dan kuota AI Satu Alur tidak terpakai.')
+  const note = el('p', { className: 'muted small' }, t('settings.integrations.ownNote'))
   const sync = () => {
     const m = mode.value()
     box.hidden = m === 'builtin'
@@ -127,29 +128,29 @@ function aiSection(data, container) {
   sync()
 
   const out = C.message()
-  const save = C.button({ label: 'Simpan mesin AI', icon: 'save', variant: 'primary', size: 'sm' })
-  const test = C.button({ label: 'Uji koneksi AI', icon: 'sparkles', variant: 'soft', size: 'sm' })
+  const save = C.button({ label: t('settings.integrations.saveAi'), icon: 'save', variant: 'primary', size: 'sm' })
+  const test = C.button({ label: t('settings.integrations.testAi'), icon: 'sparkles', variant: 'soft', size: 'sm' })
   // Saving a custom provider wants a passing test with the same values (or an explicit confirm).
   let tested = null
   save.addEventListener('click', async () => {
     const v = formValues()
-    if (v.ai_mode !== 'builtin' && tested !== JSON.stringify(v) && !confirm('Penyedia ini belum diuji dengan nilai saat ini. Simpan tanpa uji?')) return
-    const restore = C.setBusy(save, 'Menyimpan…')
+    if (v.ai_mode !== 'builtin' && tested !== JSON.stringify(v) && !confirm(t('settings.integrations.confirmUntested'))) return
+    const restore = C.setBusy(save, t('settings.common.saving'))
     try {
       await saveAiIntegration(v)
-      showToast('Mesin AI disimpan.', 'success')
+      showToast(t('settings.integrations.aiSaved'), 'success')
       renderIntegrationsTab(container)
     } catch (ex) { out.show('danger', ex.message) } finally { restore() }
   })
   test.addEventListener('click', async () => {
-    const restore = C.setBusy(test, 'Menguji…')
+    const restore = C.setBusy(test, t('settings.common.testing'))
     try {
       const v = formValues()
       const r = await testAiIntegration(v)
       tested = JSON.stringify(v)
-      out.show('ok', r.mode === 'builtin' ? (r.reply || 'Mesin AI bawaan siap dipakai.') : `Terhubung ke ${r.model || 'model Anda'}: "${r.reply}"${r.ms ? ` dalam ${r.ms} ms` : ''}.`)
+      out.show('ok', r.mode === 'builtin' ? (r.reply || t('settings.integrations.builtinReady')) : t('settings.integrations.aiConnected', { model: r.model || t('settings.integrations.yourModel'), reply: r.reply, ms: r.ms ? t('settings.integrations.inMs', { ms: r.ms }) : '' }))
     } catch (ex) { tested = null; out.show('danger', ex.message) } finally { restore() }
   })
-  return section('AI · 02', 'Mesin AI', 'Dipakai semua fitur AI: penawaran, laporan, radar, penasihat, media sosial, dan optimasi pendapatan.',
+  return section('AI · 02', t('settings.integrations.aiEngine'), t('settings.integrations.aiDesc'),
     mode.wrap, box, note, el('div', { className: 'form-actions' }, save, test), out)
 }

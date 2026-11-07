@@ -23,6 +23,7 @@ import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel } from './data.js'
 import { offerEmailButton, openOfferEmail } from '../email/offer-dialog.js'
 import { jobHeader, solo, pickFromWorkflow, workflowLink } from './job.js'
+import { t } from '../i18n/index.js'
 
 const { el, icon } = C
 
@@ -46,7 +47,7 @@ export function abortable(promise, signal) {
   ])
 }
 
-const offerTag = (o) => (o.status === 'approved' ? C.tag('Disetujui', 'ok') : o.status === 'rejected' ? C.tag('Ditolak', 'danger') : C.tag(o.status === 'draft' ? 'Draf' : o.status, 'warn'))
+const offerTag = (o) => (o.status === 'approved' ? C.tag(t('offer.status.approved'), 'ok') : o.status === 'rejected' ? C.tag(t('offer.status.rejected'), 'danger') : C.tag(o.status === 'draft' ? t('offer.status.draft') : o.status, 'warn'))
 
 /** Minimum time each "Susun dengan AI" step stays on screen (ms), so the pipeline reads as thinking. */
 export const MIN_STEP_MS = { data: 1400, schedule: 1200, offer: 2600, pdf: 1300, email: 1500, review: 1100 }
@@ -70,22 +71,22 @@ export async function render(container, ctx = {}) {
   const businessName = ctx.user?.name || ''
 
   /* ------------------------------------------------- Step 1: pick */
-  const reqSelect = C.select({ label: 'Permintaan', name: 'request_id', required: true, hint: 'Permintaan tanpa penawaran ditampilkan lebih dulu.', options: [{ value: '', label: 'Memuat…' }] })
+  const reqSelect = C.select({ label: t('offer.pick.request'), name: 'request_id', required: true, hint: t('offer.pick.requestHint'), options: [{ value: '', label: t('offer.loading') }] })
   const preview = el('div', { className: 'req-preview-slot', hidden: true })
-  const tmplSelect = C.select({ label: 'Template penawaran', name: 'template_id', hint: 'Opsional. Template menambah pertanyaan khusus agar penawaran lebih tepat.', options: [{ value: '', label: 'Tanpa template' }] })
+  const tmplSelect = C.select({ label: t('offer.pick.template'), name: 'template_id', hint: t('offer.pick.templateHint'), options: [{ value: '', label: t('offer.pick.noTemplate') }] })
   const tmplDesc = el('p', { className: 'muted small tmpl-desc', hidden: true })
   const tmplFields = el('div', { className: 'tmpl-fields' })
   const tmplBox = el('div', { className: 'tmpl-box' }, tmplSelect.wrap, tmplDesc, tmplFields)
 
   /* -------------------------------------------- Step 2: AI pipeline */
   const forBox = el('div', {})
-  const pipeList = el('ol', { className: 'pipe', 'aria-label': 'Proses penyusunan penawaran' })
+  const pipeList = el('ol', { className: 'pipe', 'aria-label': t('offer.pipe.aria') })
   const pipeHead = el('div', { className: 'pipe-head' })
-  const stopBtn = C.button({ label: 'Hentikan', icon: 'stop', size: 'sm', variant: 'ghost', hidden: true })
+  const stopBtn = C.button({ label: t('offer.pipe.stop'), icon: 'stop', size: 'sm', variant: 'ghost', hidden: true })
   const pipeTime = el('span', { className: 'pipe-time tnum muted small', 'aria-live': 'off' })
-  pipeHead.append(el('span', { className: 'pipe-title' }, icon('sparkles', { size: 16 }), 'Proses AI'), pipeTime, stopBtn)
+  pipeHead.append(el('span', { className: 'pipe-title' }, icon('sparkles', { size: 16 }), t('offer.pipe.title')), pipeTime, stopBtn)
   const liveBox = el('div', { className: 'live-offer', hidden: true, 'aria-live': 'polite' })
-  const scheduleInput = el('input', { type: 'datetime-local', className: 'input input-sm', name: 'offer_schedule', 'aria-label': 'Jadwal pelaksanaan' })
+  const scheduleInput = el('input', { type: 'datetime-local', className: 'input input-sm', name: 'offer_schedule', 'aria-label': t('offer.schedule') })
   const modelNote = el('span', { className: 'model-note', hidden: true })
   const pipeBox = el('div', { className: 'pipe-box' }, pipeHead, pipeList, liveBox, modelNote)
 
@@ -118,7 +119,7 @@ export async function render(container, ctx = {}) {
     tmplFields.replaceChildren(...t.fields.map((f) => {
       const name = `tf_${f.key}`
       let w
-      if (f.type === 'select') w = C.select({ label: f.label, name, required: f.required, options: [{ value: '', label: 'Pilih' }, ...f.options.map((o) => ({ value: o, label: o }))] })
+      if (f.type === 'select') w = C.select({ label: f.label, name, required: f.required, options: [{ value: '', label: t('offer.pick.choose') }, ...f.options.map((o) => ({ value: o, label: o }))] })
       else w = C.field({ label: f.label, name, required: f.required, type: f.type === 'number' ? 'number' : f.type === 'date' ? 'date' : 'text', attrs: { maxlength: '300', ...(f.type === 'number' ? { inputmode: 'decimal', min: '0', step: 'any' } : {}) } })
       fieldInputs.set(f.key, w.input)
       return w.wrap
@@ -133,27 +134,27 @@ export async function render(container, ctx = {}) {
   }
 
   const wiz = C.wizard({
-    label: 'Susun penawaran',
+    label: t('offer.wiz.label'),
     steps: [
       {
         key: 'pick',
-        title: 'Pilih permintaan',
-        description: 'Pelanggan mana yang akan ditawari, dan pakai template apa?',
+        title: t('offer.wiz.pick'),
+        description: t('offer.wiz.pickDesc'),
         content: [reqSelect.wrap, preview, tmplBox],
         validate: () => {
-          if (!selectedRequest()) return [{ text: 'Pilih permintaan terlebih dahulu.', input: reqSelect.input }]
+          if (!selectedRequest()) return [{ text: t('offer.error.pickRequest'), input: reqSelect.input }]
           return templateAnswers().errors.map((e) => ({ text: e.text, input: fieldInputs.get(e.key) }))
         },
         primary: () => ({ disabled: !flow?.requests.length }),
       },
       {
         key: 'compose',
-        title: 'Susun dengan AI',
-        description: 'AI mengambil data klien, menyusun penawaran, PDF, dan draf pesan.',
+        title: t('offer.wiz.compose'),
+        description: t('offer.wiz.composeDesc'),
         content: [forBox, pipeBox],
         primary: () => (hasDraftFor(selectedRequest()) && !current
-          ? { label: 'Lanjut', iconRight: 'arrowRight' }
-          : { label: lastError ? 'Coba lagi' : 'Hasilkan penawaran', icon: lastError ? 'refresh' : 'sparkles', iconRight: undefined }),
+          ? { label: t('offer.wiz.next'), iconRight: 'arrowRight' }
+          : { label: lastError ? t('offer.wiz.retry') : t('offer.wiz.generate'), icon: lastError ? 'refresh' : 'sparkles', iconRight: undefined }),
         onPrimary: async () => {
           if (hasDraftFor(selectedRequest())) { wiz.next(); return }
           await runPipeline(lastError && pipe ? pipe.resumeKey : 'data')
@@ -162,10 +163,10 @@ export async function render(container, ctx = {}) {
       },
       {
         key: 'review',
-        title: 'Tinjau & simpan',
-        description: 'Semua isian bisa diubah sebelum disimpan.',
+        title: t('offer.wiz.review'),
+        description: t('offer.wiz.reviewDesc'),
         content: reviewBox,
-        primary: { label: 'Simpan penawaran', icon: 'save', iconRight: undefined },
+        primary: { label: t('offer.wiz.save'), icon: 'save', iconRight: undefined },
         onPrimary: () => save(),
         onEnter: () => drawReview(),
       },
@@ -177,21 +178,21 @@ export async function render(container, ctx = {}) {
   const headSlot = el('div', {})
   const loadNote = el('div', {})
   container.replaceChildren(
-    C.pageHeader({ title: 'Penawaran baru' }),
+    C.pageHeader({ title: t('offer.newTitle') }),
     solo(headSlot, loadNote, wiz.root, workflowLink(navigate)),
   )
   const drawHead = () => {
     const r = selectedRequest()
-    headSlot.replaceChildren(r ? jobHeader(r, { note: 'Penawaran baru' }) : '')
+    headSlot.replaceChildren(r ? jobHeader(r, { note: t('offer.newTitle') }) : '')
   }
 
   const modelReady = resolveModel()
-    .then((mdl) => { model = mdl; if (!mdl) { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false } })
-    .catch(() => { modelNote.textContent = 'AI sedang tidak tersedia'; modelNote.hidden = false })
+    .then((mdl) => { model = mdl; if (!mdl) { modelNote.textContent = t('offer.aiUnavailableShort'); modelNote.hidden = false } })
+    .catch(() => { modelNote.textContent = t('offer.aiUnavailableShort'); modelNote.hidden = false })
 
   listTemplates().then((rows) => {
     templates = rows
-    C.setOptions(tmplSelect.input, [{ value: '', label: 'Tanpa template' }, ...rows.map((t) => ({ value: t.id, label: t.name }))], tmplSelect.input.value)
+    C.setOptions(tmplSelect.input, [{ value: '', label: t('offer.pick.noTemplate') }, ...rows.map((t) => ({ value: t.id, label: t.name }))], tmplSelect.input.value)
     tmplBox.hidden = !rows.length
   })
 
@@ -199,25 +200,25 @@ export async function render(container, ctx = {}) {
   const requestPreview = (r) => C.miniPreview({
     title: customerLabel(r),
     chips: [
-      { icon: 'layers', text: r.service_type || '—', title: `Layanan: ${r.service_type || '—'}` },
-      r.location ? { icon: 'mapPin', text: r.location, title: `Lokasi: ${r.location}` } : null,
-      r.phone ? { icon: 'phone', text: r.phone, title: `Telepon: ${r.phone}` } : null,
+      { icon: 'layers', text: r.service_type || '—', title: t('offer.preview.service', { value: r.service_type || '—' }) },
+      r.location ? { icon: 'mapPin', text: r.location, title: t('offer.preview.location', { value: r.location }) } : null,
+      r.phone ? { icon: 'phone', text: r.phone, title: t('offer.preview.phone', { value: r.phone }) } : null,
     ],
-    note: r.description || 'Belum ada deskripsi kebutuhan.',
+    note: r.description || t('offer.preview.noDesc'),
   })
 
   let firstFill = true
   function fillRequests() {
     const fresh = flow.requestsWithoutOffer()
     const offered = flow.requests.filter((r) => flow.offersOf(r.id).length > 0)
-    const opts = [{ value: '', label: flow.requests.length ? 'Pilih permintaan' : 'Belum ada permintaan' }]
-    fresh.forEach((r) => opts.push({ value: r.id, label: `${customerLabel(r)} — ${r.service_type || 'layanan'}` }))
-    offered.forEach((r) => opts.push({ value: r.id, label: `${customerLabel(r)} — ${r.service_type || 'layanan'} (sudah ditawarkan)` }))
+    const opts = [{ value: '', label: flow.requests.length ? t('offer.pick.chooseRequest') : t('offer.pick.noRequests') }]
+    fresh.forEach((r) => opts.push({ value: r.id, label: `${customerLabel(r)} — ${r.service_type || t('offer.service')}` }))
+    offered.forEach((r) => opts.push({ value: r.id, label: `${customerLabel(r)} — ${r.service_type || t('offer.service')}${t('offer.pick.alreadyOffered')}` }))
     const keep = reqSelect.input.value || (firstFill && params.requestId != null ? String(params.requestId) : '')
     C.setOptions(reqSelect.input, opts, keep)
     if (!flow.requests.length && wiz.index === 0 && !wiz.done) {
-      msg.show('info', 'Belum ada permintaan. Buat permintaan di tahap 01 terlebih dahulu.')
-      const go = C.button({ label: 'Ke permintaan', iconRight: 'arrowRight', size: 'sm' })
+      msg.show('info', t('offer.pick.noRequestsNote'))
+      const go = C.button({ label: t('offer.pick.toRequests'), iconRight: 'arrowRight', size: 'sm' })
       go.addEventListener('click', () => navigate('request'))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
     }
@@ -247,17 +248,17 @@ export async function render(container, ctx = {}) {
         : s.state === 'running' ? el('span', { className: 'pipe-spin', 'aria-hidden': 'true' })
           : s.state === 'error' ? icon('x', { size: 14 })
             : el('span', { className: 'pipe-num tnum' }, String(i + 1))
-      const state = { pending: 'menunggu', running: 'berjalan', done: 'selesai', error: 'gagal', stopped: 'dihentikan' }[s.state]
+      const state = t(`offer.pipe.state.${s.state}`)
       const li = el('li', { className: `pipe-step is-${s.state}`, dataset: { step: s.key } },
         el('span', { className: 'pipe-mark' }, mark),
         el('div', { className: 'pipe-body' },
-          el('span', { className: 'pipe-label' }, s.label, el('span', { className: 'sr-only' }, ` (${state})`)),
-          s.ms != null && s.state === 'done' ? el('span', { className: 'pipe-ms tnum' }, `${(s.ms / 1000).toFixed(1)} dtk`) : '',
+          el('span', { className: 'pipe-label' }, t(`offer.pipe.step.${s.key}`), el('span', { className: 'sr-only' }, ` (${state})`)),
+          s.ms != null && s.state === 'done' ? el('span', { className: 'pipe-ms tnum' }, t('offer.pipe.seconds', { n: (s.ms / 1000).toFixed(1) })) : '',
           s.error ? el('span', { className: 'pipe-err' }, s.error) : '',
           STEP_DETAIL.get(s.key) || ''),
       )
       if ((s.state === 'error' || s.state === 'stopped') && !current) {
-        const retry = C.button({ label: 'Ulangi dari sini', icon: 'refresh', size: 'sm', variant: 'ghost' })
+        const retry = C.button({ label: t('offer.pipe.retryHere'), icon: 'refresh', size: 'sm', variant: 'ghost' })
         retry.addEventListener('click', () => runPipeline(s.key))
         li.querySelector('.pipe-body').appendChild(retry)
       }
@@ -291,20 +292,20 @@ export async function render(container, ctx = {}) {
   const scheduleValue = () => (scheduleInput.value && !Number.isNaN(new Date(scheduleInput.value).getTime()) ? new Date(scheduleInput.value) : null)
 
   const LIVE_FIELDS = [
-    { key: 'scope', label: 'Ruang lingkup' },
-    { key: 'price', label: 'Harga', money: true },
-    { key: 'terms', label: 'Ketentuan' },
-    { key: 'notes', label: 'Catatan' },
+    { key: 'scope' },
+    { key: 'price', money: true },
+    { key: 'terms' },
+    { key: 'notes' },
   ]
   function drawLive(fields, closed) {
     liveBox.hidden = false
     liveBox.replaceChildren(...LIVE_FIELDS.map((f) => {
       const has = fields[f.key] !== undefined && fields[f.key] !== ''
       const writing = has && !closed.has(f.key)
-      const val = !has ? el('span', { className: 'live-wait' }, 'menunggu…')
+      const val = !has ? el('span', { className: 'live-wait' }, t('offer.live.waiting'))
         : f.money ? el('b', { className: 'tnum' }, C.rupiah(fields[f.key])) : el('span', {}, String(fields[f.key]))
       return el('div', { className: `live-field${writing ? ' is-writing' : ''}${has ? '' : ' is-empty'}` },
-        el('span', { className: 'live-label' }, f.label), el('div', { className: 'live-value' }, val, writing ? el('span', { className: 'caret', 'aria-hidden': 'true' }) : ''))
+        el('span', { className: 'live-label' }, t(`offer.field.${f.key}`)), el('div', { className: 'live-value' }, val, writing ? el('span', { className: 'caret', 'aria-hidden': 'true' }) : ''))
     }))
   }
 
@@ -318,11 +319,11 @@ export async function render(container, ctx = {}) {
     const request = selectedRequest()
     if (!request) {
       wiz.go('pick')
-      wiz.invalid([{ text: 'Pilih permintaan terlebih dahulu.', input: reqSelect.input }])
+      wiz.invalid([{ text: t('offer.error.pickRequest'), input: reqSelect.input }])
       return
     }
     if (!model) { try { await modelReady } catch { /* reported below */ } }
-    if (!model) { msg.show('danger', 'AI sedang tidak tersedia. Periksa koneksi lalu muat ulang halaman.'); return }
+    if (!model) { msg.show('danger', t('offer.aiUnavailable')); return }
 
     current?.abort()
     const ac = new AbortController()
@@ -336,11 +337,11 @@ export async function render(container, ctx = {}) {
     pendingWork = work
     draft = null
     lastError = false
-    const restore = wiz.busy('Menyusun…')
+    const restore = wiz.busy(t('offer.composing'))
     stopBtn.hidden = false
     const started = Date.now()
     clearInterval(ticker)
-    ticker = setInterval(() => { pipeTime.textContent = `${((Date.now() - started) / 1000).toFixed(0)} dtk` }, 500)
+    ticker = setInterval(() => { pipeTime.textContent = t('offer.pipe.seconds', { n: ((Date.now() - started) / 1000).toFixed(0) }) }, 500)
     stopBtn.onclick = () => ac.abort()
     const order = pipe.steps.map((s) => s.key)
     const startAt = Math.max(0, order.indexOf(fromKey))
@@ -360,7 +361,7 @@ export async function render(container, ctx = {}) {
       if (err.name === 'AbortError') {
         pipe.stop()
         lastError = true
-        msg.show('info', 'Proses dihentikan. Tidak ada yang disimpan.')
+        msg.show('info', t('offer.pipe.stopped'))
       } else {
         const key = pipe.running?.key
         if (key) pipe.fail(key, err)
@@ -389,9 +390,9 @@ export async function render(container, ctx = {}) {
       const sameCustomer = flow.requests.filter((x) => String(x.id) !== String(r.id) && String(x.customer_name || '').toLowerCase() === String(r.customer_name || '').toLowerCase())
       work.history = priceHistory(sameService)
       STEP_DETAIL.set('data', el('span', { className: 'pipe-detail' },
-        [r.phone ? 'Telepon ada' : 'Tanpa telepon',
-          sameCustomer.length ? `${sameCustomer.length} permintaan sebelumnya dari pelanggan ini` : 'Pelanggan baru',
-          work.history ? `${work.history.count} penawaran serupa` : 'Belum ada penawaran serupa'].join(' · ')))
+        [r.phone ? t('offer.pipe.data.hasPhone') : t('offer.pipe.data.noPhone'),
+          sameCustomer.length ? t('offer.pipe.data.previous', { count: sameCustomer.length }) : t('offer.pipe.data.newCustomer'),
+          work.history ? t('offer.pipe.data.similar', { count: work.history.count }) : t('offer.pipe.data.noSimilar')].join(' · ')))
       await wait(250, signal)
     },
     async schedule(work, signal) {
@@ -401,7 +402,7 @@ export async function render(container, ctx = {}) {
         scheduleInput.dataset.for = String(work.request.id)
         scheduleInput.dataset.reason = s.reason
       }
-      const why = { client: 'Sesuai permintaan klien.', free: 'Hari kerja terdekat yang masih kosong.', lightest: 'Hari kerja dengan tugas paling sedikit.' }[scheduleInput.dataset.reason] || ''
+      const why = ['client', 'free', 'lightest'].includes(scheduleInput.dataset.reason) ? t(`offer.pipe.why.${scheduleInput.dataset.reason}`) : ''
       STEP_DETAIL.set('schedule', el('label', { className: 'pipe-detail pipe-schedule' }, el('span', {}, why), scheduleInput))
       work.schedule = scheduleValue()
       await wait(200, signal)
@@ -423,16 +424,16 @@ export async function render(container, ctx = {}) {
     },
     async pdf(work, signal) {
       work.schedule = scheduleValue()
-      const btn = C.button({ label: 'Pratinjau PDF', icon: 'download', size: 'sm', variant: 'ghost' })
+      const btn = C.button({ label: t('offer.pipe.previewPdf'), icon: 'download', size: 'sm', variant: 'ghost' })
       btn.addEventListener('click', () => openOfferDocument({ businessName, request: work.request, offer: work.offerJson, schedule: work.schedule, templateName: work.template?.name }))
-      STEP_DETAIL.set('pdf', el('span', { className: 'pipe-detail' }, `Nomor ${offerNumber({ requestId: work.request.id })}`, btn))
+      STEP_DETAIL.set('pdf', el('span', { className: 'pipe-detail' }, t('offer.pipe.number', { number: offerNumber({ requestId: work.request.id }) }), btn))
       await wait(200, signal)
     },
     async email(work, signal) {
       const o = work.offerJson
       work.email = offerEmailDraft({ customer: work.request.customer_name, service: work.request.service_type, price: o.price, scope: o.scope, terms: o.terms, businessName })
       work.wa = offerMessage({ customer: work.request.customer_name, service: work.request.service_type, scope: o.scope, price: o.price, terms: o.terms, business: businessName })
-      STEP_DETAIL.set('email', el('span', { className: 'pipe-detail' }, `Email: "${work.email.subject}"`))
+      STEP_DETAIL.set('email', el('span', { className: 'pipe-detail' }, t('offer.pipe.emailSubject', { subject: work.email.subject })))
       await wait(200, signal)
     },
     async review(work, signal) {
@@ -448,30 +449,30 @@ export async function render(container, ctx = {}) {
     if (!draft) { wiz.go('compose', { focus: false }); return }
     if (review?.draft === draft) { review.syncChecks(); return }
     const { request, offerJson, template } = draft
-    const scopeF = C.textarea({ label: 'Ruang lingkup', name: 'offer_scope', rows: 4, value: offerJson.scope || '', required: true, attrs: { maxlength: '2000' } })
-    const termsF = C.textarea({ label: 'Ketentuan', name: 'offer_terms', rows: 3, value: offerJson.terms || '', required: true, attrs: { maxlength: '1000' } })
-    const notesF = C.textarea({ label: 'Catatan', name: 'offer_notes', rows: 2, value: offerJson.notes || '', attrs: { maxlength: '1000' } })
+    const scopeF = C.textarea({ label: t('offer.field.scope'), name: 'offer_scope', rows: 4, value: offerJson.scope || '', required: true, attrs: { maxlength: '2000' } })
+    const termsF = C.textarea({ label: t('offer.field.terms'), name: 'offer_terms', rows: 3, value: offerJson.terms || '', required: true, attrs: { maxlength: '1000' } })
+    const notesF = C.textarea({ label: t('offer.field.notes'), name: 'offer_notes', rows: 2, value: offerJson.notes || '', attrs: { maxlength: '1000' } })
     const priceField = C.field({
-      label: 'Harga final (Rp)', name: 'validated_price', type: 'number', required: true,
+      label: t('offer.field.finalPrice'), name: 'validated_price', type: 'number', required: true,
       value: String(Math.round(Number(offerJson?.price) || 0)),
       attrs: { min: String(OfferRules.minPrice), max: String(OfferRules.maxPrice), step: '1000', inputmode: 'numeric' },
     })
     priceField.wrap.querySelector('.field-req')?.remove()
-    priceField.wrap.querySelector('.field-label').appendChild(el('span', { className: 'price-ai' }, 'Usulan AI ', el('b', {}, C.rupiah(offerJson?.price))))
-    const schedF = C.field({ label: 'Jadwal pelaksanaan', name: 'offer_schedule_final', type: 'datetime-local', value: scheduleInput.value, hint: 'Disimpan sebagai jadwal yang diminta klien dan dipakai di Penugasan.' })
-    const checks = el('ul', { className: 'chips', role: 'list', 'aria-label': 'Hasil aturan domain' })
+    priceField.wrap.querySelector('.field-label').appendChild(el('span', { className: 'price-ai' }, t('offer.review.aiSuggestion'), ' ', el('b', {}, C.rupiah(offerJson?.price))))
+    const schedF = C.field({ label: t('offer.schedule'), name: 'offer_schedule_final', type: 'datetime-local', value: scheduleInput.value, hint: t('offer.review.scheduleHint') })
+    const checks = el('ul', { className: 'chips', role: 'list', 'aria-label': t('offer.rules.aria') })
 
     const candidate = () => ({ ...offerJson, scope: scopeF.input.value.trim(), terms: termsF.input.value.trim(), notes: notesF.input.value.trim(), price: Number(priceField.input.value) })
     const RULES = [
-      { label: `Harga ${C.rupiahCompact(OfferRules.minPrice)} – ${C.rupiahCompact(OfferRules.maxPrice)}`, full: `Harga dalam rentang ${C.rupiah(OfferRules.minPrice)} – ${C.rupiah(OfferRules.maxPrice)}`, test: (o) => { const p = Number(o.price); return !Number.isNaN(p) && p >= OfferRules.minPrice && p <= OfferRules.maxPrice } },
-      { label: 'Lingkup ≥ 10 kar.', full: 'Ruang lingkup minimal 10 karakter', test: (o) => String(o.scope || '').trim().length >= 10 },
-      { label: 'Ketentuan ≥ 10 kar.', full: 'Ketentuan minimal 10 karakter', test: (o) => String(o.terms || '').trim().length >= 10 },
+      { label: t('offer.rules.price', { min: C.rupiahCompact(OfferRules.minPrice), max: C.rupiahCompact(OfferRules.maxPrice) }), full: t('offer.rules.priceFull', { min: C.rupiah(OfferRules.minPrice), max: C.rupiah(OfferRules.maxPrice) }), test: (o) => { const p = Number(o.price); return !Number.isNaN(p) && p >= OfferRules.minPrice && p <= OfferRules.maxPrice } },
+      { label: t('offer.rules.scope'), full: t('offer.rules.scopeFull'), test: (o) => String(o.scope || '').trim().length >= 10 },
+      { label: t('offer.rules.terms'), full: t('offer.rules.termsFull'), test: (o) => String(o.terms || '').trim().length >= 10 },
     ]
 
     // Drafts follow the edited fields until the user edits the draft itself.
-    const mailSubj = C.field({ label: 'Subjek email', name: 'mail_subject', value: draft.email.subject, attrs: { maxlength: '150' } })
-    const mailBody = C.textarea({ label: 'Isi email', name: 'mail_body', rows: 8, value: draft.email.body, attrs: { maxlength: '10000' } })
-    const waBody = C.textarea({ label: 'Pesan WhatsApp', name: 'wa_body', rows: 7, value: draft.wa, attrs: { maxlength: '4000' } })
+    const mailSubj = C.field({ label: t('offer.review.mailSubject'), name: 'mail_subject', value: draft.email.subject, attrs: { maxlength: '150' } })
+    const mailBody = C.textarea({ label: t('offer.review.mailBody'), name: 'mail_body', rows: 8, value: draft.email.body, attrs: { maxlength: '10000' } })
+    const waBody = C.textarea({ label: t('offer.review.waBody'), name: 'wa_body', rows: 7, value: draft.wa, attrs: { maxlength: '4000' } })
     const dirty = { mail: false, wa: false }
     mailSubj.input.addEventListener('input', () => { dirty.mail = true })
     mailBody.input.addEventListener('input', () => { dirty.mail = true })
@@ -494,9 +495,9 @@ export async function render(container, ctx = {}) {
       const o = candidate()
       checks.replaceChildren(...RULES.map((r) => {
         const ok = r.test(o)
-        return el('li', { className: `chip ${ok ? 'is-ok' : 'is-bad'}`, title: `${r.full || r.label}: ${ok ? 'lolos' : 'belum lolos'}` },
+        return el('li', { className: `chip ${ok ? 'is-ok' : 'is-bad'}`, title: `${r.full || r.label}: ${ok ? t('offer.rules.pass') : t('offer.rules.fail')}` },
           icon(ok ? 'check' : 'x', { size: 13 }), el('span', { className: 'chip-text' }, r.label),
-          el('span', { className: 'sr-only' }, ok ? ' (lolos)' : ' (belum lolos)'))
+          el('span', { className: 'sr-only' }, ok ? ` (${t('offer.rules.pass')})` : ` (${t('offer.rules.fail')})`))
       }))
       const v = validateOffer(o)
       wiz.setPrimaryDisabled(!v.valid)
@@ -504,31 +505,31 @@ export async function render(container, ctx = {}) {
     }
     for (const f of [scopeF, termsF, notesF, priceField, schedF]) f.input.addEventListener('input', () => { syncChecks(); refreshDrafts(); drawNotes() })
     priceField.wrap.appendChild(el('div', { className: 'rules-row' },
-      el('span', { className: 'proposal-label' }, icon('shield', { size: 14 }), 'Aturan domain'), checks))
+      el('span', { className: 'proposal-label' }, icon('shield', { size: 14 }), t('offer.rules.title')), checks))
 
     const currentOffer = () => {
       const o = candidate()
       return { validated_price: o.price, validated_scope: o.scope, ai_proposal_json: o }
     }
-    const pdfBtn = C.button({ label: 'Unduh PDF', icon: 'download', size: 'sm', variant: 'soft' })
+    const pdfBtn = C.button({ label: t('offer.actions.pdf'), icon: 'download', size: 'sm', variant: 'soft' })
     pdfBtn.addEventListener('click', () => openOfferDocument({ businessName, request, offer: candidate(), schedule: schedF.input.value || null, templateName: template?.name }))
-    const mailBtn = C.button({ label: 'Kirim email', icon: 'mail', size: 'sm', variant: 'ghost' })
+    const mailBtn = C.button({ label: t('offer.actions.email'), icon: 'mail', size: 'sm', variant: 'ghost' })
     mailBtn.addEventListener('click', () => openOfferEmail({ offer: currentOffer(), request, businessName, opener: mailBtn, draft: { subject: mailSubj.input.value, body: mailBody.input.value } }))
-    const waBtn = C.button({ label: 'Kirim WhatsApp', icon: 'send', size: 'sm', variant: 'ghost', disabled: !request.phone, title: request.phone ? '' : 'Nomor telepon pelanggan belum ada' })
+    const waBtn = C.button({ label: t('offer.actions.wa'), icon: 'send', size: 'sm', variant: 'ghost', disabled: !request.phone, title: request.phone ? '' : t('offer.actions.noPhone') })
     waBtn.addEventListener('click', () => openWaDialog({ requestId: request.id, customer: customerLabel(request), phone: request.phone, kind: 'offer', opener: waBtn, openSettings: ctx.openSettings, text: waBody.input.value }))
 
     reviewBox.replaceChildren(
       el('div', { className: 'proposal-top' },
-        el('span', { className: 'tag tag-accent' }, icon('sparkles', { size: 14 }), 'Usulan AI'),
-        el('span', { className: 'proposal-for', title: `${customerLabel(request)} — ${request.service_type || 'layanan'}` }, `${customerLabel(request)} — ${request.service_type || 'layanan'}`),
+        el('span', { className: 'tag tag-accent' }, icon('sparkles', { size: 14 }), t('offer.review.aiSuggestion')),
+        el('span', { className: 'proposal-for', title: `${customerLabel(request)} — ${request.service_type || t('offer.service')}` }, `${customerLabel(request)} — ${request.service_type || t('offer.service')}`),
         template ? C.tag(template.name, 'neutral') : '',
       ),
       scopeF.wrap, termsF.wrap, notesF.wrap,
       el('div', { className: 'form-row keep-row review-row' }, priceField.wrap, schedF.wrap),
-      el('section', { className: 'review-box', 'aria-label': 'Draf tinjauan' },
-        el('h4', { className: 'review-box-title' }, icon('checkCircle', { size: 15 }), 'Draf tinjauan'), reviewNotes),
-      el('details', { className: 'draft-box' }, el('summary', {}, icon('mail', { size: 14 }), 'Draf email'), mailSubj.wrap, mailBody.wrap),
-      el('details', { className: 'draft-box' }, el('summary', {}, icon('send', { size: 14 }), 'Draf WhatsApp'), waBody.wrap),
+      el('section', { className: 'review-box', 'aria-label': t('offer.review.notes') },
+        el('h4', { className: 'review-box-title' }, icon('checkCircle', { size: 15 }), t('offer.review.notes')), reviewNotes),
+      el('details', { className: 'draft-box' }, el('summary', {}, icon('mail', { size: 14 }), t('offer.review.mailDraft')), mailSubj.wrap, mailBody.wrap),
+      el('details', { className: 'draft-box' }, el('summary', {}, icon('send', { size: 14 }), t('offer.review.waDraft')), waBody.wrap),
       el('div', { className: 'review-actions' }, pdfBtn, mailBtn, waBtn),
     )
     review = { draft, priceField, scopeF, termsF, schedF, candidate, syncChecks }
@@ -545,7 +546,7 @@ export async function render(container, ctx = {}) {
       wiz.invalid([...byField(/harga/i, review.priceField.input), ...byField(/lingkup|scope/i, review.scopeF.input), ...byField(/ketentuan|terms/i, review.termsF.input)].concat(v.errors.filter((e) => !/harga|lingkup|scope|ketentuan|terms/i.test(e))))
       return
     }
-    const restore = wiz.busy('Menyimpan…')
+    const restore = wiz.busy(t('offer.saving'))
     try {
       const db = getCloud().database
       const { data, error } = await db.from('offers').insert({
@@ -564,9 +565,9 @@ export async function render(container, ctx = {}) {
       }
       const row = Array.isArray(data) ? data[0] : data
       restore()
-      const next = C.button({ label: 'Tugaskan pekerja', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+      const next = C.button({ label: t('offer.done.assign'), iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       next.addEventListener('click', () => navigate('assign', { offerId: row?.id }))
-      const again = C.button({ label: 'Buat penawaran lain', icon: 'plus', size: 'sm', variant: 'soft' })
+      const again = C.button({ label: t('offer.done.another'), icon: 'plus', size: 'sm', variant: 'soft' })
       again.addEventListener('click', () => {
         draft = null; review = null; pipe = null; pendingWork = null; lastError = false
         STEP_DETAIL.clear()
@@ -579,16 +580,16 @@ export async function render(container, ctx = {}) {
         wiz.reset()
       })
       const mail = offerEmailButton({ offer: { ...row, validated_price: o.price, validated_scope: o.scope, ai_proposal_json: { ...offerJson, ...o } }, request, businessName })
-      const view = C.button({ label: 'Lihat penawaran', icon: 'fileText', size: 'sm', variant: 'ghost' })
+      const view = C.button({ label: t('offer.done.view'), icon: 'fileText', size: 'sm', variant: 'ghost' })
       view.addEventListener('click', () => navigate('offer', { offerId: row?.id }))
-      wiz.complete({ text: `Penawaran ${C.rupiah(o.price)} untuk ${customerLabel(request)} disimpan dan disetujui.`, actions: row?.id != null ? [next, mail, view, again] : [next, mail, again] })
-      showToast('Penawaran disimpan.', 'success')
+      wiz.complete({ text: t('offer.done.text', { price: C.rupiah(o.price), name: customerLabel(request) }), actions: row?.id != null ? [next, mail, view, again] : [next, mail, again] })
+      showToast(t('offer.done.toast'), 'success')
       notifyDataChanged()
       await loadList()
     } catch (err) {
       restore()
       review.syncChecks()
-      msg.show('danger', `Gagal menyimpan: ${err.message}`)
+      msg.show('danger', t('offer.saveError', { error: err.message }))
     }
   }
 
@@ -597,7 +598,7 @@ export async function render(container, ctx = {}) {
     try {
       flow = await loadFlow()
     } catch (err) {
-      loadNote.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      loadNote.replaceChildren(C.errorState(t('offer.loadError', { error: err.message })))
       return
     }
     if (ctx.signal?.aborted) return
@@ -616,20 +617,20 @@ async function renderDetail(container, ctx) {
   const id = String(ctx.params.offerId)
   const status = C.message()
   const body = el('div', { className: 'stage-solo' }, C.skeletonRows(4))
-  container.replaceChildren(C.pageHeader({ title: 'Penawaran' }), body)
+  container.replaceChildren(C.pageHeader({ title: t('offer.title') }), body)
 
   async function load() {
     let flow
     try {
       flow = await loadFlow()
     } catch (err) {
-      body.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      body.replaceChildren(C.errorState(t('offer.loadError', { error: err.message })))
       return
     }
     if (ctx.signal?.aborted) return
     const o = flow.offer(id)
     if (!o) {
-      body.replaceChildren(pickFromWorkflow(navigate, { title: 'Penawaran tidak ditemukan.', body: 'Mungkin sudah dihapus. Pilih pekerjaan lain dari Alur kerja.' }))
+      body.replaceChildren(pickFromWorkflow(navigate, { title: t('offer.detail.notFound'), body: t('offer.detail.notFoundBody') }))
       return
     }
     draw(flow, o)
@@ -640,54 +641,54 @@ async function renderDetail(container, ctx) {
     const proposal = typeof o.ai_proposal_json === 'object' && o.ai_proposal_json ? o.ai_proposal_json : {}
     const assigned = flow.assignmentsOf(o.id)
     const facts = C.defList([
-      ['Layanan', r?.service_type || '—'],
-      ['Lokasi', r?.location || '—'],
-      ['Telepon', r?.phone || '—'],
-      ['Ruang lingkup', o.validated_scope || proposal.scope || '—'],
-      ['Harga', el('span', { className: 'tnum strong' }, C.rupiah(o.validated_price))],
-      ['Ketentuan', proposal.terms || '—'],
-      ...(proposal.notes ? [['Catatan', proposal.notes]] : []),
-      ['Jadwal', r?.requested_at ? C.formatDateTime(r.requested_at) : '—'],
-      ['Status', offerTag(o)],
-      ['Dibuat', C.formatDateTime(o.created_at)],
+      [t('offer.detail.service'), r?.service_type || '—'],
+      [t('offer.detail.location'), r?.location || '—'],
+      [t('offer.detail.phone'), r?.phone || '—'],
+      [t('offer.field.scope'), o.validated_scope || proposal.scope || '—'],
+      [t('offer.field.price'), el('span', { className: 'tnum strong' }, C.rupiah(o.validated_price))],
+      [t('offer.field.terms'), proposal.terms || '—'],
+      ...(proposal.notes ? [[t('offer.field.notes'), proposal.notes]] : []),
+      [t('offer.detail.schedule'), r?.requested_at ? C.formatDateTime(r.requested_at) : '—'],
+      [t('offer.detail.status'), offerTag(o)],
+      [t('offer.detail.created'), C.formatDateTime(o.created_at)],
     ])
 
     const actions = []
     if (o.status !== 'approved') {
-      const ok = C.button({ label: 'Setujui', icon: 'check', size: 'sm', variant: 'primary' })
+      const ok = C.button({ label: t('offer.detail.approve'), icon: 'check', size: 'sm', variant: 'primary' })
       ok.addEventListener('click', () => approve(o, ok))
       actions.push(ok)
-      const redo = C.button({ label: 'Susun ulang dengan AI', icon: 'sparkles', size: 'sm', variant: 'soft' })
+      const redo = C.button({ label: t('offer.detail.redo'), icon: 'sparkles', size: 'sm', variant: 'soft' })
       redo.addEventListener('click', () => navigate('offer', { requestId: o.request_id }))
       actions.push(redo)
     } else if (!assigned.length) {
-      const go = C.button({ label: 'Tugaskan', iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
+      const go = C.button({ label: t('offer.detail.assign'), iconRight: 'arrowRight', size: 'sm', variant: 'primary' })
       go.addEventListener('click', () => navigate('assign', { offerId: o.id }))
       actions.push(go)
     } else {
-      const go = C.button({ label: 'Lihat penugasan', iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
+      const go = C.button({ label: t('offer.detail.viewAssignment'), iconRight: 'arrowRight', size: 'sm', variant: 'soft' })
       go.addEventListener('click', () => navigate('assign', { offerId: o.id }))
-      actions.push(C.tag('Ditugaskan', 'ok'), go)
+      actions.push(C.tag(t('offer.detail.assigned'), 'ok'), go)
     }
     // Send the offer by email (any address, confirmed in a dialog) or WhatsApp (needs the customer's phone).
     actions.push(offerEmailButton({ offer: o, request: r, businessName }))
     if (r?.phone) {
-      const wa = C.button({ label: 'WhatsApp', icon: 'send', size: 'sm', variant: 'ghost' })
-      wa.setAttribute('aria-label', `Kirim penawaran ke ${customerLabel(r)} via WhatsApp`)
+      const wa = C.button({ label: t('offer.actions.waShort'), icon: 'send', size: 'sm', variant: 'ghost' })
+      wa.setAttribute('aria-label', t('offer.detail.waAria', { name: customerLabel(r) }))
       wa.addEventListener('click', () => openWaDialog({
         requestId: r.id, customer: customerLabel(r), phone: r.phone, kind: 'offer', opener: wa, openSettings: ctx.openSettings,
         text: offerMessage({ customer: r.customer_name, service: r.service_type, scope: o.validated_scope, price: o.validated_price, terms: proposal.terms, business: businessName }),
       }))
       actions.push(wa)
     }
-    const pdf = C.button({ label: 'Unduh PDF', icon: 'download', size: 'sm', variant: 'ghost' })
+    const pdf = C.button({ label: t('offer.actions.pdf'), icon: 'download', size: 'sm', variant: 'ghost' })
     pdf.addEventListener('click', () => openOfferDocument({ businessName, request: r, offer: { ...proposal, scope: o.validated_scope || proposal.scope, price: o.validated_price }, schedule: r?.requested_at || null }))
     actions.push(pdf)
 
     body.replaceChildren(
-      jobHeader(r, { tag: offerTag(o), note: `Penawaran #${o.id}` }),
+      jobHeader(r, { tag: offerTag(o), note: t('offer.detail.number', { id: o.id }) }),
       status,
-      C.panel({ title: 'Penawaran', meta: C.rupiah(o.validated_price), className: 'offer-detail', raised: true },
+      C.panel({ title: t('offer.title'), meta: C.rupiah(o.validated_price), className: 'offer-detail', raised: true },
         facts, el('div', { className: 'job-actions' }, actions)),
       workflowLink(navigate),
     )
@@ -696,17 +697,17 @@ async function renderDetail(container, ctx) {
   async function approve(o, btnEl) {
     const proposal = typeof o.ai_proposal_json === 'object' && o.ai_proposal_json ? o.ai_proposal_json : {}
     const v = validateOffer({ ...proposal, price: o.validated_price, scope: o.validated_scope || proposal.scope })
-    if (!v.valid) { status.show('danger', `Penawaran #${o.id} tidak lolos validasi.`, v.errors); return }
-    const restore = C.setBusy(btnEl, 'Menyetujui…')
+    if (!v.valid) { status.show('danger', t('offer.detail.invalid', { id: o.id }), v.errors); return }
+    const restore = C.setBusy(btnEl, t('offer.detail.approving'))
     try {
       const { error } = await getCloud().database.from('offers').update({ status: 'approved' }).eq('id', o.id)
       if (error) throw new Error(error.message)
-      showToast('Penawaran disetujui.', 'success')
+      showToast(t('offer.detail.approvedToast'), 'success')
       notifyDataChanged()
       await load()
     } catch (err) {
       restore()
-      status.show('danger', `Gagal menyetujui: ${err.message}`)
+      status.show('danger', t('offer.detail.approveError', { error: err.message }))
     }
   }
 

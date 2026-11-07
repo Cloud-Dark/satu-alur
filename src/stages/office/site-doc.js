@@ -5,11 +5,13 @@ import { saveSite } from '../../site/api.js'
 import { validateSiteContent, parseDoc } from '../../site/content-rules.js'
 import { DOC_TITLES, blockNode } from '../../site/doc-page.js'
 import { stampLine, loadOrRetry } from './site-landing.js'
+import { t } from '../../i18n/index.js'
 
 const { el } = C
 const ROUTE = { about: '#/tentang', privacy: '#/privasi', terms: '#/syarat', cookies: '#/cookie' }
-const LEGAL = [{ value: 'privacy', label: 'Kebijakan privasi' }, { value: 'terms', label: 'Syarat & ketentuan' }, { value: 'cookies', label: 'Kebijakan cookie' }]
-export const LEAVE_MSG = 'Perubahan belum disimpan. Tinggalkan halaman ini?'
+// Language is fixed per page load, so these can be resolved once.
+const LEGAL = ['privacy', 'terms', 'cookies'].map((value) => ({ value, label: t(`office.doc.legal.${value}`) }))
+export const LEAVE_MSG = t('office.common.leave')
 let seq = 0
 
 async function drawDoc(host, ctx, setDirty, key) {
@@ -23,9 +25,9 @@ async function drawDoc(host, ctx, setDirty, key) {
   setDirty(false)
   const id = ++seq
 
-  const title = C.field({ label: 'Judul', id: `of-doc-title-${id}`, value: state.title, attrs: { maxlength: '120' } })
-  const body = C.textarea({ label: 'Isi', id: `of-doc-body-${id}`, value: state.body, rows: 16, attrs: { maxlength: '50000' },
-    hint: 'Awali baris dengan ## untuk judul bagian dan - untuk poin daftar. Pisahkan paragraf dengan baris kosong.' })
+  const title = C.field({ label: t('office.doc.title'), id: `of-doc-title-${id}`, value: state.title, attrs: { maxlength: '120' } })
+  const body = C.textarea({ label: t('office.doc.body'), id: `of-doc-body-${id}`, value: state.body, rows: 16, attrs: { maxlength: '50000' },
+    hint: t('office.doc.bodyHint') })
   const stamp = el('p', { className: 'muted small', role: 'status' }, stampLine(row))
   const err = el('p', { className: 'field-error', role: 'alert' })
   const pTitle = el('h1', { className: 'display doc-title' })
@@ -34,25 +36,25 @@ async function drawDoc(host, ctx, setDirty, key) {
   title.input.addEventListener('input', () => { state.title = title.input.value; redraw(); touch() })
   body.input.addEventListener('input', () => { state.body = body.input.value; redraw(); touch() })
 
-  const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary' })
+  const save = C.button({ label: t('office.common.save'), icon: 'save', variant: 'primary' })
   save.addEventListener('click', async () => {
     err.textContent = ''
     let clean
     try { clean = validateSiteContent(key, state) } catch (ex) { err.textContent = ex.message; return }
-    const restore = C.setBusy(save, 'Menyimpan…')
+    const restore = C.setBusy(save, t('office.common.saving'))
     try {
       row = await saveSite(key, clean)
       saved = snap()
       if (host.dataset.doc === mine) touch()
       stamp.textContent = stampLine(row)
-      showToast('Halaman tersimpan.', 'success')
+      showToast(t('office.doc.saved'), 'success')
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
-  const view = el('a', { className: 'btn btn-ghost', href: ROUTE[key], target: '_blank', rel: 'noopener' }, 'Lihat halaman ↗')
+  const view = el('a', { className: 'btn btn-ghost', href: ROUTE[key], target: '_blank', rel: 'noopener' }, t('office.doc.view'))
 
   host.replaceChildren(
     C.panel({ title: DOC_TITLES[key] }, title.wrap, body.wrap),
-    C.panel({ title: 'Pratinjau' }, el('div', { className: 'lp doc-page of-preview' }, el('article', { className: 'doc-col' }, pTitle, pBody))),
+    C.panel({ title: t('office.common.preview') }, el('div', { className: 'lp doc-page of-preview' }, el('article', { className: 'doc-col' }, pTitle, pBody))),
     err, el('div', { className: 'of-actions' }, save, view), stamp)
   redraw()
 }
@@ -72,6 +74,6 @@ export function drawLegal(host, ctx, setDirty) {
     set(false)
     drawDoc(sub, ctx, set, current)
   })
-  host.replaceChildren(el('div', { className: 'field of-legal-pick' }, el('label', { className: 'field-label', htmlFor: id }, 'Dokumen'), select), sub)
+  host.replaceChildren(el('div', { className: 'field of-legal-pick' }, el('label', { className: 'field-label', htmlFor: id }, t('office.doc.document')), select), sub)
   drawDoc(sub, ctx, set, current)
 }

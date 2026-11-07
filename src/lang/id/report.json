@@ -1,0 +1,82 @@
+{
+  "title": "Laporan keuangan",
+  "loading": "Memuat…",
+  "loadError": "Gagal memuat buku besar: {error}",
+  "period": {
+    "aria": "Periode laporan",
+    "30d": "30 hari",
+    "month": "Bulan ini",
+    "prev": "Bulan lalu",
+    "all": "Semua",
+    "prev30": "30 hari sebelumnya",
+    "noData": "Belum ada data",
+    "line": {
+      "one": "Periode {label} · {count} jurnal",
+      "other": "Periode {label} · {count} jurnal"
+    },
+    "compare": " · pembanding: {label}"
+  },
+  "kpi": {
+    "profit": "Laba sebelum pajak",
+    "revenue": "Pendapatan",
+    "cost": "Biaya",
+    "margin": "Margin",
+    "noRevenue": "Belum ada pendapatan",
+    "costShare": "Biaya {pct}% dari pendapatan"
+  },
+  "cat": {
+    "title": "Rincian kategori",
+    "count": {
+      "one": "{count} kategori",
+      "other": "{count} kategori"
+    },
+    "category": "Kategori",
+    "entries": "Jurnal",
+    "share": "Porsi",
+    "amount": "Jumlah"
+  },
+  "cust": {
+    "title": "Pelanggan teratas",
+    "meta": "berdasarkan pendapatan",
+    "emptyKicker": "Kosong",
+    "emptyTitle": "Belum ada pendapatan di periode ini."
+  },
+  "empty": {
+    "kicker": "Periode kosong",
+    "title": "Tidak ada jurnal di periode ini.",
+    "tryOther": "Coba periode lain, atau posting jurnal baru.",
+    "post": "Posting jurnal di tahap 05 agar laporan terisi.",
+    "toBook": "Pekerjaan siap dibukukan"
+  },
+  "ai": {
+    "explain": "Jelaskan dengan AI",
+    "title": "Penjelasan AI",
+    "meta": "Bahasa Indonesia · HTML tersanitasi",
+    "lead": "AI membaca angka periode terpilih, membandingkannya dengan periode sebelumnya, lalu memberi ringkasan dan rekomendasi. Angka di atas tetap menjadi acuan.",
+    "unavailableShort": "AI sedang tidak tersedia",
+    "unavailable": "Model AI tidak tersedia. Periksa koneksi lalu muat ulang halaman.",
+    "nothing": "Tidak ada jurnal di periode ini, jadi belum ada yang bisa dijelaskan.",
+    "analyzing": "Menganalisis…",
+    "model": "Analis laporan",
+    "writing": "Menulis…",
+    "done": "Selesai",
+    "doneToast": "Penjelasan laporan selesai.",
+    "stopped": "Dihentikan",
+    "stoppedMsg": "Penjelasan dihentikan.",
+    "failed": "Gagal"
+  },
+  "mail": {
+    "button": "Kirim ke email saya",
+    "heading": "Laporan keuangan {period}",
+    "revenue": "Pendapatan: {amount}",
+    "cost": "Biaya: {amount}",
+    "profit": "Laba sebelum pajak: {amount}",
+    "margin": " (margin {pct}%)",
+    "compare": "Pembanding {label}: laba {amount}",
+    "ai": "Penjelasan AI:",
+    "sending": "Mengirim…",
+    "subject": "Laporan {period}",
+    "simulated": "Simulasi: email tidak dikirim dari akun demo.",
+    "sent": "Laporan terkirim ke {to}."
+  }
+}

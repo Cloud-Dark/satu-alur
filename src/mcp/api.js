@@ -1,3 +1,4 @@
+import { t } from '../i18n/index.js'
 /**
  * Thin HTTP client for /api/mcp/*.
  *
@@ -23,7 +24,7 @@ export async function call(path, { method = 'GET', body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('erp.common.network'))
   }
 
   let json = null

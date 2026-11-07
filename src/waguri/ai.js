@@ -12,6 +12,7 @@ import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { isQuotaError } from '../quota/errors.js'
 import { buildMessages, historyTurns } from './skills.js'
 import { knowledgeText } from './knowledge.js'
+import { t } from '../i18n/index.js'
 
 let modelPromise = null
 async function modelId() {
@@ -19,7 +20,7 @@ async function modelId() {
     modelPromise = getCloud().llm.models.list().then(({ data, error }) => {
       if (error) throw new Error(error.message)
       const m = (data || []).find((x) => x.disabled !== true)
-      if (!m) throw new Error('Tidak ada model AI yang tersedia saat ini.')
+      if (!m) throw new Error(t('waguri.ai.noModel'))
       return m.id
     })
     modelPromise.catch(() => { modelPromise = null })
@@ -92,20 +93,20 @@ export async function askPublic({ skill, question, history, context, signal, onC
     })
   } catch (e) {
     if (e.name === 'AbortError') throw e
-    throw new Error('Jaringan bermasalah.')
+    throw new Error(t('waguri.ai.network'))
   }
   if (!res.ok) {
     let message = `HTTP ${res.status}`
     try { const j = await res.json(); message = j?.error?.message || j?.error || j?.message || message } catch { /* not JSON */ }
     throw Object.assign(new Error(message), { status: res.status })
   }
-  if (!res.body) throw new Error('Respons AI kosong.')
+  if (!res.body) throw new Error(t('waguri.ai.empty'))
   return collect(sse(res.body), onChunk)
 }
 
 /** User-facing reason an AI call failed (the deterministic answer stays). */
 export function aiErrorNote(err) {
-  if (isQuotaError(err)) return 'Kuota AI bulan ini sudah habis, jadi saya menjawab dari data saja.'
-  if (err?.status === 429) return 'Banyak sekali pertanyaan barusan. Coba lagi beberapa menit lagi.'
+  if (isQuotaError(err)) return t('waguri.ai.quota')
+  if (err?.status === 429) return t('waguri.ai.rateLimit')
   return null
 }

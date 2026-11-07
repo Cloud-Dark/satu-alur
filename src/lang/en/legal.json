@@ -1,0 +1,24 @@
+{
+  "titles": {
+    "about": "About Satu Alur",
+    "privacy": "Privacy Policy",
+    "terms": "Terms & Conditions",
+    "cookies": "Cookie Policy"
+  },
+  "links": {
+    "about": "About us",
+    "privacy": "Privacy policy",
+    "terms": "Terms & conditions",
+    "cookies": "Cookie policy"
+  },
+  "home": "Home",
+  "navLabel": "Satu Alur pages",
+  "empty": "This document is being prepared.",
+  "updated": "Last updated {date}",
+  "onlyIndonesian": "This document is currently available in Indonesian only.",
+  "errors": {
+    "network": "Network problem. Check your connection and try again.",
+    "loadRetry": "Couldn't load the content. Try again.",
+    "load": "Couldn't load the content. {message}"
+  }
+}

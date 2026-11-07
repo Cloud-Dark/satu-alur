@@ -12,6 +12,7 @@ import { heuristicRank } from './scoring.js'
 import { rankLeads } from '../ai/leads-agent.js'
 import { abortable } from '../stages/offer.js'
 import { showToast } from '../ui/animations.js'
+import { t } from '../i18n/index.js'
 
 export const JOB_EVENT = 'satualur:leads-job'
 export const HISTORY_MAX = 8
@@ -180,7 +181,7 @@ async function run(j, { isMock, prepare }) {
   finish('done')
   if (!pageMounted) {
     const n = j.leads.filter((l) => l.ai?.keep !== false).length
-    showToast(`Pencarian prospek selesai: ${n} usaha.`, 'success', 5000)
+    showToast(t('leads.job.done', { count: n }), 'success', 5000)
   }
 }
 

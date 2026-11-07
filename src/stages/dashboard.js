@@ -5,7 +5,8 @@
 import * as C from '../ui/components.js'
 import { staggerChildren } from '../ui/animations.js'
 import { loadFlow, totals, ledgerDate, isRevenue, categoryLabel, customerLabel } from './data.js'
-import { progressOf, progressLabel } from '../domain/progress.js'
+import { progressOf } from '../domain/progress.js'
+import { t, locale, has } from '../i18n/index.js'
 
 /** Funnel step -> Alur kerja filter (posisi). */
 const FUNNEL_FILTER = { request: 'all', offer: 'offer', assign: 'assign', complete: 'work', bookkeeping: 'book' }
@@ -14,21 +15,25 @@ const { el, icon } = C
 const DAY = 86400000
 
 const STEPS = [
-  { key: 'request', num: '01', label: 'Permintaan', icon: 'inbox', desc: 'Catat kebutuhan pelanggan.' },
-  { key: 'offer', num: '02', label: 'Penawaran', icon: 'sparkles', desc: 'AI menyusun, aturan memvalidasi.' },
-  { key: 'assign', num: '03', label: 'Penugasan', icon: 'users', desc: 'Jadwalkan tenaga pelaksana.' },
-  { key: 'complete', num: '04', label: 'Penyelesaian', icon: 'checkCircle', desc: 'Catat hasil pekerjaan.' },
-  { key: 'bookkeeping', num: '05', label: 'Pembukuan', icon: 'ledger', desc: 'Posting pendapatan dan biaya.' },
-  { key: 'report', num: '06', label: 'Laporan', icon: 'chart', desc: 'AI menjelaskan angka Anda.' },
+  { key: 'request', num: '01', icon: 'inbox' },
+  { key: 'offer', num: '02', icon: 'sparkles' },
+  { key: 'assign', num: '03', icon: 'users' },
+  { key: 'complete', num: '04', icon: 'checkCircle' },
+  { key: 'bookkeeping', num: '05', icon: 'ledger' },
+  { key: 'report', num: '06', icon: 'chart' },
 ]
+/** Step with its label and description in the current language (read at render time). */
+const stepAt = (i) => ({ ...STEPS[i], label: t(`dashboard.steps.${STEPS[i].key}.label`), desc: t(`dashboard.steps.${STEPS[i].key}.desc`) })
+const progressText = (v) => t(`assign.progress.${v}`)
+const catLabel = (c) => (has(`bookkeeping.category.${c}`) ? t(`bookkeeping.category.${c}`) : categoryLabel(c))
 const STEP_ICON = Object.fromEntries(STEPS.map((st) => [st.num, st.icon]))
 
 function greeting(d = new Date()) {
   const h = d.getHours()
-  if (h < 11) return 'Selamat pagi'
-  if (h < 15) return 'Selamat siang'
-  if (h < 18) return 'Selamat sore'
-  return 'Selamat malam'
+  if (h < 11) return t('dashboard.greeting.morning')
+  if (h < 15) return t('dashboard.greeting.afternoon')
+  if (h < 18) return t('dashboard.greeting.evening')
+  return t('dashboard.greeting.night')
 }
 
 function displayName(user) {
@@ -53,7 +58,7 @@ function deltaText(cur, prev) {
   if (prev > 0) {
     const pct = ((cur - prev) / prev) * 100
     const sign = pct > 0 ? '+' : pct < 0 ? '−' : '±'
-    return { pct, value: `${sign}${Math.abs(pct).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`, text: 'vs 7 hari sebelumnya' }
+    return { pct, value: `${sign}${Math.abs(pct).toLocaleString(locale(), { maximumFractionDigits: 1 })}%`, text: t('dashboard.kpi.vsPrev7') }
   }
   return null
 }
@@ -65,9 +70,9 @@ export async function render(container, ctx = {}) {
   /* ---------------------------------------------------------- Header */
   const syncLine = el('span', { className: 'sync-line' },
     el('span', { className: 'pulse-dot', 'aria-hidden': 'true' }),
-    el('span', {}, 'Memuat…'),
+    el('span', {}, t('dashboard.loading')),
   )
-  const refreshBtn = C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost' })
+  const refreshBtn = C.button({ label: t('dashboard.refresh'), icon: 'refresh', size: 'sm', variant: 'ghost' })
   const name = displayName(ctx.user)
   const head = C.pageHeader({ title: `${greeting(now)}${name ? `, ${name}` : ''}`, actions: [syncLine, refreshBtn], className: 'dash-head' })
 
@@ -78,8 +83,8 @@ export async function render(container, ctx = {}) {
   body.replaceChildren(
     el('div', { className: 'kpis is-loading' }, [0, 1, 2, 3].map((i) => el('div', { className: `kpi ${i === 0 ? 'is-hero' : ''}`.trim() }, C.skeleton({ lines: 2 })))),
     el('div', { className: 'dash-grid' },
-      C.panel({ title: 'Pendapatan vs biaya', className: 'span-7' }, C.skeletonRows(5)),
-      C.panel({ title: 'Alur kerja', className: 'span-5' }, C.skeletonRows(4)),
+      C.panel({ title: t('dashboard.chart.title'), className: 'span-7' }, C.skeletonRows(5)),
+      C.panel({ title: t('dashboard.pipeline.title'), className: 'span-5' }, C.skeletonRows(4)),
     ),
   )
 
@@ -93,8 +98,8 @@ export async function render(container, ctx = {}) {
   }
   if (ctx.signal?.aborted) return
 
-  const syncedAt = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
-  syncLine.lastChild.textContent = `Diperbarui ${syncedAt}`
+  const syncedAt = new Date().toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+  syncLine.lastChild.textContent = t('dashboard.updatedAt', { time: syncedAt })
 
   const isEmpty = !m.requests.length && !m.offers.length && !m.assignments.length && !m.completions.length && !m.ledger.length
 
@@ -123,9 +128,9 @@ export async function render(container, ctx = {}) {
 
 function renderKpis(m, now) {
   const all = totals(m.ledger)
-  const t = now.getTime()
-  const cur = windowTotals(m.ledger, t - 7 * DAY, t + 1)
-  const prev = windowTotals(m.ledger, t - 14 * DAY, t - 7 * DAY)
+  const nowMs = now.getTime()
+  const cur = windowTotals(m.ledger, nowMs - 7 * DAY, nowMs + 1)
+  const prev = windowTotals(m.ledger, nowMs - 14 * DAY, nowMs - 7 * DAY)
 
   const deltaNode = (key, { invert = false } = {}) => {
     const d = deltaText(cur[key], prev[key])
@@ -141,9 +146,9 @@ function renderKpis(m, now) {
         tone,
       }
     }
-    if (cur[key] > 0) return { node: `${C.rupiahCompact(cur[key])} dalam 7 hari terakhir`, tone: null }
-    if (!m.ledger.length) return { node: 'Belum ada jurnal', tone: null }
-    return { node: 'Tidak ada transaksi 7 hari terakhir', tone: null }
+    if (cur[key] > 0) return { node: t('dashboard.kpi.last7', { amount: C.rupiahCompact(cur[key]) }), tone: null }
+    if (!m.ledger.length) return { node: t('dashboard.kpi.noLedger'), tone: null }
+    return { node: t('dashboard.kpi.noTx7'), tone: null }
   }
 
   const rev = deltaNode('revenue')
@@ -154,26 +159,26 @@ function renderKpis(m, now) {
   const rate = m.assignments.length ? Math.round((doneAssign / m.assignments.length) * 100) : null
 
   const pct = (n) => `${Math.round(n)}%`
-  return el('div', { className: 'kpis', role: 'group', 'aria-label': 'Indikator utama' },
+  return el('div', { className: 'kpis', role: 'group', 'aria-label': t('dashboard.kpi.aria') },
     C.kpi({
-      label: 'Laba sebelum pajak',
+      label: t('dashboard.kpi.profit'),
       hero: true,
       iconName: 'sprout',
       value: C.rupiah(all.profit),
       countTo: all.profit,
       format: C.rupiah,
-      sub: margin == null ? 'Margin — (belum ada pendapatan)' : `Margin ${margin.toLocaleString('id-ID', { maximumFractionDigits: 1 })}%`,
+      sub: margin == null ? t('dashboard.kpi.marginNone') : t('dashboard.kpi.margin', { pct: margin.toLocaleString(locale(), { maximumFractionDigits: 1 }) }),
       tone: margin == null ? null : all.profit >= 0 ? 'ok' : 'danger',
     }),
-    C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(all.revenue), countTo: all.revenue, format: C.rupiah, delta: rev.node, tone: rev.tone }),
-    C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(all.cost), countTo: all.cost, format: C.rupiah, delta: cost.node, tone: cost.tone }),
+    C.kpi({ label: t('dashboard.word.revenue'), iconName: 'wallet', value: C.rupiah(all.revenue), countTo: all.revenue, format: C.rupiah, delta: rev.node, tone: rev.tone }),
+    C.kpi({ label: t('dashboard.word.cost'), iconName: 'receipt', value: C.rupiah(all.cost), countTo: all.cost, format: C.rupiah, delta: cost.node, tone: cost.tone }),
     C.kpi({
-      label: 'Tingkat penyelesaian',
+      label: t('dashboard.kpi.completionRate'),
       iconName: 'checkCircle',
       value: rate == null ? '—' : `${rate}%`,
       countTo: rate == null ? undefined : rate,
       format: pct,
-      sub: m.assignments.length ? `${doneAssign} dari ${m.assignments.length} penugasan selesai` : 'Belum ada penugasan',
+      sub: m.assignments.length ? t('dashboard.kpi.doneOf', { done: doneAssign, total: m.assignments.length }) : t('dashboard.kpi.noAssignments'),
     }),
   )
 }
@@ -188,17 +193,17 @@ function renderPipeline(m, navigate) {
   const weekAgo = Date.now() - 7 * DAY
 
   const cells = [
-    { ...STEPS[0], count: reqTotal, sub: `${m.requests.filter((r) => (C.toDate(r.created_at)?.getTime() || 0) > weekAgo).length} masuk 7 hari terakhir`, reach: reqTotal },
-    { ...STEPS[1], count: m.offers.length, sub: `${m.offers.filter((o) => o.status === 'approved').length} disetujui`, reach: reached(['offered', 'draft', 'assigned', 'done', 'booked']) },
-    { ...STEPS[2], count: m.assignments.length, sub: `${m.activeAssignments().length} aktif`, reach: reached(['assigned', 'done', 'booked']) },
-    { ...STEPS[3], count: m.completions.length, sub: `${m.completionsWithoutLedger().length} belum dibukukan`, reach: reached(['done', 'booked']) },
-    { ...STEPS[4], count: m.ledger.length, sub: `${C.rupiahCompact(totals(m.ledger).revenue)} pendapatan`, reach: reached(['booked']) },
-    { ...STEPS[5], count: months.size, sub: months.size === 1 ? 'periode bulanan' : 'periode bulanan', reach: reached(['booked']), unit: 'periode' },
+    { ...stepAt(0), count: reqTotal, sub: t('dashboard.pipeline.sub.request', { count: m.requests.filter((r) => (C.toDate(r.created_at)?.getTime() || 0) > weekAgo).length }), reach: reqTotal },
+    { ...stepAt(1), count: m.offers.length, sub: t('dashboard.pipeline.sub.offer', { count: m.offers.filter((o) => o.status === 'approved').length }), reach: reached(['offered', 'draft', 'assigned', 'done', 'booked']) },
+    { ...stepAt(2), count: m.assignments.length, sub: t('dashboard.pipeline.sub.assign', { count: m.activeAssignments().length }), reach: reached(['assigned', 'done', 'booked']) },
+    { ...stepAt(3), count: m.completions.length, sub: t('dashboard.pipeline.sub.complete', { count: m.completionsWithoutLedger().length }), reach: reached(['done', 'booked']) },
+    { ...stepAt(4), count: m.ledger.length, sub: t('dashboard.pipeline.sub.bookkeeping', { amount: C.rupiahCompact(totals(m.ledger).revenue) }), reach: reached(['booked']) },
+    { ...stepAt(5), count: months.size, sub: t('dashboard.pipeline.sub.report'), reach: reached(['booked']), unit: 'periode' },
   ]
 
   const list = el('ol', { className: 'funnel' }, cells.map((c, i) => {
     const pct = reqTotal ? Math.round((c.reach / reqTotal) * 100) : 0
-    const b = el('button', { type: 'button', className: 'funnel-row', 'aria-label': `${c.num} ${c.label}: ${c.count}. ${pct}% permintaan mencapai tahap ini. Buka di Alur kerja.` },
+    const b = el('button', { type: 'button', className: 'funnel-row', 'aria-label': t('dashboard.pipeline.rowAria', { num: c.num, label: c.label, count: c.count, pct }) },
       el('span', { className: 'funnel-top' },
         el('span', { className: 'funnel-num tnum' }, c.num),
         el('span', { className: 'funnel-label' }, c.label),
@@ -216,7 +221,7 @@ function renderPipeline(m, navigate) {
     return el('li', {}, b)
   }))
 
-  return C.panel({ title: 'Alur kerja', meta: `${reqTotal} permintaan · konversi per tahap`, className: 'span-5 funnel-panel' }, list)
+  return C.panel({ title: t('dashboard.pipeline.title'), meta: t('dashboard.pipeline.meta', { count: reqTotal }), className: 'span-5 funnel-panel' }, list)
 }
 
 /* =============================================================== Chart */
@@ -226,17 +231,17 @@ function renderChart(m, ctx) {
   const wrap = el('div', { className: 'chart-wrap' })
   const summary = el('p', { className: 'chart-summary' })
   const legend = el('div', { className: 'chart-legend' },
-    el('span', {}, el('i', { className: 'lg lg-rev' }), 'Pendapatan'),
-    el('span', {}, el('i', { className: 'lg lg-cost' }), 'Biaya'),
-    el('span', { className: 'chart-legend-note' }, 'akumulasi harian'),
+    el('span', {}, el('i', { className: 'lg lg-rev' }), t('dashboard.word.revenue')),
+    el('span', {}, el('i', { className: 'lg lg-cost' }), t('dashboard.word.cost')),
+    el('span', { className: 'chart-legend-note' }, t('dashboard.chart.cumulative')),
   )
   const seg = C.segmented({
-    label: 'Rentang grafik',
+    label: t('dashboard.chart.rangeLabel'),
     value: '30',
-    options: [{ value: '14', label: '14 hari' }, { value: '30', label: '30 hari' }],
+    options: [{ value: '14', label: t('dashboard.chart.days', { n: 14 }) }, { value: '30', label: t('dashboard.chart.days', { n: 30 }) }],
     onChange: (v) => { range = Number(v); draw() },
   })
-  const p = C.panel({ title: 'Pendapatan vs biaya', className: 'span-7 chart-panel', actions: seg }, legend, wrap, summary)
+  const p = C.panel({ title: t('dashboard.chart.title'), className: 'span-7 chart-panel', actions: seg }, legend, wrap, summary)
 
   function series() {
     const end = startOfDay(Date.now())
@@ -266,15 +271,15 @@ function renderChart(m, ctx) {
     const sumCost = days.reduce((s, d) => s + d.cost, 0)
     if (sumRev === 0 && sumCost === 0) {
       wrap.replaceChildren(C.emptyState({
-        kicker: `${range} hari terakhir`,
-        title: 'Belum ada jurnal di rentang ini.',
-        body: 'Posting pendapatan dan biaya di tahap Pembukuan agar grafik terisi.',
+        kicker: t('dashboard.chart.lastDays', { n: range }),
+        title: t('dashboard.chart.emptyTitle'),
+        body: t('dashboard.chart.emptyBody'),
         iconName: 'chart',
       }))
       summary.textContent = ''
       return
     }
-    summary.textContent = `${range} hari terakhir: pendapatan ${C.rupiah(sumRev)}, biaya ${C.rupiah(sumCost)}, laba ${C.rupiah(sumRev - sumCost)}.`
+    summary.textContent = t('dashboard.chart.summary', { n: range, revenue: C.rupiah(sumRev), cost: C.rupiah(sumCost), profit: C.rupiah(sumRev - sumCost) })
     const width = Math.max(280, Math.round(wrap.clientWidth || 640))
     const height = width >= 560 ? 392 : 264
     wrap.replaceChildren(buildAreaChart(days, width, height, summary.textContent))
@@ -376,7 +381,7 @@ function buildAreaChart(days, width, height, label) {
     const isLast = i === days.length - 1
     if ((days.length - 1 - i) % every !== 0) return
     svg.appendChild(s('text', { x: x(i), y: height - 8, class: `tick ${isLast ? 'tick-strong' : ''}`, 'text-anchor': isLast ? 'end' : 'middle' },
-      isLast ? 'Hari ini' : d.date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })))
+      isLast ? t('dashboard.chart.today') : d.date.toLocaleDateString(locale(), { day: 'numeric', month: 'short' })))
   })
 
   const revPts = days.map((d, i) => [x(i), y(d.cumRev)])
@@ -411,11 +416,11 @@ function buildAreaChart(days, width, height, label) {
     dotCost.setAttribute('cx', cx); dotCost.setAttribute('cy', y(d.cumCost))
     show('visible')
     tip.replaceChildren(
-      el('span', { className: 'tip-date' }, d.date.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short' })),
-      el('span', { className: 'tip-row' }, el('i', { className: 'lg lg-rev' }), 'Pendapatan', el('b', { className: 'tnum' }, C.rupiah(d.rev))),
-      el('span', { className: 'tip-row' }, el('i', { className: 'lg lg-cost' }), 'Biaya', el('b', { className: 'tnum' }, C.rupiah(d.cost))),
-      el('span', { className: 'tip-row tip-total' }, 'Laba hari ini', el('b', { className: 'tnum' }, C.rupiah(d.rev - d.cost))),
-      el('span', { className: 'tip-row tip-cum' }, 'Akumulasi laba', el('b', { className: 'tnum' }, C.rupiah(d.cumRev - d.cumCost))),
+      el('span', { className: 'tip-date' }, d.date.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'short' })),
+      el('span', { className: 'tip-row' }, el('i', { className: 'lg lg-rev' }), t('dashboard.word.revenue'), el('b', { className: 'tnum' }, C.rupiah(d.rev))),
+      el('span', { className: 'tip-row' }, el('i', { className: 'lg lg-cost' }), t('dashboard.word.cost'), el('b', { className: 'tnum' }, C.rupiah(d.cost))),
+      el('span', { className: 'tip-row tip-total' }, t('dashboard.chart.profitToday'), el('b', { className: 'tnum' }, C.rupiah(d.rev - d.cost))),
+      el('span', { className: 'tip-row tip-cum' }, t('dashboard.chart.cumProfit'), el('b', { className: 'tnum' }, C.rupiah(d.cumRev - d.cumCost))),
     )
     tip.hidden = false
     const tw = 212
@@ -427,8 +432,8 @@ function buildAreaChart(days, width, height, label) {
 
   // Screen reader data table
   const table = el('table', { className: 'sr-only' },
-    el('caption', {}, 'Pendapatan dan biaya per hari'),
-    el('thead', {}, el('tr', {}, el('th', {}, 'Tanggal'), el('th', {}, 'Pendapatan'), el('th', {}, 'Biaya'))),
+    el('caption', {}, t('dashboard.chart.tableCaption')),
+    el('thead', {}, el('tr', {}, el('th', {}, t('dashboard.chart.date')), el('th', {}, t('dashboard.word.revenue')), el('th', {}, t('dashboard.word.cost')))),
     el('tbody', {}, days.filter((d) => d.rev || d.cost).map((d) =>
       el('tr', {}, el('td', {}, C.formatDate(d.date)), el('td', {}, C.rupiah(d.rev)), el('td', {}, C.rupiah(d.cost))))),
   )
@@ -440,7 +445,7 @@ function buildAreaChart(days, width, height, label) {
 
 export function overdueLabel(ms) {
   const days = Math.floor(ms / DAY)
-  return days >= 1 ? `Lewat ${days} hari` : 'Lewat jadwal'
+  return days >= 1 ? t('dashboard.actions.overdueDays', { count: days }) : t('dashboard.actions.overdue')
 }
 
 function renderActions(m, navigate) {
@@ -450,7 +455,7 @@ function renderActions(m, navigate) {
 
   for (const c of m.completionsWithoutLedger()) {
     const r = m.requestOfCompletion(c)
-    items.push({ rank: 1, num: '05', type: 'Pembukuan', title: `Posting jurnal: ${cust(r)}`, meta: `Selesai ${C.relativeTime(c.completed_at || c.created_at)}`, to: 'bookkeeping', params: { completionId: c.id }, cta: 'Posting' })
+    items.push({ rank: 1, num: '05', type: t('dashboard.actions.type.bookkeeping'), title: t('dashboard.actions.title.bookkeeping', { name: cust(r) }), meta: t('dashboard.actions.meta.done', { time: C.relativeTime(c.completed_at || c.created_at) }), to: 'bookkeeping', params: { completionId: c.id }, cta: t('dashboard.actions.cta.bookkeeping') })
   }
   for (const a of m.activeAssignments()) {
     const r = m.requestOfAssignment(a)
@@ -459,45 +464,45 @@ function renderActions(m, navigate) {
     const prog = progressOf(a, false)
     const overdue = prog === 'belum' && sched && sched.getTime() < now
     items.push({
-      rank: overdue ? 0 : 2, num: '04', type: 'Penyelesaian', title: `Konfirmasi selesai: ${cust(r)}`,
-      meta: `${a.worker_name || 'Tanpa nama'} · jadwal ${C.formatDate(a.scheduled_at)}${prog !== 'belum' ? ` · ${progressLabel(prog)}` : ''}`,
-      flag: overdue ? overdueLabel(now - sched.getTime()) : prog === 'ditunda' ? 'Ditunda' : null,
-      to: 'complete', params: { assignmentId: a.id }, cta: 'Tandai',
+      rank: overdue ? 0 : 2, num: '04', type: t('dashboard.actions.type.complete'), title: t('dashboard.actions.title.complete', { name: cust(r) }),
+      meta: `${t('dashboard.actions.meta.assign', { worker: a.worker_name || t('dashboard.noName'), date: C.formatDate(a.scheduled_at) })}${prog !== 'belum' ? ` · ${progressText(prog)}` : ''}`,
+      flag: overdue ? overdueLabel(now - sched.getTime()) : prog === 'ditunda' ? progressText('ditunda') : null,
+      to: 'complete', params: { assignmentId: a.id }, cta: t('dashboard.actions.cta.complete'),
     })
   }
   for (const o of m.approvedWithoutAssignment()) {
     const r = m.requestOfOffer(o)
-    items.push({ rank: 3, num: '03', type: 'Penugasan', title: `Tugaskan pekerja: ${cust(r)}`, meta: `${C.rupiah(o.validated_price)} · disetujui ${C.relativeTime(o.created_at)}`, to: 'assign', params: { offerId: o.id }, cta: 'Tugaskan' })
+    items.push({ rank: 3, num: '03', type: t('dashboard.actions.type.assign'), title: t('dashboard.actions.title.assign', { name: cust(r) }), meta: t('dashboard.actions.meta.approved', { price: C.rupiah(o.validated_price), time: C.relativeTime(o.created_at) }), to: 'assign', params: { offerId: o.id }, cta: t('dashboard.actions.cta.assign') })
   }
   for (const o of m.draftOffers()) {
     const r = m.requestOfOffer(o)
-    items.push({ rank: 4, num: '02', type: 'Persetujuan', title: `Tinjau penawaran draf: ${cust(r)}`, meta: `${C.rupiah(o.validated_price)} · dibuat ${C.relativeTime(o.created_at)}`, to: 'offer', params: { offerId: o.id }, cta: 'Tinjau' })
+    items.push({ rank: 4, num: '02', type: t('dashboard.actions.type.approval'), title: t('dashboard.actions.title.review', { name: cust(r) }), meta: t('dashboard.actions.meta.created', { price: C.rupiah(o.validated_price), time: C.relativeTime(o.created_at) }), to: 'offer', params: { offerId: o.id }, cta: t('dashboard.actions.cta.review') })
   }
   for (const r of m.requestsWithoutOffer()) {
-    items.push({ rank: 5, num: '02', type: 'Penawaran', title: `Buat penawaran: ${cust(r)}`, meta: `${r.service_type || 'Layanan'} · masuk ${C.relativeTime(r.created_at)}`, to: 'offer', params: { requestId: r.id }, cta: 'Buat' })
+    items.push({ rank: 5, num: '02', type: t('dashboard.actions.type.offer'), title: t('dashboard.actions.title.offer', { name: cust(r) }), meta: t('dashboard.actions.meta.received', { service: r.service_type || t('dashboard.actions.service'), time: C.relativeTime(r.created_at) }), to: 'offer', params: { requestId: r.id }, cta: t('dashboard.actions.cta.offer') })
   }
   items.sort((a, b) => a.rank - b.rank)
 
   const content = items.length
-    ? C.paginate({ key: 'dash-todo', label: 'perlu tindakan', pageSize: 5, sizes: [5], hideSize: true, items, render: (shown) => el('ol', { className: 'todo' }, shown.map((it) => {
+    ? C.paginate({ key: 'dash-todo', label: t('dashboard.actions.pageLabel'), pageSize: 5, sizes: [5], hideSize: true, items, render: (shown) => el('ol', { className: 'todo' }, shown.map((it) => {
         const b = C.button({ label: it.cta, iconRight: 'arrowRight', size: 'sm', variant: 'soft', className: 'todo-btn' })
         b.setAttribute('aria-label', `${it.cta}: ${it.title}`)
         b.addEventListener('click', () => navigate(it.to, it.params))
         return el('li', { className: `todo-item ${it.flag ? 'is-overdue' : ''}`.trim() },
           el('span', { className: 'todo-ico', 'aria-hidden': 'true' }, icon(STEP_ICON[it.num] || 'circleDot', { size: 16 })),
           el('div', { className: 'todo-text' },
-            el('span', { className: 'todo-type' }, el('span', { className: 'tnum' }, `Tahap ${it.num}`), ` · ${it.type}`, it.flag ? C.tag(it.flag, 'warn') : null),
+            el('span', { className: 'todo-type' }, el('span', { className: 'tnum' }, t('dashboard.actions.stage', { num: it.num })), ` · ${it.type}`, it.flag ? C.tag(it.flag, 'warn') : null),
             el('span', { className: 'todo-title' }, it.title),
             el('span', { className: 'todo-meta' }, it.meta),
           ),
           b,
         )
       })) }).root
-    : C.emptyState({ kicker: 'Antrian bersih', title: 'Tidak ada yang menunggu.', body: 'Semua permintaan sudah diproses sampai pembukuan.', iconName: 'checkCircle' })
+    : C.emptyState({ kicker: t('dashboard.actions.emptyKicker'), title: t('dashboard.actions.emptyTitle'), body: t('dashboard.actions.emptyBody'), iconName: 'checkCircle' })
 
   return C.panel({
-    title: 'Perlu tindakan',
-    meta: items.length ? `${C.number(items.length)} item · paling mendesak dulu` : 'kosong',
+    title: t('dashboard.actions.title.panel'),
+    meta: items.length ? t('dashboard.actions.meta.panel', { count: C.number(items.length) }) : t('dashboard.actions.meta.empty'),
     className: 'span-7 todo-panel',
   }, content)
 }
@@ -506,26 +511,26 @@ function renderActions(m, navigate) {
 
 function renderActivity(m) {
   const ev = []
-  for (const r of m.requests) ev.push({ at: r.created_at, num: '01', title: 'Permintaan masuk', text: `${customerLabel(r)} — ${r.service_type || 'layanan'}` })
+  for (const r of m.requests) ev.push({ at: r.created_at, num: '01', title: t('dashboard.activity.request'), text: `${customerLabel(r)} — ${r.service_type || t('dashboard.activity.service')}` })
   for (const o of m.offers) {
     const r = m.requestOfOffer(o)
-    ev.push({ at: o.created_at, num: '02', title: o.status === 'approved' ? 'Penawaran disetujui' : 'Penawaran draf', text: `${customerLabel(r)} · ${C.rupiah(o.validated_price)}` })
+    ev.push({ at: o.created_at, num: '02', title: o.status === 'approved' ? t('dashboard.activity.offerApproved') : t('dashboard.activity.offerDraft'), text: `${customerLabel(r)} · ${C.rupiah(o.validated_price)}` })
   }
   for (const a of m.assignments) {
     const r = m.requestOfAssignment(a)
-    ev.push({ at: a.created_at, num: '03', title: 'Pekerja ditugaskan', text: `${a.worker_name || 'Tanpa nama'} → ${customerLabel(r)}` })
+    ev.push({ at: a.created_at, num: '03', title: t('dashboard.activity.assigned'), text: `${a.worker_name || t('dashboard.noName')} → ${customerLabel(r)}` })
   }
   for (const c of m.completions) {
     const r = m.requestOfCompletion(c)
-    ev.push({ at: c.completed_at || c.created_at, num: '04', title: 'Pekerjaan selesai', text: customerLabel(r) })
+    ev.push({ at: c.completed_at || c.created_at, num: '04', title: t('dashboard.activity.done'), text: customerLabel(r) })
   }
   for (const l of m.ledger) {
     const r = m.requestOfLedger(l)
-    ev.push({ at: ledgerDate(l), num: '05', title: isRevenue(l) ? 'Pendapatan diposting' : 'Biaya diposting', text: `${categoryLabel(l.category)} · ${C.rupiah(l.amount)}${r ? ` · ${customerLabel(r)}` : ''}` })
+    ev.push({ at: ledgerDate(l), num: '05', title: isRevenue(l) ? t('dashboard.activity.revenuePosted') : t('dashboard.activity.costPosted'), text: `${catLabel(l.category)} · ${C.rupiah(l.amount)}${r ? ` · ${customerLabel(r)}` : ''}` })
   }
   const recent = ev.filter((e) => C.toDate(e.at)).sort((a, b) => C.toDate(b.at) - C.toDate(a.at))
 
-  const list = C.paginate({ key: 'dash-feed', label: 'aktivitas terbaru', pageSize: 6, sizes: [6], hideSize: true, items: recent, render: (shown) => el('ol', { className: 'feed' }, shown.map((e) =>
+  const list = C.paginate({ key: 'dash-feed', label: t('dashboard.activity.pageLabel'), pageSize: 6, sizes: [6], hideSize: true, items: recent, render: (shown) => el('ol', { className: 'feed' }, shown.map((e) =>
     el('li', { className: 'feed-item' },
       el('span', { className: 'feed-node', 'aria-hidden': 'true' }, icon(STEP_ICON[e.num] || 'circleDot', { size: 14 })),
       el('div', { className: 'feed-text' },
@@ -534,7 +539,7 @@ function renderActivity(m) {
       ),
       el('time', { className: 'feed-time', datetime: C.toDate(e.at).toISOString(), title: C.formatDateTime(e.at) }, C.relativeTime(e.at)),
     ))) }).root
-  return C.panel({ title: 'Aktivitas terbaru', meta: `${C.number(recent.length)} peristiwa · terbaru dulu`, className: 'span-5 feed-panel' }, list)
+  return C.panel({ title: t('dashboard.activity.title'), meta: t('dashboard.activity.meta', { count: C.number(recent.length) }), className: 'span-5 feed-panel' }, list)
 }
 
 /* ========================================================= Composition */
@@ -544,32 +549,29 @@ function renderComposition(m) {
   for (const l of m.ledger) byCat.set(l.category, (byCat.get(l.category) || 0) + (Number(l.amount) || 0))
   const rows = [...byCat.entries()].sort((a, b) => (a[0] === 'pendapatan' ? -1 : b[0] === 'pendapatan' ? 1 : b[1] - a[1]))
   const max = Math.max(1, ...rows.map((r) => r[1]))
-  const t = totals(m.ledger)
+  const tt = totals(m.ledger)
 
   const content = rows.length
     ? el('div', {},
         el('ul', { className: 'bars' }, rows.map(([cat, amt]) =>
           el('li', { className: `bars-row ${cat === 'pendapatan' ? 'is-rev' : ''}` },
-            el('span', { className: 'bars-label' }, categoryLabel(cat)),
+            el('span', { className: 'bars-label' }, catLabel(cat)),
             el('span', { className: 'bars-val tnum' }, C.rupiah(amt)),
             el('span', { className: 'bars-track', 'aria-hidden': 'true' }, el('span', { className: 'bars-fill', style: `width:${(amt / max) * 100}%` })),
           ))),
-        el('p', { className: 'bars-foot' }, t.revenue > 0
-          ? `Biaya = ${Math.round((t.cost / t.revenue) * 100)}% dari pendapatan`
-          : 'Belum ada pendapatan tercatat'),
+        el('p', { className: 'bars-foot' }, tt.revenue > 0
+          ? t('dashboard.composition.costShare', { pct: Math.round((tt.cost / tt.revenue) * 100) })
+          : t('dashboard.composition.noRevenue')),
       )
-    : C.emptyState({ kicker: 'Pembukuan', title: 'Belum ada jurnal.', body: 'Komposisi muncul setelah jurnal pertama diposting.', iconName: 'ledger' })
+    : C.emptyState({ kicker: t('dashboard.composition.emptyKicker'), title: t('dashboard.composition.emptyTitle'), body: t('dashboard.composition.emptyBody'), iconName: 'ledger' })
 
-  return C.panel({ title: 'Komposisi buku besar', meta: `${m.ledger.length} jurnal`, className: 'span-7' }, content)
+  return C.panel({ title: t('dashboard.composition.title'), meta: t('dashboard.composition.meta', { count: m.ledger.length }), className: 'span-7' }, content)
 }
 
 /* ========================================================== Status mix */
 
 function renderStatusMix(m) {
-  const ORDER = [
-    ['new', 'Baru'], ['draft', 'Draf penawaran'], ['rejected', 'Ditolak'], ['offered', 'Ditawarkan'],
-    ['assigned', 'Ditugaskan'], ['done', 'Selesai'], ['booked', 'Terbukukan'],
-  ]
+  const ORDER = ['new', 'draft', 'rejected', 'offered', 'assigned', 'done', 'booked'].map((k) => [k, t(`dashboard.mix.${k}`)])
   const counts = new Map(ORDER.map(([k]) => [k, 0]))
   for (const r of m.requests) { const k = m.requestStage(r).key; counts.set(k, (counts.get(k) || 0) + 1) }
   const total = m.requests.length || 1
@@ -581,32 +583,32 @@ function renderStatusMix(m) {
       el('span', {}, label),
       el('b', { className: 'tnum' }, String(counts.get(k))),
     )))
-  return C.panel({ title: 'Posisi permintaan', meta: `${m.requests.length} permintaan`, className: 'span-5' },
-    m.requests.length ? el('div', {}, strip, legend) : C.emptyState({ kicker: 'Kosong', title: 'Belum ada permintaan.' }),
-    el('p', { className: 'sr-only' }, ORDER.map(([k, label]) => `${label}: ${counts.get(k)}`).join(', ') + ` dari ${total}.`),
+  return C.panel({ title: t('dashboard.mix.title'), meta: t('dashboard.mix.meta', { count: m.requests.length }), className: 'span-5' },
+    m.requests.length ? el('div', {}, strip, legend) : C.emptyState({ kicker: t('dashboard.mix.emptyKicker'), title: t('dashboard.mix.emptyTitle') }),
+    el('p', { className: 'sr-only' }, ORDER.map(([k, label]) => `${label}: ${counts.get(k)}`).join(', ') + t('dashboard.mix.ofTotal', { total })),
   )
 }
 
 /* ========================================================== Onboarding */
 
 function renderOnboarding(navigate) {
-  const cta = C.button({ label: 'Buat permintaan pertama', icon: 'plus', variant: 'primary', size: 'lg' })
+  const cta = C.button({ label: t('dashboard.onboard.cta'), icon: 'plus', variant: 'primary', size: 'lg' })
   cta.addEventListener('click', () => navigate('request'))
   return el('section', { className: 'onboard' },
     el('div', { className: 'onboard-intro' },
-      el('span', { className: 'tag tag-accent' }, icon('sprout', { size: 14 }), 'Akun baru'),
-      el('h2', { className: 'onboard-title display' }, 'Alur Anda masih ', el('em', {}, 'kosong'), '.'),
-      el('p', { className: 'onboard-body' }, 'Semua angka di halaman ini dihitung dari data Anda sendiri. Mulai dengan satu permintaan pelanggan, lalu bawa sampai ke laporan. Setiap tahap membuka tahap berikutnya.'),
+      el('span', { className: 'tag tag-accent' }, icon('sprout', { size: 14 }), t('dashboard.onboard.tag')),
+      el('h2', { className: 'onboard-title display' }, t('dashboard.onboard.titleBefore'), el('em', {}, t('dashboard.onboard.titleEm')), t('dashboard.onboard.titleAfter')),
+      el('p', { className: 'onboard-body' }, t('dashboard.onboard.body')),
       cta,
     ),
-    el('ol', { className: 'onboard-steps' }, STEPS.map((st, i) =>
+    el('ol', { className: 'onboard-steps' }, STEPS.map((_, i) => stepAt(i)).map((st, i) =>
       el('li', { className: `onboard-step ${i === 0 ? 'is-next' : ''}` },
         el('span', { className: 'onboard-node', 'aria-hidden': 'true' }, icon(st.icon, { size: 16 })),
         el('span', { className: 'onboard-text' },
           el('span', { className: 'onboard-label' }, el('span', { className: 'onboard-num tnum' }, st.num), st.label),
           el('span', { className: 'onboard-desc' }, st.desc),
         ),
-        i === 0 ? el('span', { className: 'onboard-next' }, 'Mulai di sini') : null,
+        i === 0 ? el('span', { className: 'onboard-next' }, t('dashboard.onboard.start')) : null,
       ))),
   )
 }

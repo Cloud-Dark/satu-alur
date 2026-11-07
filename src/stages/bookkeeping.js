@@ -8,6 +8,10 @@ import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { loadFlow, notifyDataChanged, customerLabel, LEDGER_CATEGORIES, categoryLabel, isRevenue, ledgerDate, totals } from './data.js'
 import { jobHeader, solo, pickFromWorkflow, workflowLink } from './job.js'
+import { t, has, locale } from '../i18n/index.js'
+
+// Category labels live in domain/model.js (shared with the worker); translate by value.
+const catLabel = (c) => (has(`bookkeeping.category.${c}`) ? t(`bookkeeping.category.${c}`) : categoryLabel(c))
 
 const { el } = C
 
@@ -15,33 +19,33 @@ export async function render(container, ctx = {}) {
   const navigate = ctx.navigate || (() => {})
   const params = ctx.params || {}
   if (params.completionId == null) {
-    container.replaceChildren(C.pageHeader({ title: 'Pembukuan' }),
-      pickFromWorkflow(navigate, { filter: 'book', body: 'Buka Alur kerja, lalu tekan "Bukukan" pada pekerjaan yang sudah selesai. Total semua pekerjaan ada di Laporan.' }))
+    container.replaceChildren(C.pageHeader({ title: t('bookkeeping.title') }),
+      pickFromWorkflow(navigate, { filter: 'book', body: t('bookkeeping.pickBody') }))
     return
   }
 
-  const complSel = C.select({ label: 'Pekerjaan selesai', name: 'completion_id', required: true, hint: 'Satu pekerjaan boleh punya beberapa jurnal: pendapatan dan biaya-biayanya.', options: [{ value: '', label: 'Memuat…' }] })
+  const complSel = C.select({ label: t('bookkeeping.form.job'), name: 'completion_id', required: true, hint: t('bookkeeping.form.jobHint'), options: [{ value: '', label: t('bookkeeping.loading') }] })
   const preview = el('div', { hidden: true })
   const ctxBox = el('div', {})
-  const category = C.select({ label: 'Kategori', name: 'category', required: true, options: [{ value: '', label: 'Pilih kategori' }, ...LEDGER_CATEGORIES] })
-  const amount = C.field({ label: 'Jumlah (Rp)', name: 'amount', type: 'number', required: true, placeholder: '1500000', attrs: { min: '1', step: '1', inputmode: 'numeric' } })
+  const category = C.select({ label: t('bookkeeping.form.category'), name: 'category', required: true, options: [{ value: '', label: t('bookkeeping.form.chooseCategory') }, ...LEDGER_CATEGORIES.map((c) => ({ ...c, label: catLabel(c.value) }))] })
+  const amount = C.field({ label: t('bookkeeping.form.amount'), name: 'amount', type: 'number', required: true, placeholder: '1500000', attrs: { min: '1', step: '1', inputmode: 'numeric' } })
   // Optional link to a VAS catalog item: this is what makes "Porsi VAS" measurable
   // instead of a guess. Only revenue entries can carry it.
   const vasSel = C.select({
-    label: 'Layanan tambahan (opsional)', name: 'vas_item_id',
-    hint: 'Tandai bila pendapatan ini berasal dari item di menu Layanan tambahan.',
-    options: [{ value: '', label: 'Bukan layanan tambahan' }],
+    label: t('bookkeeping.form.vas'), name: 'vas_item_id',
+    hint: t('bookkeeping.form.vasHint'),
+    options: [{ value: '', label: t('bookkeeping.form.notVas') }],
   })
   vasSel.wrap.hidden = true
   let vasItems = null
   async function ensureVasOptions() {
     if (vasItems) return
     const { data, error } = await getCloud().database.from('vas_items').select('id,name,status')
-    if (error) { msg.show('danger', `Gagal memuat layanan tambahan: ${error.message}`); return }
+    if (error) { msg.show('danger', t('bookkeeping.form.vasError', { error: error.message })); return }
     if (ctx.signal?.aborted) return
     vasItems = (data || []).filter((v) => v.status === 'active')
     C.setOptions(vasSel.input, [
-      { value: '', label: 'Bukan layanan tambahan' },
+      { value: '', label: t('bookkeeping.form.notVas') },
       ...vasItems.map((v) => ({ value: v.id, label: v.name })),
     ], vasSel.input.value)
   }
@@ -51,7 +55,7 @@ export async function render(container, ctx = {}) {
 
   const summary = el('div', { className: 'kpis kpis-3' })
   const listBody = el('div', {}, C.skeletonRows(6))
-  const listPanel = C.panel({ title: 'Jurnal pekerjaan ini', meta: 'memuat…', className: 'list-panel' }, summary, listBody)
+  const listPanel = C.panel({ title: t('bookkeeping.list.title'), meta: t('bookkeeping.list.loading'), className: 'list-panel' }, summary, listBody)
   const headSlot = el('div', {})
 
   let flow = null
@@ -64,43 +68,43 @@ export async function render(container, ctx = {}) {
   }
 
   const wiz = C.wizard({
-    label: 'Posting jurnal',
+    label: t('bookkeeping.wiz.label'),
     steps: [
       {
         key: 'pick',
-        title: 'Pilih pekerjaan',
-        description: 'Pekerjaan selesai yang akan dibukukan.',
+        title: t('bookkeeping.wiz.pick'),
+        description: t('bookkeeping.wiz.pickDesc'),
         content: [complSel.wrap, preview],
-        validate: () => (selected() ? [] : [{ text: 'Pilih pekerjaan selesai.', input: complSel.input }]),
+        validate: () => (selected() ? [] : [{ text: t('bookkeeping.error.pick'), input: complSel.input }]),
         primary: () => ({ disabled: !flow?.completions.length }),
       },
       {
         key: 'entry',
-        title: 'Jurnal',
-        description: 'Pendapatan atau biaya, beserta jumlahnya.',
+        title: t('bookkeeping.wiz.entry'),
+        description: t('bookkeeping.wiz.entryDesc'),
         content: [ctxBox, category.wrap, vasSel.wrap, amount.wrap],
         validate: () => {
           const errs = []
-          if (!category.input.value) errs.push({ text: 'Pilih kategori.', input: category.input })
+          if (!category.input.value) errs.push({ text: t('bookkeeping.error.category'), input: category.input })
           const amt = amountValue()
-          if (!amount.input.value || !Number.isFinite(amt) || amt <= 0) errs.push({ text: 'Jumlah harus angka lebih dari nol.', input: amount.input })
-          if (revenueTaken()) errs.push({ text: 'Pendapatan pekerjaan ini sudah diposting. Pilih kategori biaya, atau pekerjaan lain.', input: category.input })
+          if (!amount.input.value || !Number.isFinite(amt) || amt <= 0) errs.push({ text: t('bookkeeping.error.amount'), input: amount.input })
+          if (revenueTaken()) errs.push({ text: t('bookkeeping.error.revenueTakenLong'), input: category.input })
           return errs
         },
         onEnter: () => drawContext(),
       },
       {
         key: 'review',
-        title: 'Tinjau',
-        description: 'Periksa jurnal sebelum diposting.',
+        title: t('bookkeeping.wiz.review'),
+        description: t('bookkeeping.wiz.reviewDesc'),
         content: reviewBox,
-        primary: { label: 'Posting jurnal', icon: 'ledger', iconRight: undefined },
+        primary: { label: t('bookkeeping.wiz.label'), icon: 'ledger', iconRight: undefined },
         validate: () => {
           const errs = []
-          if (!selected()) errs.push('Pilih pekerjaan selesai.')
-          if (!category.input.value) errs.push('Pilih kategori.')
-          if (!(amountValue() > 0)) errs.push('Jumlah harus angka lebih dari nol.')
-          if (revenueTaken()) errs.push('Pendapatan pekerjaan ini sudah diposting.')
+          if (!selected()) errs.push(t('bookkeeping.error.pick'))
+          if (!category.input.value) errs.push(t('bookkeeping.error.category'))
+          if (!(amountValue() > 0)) errs.push(t('bookkeeping.error.amount'))
+          if (revenueTaken()) errs.push(t('bookkeeping.error.revenueTaken'))
           return errs
         },
         onPrimary: () => save(),
@@ -111,7 +115,7 @@ export async function render(container, ctx = {}) {
   const msg = wiz.msg
 
   container.replaceChildren(
-    C.pageHeader({ title: 'Pembukuan' }),
+    C.pageHeader({ title: t('bookkeeping.title') }),
     solo(headSlot, wiz.root, listPanel, workflowLink(navigate)),
   )
 
@@ -125,8 +129,8 @@ export async function render(container, ctx = {}) {
       aside: C.rupiah(offerPrice(c)),
       chips: [
         a?.worker_name ? { icon: 'users', text: a.worker_name } : null,
-        { icon: 'calendar', text: C.formatDate(c.completed_at || c.created_at), title: 'Tanggal selesai' },
-        { icon: 'ledger', text: n ? `${n} jurnal` : 'Belum dibukukan' },
+        { icon: 'calendar', text: C.formatDate(c.completed_at || c.created_at), title: t('bookkeeping.preview.doneDate') },
+        { icon: 'ledger', text: n ? t('bookkeeping.entries', { count: n }) : t('bookkeeping.notBooked') },
       ],
     })
   }
@@ -135,7 +139,7 @@ export async function render(container, ctx = {}) {
     const c = selected()
     const price = c ? offerPrice(c) : 0
     if (c && price && category.input.value === 'pendapatan') {
-      fillBtn.textContent = `Isi nilai penawaran ${C.rupiah(price)}`
+      fillBtn.textContent = t('bookkeeping.form.fillOffer', { price: C.rupiah(price) })
       fillBtn.hidden = false
     } else {
       fillBtn.hidden = true
@@ -182,11 +186,11 @@ export async function render(container, ctx = {}) {
     const amt = amountValue()
     reviewBox.replaceChildren(
       el('dl', { className: 'sum-grid' },
-        el('div', { className: 'is-wide' }, el('dt', {}, 'Pekerjaan'), el('dd', {}, customerLabel(flow.requestOfCompletion(c)))),
-        el('div', {}, el('dt', {}, 'Kategori'), el('dd', {}, categoryLabel(category.input.value))),
-        el('div', {}, el('dt', {}, rev ? 'Masuk' : 'Keluar'), el('dd', {}, el('span', { className: `tnum strong ${rev ? 'amt-in' : 'amt-out'}` }, `${rev ? '+' : '−'}${C.rupiah(amt)}`))),
-        el('div', {}, el('dt', {}, 'Nilai penawaran'), el('dd', {}, el('span', { className: 'tnum' }, C.rupiah(offerPrice(c))))),
-        el('div', {}, el('dt', {}, 'Jurnal sebelumnya'), el('dd', {}, String(flow.ledgerOf(c.id).length))),
+        el('div', { className: 'is-wide' }, el('dt', {}, t('bookkeeping.review.job')), el('dd', {}, customerLabel(flow.requestOfCompletion(c)))),
+        el('div', {}, el('dt', {}, t('bookkeeping.form.category')), el('dd', {}, catLabel(category.input.value))),
+        el('div', {}, el('dt', {}, rev ? t('bookkeeping.col.in') : t('bookkeeping.col.out')), el('dd', {}, el('span', { className: `tnum strong ${rev ? 'amt-in' : 'amt-out'}` }, `${rev ? '+' : '−'}${C.rupiah(amt)}`))),
+        el('div', {}, el('dt', {}, t('bookkeeping.review.offerValue')), el('dd', {}, el('span', { className: 'tnum' }, C.rupiah(offerPrice(c))))),
+        el('div', {}, el('dt', {}, t('bookkeeping.review.previous')), el('dd', {}, String(flow.ledgerOf(c.id).length))),
       ),
     )
   }
@@ -198,14 +202,14 @@ export async function render(container, ctx = {}) {
     const unbooked = all.filter((c) => !flow.ledgerOf(c.id).length)
     const booked = all.filter((c) => flow.ledgerOf(c.id).length)
     const label = (c) => `${customerLabel(flow.requestOfCompletion(c))} — ${C.rupiah(offerPrice(c))}`
-    const opts = [{ value: '', label: all.length ? 'Pilih pekerjaan' : 'Belum ada pekerjaan selesai' }]
+    const opts = [{ value: '', label: all.length ? t('bookkeeping.form.chooseJob') : t('bookkeeping.form.noJobs') }]
     unbooked.forEach((c) => opts.push({ value: c.id, label: label(c) }))
-    booked.forEach((c) => opts.push({ value: c.id, label: `${label(c)} (${flow.ledgerOf(c.id).length} jurnal)` }))
+    booked.forEach((c) => opts.push({ value: c.id, label: `${label(c)} (${t('bookkeeping.entries', { count: flow.ledgerOf(c.id).length })})` }))
     const keep = complSel.input.value || (firstFill && params.completionId != null ? String(params.completionId) : '')
     C.setOptions(complSel.input, opts, keep)
     if (!all.length && wiz.index === 0 && !wiz.done) {
-      msg.show('info', 'Pekerjaan selesai ini tidak ditemukan.')
-      const go = C.button({ label: 'Ke alur kerja', iconRight: 'arrowRight', size: 'sm' })
+      msg.show('info', t('bookkeeping.notFound'))
+      const go = C.button({ label: t('bookkeeping.toWorkflow'), iconRight: 'arrowRight', size: 'sm' })
       go.addEventListener('click', () => navigate('workflow'))
       msg.querySelector('.note-body').appendChild(el('div', { className: 'note-actions' }, go))
     }
@@ -219,7 +223,7 @@ export async function render(container, ctx = {}) {
   async function save() {
     const c = selected()
     const amt = amountValue()
-    const restore = wiz.busy('Memposting…')
+    const restore = wiz.busy(t('bookkeeping.posting'))
     try {
       const { error } = await getCloud().database.from('ledger_entries').insert({
         completion_id: Number(c.id),
@@ -231,27 +235,27 @@ export async function render(container, ctx = {}) {
       })
       if (error) throw new Error(error.message)
       restore()
-      const catText = categoryLabel(category.input.value)
+      const catText = catLabel(category.input.value)
       const clearEntry = () => {
         amount.input.value = ''
         category.input.value = ''
         category.input.dispatchEvent(new Event('change'))
       }
-      const more = C.button({ label: 'Tambah jurnal', icon: 'plus', size: 'sm', variant: 'primary' })
+      const more = C.button({ label: t('bookkeeping.done.more'), icon: 'plus', size: 'sm', variant: 'primary' })
       more.addEventListener('click', () => { clearEntry(); wiz.reset({ to: 1 }) })
-      const other = C.button({ label: 'Pekerjaan lain', icon: 'activity', size: 'sm', variant: 'soft' })
+      const other = C.button({ label: t('bookkeeping.done.other'), icon: 'activity', size: 'sm', variant: 'soft' })
       other.addEventListener('click', () => navigate('workflow', { filter: 'book' }))
-      const report = C.button({ label: 'Lihat laporan', iconRight: 'arrowRight', size: 'sm', variant: 'ghost' })
+      const report = C.button({ label: t('bookkeeping.done.report'), iconRight: 'arrowRight', size: 'sm', variant: 'ghost' })
       report.addEventListener('click', () => navigate('report'))
-      const bill = C.button({ label: 'Buat invoice', icon: 'receipt', size: 'sm', variant: 'soft' })
+      const bill = C.button({ label: t('bookkeeping.done.invoice'), icon: 'receipt', size: 'sm', variant: 'soft' })
       bill.addEventListener('click', () => navigate('invoice', { completionId: c.id }))
-      wiz.complete({ text: `${catText} ${C.rupiah(amt)} untuk ${customerLabel(flow.requestOfCompletion(c))} diposting.`, actions: [more, other, bill, report] })
-      showToast('Jurnal diposting.', 'success')
+      wiz.complete({ text: t('bookkeeping.done.text', { category: catText, amount: C.rupiah(amt), name: customerLabel(flow.requestOfCompletion(c)) }), actions: [more, other, bill, report] })
+      showToast(t('bookkeeping.done.toast'), 'success')
       notifyDataChanged()
       await loadList()
     } catch (err) {
       restore()
-      msg.show('danger', `Gagal memposting: ${err.message}`)
+      msg.show('danger', t('bookkeeping.postError', { error: err.message }))
     }
   }
 
@@ -259,14 +263,14 @@ export async function render(container, ctx = {}) {
     try {
       flow = await loadFlow()
     } catch (err) {
-      listBody.replaceChildren(C.errorState(`Gagal memuat: ${err.message}`))
+      listBody.replaceChildren(C.errorState(t('bookkeeping.loadError', { error: err.message })))
       return
     }
     if (ctx.signal?.aborted) return
     const c = flow.completion(params.completionId)
     const r = c ? flow.requestOfCompletion(c) : null
     const n = c ? flow.ledgerOf(c.id).length : 0
-    headSlot.replaceChildren(r ? jobHeader(r, { tag: n ? C.tag('Dibukukan', 'ok') : C.tag('Belum dibukukan', 'warn'), note: `Nilai penawaran ${C.rupiah(offerPrice(c))}` }) : '')
+    headSlot.replaceChildren(r ? jobHeader(r, { tag: n ? C.tag(t('bookkeeping.booked'), 'ok') : C.tag(t('bookkeeping.notBooked'), 'warn'), note: t('bookkeeping.offerValueNote', { price: C.rupiah(offerPrice(c)) }) }) : '')
     fillCompletions()
     drawList()
   }
@@ -274,16 +278,16 @@ export async function render(container, ctx = {}) {
   function drawList() {
     const job = flow.completion(params.completionId)
     const ledger = job ? flow.ledgerOf(job.id) : []
-    const t = totals(ledger)
+    const sum = totals(ledger)
     summary.replaceChildren(
-      C.kpi({ label: 'Pendapatan', iconName: 'wallet', value: C.rupiah(t.revenue) }),
-      C.kpi({ label: 'Biaya', iconName: 'receipt', value: C.rupiah(t.cost) }),
-      C.kpi({ label: t.profit >= 0 ? 'Laba' : 'Rugi', iconName: 'sprout', value: C.rupiah(t.profit), sub: t.revenue > 0 ? `Margin ${((t.profit / t.revenue) * 100).toLocaleString('id-ID', { maximumFractionDigits: 1 })}%` : 'Margin —', tone: t.revenue > 0 ? (t.profit >= 0 ? 'ok' : 'danger') : null }),
+      C.kpi({ label: t('bookkeeping.kpi.revenue'), iconName: 'wallet', value: C.rupiah(sum.revenue) }),
+      C.kpi({ label: t('bookkeeping.kpi.cost'), iconName: 'receipt', value: C.rupiah(sum.cost) }),
+      C.kpi({ label: sum.profit >= 0 ? t('bookkeeping.kpi.profit') : t('bookkeeping.kpi.loss'), iconName: 'sprout', value: C.rupiah(sum.profit), sub: sum.revenue > 0 ? t('bookkeeping.kpi.margin', { pct: ((sum.profit / sum.revenue) * 100).toLocaleString(locale(), { maximumFractionDigits: 1 }) }) : t('bookkeeping.kpi.marginNone'), tone: sum.revenue > 0 ? (sum.profit >= 0 ? 'ok' : 'danger') : null }),
     )
-    listPanel.querySelector('.panel-meta').textContent = `${ledger.length} jurnal`
+    listPanel.querySelector('.panel-meta').textContent = t('bookkeeping.entries', { count: ledger.length })
 
     if (!ledger.length) {
-      listBody.replaceChildren(C.emptyState({ kicker: 'Belum ada data', title: 'Pekerjaan ini belum dibukukan.', body: 'Jurnal pendapatan dan biayanya muncul di sini beserta saldo berjalan.' }))
+      listBody.replaceChildren(C.emptyState({ kicker: t('bookkeeping.list.emptyKicker'), title: t('bookkeeping.list.emptyTitle'), body: t('bookkeeping.list.emptyBody') }))
       return
     }
     // Running balance, oldest first; displayed newest first.
@@ -296,14 +300,14 @@ export async function render(container, ctx = {}) {
     }
     const rows = asc.reverse()
     listBody.replaceChildren(C.dataTable({
-      caption: 'Jurnal pekerjaan ini',
+      caption: t('bookkeeping.list.title'),
       rows,
       columns: [
-        { label: 'Tanggal', className: 'col-date', render: (l) => el('time', { className: 'tnum', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
-        { label: 'Keterangan', render: (l) => C.cellStack(customerLabel(flow.requestOfLedger(l)), categoryLabel(l.category)) },
-        { label: 'Masuk', align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, `+${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
-        { label: 'Keluar', align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, `−${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
-        { label: 'Saldo', align: 'right', render: (l) => { const b = balance.get(l); return el('span', { className: `tnum strong ${b < 0 ? 'amt-neg' : ''}` }, C.rupiah(b)) } },
+        { label: t('bookkeeping.col.date'), className: 'col-date', render: (l) => el('time', { className: 'tnum', datetime: ledgerDate(l) || '', title: C.formatDateTime(ledgerDate(l)) }, C.formatDate(ledgerDate(l))) },
+        { label: t('bookkeeping.col.desc'), render: (l) => C.cellStack(customerLabel(flow.requestOfLedger(l)), catLabel(l.category)) },
+        { label: t('bookkeeping.col.in'), align: 'right', render: (l) => (isRevenue(l) ? el('span', { className: 'tnum amt-in' }, `+${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
+        { label: t('bookkeeping.col.out'), align: 'right', render: (l) => (!isRevenue(l) ? el('span', { className: 'tnum amt-out' }, `−${C.rupiah(l.amount)}`) : el('span', { className: 'muted nil' }, '—')) },
+        { label: t('bookkeeping.col.balance'), align: 'right', render: (l) => { const b = balance.get(l); return el('span', { className: `tnum strong ${b < 0 ? 'amt-neg' : ''}` }, C.rupiah(b)) } },
       ],
     }))
   }

@@ -1,0 +1,85 @@
+{
+  "phase": {
+    "idle": "Waiting",
+    "working": "Writing",
+    "done": "Done",
+    "error": "Failed",
+    "stopped": "Stopped"
+  },
+  "scope": {
+    "vas": "Add-on services (VAS)",
+    "waste": "Zero waste"
+  },
+  "teams": {
+    "kreatif": {
+      "name": "Creative team",
+      "role": "Naming, packaging, story",
+      "ask": "Propose a package name and contents that fit in one sentence."
+    },
+    "pemasaran": {
+      "name": "Marketing team",
+      "role": "Demand & channels",
+      "ask": "Find the cheapest channel to reach existing customers."
+    },
+    "keuangan": {
+      "name": "Finance team",
+      "role": "Pricing, margin, cash flow",
+      "ask": "Work out the margin and the lowest healthy price."
+    },
+    "operasional": {
+      "name": "Operations team",
+      "role": "Capacity & execution",
+      "ask": "Estimate the extra time per job and whether the crew can handle it."
+    },
+    "riset": {
+      "name": "Research & data team",
+      "role": "Evidence & assumptions",
+      "ask": "Separate facts from assumptions in this brief."
+    }
+  },
+  "lead": {
+    "name": "Optimization lead",
+    "waiting": "Waiting for the five teams",
+    "merging": "Merging the five teams' proposals…",
+    "noConclusion": "No conclusion could be drawn.",
+    "hint": "The conclusion appears once all five teams have answered.",
+    "done": "Done{when}",
+    "mergingShort": "Merging proposals…",
+    "stopped": "Stopped before the conclusion"
+  },
+  "form": {
+    "problem": "Problem to solve",
+    "problemPlaceholderVas": "Example: my quotes always stop at the basic service price, even though customers ask for follow-up maintenance.",
+    "problemPlaceholderWaste": "Example: technicians often wait for materials and drive back and forth; fuel costs are up but the job count is flat.",
+    "target": "Extra target per month (Rp)",
+    "targetHint": "Leave blank if you have no number yet. The teams will use your business figures as the baseline.",
+    "note": "Owner notes",
+    "notePlaceholder": "Constraints to respect, e.g. no new technicians this month.",
+    "presets": "Sample briefs",
+    "run": "Run 5 teams",
+    "stop": "Stop",
+    "title": "{scope} optimization room",
+    "meta": "Five teams work in parallel, then the optimization lead merges their answers"
+  },
+  "facts": {
+    "title": "Numbers every team reads",
+    "empty": "No data yet. The teams will answer with their assumptions stated openly."
+  },
+  "teamsHead": {
+    "title": "Five teams",
+    "note": "Each team looks at the same numbers from a different angle"
+  },
+  "team": {
+    "working": "Drafting a proposal…",
+    "error": "This team couldn't answer.",
+    "waiting": "Waiting for a brief. {ask}"
+  },
+  "run": {
+    "needProblem": "Describe the problem first so the teams don’t have to guess.",
+    "modelNotReady": "The AI model isn’t ready ({error}). Try again in a moment.",
+    "genericError": "Something went wrong.",
+    "ready": "Optimization plan ready.",
+    "stopped": "Stopped. Finished proposals stay on this page.",
+    "stopping": "Stopping the teams…"
+  }
+}

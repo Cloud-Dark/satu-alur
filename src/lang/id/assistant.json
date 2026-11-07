@@ -1,0 +1,66 @@
+{
+  "agentLabel": "Asisten",
+  "modelLabel": "Model AI",
+  "modelLoading": "Memuat model…",
+  "logLabel": "Percakapan AI",
+  "messageLabel": "Pesan Anda",
+  "messagePlaceholder": "Apa yang ingin Anda kerjakan?",
+  "messageHint": "Enter untuk mengirim · Shift + Enter untuk baris baru.",
+  "send": "Kirim pesan",
+  "stop": "Hentikan",
+  "reset": "Reset",
+  "title": "Asisten untuk bisnis Anda",
+  "titleEm": "bisnis",
+  "description": "Pilih spesialis, lanjutkan percakapan, dan gunakan data operasional untuk menentukan langkah berikutnya.",
+  "panels": {
+    "superpowers": "AI Superpowers",
+    "superpowersMeta": "Satu spesialis per percakapan",
+    "activity": "Aktivitas AI",
+    "activityMeta": "100 interaksi terakhir",
+    "conversation": "Percakapan"
+  },
+  "privacyHint": "Riwayat disimpan di browser ini. Jangan masukkan rahasia atau data sensitif.",
+  "stats": {
+    "conversations": "Percakapan",
+    "success": "Berhasil",
+    "avgResponse": "Rata-rata respons"
+  },
+  "you": "Anda",
+  "empty": {
+    "kicker": "Mulai percakapan",
+    "title": "Ada yang ingin Anda diskusikan?",
+    "body": "Tanyakan alur kerja, siapkan penawaran, atau minta ringkasan bisnis."
+  },
+  "modelUnavailable": "Model tidak tersedia: {message}",
+  "preparing": "Sedang menyiapkan jawaban…",
+  "answering": "Menjawab…",
+  "noAnswer": "AI tidak mengembalikan jawaban. Silakan coba lagi.",
+  "stopped": "Percakapan dihentikan.",
+  "notAvailable": "Jawaban belum tersedia.",
+  "agents": {
+    "offer": {
+      "name": "Agen Penawaran",
+      "description": "Membuat proposal penawaran profesional"
+    },
+    "report": {
+      "name": "Analis Laporan",
+      "description": "Menganalisis dan menjelaskan laporan keuangan"
+    },
+    "general": {
+      "name": "Asisten Umum",
+      "description": "Asisten AI untuk pertanyaan umum tentang Satu Alur"
+    },
+    "analyst": {
+      "name": "Analis Bisnis",
+      "description": "Analis data bisnis dengan query database"
+    },
+    "social": {
+      "name": "Social Media Expert",
+      "description": "Ahli konten media sosial dan digital marketing"
+    },
+    "pertumbuhan": {
+      "name": "Asisten Pertumbuhan",
+      "description": "AI Business Development — temukan peluang dan tingkatkan keberhasilan bisnis"
+    }
+  }
+}

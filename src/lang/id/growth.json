@@ -1,0 +1,116 @@
+{
+  "tabs": {
+    "radar": "Radar Peluang",
+    "rekomendasi": "Rekomendasi AI",
+    "notifikasi": "Notifikasi",
+    "prediksi": "Prediksi Keberhasilan"
+  },
+  "level": {
+    "high": "Tinggi",
+    "mid": "Sedang",
+    "low": "Rendah",
+    "good": "Baik"
+  },
+  "type": {
+    "hot-lead": "Hot Lead",
+    "upsell": "Upsell",
+    "follow-up": "Follow-up",
+    "partnership": "Partnership",
+    "seasonal": "Musiman",
+    "churn-risk": "Churn Risk"
+  },
+  "page": {
+    "title": "Pertumbuhan Bisnis",
+    "em": "Pertumbuhan",
+    "description": "Temukan peluang baru, terima rekomendasi AI, dan tingkatkan potensi keberhasilan bisnis Anda."
+  },
+  "live": {
+    "panel": "Pertumbuhan dari data Anda sendiri",
+    "kicker": "Akun Anda",
+    "title": "Peluang dan rekomendasi dihitung dari transaksi Anda.",
+    "body": "Belum ada contoh di sini: semua angka berasal dari permintaan, penawaran, dan pembukuan akun ini. Mulai dari Permintaan baru, lalu buka Radar peluang dan Penasihat AI.",
+    "request": "Permintaan baru",
+    "radar": "Radar peluang",
+    "leads": "Pencari prospek",
+    "advisor": "Penasihat AI"
+  },
+  "tabsLabel": "Pertumbuhan",
+  "demo": {
+    "badge": "Data contoh (akun demo). ",
+    "note": "Peluang, notifikasi, prediksi, dan jawaban asisten di halaman ini adalah contoh tetap, bukan hasil analisis data akun."
+  },
+  "radar": {
+    "score": "Score {score}",
+    "action": "💡 Tindakan",
+    "roi": "💰 Expected ROI",
+    "probability": "📊 Probabilitas",
+    "deadline": "⏰ Deadline",
+    "accept": "Terima & Tindak",
+    "accepted": "Peluang \"{title}\" diterima. Tindakan direkomendasikan: {action}",
+    "snooze": "Tunda",
+    "snoozed": "Peluang ditunda. AI akan mengingatkan kembali.",
+    "dismiss": "Abaikan",
+    "dismissed": "Peluang diabaikan. AI akan belajar dari preferensi Anda.",
+    "active": "Peluang Aktif"
+  },
+  "kpi": {
+    "hotLeads": "Hot Leads",
+    "newOne": "+1 baru",
+    "upsell": "Upsell",
+    "upsellSub": "Rp4.2jt potensi",
+    "churn": "Churn Risk",
+    "attention": "Perlu perhatian",
+    "partnership": "Partnership",
+    "ready": "Siap eksekusi"
+  },
+  "chat": {
+    "placeholder": "Tanyakan tentang peluang, minta saran, atau eksekusi tindakan...",
+    "send": "Kirim",
+    "quickHotel": "🏨 Kirim penawaran Hotel",
+    "quickAnnual": "💰 Tawarkan paket tahunan",
+    "quickClinic": "📞 Telepon Klinik Sehat",
+    "quickBsd": "🤝 Hubungi BSD AC",
+    "title": "Asisten AI Pertumbuhan",
+    "typing": "Asisten Pertumbuhan sedang menganalisis...",
+    "assistant": "🤖 Asisten Pertumbuhan: "
+  },
+  "notif": {
+    "all": "Semua ({count})",
+    "unread": "Belum Dibaca ({count})",
+    "urgent": "Urgent",
+    "markAll": "Tandai Semua Dibaca",
+    "allRead": "Semua notifikasi ditandai dibaca.",
+    "title": "Pusat Notifikasi",
+    "empty": "Tidak ada notifikasi",
+    "markRead": "Tandai Dibaca",
+    "read": "Notifikasi ditandai dibaca."
+  },
+  "pred": {
+    "success": "{pct}% Keberhasilan",
+    "probability": "Probabilitas",
+    "suggestion": "💡 Saran AI:",
+    "expected": "Expected Value:",
+    "run": "Jalankan Sekarang",
+    "running": "Menjalankan \"{title}\". AI akan memonitor progress dan update probabilitas.",
+    "detail": "Detail",
+    "detailToast": "Detail analisis lengkap tersedia di AI Superpowers → Agent Pertumbuhan",
+    "avg": "Rata-rata Probabilitas",
+    "avgSub": "+8% dari bulan lalu",
+    "total": "Total Expected Value",
+    "totalSub": "Dari 4 peluang aktif",
+    "high": "Peluang Tinggi (>80%)",
+    "highSub": "Prioritas utama",
+    "attention": "Perlu Perhatian (<70%)",
+    "attentionSub": "Retention Klinik",
+    "title": "Prediksi Keberhasilan"
+  },
+  "api": {
+    "network": "Jaringan bermasalah. Periksa koneksi lalu coba lagi.",
+    "plansFailed": "Gagal memuat paket. Coba lagi.",
+    "plansFailedWith": "Gagal memuat paket. {error}",
+    "planNotFound": "Paket tidak ditemukan.",
+    "slugTaken": "Slug sudah dipakai.",
+    "paymentFailed": "Gagal memuat pengaturan pembayaran. Coba lagi.",
+    "paymentFailedWith": "Gagal memuat pengaturan pembayaran. {error}"
+  }
+}

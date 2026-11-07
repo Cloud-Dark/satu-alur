@@ -1,0 +1,37 @@
+{
+  "errors": {
+    "team": "Tim ini gagal menjawab.",
+    "leadEmpty": "Pimpinan optimasi tidak mengembalikan jawaban.",
+    "merge": "Penyatuan gagal."
+  },
+  "scope": {
+    "vas": "Layanan tambahan (VAS)",
+    "waste": "Tanpa limbah (zero waste)"
+  },
+  "teams": {
+    "kreatif": {
+      "name": "Tim Kreatif",
+      "role": "Nama, kemasan, cerita"
+    },
+    "pemasaran": {
+      "name": "Tim Marketing",
+      "role": "Permintaan & kanal"
+    },
+    "keuangan": {
+      "name": "Tim Keuangan",
+      "role": "Harga, margin, arus kas"
+    },
+    "operasional": {
+      "name": "Tim Operasional",
+      "role": "Kapasitas & eksekusi"
+    },
+    "riset": {
+      "name": "Tim Riset & Data",
+      "role": "Bukti & asumsi"
+    }
+  },
+  "lead": {
+    "name": "Pimpinan Optimasi",
+    "role": "Menyatukan lima tim"
+  }
+}

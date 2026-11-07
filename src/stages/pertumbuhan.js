@@ -3,15 +3,12 @@ import { loadModels, pickDefaultModel } from '../ai/models.js'
 import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { isDemoEmail } from '../auth/demo-accounts.js'
+import { t } from '../i18n/index.js'
 
 const { el } = C
 
-const TABS = [
-  { value: 'radar', label: 'Radar Peluang' },
-  { value: 'rekomendasi', label: 'Rekomendasi AI' },
-  { value: 'notifikasi', label: 'Notifikasi' },
-  { value: 'prediksi', label: 'Prediksi Keberhasilan' },
-]
+const TAB_KEYS = ['radar', 'rekomendasi', 'notifikasi', 'prediksi']
+const tabOptions = () => TAB_KEYS.map((value) => ({ value, label: t(`growth.tabs.${value}`) }))
 let currentTab = 'radar'
 
 /* ------------------------------------------------------------------ Demo */
@@ -226,9 +223,9 @@ function scoreClass(score) {
 }
 
 function scoreLabel(score) {
-  if (score >= 80) return 'Tinggi'
-  if (score >= 60) return 'Sedang'
-  return 'Rendah'
+  if (score >= 80) return t('growth.level.high')
+  if (score >= 60) return t('growth.level.mid')
+  return t('growth.level.low')
 }
 
 function typeIcon(type) {
@@ -240,11 +237,8 @@ function typeIcon(type) {
 }
 
 function typeLabel(type) {
-  const map = {
-    'hot-lead': 'Hot Lead', upsell: 'Upsell', 'follow-up': 'Follow-up',
-    partnership: 'Partnership', seasonal: 'Musiman', 'churn-risk': 'Churn Risk',
-  }
-  return map[type] || type
+  const known = ['hot-lead', 'upsell', 'follow-up', 'partnership', 'seasonal', 'churn-risk']
+  return known.includes(type) ? t(`growth.type.${type}`) : type
 }
 
 /* ------------------------------------------------------------- Live view */
@@ -254,18 +248,18 @@ function typeLabel(type) {
 function renderLive(container, ctx) {
   const go = (key, label, iconName) => C.button({ label, icon: iconName, variant: 'soft', size: 'sm', onClick: () => ctx.navigate?.(key) })
   container.replaceChildren(
-    C.pageHeader({ title: 'Pertumbuhan Bisnis', em: 'Pertumbuhan' }),
-    C.panel({ title: 'Pertumbuhan dari data Anda sendiri' },
+    C.pageHeader({ title: t('growth.page.title'), em: t('growth.page.em') }),
+    C.panel({ title: t('growth.live.panel') },
       C.emptyState({
-        kicker: 'Akun Anda',
+        kicker: t('growth.live.kicker'),
         iconName: 'trendingUp',
-        title: 'Peluang dan rekomendasi dihitung dari transaksi Anda.',
-        body: 'Belum ada contoh di sini: semua angka berasal dari permintaan, penawaran, dan pembukuan akun ini. Mulai dari Permintaan baru, lalu buka Radar peluang dan Penasihat AI.',
+        title: t('growth.live.title'),
+        body: t('growth.live.body'),
         action: el('div', { className: 'form-actions' },
-          go('request', 'Permintaan baru', 'plus'),
-          go('radar', 'Radar peluang', 'radar'),
-          go('leads', 'Pencari prospek', 'mapPin'),
-          go('advisor', 'Penasihat AI', 'bot')),
+          go('request', t('growth.live.request'), 'plus'),
+          go('radar', t('growth.live.radar'), 'radar'),
+          go('leads', t('growth.live.leads'), 'mapPin'),
+          go('advisor', t('growth.live.advisor'), 'bot')),
       })))
 }
 
@@ -276,7 +270,7 @@ export async function render(container, ctx = {}) {
   let modelId = null
   const status = C.message()
   const host = el('div')
-  const tabs = C.segmented({ options: TABS, value: currentTab, label: 'Pertumbuhan', onChange: (value) => {
+  const tabs = C.segmented({ options: tabOptions(), value: currentTab, label: t('growth.tabsLabel'), onChange: (value) => {
     controller?.abort()
     currentTab = value
     status.hide()
@@ -284,9 +278,9 @@ export async function render(container, ctx = {}) {
   } })
   tabs.classList.add('workspace-tabs')
   container.replaceChildren(
-    C.pageHeader({ title: 'Pertumbuhan Bisnis', em: 'Pertumbuhan', description: 'Temukan peluang baru, terima rekomendasi AI, dan tingkatkan potensi keberhasilan bisnis Anda.' }),
+    C.pageHeader({ title: t('growth.page.title'), em: t('growth.page.em'), description: t('growth.page.description') }),
     el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' },
-      el('p', {}, el('b', {}, 'Data contoh (akun demo). '), 'Peluang, notifikasi, prediksi, dan jawaban asisten di halaman ini adalah contoh tetap, bukan hasil analisis data akun.'))),
+      el('p', {}, el('b', {}, t('growth.demo.badge')), t('growth.demo.note')))),
     tabs, status, host)
   ctx.signal?.addEventListener('abort', () => controller?.abort(), { once: true })
 
@@ -316,25 +310,25 @@ export async function render(container, ctx = {}) {
       const card = el('article', { className: 'card card-hover' },
         el('div', { className: 'card-accent-row' },
           C.tag(typeLabel(opp.type), scoreClass(opp.score)),
-          C.tag(`Score ${opp.score}`, scoreClass(opp.score)),
+          C.tag(t('growth.radar.score', { score: opp.score }), scoreClass(opp.score)),
         ),
         el('h3', { className: 'card-title', style: 'margin:12px 0 8px;' }, opp.title),
         el('p', { className: 'text-body', style: 'margin:0 0 12px;' }, opp.description),
         el('div', { className: 'deflist' },
-          el('dt', {}, '💡 Tindakan'), el('dd', {}, opp.action),
-          el('dt', {}, '💰 Expected ROI'), el('dd', { style: 'color:var(--success);font-weight:700;' }, opp.expectedRoi),
-          el('dt', {}, '📊 Probabilitas'), el('dd', {}, `${opp.probability}% ${scoreLabel(opp.probability)}`),
-          el('dt', {}, '⏰ Deadline'), el('dd', {}, C.formatDate(opp.deadline)),
+          el('dt', {}, t('growth.radar.action')), el('dd', {}, opp.action),
+          el('dt', {}, t('growth.radar.roi')), el('dd', { style: 'color:var(--success);font-weight:700;' }, opp.expectedRoi),
+          el('dt', {}, t('growth.radar.probability')), el('dd', {}, `${opp.probability}% ${scoreLabel(opp.probability)}`),
+          el('dt', {}, t('growth.radar.deadline')), el('dd', {}, C.formatDate(opp.deadline)),
         ),
         el('div', { className: 'form-actions', style: 'margin-top:16px;padding-top:16px;border-top:1px solid var(--border);' },
-          C.button({ label: 'Terima & Tindak', icon: 'check', variant: 'primary', onClick: () => {
-            showToast(`Peluang "${opp.title}" diterima. Tindakan direkomendasikan: ${opp.action}`, 'success')
+          C.button({ label: t('growth.radar.accept'), icon: 'check', variant: 'primary', onClick: () => {
+            showToast(t('growth.radar.accepted', { title: opp.title, action: opp.action }), 'success')
           } }),
-          C.button({ label: 'Tunda', icon: 'clock', variant: 'soft', onClick: () => {
-            showToast('Peluang ditunda. AI akan mengingatkan kembali.', 'info')
+          C.button({ label: t('growth.radar.snooze'), icon: 'clock', variant: 'soft', onClick: () => {
+            showToast(t('growth.radar.snoozed'), 'info')
           } }),
-          C.button({ label: 'Abaikan', icon: 'x', variant: 'ghost', onClick: () => {
-            showToast('Peluang diabaikan. AI akan belajar dari preferensi Anda.', 'info')
+          C.button({ label: t('growth.radar.dismiss'), icon: 'x', variant: 'ghost', onClick: () => {
+            showToast(t('growth.radar.dismissed'), 'info')
           } }),
         ),
       )
@@ -342,14 +336,14 @@ export async function render(container, ctx = {}) {
     })
 
     const summary = el('div', { className: 'kpis', style: 'margin-bottom:20px;' },
-      kpiCard('🔥', 'Hot Leads', '2', 'Tinggi', '+1 baru'),
-      kpiCard('💰', 'Upsell', '1', 'Tinggi', 'Rp4.2jt potensi'),
-      kpiCard('⚠️', 'Churn Risk', '1', 'Sedang', 'Perlu perhatian'),
-      kpiCard('🤝', 'Partnership', '2', 'Tinggi', 'Siap eksekusi'),
+      kpiCard('🔥', t('growth.kpi.hotLeads'), '2', 'high', t('growth.kpi.newOne')),
+      kpiCard('💰', t('growth.kpi.upsell'), '1', 'high', t('growth.kpi.upsellSub')),
+      kpiCard('⚠️', t('growth.kpi.churn'), '1', 'mid', t('growth.kpi.attention')),
+      kpiCard('🤝', t('growth.kpi.partnership'), '2', 'high', t('growth.kpi.ready')),
     )
 
     target.appendChild(summary)
-    target.appendChild(el('h2', { className: 'section-title', style: 'margin:24px 0 16px;' }, 'Peluang Aktif'))
+    target.appendChild(el('h2', { className: 'section-title', style: 'margin:24px 0 16px;' }, t('growth.radar.active')))
     target.appendChild(grid)
   }
 
@@ -360,23 +354,23 @@ export async function render(container, ctx = {}) {
     // AI welcome message
     chatHistory.appendChild(el('div', { className: 'chat-msg chat-msg-ai', style: 'margin-bottom:12px;' },
       el('div', { className: 'chat-bubble', style: 'background:var(--bg-input);padding:12px 16px;border-radius:var(--radius-md);' },
-        el('strong', {}, '🤖 Asisten Pertumbuhan: '), 'Saya telah menganalisis data bisnis Anda. Ada 6 peluang terdeteksi dengan total potensi **Rp 106.3 juta/bulan**.\n\nPeluang terbaik saat ini:\n1. Hotel Horizon Jakarta (Score 92) — Hot Lead enterprise\n2. PT Maju Jaya upsell (Score 85) — Paket tahunan\n3. BSD AC Partnership (Score 88) — Overflow handler\n\n**Apa yang ingin Anda tindaklanjuti hari ini?**'
+        el('strong', {}, t('growth.chat.assistant')), 'Saya telah menganalisis data bisnis Anda. Ada 6 peluang terdeteksi dengan total potensi **Rp 106.3 juta/bulan**.\n\nPeluang terbaik saat ini:\n1. Hotel Horizon Jakarta (Score 92) — Hot Lead enterprise\n2. PT Maju Jaya upsell (Score 85) — Paket tahunan\n3. BSD AC Partnership (Score 88) — Overflow handler\n\n**Apa yang ingin Anda tindaklanjuti hari ini?**'
       )
     ))
 
     const inputRow = el('div', { className: 'form-row', style: 'margin-top:12px;' },
-      el('input', { id: 'growth-chat', className: 'input', placeholder: 'Tanyakan tentang peluang, minta saran, atau eksekusi tindakan...', style: 'flex:1;' }),
-      C.button({ label: 'Kirim', icon: 'send', variant: 'primary', onClick: () => handleChat(ctx) }),
+      el('input', { id: 'growth-chat', className: 'input', placeholder: t('growth.chat.placeholder'), style: 'flex:1;' }),
+      C.button({ label: t('growth.chat.send'), icon: 'send', variant: 'primary', onClick: () => handleChat(ctx) }),
     )
 
     const quickActions = el('div', { className: 'quick-actions', style: 'display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;' },
-      C.button({ label: '🏨 Kirim penawaran Hotel', variant: 'soft', size: 'sm', onClick: () => sendQuick('Kirim penawaran ke Hotel Horizon Jakarta') }),
-      C.button({ label: '💰 Tawarkan paket tahunan', variant: 'soft', size: 'sm', onClick: () => sendQuick('Tawarkan paket tahunan ke PT Maju Jaya') }),
-      C.button({ label: '📞 Telepon Klinik Sehat', variant: 'soft', size: 'sm', onClick: () => sendQuick('Telepon Klinik Sehat Sentosa untuk retention') }),
-      C.button({ label: '🤝 Hubungi BSD AC', variant: 'soft', size: 'sm', onClick: () => sendQuick('Hubungi BSD AC Service untuk partnership') }),
+      C.button({ label: t('growth.chat.quickHotel'), variant: 'soft', size: 'sm', onClick: () => sendQuick('Kirim penawaran ke Hotel Horizon Jakarta') }),
+      C.button({ label: t('growth.chat.quickAnnual'), variant: 'soft', size: 'sm', onClick: () => sendQuick('Tawarkan paket tahunan ke PT Maju Jaya') }),
+      C.button({ label: t('growth.chat.quickClinic'), variant: 'soft', size: 'sm', onClick: () => sendQuick('Telepon Klinik Sehat Sentosa untuk retention') }),
+      C.button({ label: t('growth.chat.quickBsd'), variant: 'soft', size: 'sm', onClick: () => sendQuick('Hubungi BSD AC Service untuk partnership') }),
     )
 
-    target.appendChild(el('h2', { className: 'section-title', style: 'margin-bottom:16px;' }, 'Asisten AI Pertumbuhan'))
+    target.appendChild(el('h2', { className: 'section-title', style: 'margin-bottom:16px;' }, t('growth.chat.title')))
     target.appendChild(chatHistory)
     target.appendChild(quickActions)
     target.appendChild(inputRow)
@@ -401,7 +395,7 @@ export async function render(container, ctx = {}) {
       // AI typing indicator
       const typing = el('div', { className: 'chat-msg chat-msg-ai', style: 'margin-bottom:12px;' },
         el('div', { className: 'chat-bubble', style: 'background:var(--bg-input);padding:12px 16px;border-radius:var(--radius-md);' },
-          el('em', {}, 'Asisten Pertumbuhan sedang menganalisis...')
+          el('em', {}, t('growth.chat.typing'))
         )
       )
       chatHistory.appendChild(typing)
@@ -436,18 +430,18 @@ export async function render(container, ctx = {}) {
   function renderNotifikasi(target) {
     const unreadCount = DEMO_NOTIFICATIONS.filter(n => !n.read).length
     const filterTabs = el('div', { className: 'form-actions', style: 'margin-bottom:16px;' },
-      C.button({ label: `Semua (${DEMO_NOTIFICATIONS.length})`, variant: 'soft', size: 'sm', onClick: () => renderList('all') }),
-      C.button({ label: `Belum Dibaca (${unreadCount})`, variant: 'soft', size: 'sm', onClick: () => renderList('unread') }),
-      C.button({ label: 'Urgent', variant: 'soft', size: 'sm', onClick: () => renderList('urgent') }),
-      C.button({ label: 'Tandai Semua Dibaca', variant: 'ghost', size: 'sm', onClick: () => {
+      C.button({ label: t('growth.notif.all', { count: DEMO_NOTIFICATIONS.length }), variant: 'soft', size: 'sm', onClick: () => renderList('all') }),
+      C.button({ label: t('growth.notif.unread', { count: unreadCount }), variant: 'soft', size: 'sm', onClick: () => renderList('unread') }),
+      C.button({ label: t('growth.notif.urgent'), variant: 'soft', size: 'sm', onClick: () => renderList('urgent') }),
+      C.button({ label: t('growth.notif.markAll'), variant: 'ghost', size: 'sm', onClick: () => {
         DEMO_NOTIFICATIONS.forEach(n => n.read = true)
-        showToast('Semua notifikasi ditandai dibaca.', 'success')
+        showToast(t('growth.notif.allRead'), 'success')
         renderList('all')
       } }),
     )
 
     const listContainer = el('div', { className: 'notification-list' })
-    target.appendChild(el('h2', { className: 'section-title', style: 'margin-bottom:16px;' }, 'Pusat Notifikasi'))
+    target.appendChild(el('h2', { className: 'section-title', style: 'margin-bottom:16px;' }, t('growth.notif.title')))
     target.appendChild(filterTabs)
     target.appendChild(listContainer)
 
@@ -463,7 +457,7 @@ export async function render(container, ctx = {}) {
       })
 
       if (!filtered.length) {
-        listContainer.appendChild(C.emptyState({ title: 'Tidak ada notifikasi', iconName: 'bell' }))
+        listContainer.appendChild(C.emptyState({ title: t('growth.notif.empty'), iconName: 'bell' }))
         return
       }
 
@@ -491,9 +485,9 @@ export async function render(container, ctx = {}) {
                 currentTab = notif.action.tab
                 tabs.querySelector(`[data-value="${notif.action.tab}"]`)?.click()
               } }),
-              !notif.read && C.button({ label: 'Tandai Dibaca', variant: 'ghost', size: 'sm', onClick: () => {
+              !notif.read && C.button({ label: t('growth.notif.markRead'), variant: 'ghost', size: 'sm', onClick: () => {
                 notif.read = true
-                showToast('Notifikasi ditandai dibaca.', 'success')
+                showToast(t('growth.notif.read'), 'success')
                 renderList(filter)
               } }),
             ),
@@ -523,7 +517,7 @@ export async function render(container, ctx = {}) {
       const card = el('article', { className: 'card card-hover' },
         el('div', { className: 'card-accent-row' },
           C.tag(pred.category, scoreClass(pred.probability)),
-          C.tag(`${pred.probability}% Keberhasilan`, scoreClass(pred.probability)),
+          C.tag(t('growth.pred.success', { pct: pred.probability }), scoreClass(pred.probability)),
         ),
         el('h3', { className: 'card-title', style: 'margin:12px 0 8px;' }, pred.title),
         el('div', { style: 'text-align:center;margin:16px 0;' },
@@ -541,25 +535,25 @@ export async function render(container, ctx = {}) {
             ),
             el('div', { style: 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;' },
               el('div', { style: 'font-size:1.6rem;font-weight:800;color:var(--text);' }, `${pred.probability}%`),
-              el('div', { className: 'muted small', style: 'font-size:0.75rem;' }, 'Probabilitas'),
+              el('div', { className: 'muted small', style: 'font-size:0.75rem;' }, t('growth.pred.probability')),
             ),
           ),
         ),
         el('div', { style: 'margin:12px 0;' },
-          el('strong', { style: 'font-size:0.9rem;' }, '💡 Saran AI:'),
+          el('strong', { style: 'font-size:0.9rem;' }, t('growth.pred.suggestion')),
           el('p', { style: 'margin:4px 0 0;font-size:0.9rem;line-height:1.6;color:var(--text);' }, pred.suggestion),
         ),
         el('div', { style: 'display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--border);margin-top:12px;' },
-          el('span', { style: 'font-size:0.85rem;color:var(--text-muted);' }, 'Expected Value:'),
+          el('span', { style: 'font-size:0.85rem;color:var(--text-muted);' }, t('growth.pred.expected')),
           el('strong', { style: 'color:var(--success);font-size:1rem;' }, pred.expectedValue),
         ),
         factorsList,
         el('div', { className: 'form-actions', style: 'margin-top:12px;' },
-          C.button({ label: 'Jalankan Sekarang', icon: 'play', variant: 'primary', onClick: () => {
-            showToast(`Menjalankan "${pred.title}". AI akan memonitor progress dan update probabilitas.`, 'success')
+          C.button({ label: t('growth.pred.run'), icon: 'play', variant: 'primary', onClick: () => {
+            showToast(t('growth.pred.running', { title: pred.title }), 'success')
           } }),
-          C.button({ label: 'Detail', icon: 'info', variant: 'soft', onClick: () => {
-            showToast('Detail analisis lengkap tersedia di AI Superpowers → Agent Pertumbuhan', 'info')
+          C.button({ label: t('growth.pred.detail'), icon: 'info', variant: 'soft', onClick: () => {
+            showToast(t('growth.pred.detailToast'), 'info')
           } }),
         ),
       )
@@ -567,14 +561,14 @@ export async function render(container, ctx = {}) {
     })
 
     const summary = el('div', { className: 'kpis', style: 'margin-bottom:20px;' },
-      kpiCard('📊', 'Rata-rata Probabilitas', '74%', 'Tinggi', '+8% dari bulan lalu'),
-      kpiCard('💰', 'Total Expected Value', 'Rp 74.3jt', 'Tinggi', 'Dari 4 peluang aktif'),
-      kpiCard('🎯', 'Peluang Tinggi (>80%)', '2', 'Baik', 'Prioritas utama'),
-      kpiCard('⚡', 'Perlu Perhatian (<70%)', '1', 'Sedang', 'Retention Klinik'),
+      kpiCard('📊', t('growth.pred.avg'), '74%', 'high', t('growth.pred.avgSub')),
+      kpiCard('💰', t('growth.pred.total'), 'Rp 74.3jt', 'high', t('growth.pred.totalSub')),
+      kpiCard('🎯', t('growth.pred.high'), '2', 'good', t('growth.pred.highSub')),
+      kpiCard('⚡', t('growth.pred.attention'), '1', 'mid', t('growth.pred.attentionSub')),
     )
 
     target.appendChild(summary)
-    target.appendChild(el('h2', { className: 'section-title', style: 'margin:24px 0 16px;' }, 'Prediksi Keberhasilan'))
+    target.appendChild(el('h2', { className: 'section-title', style: 'margin:24px 0 16px;' }, t('growth.pred.title')))
     target.appendChild(grid)
   }
 
@@ -583,7 +577,7 @@ export async function render(container, ctx = {}) {
     return el('div', { className: 'kpi' },
       el('div', { className: 'kpi-top' },
         el('span', { className: 'kpi-ico' }, ico),
-        C.tag(status, status === 'Tinggi' || status === 'Baik' ? 'success' : status === 'Sedang' ? 'warning' : 'danger'),
+        C.tag(t(`growth.level.${status}`), status === 'high' || status === 'good' ? 'success' : status === 'mid' ? 'warning' : 'danger'),
       ),
       el('div', { className: 'kpi-value' }, value),
       el('div', { className: 'kpi-sub' }, label, el('br'), el('span', { className: 'muted' }, sub)),

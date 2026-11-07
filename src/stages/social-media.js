@@ -1,5 +1,6 @@
 import { loadModels, pickDefaultModel } from '../ai/models.js'
 import * as C from '../ui/components.js'
+import { t } from '../i18n/index.js'
 import '../styles/social.css'
 import { getAccount } from '../social/api.js'
 import * as Repliz from '../repliz/api.js'
@@ -15,12 +16,27 @@ const CALLBACK_ERRORS = ['Koneksi dibatalkan.', 'Integrasi Meta belum dikonfigur
 const CALLBACK_ERROR_PREFIXES = ['Gagal terhubung ke Meta:', 'Gagal terhubung ke Threads:']
 // Success outcomes the callbacks send (social=…), mapped to their message.
 const CALLBACK_OK = { connected: 'Akun berhasil terhubung.', threads_connected: 'Akun Threads berhasil terhubung.' }
+// Display text for the callback messages above (and the Repliz ones), keyed by the exact Indonesian text the worker sends.
+const CALLBACK_KEYS = {
+  'Koneksi dibatalkan.': 'cancelled', 'Integrasi Meta belum dikonfigurasi.': 'metaNotConfigured', 'Integrasi Threads belum dikonfigurasi.': 'threadsNotConfigured',
+  'Sesi koneksi kedaluwarsa, coba lagi.': 'expired', 'Akun berhasil terhubung.': 'connected', 'Akun Threads berhasil terhubung.': 'threadsConnected',
+  'Koneksi gagal, coba lagi.': 'failed', 'Hubungkan akun Repliz Anda terlebih dahulu di Media Sosial › Akun.': 'replizFirst', 'Tidak tersedia di akun demo.': 'demo',
+  'Kunci Repliz ditolak. Periksa Access key dan Secret key di Media Sosial › Akun.': 'replizKeys', 'Fitur ini butuh paket Repliz yang lebih tinggi.': 'replizPlan',
+  'Permintaan ditolak oleh platform media sosial. Periksa isinya lalu coba lagi.': 'rejected', 'Terlalu banyak permintaan. Coba lagi sebentar.': 'tooMany',
+  'Layanan media sosial sedang bermasalah. Coba lagi nanti.': 'down', 'Layanan media sosial tidak menjawab. Coba lagi sebentar.': 'timeout',
+  'Tidak dapat menghubungi layanan media sosial.': 'unreachable', 'Platform tidak mengembalikan akun.': 'noAccount', 'Platform tidak mengembalikan izin akses.': 'noToken',
+}
+function callbackText(msg) {
+  if (CALLBACK_KEYS[msg]) return t(`social.callback.${CALLBACK_KEYS[msg]}`)
+  if (msg.startsWith('Gagal terhubung ke Meta:')) return t('social.callback.metaFailed', { detail: msg.slice('Gagal terhubung ke Meta:'.length).trim() })
+  if (msg.startsWith('Gagal terhubung ke Threads:')) return t('social.callback.threadsFailed', { detail: msg.slice('Gagal terhubung ke Threads:'.length).trim() })
+  const none = msg.match(/^Tidak ada (.+) yang bisa dihubungkan\.$/)
+  if (none) return t('social.callback.noEntity', { what: none[1] })
+  return msg
+}
 
 const { el } = C
-const TABS = [
-  { value: 'account', label: 'Akun' }, { value: 'content', label: 'Konten' }, { value: 'schedule', label: 'Jadwal' },
-  { value: 'brainstorm', label: 'Brainstorm' }, { value: 'ads', label: 'Iklan' }, { value: 'collab', label: 'Kolaborasi' },
-]
+const TAB_KEYS = ['account', 'content', 'schedule', 'brainstorm', 'ads', 'collab']
 let currentTab = 'account'
 
 export async function render(container, ctx = {}) {
@@ -46,7 +62,7 @@ export async function render(container, ctx = {}) {
   }
   const status = C.message()
   const host = el('div')
-  const tabs = C.segmented({ options: TABS, value: currentTab, label: 'Social media', onChange: (value) => {
+  const tabs = C.segmented({ options: TAB_KEYS.map((value) => ({ value, label: t(`social.tabs.${value}`) })), value: currentTab, label: t('social.tabsLabel'), onChange: (value) => {
     controller?.abort()
     currentTab = value
     status.hide()
@@ -54,7 +70,7 @@ export async function render(container, ctx = {}) {
   } })
   tabs.classList.add('workspace-tabs')
   container.replaceChildren(
-    C.pageHeader({ title: 'Ruang untuk bertumbuh', em: 'bertumbuh', description: 'Siapkan konten, susun jadwal, dan temukan ide pemasaran untuk bisnis jasa Anda.' }),
+    C.pageHeader({ title: t('social.title'), em: t('social.titleEm'), description: t('social.description') }),
     tabs, status, host)
   ctx.signal?.addEventListener('abort', () => controller?.abort(), { once: true })
 
@@ -92,14 +108,14 @@ export async function render(container, ctx = {}) {
   await loadAccount()
   if (ctx.signal?.aborted) return
   draw()
-  if (back.connected) status.show('ok', back.connected)
-  else if (back.replizError) status.show('danger', back.replizError)
+  if (back.connected) status.show('ok', callbackText(back.connected))
+  else if (back.replizError) status.show('danger', callbackText(back.replizError))
   else if (back.error) {
     const known = CALLBACK_ERRORS.includes(back.error) || CALLBACK_ERROR_PREFIXES.some((p) => back.error.startsWith(p))
-    status.show('danger', known ? back.error : 'Koneksi gagal, coba lagi.')
+    status.show('danger', known ? callbackText(back.error) : t('social.callback.failed'))
   }
   try {
     await loadModels()
     if (!ctx.signal?.aborted) modelId = pickDefaultModel()?.id
-  } catch (err) { status.show('warn', `Fitur AI belum tersedia: ${err.message}. Jadwal dan rekomendasi lokal tetap dapat digunakan.`) }
+  } catch (err) { status.show('warn', t('social.aiUnavailable', { message: err.message })) }
 }

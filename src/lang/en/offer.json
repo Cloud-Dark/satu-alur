@@ -1,0 +1,208 @@
+{
+  "title": "Quote",
+  "newTitle": "New quote",
+  "loading": "Loading…",
+  "service": "service",
+  "schedule": "Scheduled for",
+  "composing": "Drafting…",
+  "saving": "Saving…",
+  "aiUnavailableShort": "AI is unavailable right now",
+  "aiUnavailable": "AI is unavailable right now. Check your connection, then reload the page.",
+  "saveError": "Could not save: {error}",
+  "loadError": "Could not load: {error}",
+  "status": {
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "draft": "Draft"
+  },
+  "pick": {
+    "request": "Request",
+    "requestHint": "Requests without a quote are listed first.",
+    "template": "Quote template",
+    "templateHint": "Optional. A template adds specific questions for a more accurate quote.",
+    "noTemplate": "No template",
+    "choose": "Choose",
+    "chooseRequest": "Choose a request",
+    "noRequests": "No requests yet",
+    "alreadyOffered": " (already quoted)",
+    "noRequestsNote": "No requests yet. Create one in step 01 first.",
+    "toRequests": "Go to requests"
+  },
+  "preview": {
+    "service": "Service: {value}",
+    "location": "Location: {value}",
+    "phone": "Phone: {value}",
+    "noDesc": "No description of needs yet."
+  },
+  "wiz": {
+    "label": "Build a quote",
+    "pick": "Choose request",
+    "pickDesc": "Which customer is this quote for, and which template?",
+    "compose": "Draft with AI",
+    "composeDesc": "AI pulls the client data and drafts the quote, PDF and messages.",
+    "next": "Next",
+    "retry": "Try again",
+    "generate": "Generate quote",
+    "review": "Review & save",
+    "reviewDesc": "Everything can still be edited before saving.",
+    "save": "Save quote"
+  },
+  "error": {
+    "pickRequest": "Choose a request first."
+  },
+  "pipe": {
+    "aria": "Quote drafting steps",
+    "title": "AI process",
+    "stop": "Stop",
+    "state": {
+      "pending": "waiting",
+      "running": "running",
+      "done": "done",
+      "error": "failed",
+      "stopped": "stopped"
+    },
+    "step": {
+      "data": "Fetching client data",
+      "schedule": "Fitting the schedule",
+      "offer": "Writing the quote from the client’s needs",
+      "pdf": "Creating the quote PDF",
+      "email": "Drafting email & WhatsApp",
+      "review": "Drafting the review notes"
+    },
+    "seconds": "{n}s",
+    "retryHere": "Retry from here",
+    "stopped": "Process stopped. Nothing was saved.",
+    "data": {
+      "hasPhone": "Phone on file",
+      "noPhone": "No phone",
+      "previous": {
+        "one": "{count} earlier request from this customer",
+        "other": "{count} earlier requests from this customer"
+      },
+      "newCustomer": "New customer",
+      "similar": {
+        "one": "{count} similar quote",
+        "other": "{count} similar quotes"
+      },
+      "noSimilar": "No similar quotes yet"
+    },
+    "why": {
+      "client": "As the client requested.",
+      "free": "The nearest free working day.",
+      "lightest": "The working day with the fewest jobs."
+    },
+    "previewPdf": "Preview PDF",
+    "number": "Number {number}",
+    "emailSubject": "Email: \"{subject}\""
+  },
+  "live": {
+    "waiting": "waiting…"
+  },
+  "field": {
+    "scope": "Scope",
+    "price": "Price",
+    "terms": "Terms",
+    "notes": "Notes",
+    "finalPrice": "Final price (Rp)"
+  },
+  "review": {
+    "aiSuggestion": "AI suggestion",
+    "scheduleHint": "Saved as the client’s requested time and used in Assignment.",
+    "mailSubject": "Email subject",
+    "mailBody": "Email body",
+    "waBody": "WhatsApp message",
+    "notes": "Review notes",
+    "mailDraft": "Email draft",
+    "waDraft": "WhatsApp draft"
+  },
+  "rules": {
+    "aria": "Domain rule results",
+    "title": "Domain rules",
+    "price": "Price {min} – {max}",
+    "priceFull": "Price between {min} and {max}",
+    "scope": "Scope ≥ 10 chars",
+    "scopeFull": "Scope at least 10 characters",
+    "terms": "Terms ≥ 10 chars",
+    "termsFull": "Terms at least 10 characters",
+    "pass": "passes",
+    "fail": "not yet"
+  },
+  "actions": {
+    "pdf": "Download PDF",
+    "email": "Send email",
+    "wa": "Send WhatsApp",
+    "noPhone": "No customer phone number yet",
+    "waShort": "WhatsApp"
+  },
+  "done": {
+    "assign": "Assign crew",
+    "another": "Create another quote",
+    "view": "View quote",
+    "text": "Quote of {price} for {name} saved and approved.",
+    "toast": "Quote saved."
+  },
+  "detail": {
+    "notFound": "Quote not found.",
+    "notFoundBody": "It may have been deleted. Pick another job from Workflow.",
+    "service": "Service",
+    "location": "Location",
+    "phone": "Phone",
+    "schedule": "Schedule",
+    "status": "Status",
+    "created": "Created",
+    "approve": "Approve",
+    "redo": "Redraft with AI",
+    "assign": "Assign",
+    "viewAssignment": "View assignment",
+    "assigned": "Assigned",
+    "waAria": "Send the quote to {name} on WhatsApp",
+    "number": "Quote #{id}",
+    "invalid": "Quote #{id} did not pass validation.",
+    "approving": "Approving…",
+    "approvedToast": "Quote approved.",
+    "approveError": "Could not approve: {error}"
+  },
+  "reviewDraft": {
+    "priceInLine": {
+      "one": "Price is in line with {count} similar quote (average {avg}).",
+      "other": "Price is in line with {count} similar quotes (average {avg})."
+    },
+    "priceAbove": {
+      "one": "Price is {pct}% above the average of {count} similar quote ({avg}). Make sure it is worth it.",
+      "other": "Price is {pct}% above the average of {count} similar quotes ({avg}). Make sure it is worth it."
+    },
+    "priceBelow": {
+      "one": "Price is {pct}% below the average of {count} similar quote ({avg}). Check your margin.",
+      "other": "Price is {pct}% below the average of {count} similar quotes ({avg}). Check your margin."
+    },
+    "noHistory": "No similar quotes yet to compare the price with.",
+    "outOfRange": "Price is outside the \"{name}\" template range.",
+    "inRange": "Price is within the \"{name}\" template range.",
+    "noPhone": "No customer phone number yet, so the quote can’t be sent on WhatsApp.",
+    "noSchedule": "No date set for the work yet.",
+    "shortDesc": "The description is short; the price may change after a site visit.",
+    "estimate": "The quote mentions an estimate; explain when the final price is locked.",
+    "recheck": "Double-check: scope matches the request, payment terms, and how long the quote is valid.",
+    "warnSummary": {
+      "one": "{count} thing to check before sending.",
+      "other": "{count} things to check before sending."
+    },
+    "readySummary": "Ready to send once you have reviewed it."
+  },
+  "doc": {
+    "yourBusiness": "Your business",
+    "sub": "Service quote",
+    "title": "Quote",
+    "number": "No. {number}",
+    "date": "Date {date}",
+    "validUntil": "Valid until {date}",
+    "to": "For",
+    "service": "Service",
+    "schedule": "Schedule: {date}",
+    "total": "Total price",
+    "regards": "Sincerely,",
+    "approvedBy": "Approved by,",
+    "customer": "Customer",
+    "foot": "This quote was made with Satu Alur. Prices in Rupiah. Reply to this message to approve or ask a question."
+  }
+}

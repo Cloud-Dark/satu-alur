@@ -1,0 +1,90 @@
+{
+  "feature": {
+    "offer": {
+      "label": "Penawaran AI",
+      "unit": "draf"
+    },
+    "report": {
+      "label": "Laporan AI",
+      "unit": "penjelasan"
+    },
+    "leads": {
+      "label": "Pencari prospek",
+      "unit": "pencarian"
+    },
+    "radar": {
+      "label": "Radar peluang",
+      "unit": "analisis"
+    },
+    "advisor": {
+      "label": "Penasihat AI",
+      "unit": "pesan"
+    },
+    "social": {
+      "label": "Konten media sosial",
+      "unit": "konten"
+    },
+    "income": {
+      "label": "Optimasi pendapatan",
+      "unit": "panggilan AI"
+    }
+  },
+  "voucherType": {
+    "plan": "Paket",
+    "credit": "Saldo AI",
+    "bundle": "Paket + saldo AI"
+  },
+  "upsell": {
+    "plans": "Lihat paket",
+    "later": "Nanti saja",
+    "title": "Kuota AI bulan ini sudah habis",
+    "desc": "Kuota fitur ini sudah habis dan saldo AI tidak cukup.",
+    "note": "Data Anda tetap aman. Fitur lain yang masih punya kuota tetap bisa dipakai, dan kuota diperbarui setiap tanggal 1."
+  },
+  "voucher": {
+    "redeem": "Tukar voucher",
+    "code": "Kode voucher",
+    "oneCode": "Satu kode untuk satu akun",
+    "desc": "Voucher bisa berisi paket, saldo AI, atau keduanya.",
+    "enter": "Masukkan kode voucher.",
+    "redeeming": "Menukar…",
+    "gotPlan": "paket {plan} {days} hari",
+    "gotCredit": "saldo AI {amount}",
+    "and": " dan ",
+    "redeemed": "Voucher berhasil ditukar: {got}."
+  },
+  "common": {
+    "contact": "Hubungi kami",
+    "retry": "Coba lagi",
+    "network": "Jaringan bermasalah. Periksa koneksi lalu coba lagi."
+  },
+  "page": {
+    "choose": "Pilih paket",
+    "noCredit": "Paket tidak termasuk saldo AI",
+    "title": "Paket & kuota",
+    "yourPlan": "Paket Anda",
+    "needMore": "Butuh kuota lebih besar atau voucher untuk tim? ",
+    "demoTag": "Akun demo",
+    "credit": "Saldo AI"
+  },
+  "summary": {
+    "erpOpen": "Integrasi ERP terbuka.",
+    "erpEnterprise": "Integrasi ERP terbuka untuk akun skala Enterprise.",
+    "scaleNoQuota": " Skala akun tidak mengubah kuota AI.",
+    "lapsed": "Masa paket Anda sudah berakhir, jadi kuota kembali ke paket Free.",
+    "demo": "Akun demo memakai AI tanpa batas untuk presentasi; pemakaian tetap tercatat.",
+    "until": "sampai {date}",
+    "noExpiry": "tanpa batas waktu",
+    "resets": "kuota diperbarui {date}",
+    "scale": "Skala akun: {plan}. "
+  },
+  "usage": {
+    "unlimited": "{used} {unit} · tanpa batas",
+    "out": "Kuota habis. Berikutnya memakai saldo AI ({price} per {unit})."
+  },
+  "errors": {
+    "loadPlan": "Gagal memuat paket. {error}",
+    "loadVouchers": "Gagal memuat voucher. {error}",
+    "loadRedemptions": "Gagal memuat penukaran. {error}"
+  }
+}

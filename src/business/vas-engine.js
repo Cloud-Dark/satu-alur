@@ -131,6 +131,8 @@ export function discoverOpportunities(model, { catalog = [], now = Date.now() } 
       effort: 'Sedang',
       owner: 'Keuangan + Operasional',
       basis: repeat.slice(0, 4).map(([name, rows]) => `${name} (${rows.length} permintaan)`).join(', '),
+      // Raw figures so the page can word the card in the viewer's language.
+      vars: { count: repeat.length, items: repeat.slice(0, 4).map(([name, rows]) => ({ name, count: rows.length })) },
     })
   }
 
@@ -164,6 +166,7 @@ export function discoverOpportunities(model, { catalog = [], now = Date.now() } 
       effort: 'Ringan',
       owner: 'Marketing + Operasional',
       basis: due.slice(0, 4).map((d) => `${d.customer} — ${d.service}, ${d.age} hari lalu`).join('; '),
+      vars: { count: due.length, items: due.slice(0, 4) },
     })
   }
 
@@ -188,6 +191,7 @@ export function discoverOpportunities(model, { catalog = [], now = Date.now() } 
       effort: 'Ringan',
       owner: 'Keuangan + Marketing',
       basis: `${bigJobs.length} pekerjaan di atas Rp${Math.round(avgJob * 1.5).toLocaleString('id-ID')}`,
+      vars: { count: bigJobs.length, threshold: Math.round(avgJob * 1.5) },
     })
   }
 
@@ -214,6 +218,7 @@ export function discoverOpportunities(model, { catalog = [], now = Date.now() } 
       effort: 'Sedang',
       owner: 'Kreatif + Keuangan',
       basis: `${topCount} permintaan "${topType}" belum punya VAS aktif`,
+      vars: { count: topCount, type: topType },
     })
   }
 
@@ -235,6 +240,7 @@ export function discoverOpportunities(model, { catalog = [], now = Date.now() } 
       effort: 'Ringan',
       owner: 'Marketing',
       basis: `${stalled.length} penawaran menunggu jawaban`,
+      vars: { count: stalled.length },
     })
   }
 
@@ -254,6 +260,7 @@ export function discoverOpportunities(model, { catalog = [], now = Date.now() } 
       effort: 'Ringan',
       owner: 'Keuangan',
       basis: weak.map((i) => i.name).slice(0, 3).join(', '),
+      vars: { count: weak.length },
     })
   }
 

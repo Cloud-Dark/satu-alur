@@ -1,0 +1,38 @@
+{
+  "status": {
+    "open": "Open",
+    "in_progress": "In progress",
+    "resolved": "Resolved",
+    "closed": "Closed"
+  },
+  "reply": "Reply",
+  "sendReply": "Send reply",
+  "sending": "Sending…",
+  "back": "Back to tickets",
+  "category": {
+    "label": "Category",
+    "teknis": "Technical",
+    "tagihan": "Billing",
+    "akun": "Account",
+    "lainnya": "Other"
+  },
+  "subject": "Subject",
+  "message": "Message",
+  "sendTicket": "Send ticket",
+  "cancel": "Cancel",
+  "create": "New ticket",
+  "createDesc": "Describe the problem. The Satu Alur team replies on this page.",
+  "sent": "Ticket sent.",
+  "title": "Help",
+  "desc": "Having a technical, billing or account issue? Open a ticket and follow the Satu Alur team's replies here.",
+  "mine": "My tickets",
+  "retry": "Try again",
+  "pagerLabel": "help tickets",
+  "empty": "No tickets yet",
+  "emptyBody": "Open a ticket if you have a technical, billing or account issue.",
+  "closed": "This ticket is closed. Open a new one if you still need help.",
+  "replySent": "Reply sent.",
+  "leave": "Your ticket has not been sent. Close without sending?",
+  "replyLeave": "Your reply has not been sent. Leave this ticket?",
+  "updatedAt": "Updated {when}"
+}

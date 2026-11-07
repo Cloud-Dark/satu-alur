@@ -4,6 +4,7 @@ import * as C from './components.js'
 import { showToast } from './animations.js'
 import * as Integrations from '../integrations/connectors.js'
 import '../styles/repliz.css'
+import { t } from '../i18n/index.js'
 
 const { el } = C
 
@@ -13,25 +14,25 @@ export function integrationCard(item, { demo = false, enabled = true, onChange }
   const msg = el('p', { className: 'muted small', role: 'status' })
 
   function drawConnected() {
-    const replace = C.button({ label: 'Ganti', icon: 'refresh', variant: 'soft', size: 'sm' })
-    const remove = C.button({ label: 'Hapus', icon: 'trash', variant: 'ghost', size: 'sm' })
-    replace.setAttribute('aria-label', `Ganti kunci ${item.label}`)
-    remove.setAttribute('aria-label', `Hapus kunci ${item.label}`)
+    const replace = C.button({ label: t('ui.integration.replace'), icon: 'refresh', variant: 'soft', size: 'sm' })
+    const remove = C.button({ label: t('ui.integration.remove'), icon: 'trash', variant: 'ghost', size: 'sm' })
+    replace.setAttribute('aria-label', t('ui.integration.replaceLabel', { name: item.label }))
+    remove.setAttribute('aria-label', t('ui.integration.removeLabel', { name: item.label }))
     replace.addEventListener('click', () => drawForm(true))
     remove.addEventListener('click', async () => {
-      if (!confirm(`Hapus kunci ${item.label}? Fitur yang memakainya berhenti sampai kunci diisi lagi.`)) return
-      const restore = C.setBusy(remove, 'Menghapus…')
+      if (!confirm(t('ui.integration.confirmRemove', { name: item.label }))) return
+      const restore = C.setBusy(remove, t('ui.integration.removing'))
       try {
         await Integrations.remove(item.provider)
-        showToast(`Kunci ${item.label} dihapus.`, 'success')
+        showToast(t('ui.integration.removed', { name: item.label }), 'success')
         await onChange?.()
       } catch (e) { msg.textContent = e.message; restore() }
     })
     const meta = Object.entries(item.meta || {}).filter(([, v]) => v).map(([k, v]) => [item.fields.find((f) => f.key === k)?.label || k, v])
     host.replaceChildren(...[
-      el('div', { className: 'ig-head' }, el('strong', {}, item.label), C.tag(`Terhubung • …${item.hint || '••••'}`, 'ok')),
+      el('div', { className: 'ig-head' }, el('strong', {}, item.label), C.tag(t('ui.integration.connected', { hint: item.hint || '••••' }), 'ok')),
       meta.length ? C.defList(meta) : null,
-      item.verified_at ? null : el('p', { className: 'muted small' }, 'Kunci tersimpan tetapi belum bisa diperiksa otomatis.'),
+      item.verified_at ? null : el('p', { className: 'muted small' }, t('ui.integration.unverified')),
       el('div', { className: 'form-actions' }, replace, remove), msg].filter(Boolean))
   }
 
@@ -43,25 +44,25 @@ export function integrationCard(item, { demo = false, enabled = true, onChange }
       inputs[f.key] = fld.input
       return fld.wrap
     })
-    const save = C.button({ label: replacing ? 'Simpan kunci baru' : `Hubungkan ${item.label}`, icon: 'plug', variant: 'primary', type: 'submit' })
-    const cancel = replacing ? C.button({ label: 'Batal', variant: 'ghost' }) : null
+    const save = C.button({ label: replacing ? t('ui.integration.saveNew') : t('ui.integration.connect', { name: item.label }), icon: 'plug', variant: 'primary', type: 'submit' })
+    const cancel = replacing ? C.button({ label: t('ui.integration.cancel'), variant: 'ghost' }) : null
     cancel?.addEventListener('click', () => drawConnected())
     const form = el('form', { className: 'form ig-form', noValidate: true },
-      el('div', { className: 'ig-head' }, el('strong', {}, item.label), replacing ? null : C.tag('Belum terhubung', 'neutral')),
-      el('p', { className: 'muted small' }, item.help, ' ', el('a', { href: item.url, target: '_blank', rel: 'noopener' }, 'Buka situsnya ↗')),
+      el('div', { className: 'ig-head' }, el('strong', {}, item.label), replacing ? null : C.tag(t('ui.integration.notConnected'), 'neutral')),
+      el('p', { className: 'muted small' }, item.help, ' ', el('a', { href: item.url, target: '_blank', rel: 'noopener' }, t('ui.integration.openSite'))),
       ...fields, el('div', { className: 'form-actions' }, save, cancel), msg)
     if (demo || !enabled) {
       save.disabled = true
       Object.values(inputs).forEach((i) => { i.disabled = true })
-      msg.textContent = demo ? 'Akun demo dipakai bersama, jadi tidak bisa menyimpan kunci. Masuk dengan email Anda sendiri.' : 'Integrasi akun belum aktif di server ini.'
+      msg.textContent = demo ? t('ui.integration.demo') : t('ui.integration.disabled')
     }
     form.addEventListener('submit', async (e) => {
       e.preventDefault()
       msg.textContent = ''
-      const restore = C.setBusy(save, 'Memeriksa kunci…')
+      const restore = C.setBusy(save, t('ui.integration.checking'))
       try {
         const out = await Integrations.save(item.provider, Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value])))
-        showToast(`${item.label} terhubung.`, 'success')
+        showToast(t('ui.integration.connectedToast', { name: item.label }), 'success')
         if (out?.note) showToast(out.note, 'info', 6000)
         await onChange?.()
       } catch (err) { msg.textContent = err.message; restore() }

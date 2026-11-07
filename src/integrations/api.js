@@ -10,6 +10,7 @@ import { signOutIfSuspended } from '../http-cloud.js'
 import { validateEmailIntegration, validateAiIntegration } from '../admin/rules.js'
 import { DEMO_MODELS } from '../ai-providers/demo-models.js'
 import { isEmail } from '../admin/constants.js'
+import { t } from '../i18n/index.js'
 
 const DEMO_KEY = 'satualur_integrations_demo_v1'
 const token = () => { try { return localStorage.getItem('satualur_token') } catch { return null } }
@@ -28,7 +29,7 @@ export async function call(path, { method = 'GET', body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('settings.common.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -124,9 +125,9 @@ export async function listAiModels(form) {
 
 /** Sends an email written by the business: kind 'offer' / 'invoice' (to the customer) or 'report' (to the owner). */
 export async function sendBusinessEmail({ kind = 'offer', to, subject, body }) {
-  if (kind !== 'report' && !isEmail(String(to || ''))) throw new Error('Alamat email penerima tidak valid.')
-  if (!String(subject || '').trim()) throw new Error('Subjek wajib diisi.')
-  if (!String(body || '').trim()) throw new Error('Isi email wajib diisi.')
+  if (kind !== 'report' && !isEmail(String(to || ''))) throw new Error(t('settings.errors.badRecipient'))
+  if (!String(subject || '').trim()) throw new Error(t('settings.errors.subjectRequired'))
+  if (!String(body || '').trim()) throw new Error(t('settings.errors.bodyRequired'))
   if (isUsingMockCloud()) {
     await delay()
     const d = readDemo()

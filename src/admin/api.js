@@ -10,6 +10,7 @@ import { withDefaults, normalizeSetting, AI_MODE_LABELS, validatePlatformTranspo
 import { DEMO_MODELS } from '../ai-providers/demo-models.js'
 import { isEmail } from './constants.js'
 import { PLANS } from '../business/plan-access.js'
+import { t } from '../i18n/index.js'
 
 const DEMO_KEY = 'satualur_system_demo_v1'
 const readDemo = () => { try { return JSON.parse(localStorage.getItem(DEMO_KEY)) || {} } catch { return {} } }
@@ -67,7 +68,7 @@ export async function saveEmailTransport(input) {
 }
 
 export async function testSystemEmail(to, via) {
-  if (to && !isEmail(to)) throw new Error('Alamat email tujuan tidak valid.')
+  if (to && !isEmail(to)) throw new Error(t('office.errors.badTestEmail'))
   if (isUsingMockCloud()) {
     await delay()
     const d = readDemo()

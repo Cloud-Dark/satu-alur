@@ -26,8 +26,16 @@ import {
 } from '../mcp/migration.js'
 import { getSession } from '../auth/auth.js'
 import { canUse, normalizePlan, planLabel } from '../business/plan-access.js'
+import { t, locale } from '../i18n/index.js'
 
 const { el, icon } = C
+
+// Display labels for values that come from shared rules (mcp/rules.js), keyed by their stable id.
+const typeLabel = (type) => (CONNECTOR_TYPE_LABELS[type] ? t(`settings.connectorType.${type}`) : type)
+const entityLabel = (key) => (SATU_ALUR_SCHEMA[key] ? t(`settings.entity.${key}`) : key)
+const knownPhase = (p) => p?.key && MIGRATION_PHASES.some((x) => x.key === p.key)
+const phaseName = (p) => (knownPhase(p) ? t(`settings.phase.${p.key}.name`) : p?.name)
+const phaseDesc = (p) => (knownPhase(p) ? t(`settings.phase.${p.key}.description`) : p?.description)
 
 const STORAGE_KEYS = {
   mcp: 'satualur_settings_mcp',
@@ -129,17 +137,17 @@ export function render(container) {
   }
   if (!TAB_KEYS.includes(currentTab)) currentTab = 'mcp'
   const tabs = C.segmented({
-    label: 'Bagian pengaturan',
+    label: t('settings.tabs.label'),
     scroll: true,
     value: currentTab,
     options: [
-      { value: 'mcp', label: 'Konektor' },
-      { value: 'integrations', label: 'Email & AI' },
-      { value: 'ai-access', label: 'Akses AI (MCP)' },
-      { value: 'erp', label: 'ERP & Integrasi' },
-      { value: 'migration', label: 'Migrasi' },
+      { value: 'mcp', label: t('settings.tabs.connectors') },
+      { value: 'integrations', label: t('settings.tabs.emailAi') },
+      { value: 'ai-access', label: t('settings.tabs.aiAccess') },
+      { value: 'erp', label: t('settings.tabs.erp') },
+      { value: 'migration', label: t('settings.tabs.migration') },
       { value: 'logs', label: 'Log' },
-      { value: 'agent', label: 'Agen AI' },
+      { value: 'agent', label: t('settings.tabs.agent') },
     ],
     onChange: (v) => {
       currentTab = v
@@ -171,7 +179,7 @@ export function render(container) {
  * user from meeting a wall of failed requests.
  */
 async function withEnterpriseGate(container, render) {
-  container.replaceChildren(loadingBox('Memeriksa paket…'))
+  container.replaceChildren(loadingBox(t('settings.locked.checking')))
   let plan = 'sole'
   try {
     const res = await getSession()
@@ -186,28 +194,28 @@ async function withEnterpriseGate(container, render) {
 
 /** Marks a panel that only Enterprise accounts can use. */
 function enterpriseTag() {
-  return el('span', { className: 'mcp-plan-tag', title: 'Tersedia untuk akun skala Enterprise' },
+  return el('span', { className: 'mcp-plan-tag', title: t('settings.locked.tagTitle') },
     icon('lock', { size: 11 }), 'Enterprise')
 }
 
 function planLockedPanel(plan) {
   const bullets = [
-    'Konektor REST API, impor CSV/JSON, dan webhook masuk',
-    'Pemetaan bidang dengan pratinjau dan validasi sebelum menulis',
-    'Migrasi bertahap dengan rollback dan laporan per fase',
+    t('settings.locked.bullet1'),
+    t('settings.locked.bullet2'),
+    t('settings.locked.bullet3'),
   ]
   return el('section', { className: 'set-section mcp-locked' },
-    el('div', { className: 'mcp-locked-tag' }, icon('lock', { size: 12 }), 'Fitur Enterprise'),
-    el('h3', { className: 'set-title' }, 'Integrasi ERP & migrasi data'),
+    el('div', { className: 'mcp-locked-tag' }, icon('lock', { size: 12 }), t('settings.locked.tag')),
+    el('h3', { className: 'set-title' }, t('settings.locked.title')),
     el('p', { className: 'mcp-locked-lede' },
-      'Kalau perusahaan Anda sudah memakai ERP, aplikasi kasir, atau spreadsheet, Satu Alur tidak meminta Anda pindah sistem. Data yang sudah ada dihubungkan, dipetakan, lalu dipindahkan bertahap sambil dua sistem tetap berjalan.'),
+      t('settings.locked.lede')),
     el('ul', { className: 'mcp-locked-list' }, ...bullets.map((b) => el('li', {}, b))),
     el('p', { className: 'mcp-locked-plan' },
-      `Skala akun Anda sekarang: ${planLabel(plan)}. `,
-      el('strong', {}, 'Fitur ini tersedia untuk akun skala Enterprise.')),
+      t('settings.locked.currentScale', { plan: planLabel(plan) }),
+      el('strong', {}, t('settings.locked.available'))),
     el('div', { className: 'mcp-locked-actions' },
       C.button({
-        label: 'Diskusikan akun Enterprise',
+        label: t('settings.locked.discuss'),
         icon: 'arrowRight',
         size: 'sm',
         variant: 'primary',
@@ -215,7 +223,7 @@ function planLockedPanel(plan) {
       }),
     ),
     el('p', { className: 'mcp-locked-note' },
-      'Ingin melihat contohnya? Masuk dengan akun demo Enterprise (PT Arunika, PT Prima Fasilitas, atau PT Sehat Bersih Medika).'),
+      t('settings.locked.note')),
   )
 }
 
@@ -265,25 +273,25 @@ function selectField({ label, id, options, value, hint, onChange }) {
 }
 
 function testConnectionLegacy(type, cfg) {
-  const name = 'Email'
-  const missing = [!cfg.smtpHost && 'SMTP host', !cfg.smtpUser && 'username', !cfg.fromEmail && 'email pengirim'].filter(Boolean)
+  const name = t('settings.email.name')
+  const missing = [!cfg.smtpHost && 'SMTP host', !cfg.smtpUser && 'username', !cfg.fromEmail && t('settings.email.fromEmailLower')].filter(Boolean)
   if (missing.length) {
-    showToast(`${name}: lengkapi ${missing.join(', ')} terlebih dahulu.`, 'error')
+    showToast(t('settings.email.missing', { name, fields: missing.join(', ') }), 'error')
     return
   }
-  showToast(`${name}: konfigurasi lengkap dan tersimpan di browser. Uji kirim membutuhkan konektor server yang belum tersedia.`, 'info', 5200)
+  showToast(t('settings.email.configOk', { name }), 'info', 5200)
 }
 
 /* ------------------------------------------------------------- WhatsApp & Repliz (own accounts) */
 // The business's own WAPilot / WAConsole keys, which one sends, the device status and a test message;
 // plus the Repliz keys used by Media Sosial.
 function waSection() {
-  const statusBox = el('div', { className: 'wa-status' }, C.tag('Memeriksa…', 'neutral'))
+  const statusBox = el('div', { className: 'wa-status' }, C.tag(t('settings.common.checking'), 'neutral'))
   const cards = el('div', { className: 'ig-grid' })
   const providerHost = el('div')
   const facts = el('div')
-  const phone = C.field({ label: 'Kirim pesan uji ke nomor', id: 'wa-test-phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '20' } })
-  const test = C.button({ label: 'Kirim pesan uji', icon: 'send', size: 'sm', variant: 'soft' })
+  const phone = C.field({ label: t('settings.wa.testPhone'), id: 'wa-test-phone', type: 'tel', placeholder: '0812 3456 7890', attrs: { autocomplete: 'tel', inputmode: 'tel', maxlength: '20' } })
+  const test = C.button({ label: t('settings.wa.sendTest'), icon: 'send', size: 'sm', variant: 'soft' })
   const out = el('p', { className: 'muted small', role: 'status' })
   test.disabled = true
 
@@ -293,34 +301,34 @@ function waSection() {
     try { [list, s] = await Promise.all([Integrations.list(), WA.status()]) } catch (e) { statusBox.replaceChildren(C.tag(e.message, 'danger')); return }
     cards.replaceChildren(...list.items.filter((i) => i.kind === 'whatsapp').map((i) => integrationCard(i, { demo: list.demo, enabled: list.enabled, onChange: load })))
     const tone = !s.configured ? 'neutral' : s.connected ? 'ok' : 'warn'
-    statusBox.replaceChildren(C.tag(s.demo ? 'Akun demo (simulasi)' : !s.configured ? 'Belum terhubung' : s.connected ? 'Terhubung' : 'Perangkat offline', s.demo ? 'neutral' : tone))
+    statusBox.replaceChildren(C.tag(s.demo ? t('settings.wa.demo') : !s.configured ? t('settings.wa.notConnected') : s.connected ? t('settings.wa.connected') : t('settings.wa.offline'), s.demo ? 'neutral' : tone))
     const connected = (s.providers || []).filter((p) => p.connected)
     if (connected.length > 1) {
-      const sel = C.select({ label: 'Kirim lewat', id: 'wa-provider', value: s.provider, options: connected.map((p) => ({ value: p.key, label: p.label })) })
+      const sel = C.select({ label: t('settings.wa.sendVia'), id: 'wa-provider', value: s.provider, options: connected.map((p) => ({ value: p.key, label: p.label })) })
       sel.input.addEventListener('change', async () => {
-        try { await WA.setProvider(sel.input.value); showToast('Pengirim WhatsApp diperbarui.', 'success'); load() } catch (e) { showToast(e.message, 'error'); sel.input.value = s.provider }
+        try { await WA.setProvider(sel.input.value); showToast(t('settings.wa.providerUpdated'), 'success'); load() } catch (e) { showToast(e.message, 'error'); sel.input.value = s.provider }
       })
       providerHost.replaceChildren(sel.wrap)
     } else providerHost.replaceChildren()
     const rows = []
-    if (s.configured) rows.push(['Dikirim lewat', (s.providers || []).find((p) => p.key === s.provider)?.label || '—'])
-    if (s.device?.name) rows.push(['Perangkat', s.device.name])
-    if (s.device?.number_masked) rows.push(['Nomor pengirim', s.device.number_masked])
-    if (s.license?.days_left != null) rows.push(['Masa aktif layanan', `${s.license.days_left} hari lagi`])
-    rows.push(['Terkirim hari ini', `${s.used_today || 0} dari ${s.limits?.per_day ?? 200} pesan`])
+    if (s.configured) rows.push([t('settings.wa.sentVia'), (s.providers || []).find((p) => p.key === s.provider)?.label || '—'])
+    if (s.device?.name) rows.push([t('settings.wa.device'), s.device.name])
+    if (s.device?.number_masked) rows.push([t('settings.wa.senderNumber'), s.device.number_masked])
+    if (s.license?.days_left != null) rows.push([t('settings.wa.license'), t('settings.wa.daysLeft', { n: s.license.days_left })])
+    rows.push([t('settings.wa.sentToday'), t('settings.wa.sentOf', { used: s.used_today || 0, max: s.limits?.per_day ?? 200 })])
     facts.replaceChildren(...[C.defList(rows), s.note ? el('p', { className: 'muted small' }, s.note) : null, s.error ? el('p', { className: 'field-error' }, s.error) : null].filter(Boolean))
     test.disabled = !s.configured
   }
   test.addEventListener('click', async () => {
-    const restore = C.setBusy(test, 'Mengirim…')
+    const restore = C.setBusy(test, t('settings.common.sending'))
     out.textContent = ''
     try {
-      const r = await WA.send({ phone: phone.input.value, text: 'Pesan uji dari Satu Alur. Bila pesan ini sampai, WhatsApp usaha Anda siap dipakai.', kind: 'test' })
-      out.textContent = r.status === 'simulated' ? `Pesan uji disimulasikan ke ${r.to}.` : `Pesan uji terkirim ke ${r.to}.`
+      const r = await WA.send({ phone: phone.input.value, text: t('settings.wa.testText'), kind: 'test' })
+      out.textContent = r.status === 'simulated' ? t('settings.wa.testSimulated', { to: r.to }) : t('settings.wa.testSent', { to: r.to })
     } catch (e) { out.textContent = e.message } finally { restore() }
   })
   load()
-  return setSection({ num: 'Konektor · 01', title: 'WhatsApp', desc: 'Hubungkan akun WAPilot atau WAConsole milik usaha Anda. Pesan ke pelanggan dikirim dari daftar Permintaan dan Penawaran, dan selalu ditampilkan dulu sebelum dikirim.', toggle: statusBox },
+  return setSection({ num: t('settings.wa.num'), title: 'WhatsApp', desc: t('settings.wa.desc'), toggle: statusBox },
     cards, providerHost, facts, phone.wrap, el('div', { className: 'form-actions' }, test), out)
 }
 
@@ -334,7 +342,7 @@ function replizSection() {
     } catch (e) { host.replaceChildren(C.errorState(e.message)) }
   }
   load()
-  return setSection({ num: 'Konektor · 02', title: 'Media sosial (Repliz)', desc: 'Hubungkan akun Repliz Anda, lalu sambungkan Instagram, Facebook, TikTok, dan lainnya di Media Sosial › Akun.' }, host)
+  return setSection({ num: t('settings.repliz.num'), title: t('settings.repliz.title'), desc: t('settings.repliz.desc') }, host)
 }
 
 /* ------------------------------------------------------------- MCP tab (legacy: WhatsApp + Email) */
@@ -344,15 +352,15 @@ function renderMcpTab(container) {
   const em = settings.email
 
   container.append(
-    el('p', { className: 'set-lead' }, 'Konektor dipakai untuk mengirim pesan ke pelanggan dan tenaga kerja.'),
+    el('p', { className: 'set-lead' }, t('settings.connectors.lead')),
     waSection(),
     replizSection(),
     setSection({
-      num: 'Konektor · 03', title: 'Email (SMTP)', desc: 'Kirim penawaran, invoice, dan laporan lewat email.',
-      toggle: switchControl({ id: 'email-enabled', label: 'Aktif', checked: em.enabled, onChange: (v) => { em.enabled = v; save() } }),
+      num: t('settings.email.num'), title: 'Email (SMTP)', desc: t('settings.email.desc'),
+      toggle: switchControl({ id: 'email-enabled', label: t('settings.common.active'), checked: em.enabled, onChange: (v) => { em.enabled = v; save() } }),
     },
       el('div', { className: 'form-row form-row-2-1' },
-        textField('SMTP host', 'email-host', em.smtpHost, 'text', (v) => { em.smtpHost = v; save() }, 'Contoh: smtp.gmail.com'),
+        textField('SMTP host', 'email-host', em.smtpHost, 'text', (v) => { em.smtpHost = v; save() }, t('settings.email.hostHint')),
         textField('Port', 'email-port', em.smtpPort, 'text', (v) => { em.smtpPort = v; save() }),
       ),
       el('div', { className: 'form-row' },
@@ -360,16 +368,16 @@ function renderMcpTab(container) {
         textField('Password', 'email-pass', em.smtpPass, 'password', (v) => { em.smtpPass = v; save() }),
       ),
       el('div', { className: 'form-row' },
-        textField('Nama pengirim', 'email-fromname', em.fromName, 'text', (v) => { em.fromName = v; save() }),
-        textField('Email pengirim', 'email-fromemail', em.fromEmail, 'email', (v) => { em.fromEmail = v; save() }),
+        textField(t('settings.email.fromName'), 'email-fromname', em.fromName, 'text', (v) => { em.fromName = v; save() }),
+        textField(t('settings.email.fromEmail'), 'email-fromemail', em.fromEmail, 'email', (v) => { em.fromEmail = v; save() }),
       ),
-      el('div', { className: 'form-actions' }, C.button({ label: 'Periksa konfigurasi', icon: 'plug', size: 'sm', onClick: () => testConnectionLegacy('email', em) })),
+      el('div', { className: 'form-actions' }, C.button({ label: t('settings.email.check'), icon: 'plug', size: 'sm', onClick: () => testConnectionLegacy('email', em) })),
     ),
   )
 }
 /* ------------------------------------------------------------- ERP & Integrasi tab */
 
-function loadingBox(message = 'Memuat…') {
+function loadingBox(message = t('settings.common.loading')) {
   return el('div', { className: 'mcp-loading' },
     el('span', { className: 'mcp-spinner', 'aria-hidden': 'true' }),
     el('span', {}, message),
@@ -380,27 +388,27 @@ function errorBox(err, retry) {
   return el('div', { className: 'mcp-error-box' },
     el('span', { className: 'mcp-error-ic', 'aria-hidden': 'true' }, icon('alert', { size: 18 })),
     el('div', { className: 'mcp-error-body' },
-      el('strong', {}, 'Gagal memuat data'),
+      el('strong', {}, t('settings.common.loadFailed')),
       el('p', {}, String(err?.message || err)),
     ),
-    retry ? C.button({ label: 'Coba lagi', icon: 'refresh', size: 'xs', variant: 'ghost', onClick: retry }) : null,
+    retry ? C.button({ label: t('settings.common.retry'), icon: 'refresh', size: 'xs', variant: 'ghost', onClick: retry }) : null,
   )
 }
 
 function statusLabel(connector) {
-  if (!connector.enabled) return 'nonaktif'
-  return connector.status === 'error' ? 'error' : 'aktif'
+  if (!connector.enabled) return t('settings.erp.status.inactive')
+  return connector.status === 'error' ? t('settings.erp.status.error') : t('settings.erp.status.active')
 }
 
 function connectorSummary(connector) {
   const c = connector.config || {}
-  if (connector.type === 'rest') return c.endpoint?.baseUrl || 'URL belum diisi'
+  if (connector.type === 'rest') return c.endpoint?.baseUrl || t('settings.erp.noUrl')
   if (connector.type === 'database') {
     const conn = c.connection || {}
     return `${conn.driver || 'mysql'}://${conn.host || '-'}${conn.database ? `/${conn.database}` : ''}`
   }
-  if (connector.type === 'file') return `Format ${String(c.format || 'csv').toUpperCase()}`
-  return 'Webhook masuk'
+  if (connector.type === 'file') return t('settings.erp.formatSummary', { format: String(c.format || 'csv').toUpperCase() })
+  return t('settings.erp.webhookIn')
 }
 
 function renderErpTab(container) {
@@ -409,7 +417,7 @@ function renderErpTab(container) {
 
   /* ---------------------------------------------------------------- list */
   async function showList() {
-    container.replaceChildren(loadingBox('Memuat konektor…'))
+    container.replaceChildren(loadingBox(t('settings.erp.loading')))
     let connectors
     try {
       connectors = await listConnectors()
@@ -420,10 +428,10 @@ function renderErpTab(container) {
 
     const header = el('div', { className: 'set-head-flex' },
       el('div', {},
-        el('h3', { className: 'set-title' }, 'Konektor Sistem Eksternal', enterpriseTag()),
-        el('p', { className: 'set-desc' }, 'Hubungkan Satu Alur dengan ERP, database, atau sistem lain yang sudah Anda pakai.'),
+        el('h3', { className: 'set-title' }, t('settings.erp.title'), enterpriseTag()),
+        el('p', { className: 'set-desc' }, t('settings.erp.desc')),
       ),
-      C.button({ label: 'Tambah Konektor', icon: 'plus', size: 'sm', onClick: () => showForm() }),
+      C.button({ label: t('settings.erp.addCap'), icon: 'plus', size: 'sm', onClick: () => showForm() }),
     )
 
     const grid = el('div', { className: 'mcp-connector-grid' })
@@ -431,8 +439,8 @@ function renderErpTab(container) {
     if (connectors.length === 0) {
       grid.append(el('div', { className: 'mcp-empty' },
         icon('plug', { size: 30 }),
-        el('p', {}, 'Belum ada konektor'),
-        el('p', { className: 'set-desc' }, 'Tambahkan konektor ke ERP, database, atau impor file untuk mulai mengintegrasikan data.'),
+        el('p', {}, t('settings.erp.empty')),
+        el('p', { className: 'set-desc' }, t('settings.erp.emptyDesc')),
       ))
     } else {
       for (const conn of connectors) {
@@ -441,13 +449,13 @@ function renderErpTab(container) {
             el('div', { className: 'mcp-card-title' },
               el('span', { className: `mcp-status ${conn.enabled ? 'active' : 'inactive'}` }),
               el('strong', {}, conn.name),
-              el('span', { className: 'mcp-type-badge' }, CONNECTOR_TYPE_LABELS[conn.type] || conn.type),
+              el('span', { className: 'mcp-type-badge' }, typeLabel(conn.type)),
             ),
             el('div', { className: 'mcp-card-actions' },
               C.button({
-                label: 'Uji', icon: 'plug', size: 'xs', variant: 'ghost',
+                label: t('settings.erp.test'), icon: 'plug', size: 'xs', variant: 'ghost',
                 onClick: async () => {
-                  showToast('Memeriksa koneksi…', 'info')
+                  showToast(t('settings.erp.testing'), 'info')
                   try {
                     const res = await testConnection(conn.id)
                     showToast(res.message, res.ok ? 'success' : 'error', 6000)
@@ -455,12 +463,12 @@ function renderErpTab(container) {
                   } catch (err) { showToast(String(err.message || err), 'error', 6000) }
                 },
               }),
-              C.button({ label: 'Peta', icon: 'map', size: 'xs', variant: 'ghost', onClick: () => showMapping(conn) }),
+              C.button({ label: t('settings.erp.map'), icon: 'map', size: 'xs', variant: 'ghost', onClick: () => showMapping(conn) }),
               conn.type === 'file'
-                ? C.button({ label: 'Impor', icon: 'upload', size: 'xs', variant: 'ghost', onClick: () => showImport(conn) })
+                ? C.button({ label: t('settings.erp.import'), icon: 'upload', size: 'xs', variant: 'ghost', onClick: () => showImport(conn) })
                 : null,
               C.button({
-                label: conn.enabled ? 'Nonaktifkan' : 'Aktifkan', icon: 'power', size: 'xs', variant: 'ghost',
+                label: conn.enabled ? t('settings.common.deactivate') : t('settings.common.activate'), icon: 'power', size: 'xs', variant: 'ghost',
                 onClick: async () => {
                   try {
                     await updateConnector(conn.id, { enabled: !conn.enabled })
@@ -469,12 +477,12 @@ function renderErpTab(container) {
                 },
               }),
               C.button({
-                label: 'Hapus', icon: 'trash', size: 'xs', variant: 'ghost',
+                label: t('settings.common.delete'), icon: 'trash', size: 'xs', variant: 'ghost',
                 onClick: async () => {
-                  if (!confirm(`Hapus konektor "${conn.name}"? Pemetaan dan lognya ikut terhapus.`)) return
+                  if (!confirm(t('settings.erp.confirmDelete', { name: conn.name }))) return
                   try {
                     await deleteConnector(conn.id)
-                    showToast('Konektor dihapus.', 'success')
+                    showToast(t('settings.erp.deleted'), 'success')
                     showList()
                   } catch (err) { showToast(String(err.message || err), 'error') }
                 },
@@ -483,11 +491,11 @@ function renderErpTab(container) {
           ),
           el('div', { className: 'mcp-card-meta' }, connectorSummary(conn)),
           el('div', { className: 'mcp-card-stats' },
-            el('span', {}, `status: ${statusLabel(conn)}`),
+            el('span', {}, t('settings.erp.statusLine', { status: statusLabel(conn) })),
             el('span', {}, conn.lastSyncAt
-              ? `sinkron terakhir ${new Date(conn.lastSyncAt).toLocaleString('id-ID')}`
-              : 'belum pernah sinkron'),
-            conn.hasSecrets ? el('span', {}, 'kredensial tersimpan') : null,
+              ? t('settings.erp.lastSync', { when: new Date(conn.lastSyncAt).toLocaleString(locale()) })
+              : t('settings.erp.neverSynced')),
+            conn.hasSecrets ? el('span', {}, t('settings.erp.hasSecrets')) : null,
           ),
           conn.lastError ? el('p', { className: 'mcp-card-error' }, conn.lastError) : null,
         ))
@@ -495,14 +503,14 @@ function renderErpTab(container) {
     }
 
     const templates = el('div', { className: 'mcp-templates' },
-      el('h4', {}, 'Template cepat'),
+      el('h4', {}, t('settings.erp.templates')),
       el('div', { className: 'mcp-template-grid' },
-        templateCard('Odoo', 'rest', 'REST API, open source'),
+        templateCard('Odoo', 'rest', t('settings.erp.tpl.odoo')),
         templateCard('SAP B1', 'rest', 'Service Layer'),
-        templateCard('MySQL', 'database', 'Database langsung'),
-        templateCard('PostgreSQL', 'database', 'Database langsung'),
-        templateCard('CSV / JSON', 'file', 'Ekspor Excel sebagai CSV'),
-        templateCard('Webhook', 'webhook', 'Event real-time'),
+        templateCard('MySQL', 'database', t('settings.erp.tpl.direct')),
+        templateCard('PostgreSQL', 'database', t('settings.erp.tpl.direct')),
+        templateCard('CSV / JSON', 'file', t('settings.erp.tpl.csv')),
+        templateCard('Webhook', 'webhook', t('settings.erp.tpl.webhook')),
       ),
     )
 
@@ -523,11 +531,11 @@ function renderErpTab(container) {
     form.name = presetName
 
     const typeSelect = C.select({
-      label: 'Tipe konektor', id: 'mcp-type',
+      label: t('settings.form.type'), id: 'mcp-type',
       options: [
         { value: 'rest', label: 'REST API (Odoo, SAP, NetSuite)' },
-        { value: 'database', label: 'Database langsung (MySQL, PostgreSQL)' },
-        { value: 'file', label: 'Impor file (CSV, JSON)' },
+        { value: 'database', label: t('settings.form.typeDb') },
+        { value: 'file', label: t('settings.form.typeFile') },
         { value: 'webhook', label: 'Webhook (real-time)' },
       ],
       value: type,
@@ -544,7 +552,7 @@ function renderErpTab(container) {
     function renderFields() {
       fields.replaceChildren()
 
-      const nameField = textField('Nama konektor', 'mcp-name', form.name, 'text', (v) => { form.name = v }, 'Contoh: Odoo Production')
+      const nameField = textField(t('settings.form.name'), 'mcp-name', form.name, 'text', (v) => { form.name = v }, t('settings.form.nameHint'))
       fields.append(nameField)
 
       if (type === 'rest') {
@@ -552,7 +560,7 @@ function renderErpTab(container) {
           textField('Base URL', 'mcp-url', form.endpoint?.baseUrl || '', 'url', (v) => { form.endpoint.baseUrl = v }, 'https://erp.perusahaan.id/api/v1'),
           el('div', { className: 'form-row' },
             C.select({
-              label: 'Autentikasi', id: 'mcp-auth',
+              label: t('settings.form.auth'), id: 'mcp-auth',
               options: [
                 { value: 'apikey', label: 'API Key' },
                 { value: 'basic', label: 'Basic Auth' },
@@ -561,9 +569,9 @@ function renderErpTab(container) {
               value: form.auth?.type || 'apikey',
               onChange: (v) => { form.auth.type = v; renderFields() },
             }).wrap,
-            textField('API key / password / bearer token', 'mcp-key', form.auth?.[{ apikey: 'apiKey', basic: 'password', oauth2: 'token' }[form.auth?.type || 'apikey']] || '', 'password', (v) => { form.auth[{ apikey: 'apiKey', basic: 'password', oauth2: 'token' }[form.auth.type]] = v }, 'Disimpan terenkripsi di server.'),
+            textField('API key / password / bearer token', 'mcp-key', form.auth?.[{ apikey: 'apiKey', basic: 'password', oauth2: 'token' }[form.auth?.type || 'apikey']] || '', 'password', (v) => { form.auth[{ apikey: 'apiKey', basic: 'password', oauth2: 'token' }[form.auth.type]] = v }, t('settings.form.encrypted')),
           ),
-          textField('Username (Basic Auth)', 'mcp-user', form.auth?.username || '', 'text', (v) => { form.auth.username = v }, 'Kosongkan jika memakai API key.'),
+          textField('Username (Basic Auth)', 'mcp-user', form.auth?.username || '', 'text', (v) => { form.auth.username = v }, t('settings.form.userHint')),
         )
       } else if (type === 'database') {
         fields.append(
@@ -582,12 +590,12 @@ function renderErpTab(container) {
             textField('Host', 'mcp-host', form.connection?.host || '', 'text', (v) => { form.connection.host = v }, 'db.perusahaan.id'),
             textField('Port', 'mcp-port', String(form.connection?.port || 3306), 'text', (v) => { form.connection.port = parseInt(v, 10) || 3306 }),
           ),
-          textField('Nama database', 'mcp-db', form.connection?.database || '', 'text', (v) => { form.connection.database = v }),
+          textField(t('settings.form.dbName'), 'mcp-db', form.connection?.database || '', 'text', (v) => { form.connection.database = v }),
           el('div', { className: 'form-row' },
             textField('Username', 'mcp-dbuser', form.connection?.username || '', 'text', (v) => { form.connection.username = v }),
-            textField('Password', 'mcp-dbpass', form.connection?.password || '', 'password', (v) => { form.connection.password = v }, 'Disimpan terenkripsi.'),
+            textField('Password', 'mcp-dbpass', form.connection?.password || '', 'password', (v) => { form.connection.password = v }, t('settings.form.encryptedShort')),
           ),
-          el('p', { className: 'field-hint' }, 'Koneksi database langsung memerlukan agen jembatan (bridge agent) di jaringan Anda. Tanpa itu, gunakan impor file atau REST API.'),
+          el('p', { className: 'field-hint' }, t('settings.form.dbHint')),
         )
       } else if (type === 'file') {
         fields.append(
@@ -601,20 +609,20 @@ function renderErpTab(container) {
             onChange: (v) => { form.format = v },
           }).wrap,
           el('div', { className: 'form-row' },
-            textField('Delimiter', 'mcp-delim', form.delimiter || ',', 'text', (v) => { form.delimiter = v }, 'Koma untuk CSV standar; titik koma untuk ekspor Excel Indonesia.'),
+            textField('Delimiter', 'mcp-delim', form.delimiter || ',', 'text', (v) => { form.delimiter = v }, t('settings.form.delimHint')),
             textField('Encoding', 'mcp-encoding', form.encoding || 'utf-8', 'text', (v) => { form.encoding = v }),
           ),
         )
       } else if (type === 'webhook') {
         fields.append(
-          textField('Secret webhook', 'mcp-secret', form.secret || '', 'password', (v) => { form.secret = v }, 'Minimal 16 karakter. Dipakai untuk verifikasi HMAC-SHA256.'),
-          el('p', { className: 'field-hint' }, 'Endpoint yang dibagikan ke sistem sumber: POST /api/mcp/webhook/<id konektor>, header X-MCP-Signature.'),
+          textField(t('settings.form.secret'), 'mcp-secret', form.secret || '', 'password', (v) => { form.secret = v }, t('settings.form.secretHint')),
+          el('p', { className: 'field-hint' }, t('settings.form.webhookHint')),
         )
       }
 
       fields.append(
         C.select({
-          label: 'Strategi sinkronisasi', id: 'mcp-strategy',
+          label: t('settings.form.strategy'), id: 'mcp-strategy',
           options: [
             { value: 'manual', label: 'Manual' },
             { value: 'realtime', label: 'Real-time (webhook)' },
@@ -625,7 +633,7 @@ function renderErpTab(container) {
       )
 
       if ((form.sync?.strategy || 'manual') === 'scheduled') {
-        fields.append(textField('Jadwal (cron)', 'mcp-cron', form.sync?.schedule || '', 'text', (v) => { form.sync.schedule = v }, 'Contoh: 0 2 * * * (setiap hari pukul 02.00).'))
+        fields.append(textField(t('settings.form.cron'), 'mcp-cron', form.sync?.schedule || '', 'text', (v) => { form.sync.schedule = v }, t('settings.form.cronHint')))
       }
     }
 
@@ -633,23 +641,23 @@ function renderErpTab(container) {
 
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
-        C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
-        el('h3', { className: 'set-title' }, 'Tambah konektor'),
+        C.button({ label: t('settings.common.back'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
+        el('h3', { className: 'set-title' }, t('settings.form.title')),
       ),
       typeSelect.wrap,
       fields,
       el('label', { className: 'checkbox-label' },
         el('input', { type: 'checkbox', checked: form.enabled, onchange: (e) => { form.enabled = e.target.checked } }),
-        el('span', {}, 'Aktifkan setelah disimpan'),
+        el('span', {}, t('settings.form.enableAfter')),
       ),
       el('div', { className: 'form-actions' },
-        C.button({ label: 'Batal', icon: 'x', size: 'sm', variant: 'ghost', onClick: showList }),
+        C.button({ label: t('settings.common.cancel'), icon: 'x', size: 'sm', variant: 'ghost', onClick: showList }),
         C.button({
-          label: 'Simpan konektor', icon: 'save', size: 'sm',
+          label: t('settings.form.save'), icon: 'save', size: 'sm',
           onClick: async () => {
             try {
               await createConnector({ ...form, type, enabled: form.enabled })
-              showToast('Konektor dibuat.', 'success')
+              showToast(t('settings.form.created'), 'success')
               showList()
             } catch (err) { showToast(String(err.message || err), 'error', 6000) }
           },
@@ -660,7 +668,7 @@ function renderErpTab(container) {
 
   /* ------------------------------------------------------------- mapping */
   async function showMapping(connector) {
-    container.replaceChildren(loadingBox('Memuat pemetaan…'))
+    container.replaceChildren(loadingBox(t('settings.mapping.loading')))
 
     let existing = []
     try {
@@ -677,8 +685,8 @@ function renderErpTab(container) {
     const body = el('div', { className: 'mcp-mapping-body' })
 
     const entitySelect = C.select({
-      label: 'Entitas Satu Alur', id: 'mcp-entity',
-      options: Object.entries(SATU_ALUR_SCHEMA).map(([key, spec]) => ({ value: key, label: spec.label })),
+      label: t('settings.mapping.entity'), id: 'mcp-entity',
+      options: Object.keys(SATU_ALUR_SCHEMA).map((key) => ({ value: key, label: entityLabel(key) })),
       value: entity,
       onChange: (v) => {
         entity = v
@@ -688,7 +696,7 @@ function renderErpTab(container) {
 
     function buildSuggestions() {
       if (!sampleColumns.length) {
-        body.replaceChildren(el('p', { className: 'set-desc' }, 'Unggah file contoh atau ambil data dari konektor untuk mendeteksi kolom sumber.'))
+        body.replaceChildren(el('p', { className: 'set-desc' }, t('settings.mapping.needSample')))
         return
       }
       suggestions = suggestMapping(sampleColumns, entity)
@@ -722,15 +730,15 @@ function renderErpTab(container) {
     function drawTable() {
       const table = el('table', { className: 'mcp-mapping-table' },
         el('thead', {}, el('tr', {},
-          el('th', {}, 'Kolom sumber'),
+          el('th', {}, t('settings.mapping.source')),
           el('th', {}, '→'),
-          el('th', {}, 'Kolom Satu Alur'),
-          el('th', {}, 'Transformasi'),
+          el('th', {}, t('settings.mapping.target')),
+          el('th', {}, t('settings.mapping.transform')),
         )),
       )
 
       const tbody = el('tbody', {})
-      const sourceOptions = [{ value: '', label: '(tidak dipakai)' }, ...sampleColumns.map((c) => ({ value: c.name, label: c.name }))]
+      const sourceOptions = [{ value: '', label: t('settings.mapping.unused') }, ...sampleColumns.map((c) => ({ value: c.name, label: c.name }))]
 
       for (const s of suggestions) {
         const select = C.select({
@@ -755,7 +763,7 @@ function renderErpTab(container) {
           el('td', {}, '→'),
           el('td', {},
             el('strong', {}, s.target),
-            s.targetRequired ? el('span', { className: 'badge-required' }, 'WAJIB') : null,
+            s.targetRequired ? el('span', { className: 'badge-required' }, t('settings.mapping.requiredBadge')) : null,
             s.targetValues ? el('div', { className: 'mcp-enum-hint' }, s.targetValues.join(' · ')) : null,
           ),
           el('td', {}, s.suggestedTransform || '—'),
@@ -770,13 +778,13 @@ function renderErpTab(container) {
         const errors = validateMapping(mapping, entity)
         if (errors.length) {
           validation.append(el('div', { className: 'mcp-validation-errors' },
-            el('strong', {}, 'Perlu diperbaiki'),
+            el('strong', {}, t('settings.mapping.fix')),
             el('ul', {}, ...errors.map((e) => el('li', {}, e.message))),
           ))
         } else {
           validation.append(el('div', { className: 'mcp-validation-ok' },
             el('span', { 'aria-hidden': 'true' }, icon('checkCircle', { size: 14 })),
-            el('span', {}, 'Semua kolom wajib sudah dipetakan.'),
+            el('span', {}, t('settings.mapping.allMapped')),
           ))
         }
       }
@@ -789,11 +797,11 @@ function renderErpTab(container) {
         validation,
         el('div', { className: 'form-actions' },
           C.button({
-            label: 'Pratinjau', icon: 'eye', size: 'sm', variant: 'secondary',
+            label: t('settings.common.preview'), icon: 'eye', size: 'sm', variant: 'secondary',
             onClick: () => {
               const rows = previewTransform(sampleRows || [], mapping, entity, 10)
               if (!rows.length) {
-                showToast('Belum ada baris contoh untuk dipratinjau.', 'info')
+                showToast(t('settings.mapping.noRows'), 'info')
                 return
               }
               previewSlot.replaceChildren(el('div', { className: 'mcp-preview-wrap' },
@@ -813,7 +821,7 @@ function renderErpTab(container) {
             },
           }),
           C.button({
-            label: 'Simpan pemetaan', icon: 'save', size: 'sm',
+            label: t('settings.mapping.save'), icon: 'save', size: 'sm',
             onClick: async () => {
               const errors = validateMapping(mapping, entity)
               if (errors.length) {
@@ -822,19 +830,19 @@ function renderErpTab(container) {
               }
               try {
                 await saveMapping(connector.id, mapping)
-                showToast('Pemetaan disimpan.', 'success')
+                showToast(t('settings.mapping.saved'), 'success')
               } catch (err) { showToast(String(err.message || err), 'error', 6000) }
             },
           }),
           existing.some((m) => m.entity === entity)
             ? C.button({
-              label: 'Hapus pemetaan', icon: 'trash', size: 'sm', variant: 'ghost',
+              label: t('settings.mapping.delete'), icon: 'trash', size: 'sm', variant: 'ghost',
               onClick: async () => {
-                if (!confirm(`Hapus pemetaan untuk ${entity}?`)) return
+                if (!confirm(t('settings.mapping.confirmDelete', { entity }))) return
                 try {
                   await deleteMapping(connector.id, entity)
                   existing = existing.filter((m) => m.entity !== entity)
-                  showToast('Pemetaan dihapus.', 'success')
+                  showToast(t('settings.mapping.deleted'), 'success')
                 } catch (err) { showToast(String(err.message || err), 'error') }
               },
             })
@@ -854,31 +862,31 @@ function renderErpTab(container) {
           const text = await file.text()
           const delimiter = connector.config?.delimiter || ','
           sampleRows = /\.json$/i.test(file.name) ? JSON.parse(text) : csvToRows(text, delimiter)
-          if (!Array.isArray(sampleRows)) throw new Error('Isi file bukan daftar baris.')
+          if (!Array.isArray(sampleRows)) throw new Error(t('settings.common.notRowList'))
           sampleColumns = columnsFromRows(sampleRows)
           if (!sampleRows.length) {
-            showToast('File tidak berisi baris data.', 'error')
+            showToast(t('settings.mapping.emptyFile'), 'error')
             return
           }
-          showToast(`${sampleRows.length} baris contoh dibaca.`, 'success')
+          showToast(t('settings.mapping.rowsRead', { count: sampleRows.length }), 'success')
           buildSuggestions()
         } catch (err) {
-          showToast(`Gagal membaca file: ${err.message || err}`, 'error', 6000)
+          showToast(t('settings.common.readFileFailed', { error: err.message || err }), 'error', 6000)
         }
       },
     })
 
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
-        C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
-        el('h3', { className: 'set-title' }, `Pemetaan · ${connector.name}`),
+        C.button({ label: t('settings.common.back'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
+        el('h3', { className: 'set-title' }, t('settings.mapping.title', { name: connector.name })),
       ),
-      el('p', { className: 'set-desc' }, 'Petakan kolom sistem sumber ke kolom Satu Alur. Unggah file contoh agar kolom terdeteksi otomatis.'),
+      el('p', { className: 'set-desc' }, t('settings.mapping.desc')),
       entitySelect.wrap,
       el('div', { className: 'mcp-file-row' },
         el('label', { className: 'mcp-file-label' },
           icon('upload', { size: 15 }),
-          el('span', {}, 'Unggah file contoh'),
+          el('span', {}, t('settings.mapping.upload')),
           fileInput,
         ),
       ),
@@ -896,22 +904,22 @@ function renderErpTab(container) {
     const previewSlot = el('div', { className: 'mcp-preview-slot' })
 
     const entitySelect = C.select({
-      label: 'Entitas tujuan', id: 'mcp-import-entity',
-      options: Object.entries(SATU_ALUR_SCHEMA).map(([key, spec]) => ({ value: key, label: spec.label })),
+      label: t('settings.import.entity'), id: 'mcp-import-entity',
+      options: Object.keys(SATU_ALUR_SCHEMA).map((key) => ({ value: key, label: entityLabel(key) })),
       value: entity,
       onChange: (v) => { entity = v },
     })
 
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
-        C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
-        el('h3', { className: 'set-title' }, `Impor · ${connector.name}`),
+        C.button({ label: t('settings.common.back'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
+        el('h3', { className: 'set-title' }, t('settings.import.title', { name: connector.name })),
       ),
-      el('p', { className: 'set-desc' }, 'Unggah CSV atau JSON. Baris ditulis ke Satu Alur memakai pemetaan yang sudah disimpan untuk entitas ini.'),
+      el('p', { className: 'set-desc' }, t('settings.import.desc')),
       entitySelect.wrap,
       el('label', { className: 'mcp-file-label' },
         icon('upload', { size: 15 }),
-        el('span', {}, 'Pilih file CSV / JSON'),
+        el('span', {}, t('settings.import.pick')),
         el('input', {
           type: 'file', accept: '.csv,text/csv,.json',
           className: 'mcp-file-input',
@@ -921,10 +929,10 @@ function renderErpTab(container) {
             try {
               const text = await file.text()
               rows = /\.json$/i.test(file.name) ? JSON.parse(text) : csvToRows(text, connector.config?.delimiter || ',')
-              if (!Array.isArray(rows)) throw new Error('Isi file bukan daftar baris.')
+              if (!Array.isArray(rows)) throw new Error(t('settings.common.notRowList'))
               const columns = columnsFromRows(rows)
               previewSlot.replaceChildren(el('div', { className: 'mcp-preview-wrap' },
-                el('p', { className: 'set-desc' }, `${rows.length} baris · ${columns.length} kolom terdeteksi`),
+                el('p', { className: 'set-desc' }, t('settings.import.detected', { rows: rows.length, cols: columns.length })),
                 el('table', { className: 'mcp-preview-table' },
                   el('thead', {}, el('tr', {}, ...columns.map((c) => el('th', {}, c.name)))),
                   el('tbody', {}, ...rows.slice(0, 5).map((r) => el('tr', {}, ...columns.map((c) => el('td', {}, String(r[c.name] ?? '')))))),
@@ -933,14 +941,14 @@ function renderErpTab(container) {
               slot.replaceChildren(
                 el('div', { className: 'form-actions' },
                   C.button({
-                    label: `Impor ${rows.length} baris`, icon: 'upload', size: 'sm',
+                    label: t('settings.import.importRows', { count: rows.length }), icon: 'upload', size: 'sm',
                     onClick: async () => {
                       try {
                         const res = await runSync(connector.id, { rows, entity, trigger: 'manual' })
-                        showToast(`Selesai: ${res.stats.inserted} dimasukkan, ${res.stats.updated} diperbarui, ${res.stats.failed} gagal.`,
+                        showToast(t('settings.import.done', { inserted: res.stats.inserted, updated: res.stats.updated, failed: res.stats.failed }),
                           res.stats.failed ? 'info' : 'success', 7000)
                         if (res.errorCount) {
-                          showToast(`${res.errorCount} baris gagal: ${res.errors?.[0]?.message || ''}`, 'error', 8000)
+                          showToast(t('settings.import.rowsFailed', { count: res.errorCount, error: res.errors?.[0]?.message || '' }), 'error', 8000)
                         }
                       } catch (err) { showToast(String(err.message || err), 'error', 7000) }
                     },
@@ -948,7 +956,7 @@ function renderErpTab(container) {
                 ),
               )
             } catch (err) {
-              showToast(`Gagal membaca file: ${err.message || err}`, 'error', 6000)
+              showToast(t('settings.common.readFileFailed', { error: err.message || err }), 'error', 6000)
             }
           },
         }),
@@ -965,7 +973,7 @@ function renderErpTab(container) {
 
 function renderMigrationTab(container) {
   async function showList() {
-    container.replaceChildren(loadingBox('Memuat migrasi…'))
+    container.replaceChildren(loadingBox(t('settings.migration.loading')))
     let migrations
     try {
       migrations = await listMigrations()
@@ -976,10 +984,10 @@ function renderMigrationTab(container) {
 
     const header = el('div', { className: 'set-head-flex' },
       el('div', {},
-        el('h3', { className: 'set-title' }, 'Migrasi database', enterpriseTag()),
-        el('p', { className: 'set-desc' }, 'Pindahkan data dari sistem lama secara bertahap. Tanpa big bang.'),
+        el('h3', { className: 'set-title' }, t('settings.migration.title'), enterpriseTag()),
+        el('p', { className: 'set-desc' }, t('settings.migration.desc')),
       ),
-      C.button({ label: 'Migrasi baru', icon: 'plus', size: 'sm', onClick: showWizard }),
+      C.button({ label: t('settings.migration.new'), icon: 'plus', size: 'sm', onClick: showWizard }),
     )
 
     const list = el('div', { className: 'mcp-migration-list' })
@@ -987,8 +995,8 @@ function renderMigrationTab(container) {
     if (migrations.length === 0) {
       list.append(el('div', { className: 'mcp-empty' },
         icon('database', { size: 30 }),
-        el('p', {}, 'Belum ada migrasi'),
-        el('p', { className: 'set-desc' }, 'Buat migrasi untuk memindahkan data dari ERP atau database lama.'),
+        el('p', {}, t('settings.migration.empty')),
+        el('p', { className: 'set-desc' }, t('settings.migration.emptyDesc')),
       ))
     } else {
       for (const mig of migrations) {
@@ -1000,27 +1008,27 @@ function renderMigrationTab(container) {
               el('strong', {}, mig.name),
               el('span', { className: `mcp-status-badge status-${mig.status}` }, mig.status),
             ),
-            el('span', { className: 'tnum text-muted' }, new Date(mig.createdAt).toLocaleDateString('id-ID')),
+            el('span', { className: 'tnum text-muted' }, new Date(mig.createdAt).toLocaleDateString(locale())),
           ),
           el('div', { className: 'mcp-mig-phases' },
             ...phases.map((p) => el('div', { className: `mcp-phase ${p.status}` },
               el('span', { className: 'mcp-phase-dot' }),
               el('span', {}, p.name),
-              p.recordsInserted ? el('span', { className: 'tnum text-muted' }, `${p.recordsInserted} baris`) : null,
+              p.recordsInserted ? el('span', { className: 'tnum text-muted' }, t('settings.migration.rows', { count: p.recordsInserted })) : null,
             )),
           ),
           el('div', { className: 'mcp-mig-actions' },
-            el('span', { className: 'text-muted tnum' }, `${done}/${phases.length} fase`),
-            C.button({ label: 'Jalankan', icon: 'play', size: 'xs', onClick: () => showRun(mig.id) }),
-            C.button({ label: 'Laporan', icon: 'fileText', size: 'xs', variant: 'ghost', onClick: () => showReport(mig) }),
+            el('span', { className: 'text-muted tnum' }, t('settings.migration.phaseProgress', { done, total: phases.length })),
+            C.button({ label: t('settings.migration.run'), icon: 'play', size: 'xs', onClick: () => showRun(mig.id) }),
+            C.button({ label: t('settings.migration.report'), icon: 'fileText', size: 'xs', variant: 'ghost', onClick: () => showReport(mig) }),
             mig.status !== 'rolled_back'
               ? C.button({
                 label: 'Rollback', icon: 'rotateCcw', size: 'xs', variant: 'ghost',
                 onClick: async () => {
-                  if (!confirm('Hapus baris baru dari migrasi ini? Baris yang sudah diedit atau dipakai akan dipertahankan. Perubahan pada data lama tidak dibatalkan.')) return
+                  if (!confirm(t('settings.migration.confirmRollback'))) return
                   try {
                     const res = await rollbackMigration(mig.id)
-                    showToast(`${res.removedRows || 0} baris dihapus.${res.retainedRows ? ` ${res.retainedRows} baris dipertahankan karena sudah berubah atau dipakai.` : ' Rollback selesai.'}`, res.retainedRows ? 'info' : 'success', 7000)
+                    showToast(t('settings.migration.rolledBack', { count: res.removedRows || 0 }) + (res.retainedRows ? t('settings.migration.retained', { count: res.retainedRows }) : t('settings.migration.rollbackDone')), res.retainedRows ? 'info' : 'success', 7000)
                     showList()
                   } catch (err) { showToast(String(err.message || err), 'error') }
                 },
@@ -1035,9 +1043,9 @@ function renderMigrationTab(container) {
       header,
       list,
       el('div', { className: 'mcp-info-box' },
-        el('h4', {}, icon('info', { size: 16 }), ' Strategi parallel running'),
-        el('p', {}, 'Pindahkan tenaga kerja dan katalog, lalu permintaan. Impor penawaran, penyelesaian, dan jurnal belum tersedia karena memerlukan pemetaan referensi internal.'),
-        el('a', { href: '#/dokumentasi/migrasi', className: 'link' }, 'Baca panduan lengkap →'),
+        el('h4', {}, icon('info', { size: 16 }), ' ', t('settings.migration.infoTitle')),
+        el('p', {}, t('settings.migration.infoBody')),
+        el('a', { href: '#/dokumentasi/migrasi', className: 'link' }, t('settings.migration.guide')),
       ),
     )
   }
@@ -1045,7 +1053,7 @@ function renderMigrationTab(container) {
   async function showWizard() {
     let connectors = []
     try { connectors = (await listConnectors()).filter((c) => c.enabled && ['rest', 'file'].includes(c.type)) } catch (err) { container.replaceChildren(errorBox(err, showWizard)); return }
-    if (!connectors.length) { showToast('Buat dan aktifkan konektor REST atau file terlebih dahulu.', 'error'); return }
+    if (!connectors.length) { showToast(t('settings.migration.needConnector'), 'error'); return }
 
     let step = 1
     const form = { name: '', connectorId: connectors[0]?.id || '', strategy: 'parallel' }
@@ -1056,21 +1064,21 @@ function renderMigrationTab(container) {
 
       if (step === 1) {
         slot.append(
-          textField('Nama migrasi', 'mig-name', form.name, 'text', (v) => { form.name = v }, 'Contoh: Migrasi Odoo Q4 2026'),
+          textField(t('settings.migration.name'), 'mig-name', form.name, 'text', (v) => { form.name = v }, t('settings.migration.nameHint')),
           C.select({
-            label: 'Sumber data', id: 'mig-source',
+            label: t('settings.migration.source'), id: 'mig-source',
             options: [
-              ...connectors.map((c) => ({ value: c.id, label: `${c.name} · ${CONNECTOR_TYPE_LABELS[c.type] || c.type}` })),
+              ...connectors.map((c) => ({ value: c.id, label: `${c.name} · ${typeLabel(c.type)}` })),
             ],
             value: form.connectorId,
             onChange: (v) => { form.connectorId = v },
           }).wrap,
           C.select({
-            label: 'Strategi', id: 'mig-strategy',
+            label: t('settings.migration.strategy'), id: 'mig-strategy',
             options: [
-              { value: 'parallel', label: 'Parallel running (disarankan)' },
-              { value: 'phased', label: 'Phased per modul' },
-              { value: 'bigbang', label: 'Big bang (tidak disarankan)' },
+              { value: 'parallel', label: t('settings.migration.parallel') },
+              { value: 'phased', label: t('settings.migration.phased') },
+              { value: 'bigbang', label: t('settings.migration.bigbang') },
             ],
             value: form.strategy,
             onChange: (v) => { form.strategy = v },
@@ -1078,21 +1086,21 @@ function renderMigrationTab(container) {
         )
       } else if (step === 2) {
         slot.append(
-          el('p', { className: 'set-desc' }, 'Fase dijalankan berurutan: tenaga kerja dan katalog, lalu permintaan. Simpan pemetaan setiap entitas sebelum menjalankan migrasi.'),
+          el('p', { className: 'set-desc' }, t('settings.migration.phasesDesc')),
           ...MIGRATION_PHASES.map((p, i) => el('div', { className: 'mcp-phase-checkbox' },
             el('div', {},
-              el('strong', {}, `${i + 1}. ${p.name}`),
-              el('span', {}, p.description),
-              p.optional ? el('span', { className: 'badge-optional' }, 'Opsional') : el('span', { className: 'badge-required' }, 'Wajib'),
+              el('strong', {}, `${i + 1}. ${phaseName(p)}`),
+              el('span', {}, phaseDesc(p)),
+              p.optional ? el('span', { className: 'badge-optional' }, t('settings.migration.optional')) : el('span', { className: 'badge-required' }, t('settings.migration.required')),
             ),
           )),
         )
       } else {
         slot.append(el('div', { className: 'mcp-confirm-box' },
-          el('div', { className: 'mcp-confirm-row' }, el('span', {}, 'Nama'), el('strong', {}, form.name || '—')),
-          el('div', { className: 'mcp-confirm-row' }, el('span', {}, 'Sumber'), el('strong', {}, connectors.find((c) => c.id === form.connectorId)?.name || 'Unggah file')),
-          el('div', { className: 'mcp-confirm-row' }, el('span', {}, 'Strategi'), el('strong', {}, form.strategy)),
-          el('div', { className: 'mcp-confirm-row' }, el('span', {}, 'Fase'), el('strong', {}, `${MIGRATION_PHASES.length} fase`)),
+          el('div', { className: 'mcp-confirm-row' }, el('span', {}, t('settings.migration.confirmName')), el('strong', {}, form.name || '—')),
+          el('div', { className: 'mcp-confirm-row' }, el('span', {}, t('settings.migration.confirmSource')), el('strong', {}, connectors.find((c) => c.id === form.connectorId)?.name || t('settings.migration.uploadFile'))),
+          el('div', { className: 'mcp-confirm-row' }, el('span', {}, t('settings.migration.strategy')), el('strong', {}, form.strategy)),
+          el('div', { className: 'mcp-confirm-row' }, el('span', {}, t('settings.migration.confirmPhases')), el('strong', {}, t('settings.migration.phaseCount', { count: MIGRATION_PHASES.length }))),
         ))
       }
     }
@@ -1102,21 +1110,21 @@ function renderMigrationTab(container) {
       drawStep()
       frame.replaceChildren(
         el('div', { className: 'set-head-flex' },
-          C.button({ label: 'Batal', icon: 'x', size: 'sm', variant: 'ghost', onClick: showList }),
-          el('h3', { className: 'set-title' }, 'Wizard migrasi'),
+          C.button({ label: t('settings.common.cancel'), icon: 'x', size: 'sm', variant: 'ghost', onClick: showList }),
+          el('h3', { className: 'set-title' }, t('settings.migration.wizard')),
         ),
         el('div', { className: 'mcp-stepper' },
-          ...[1, 2, 3].map((n) => el('div', { className: `mcp-step ${step >= n ? 'active' : ''}` }, `${n}. ${['Info', 'Fase', 'Konfirmasi'][n - 1]}`)),
+          ...[1, 2, 3].map((n) => el('div', { className: `mcp-step ${step >= n ? 'active' : ''}` }, `${n}. ${[t('settings.migration.step.info'), t('settings.migration.step.phases'), t('settings.migration.step.confirm')][n - 1]}`)),
         ),
         slot,
         el('div', { className: 'form-actions' },
-          step > 1 ? C.button({ label: 'Sebelumnya', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: () => { step--; drawWizard() } }) : el('span', {}),
+          step > 1 ? C.button({ label: t('settings.migration.prev'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: () => { step--; drawWizard() } }) : el('span', {}),
           step < 3
-            ? C.button({ label: 'Selanjutnya', icon: 'arrowRight', size: 'sm', onClick: () => { step++; drawWizard() } })
+            ? C.button({ label: t('settings.migration.next'), icon: 'arrowRight', size: 'sm', onClick: () => { step++; drawWizard() } })
             : C.button({
-              label: 'Buat migrasi', icon: 'save', size: 'sm',
+              label: t('settings.migration.create'), icon: 'save', size: 'sm',
               onClick: async () => {
-                if (form.name.trim().length < 3) { showToast('Nama migrasi minimal 3 karakter.', 'error'); return }
+                if (form.name.trim().length < 3) { showToast(t('settings.migration.nameShort'), 'error'); return }
                 try {
                   const created = await createMigration({
                     name: form.name,
@@ -1124,7 +1132,7 @@ function renderMigrationTab(container) {
                     strategy: form.strategy,
                     phases: MIGRATION_PHASES.map((p) => p.key),
                   })
-                  showToast('Migrasi dibuat.', 'success')
+                  showToast(t('settings.migration.created'), 'success')
                   showRun(created.id)
                 } catch (err) { showToast(String(err.message || err), 'error', 6000) }
               },
@@ -1137,7 +1145,7 @@ function renderMigrationTab(container) {
   }
 
   async function showRun(id) {
-    container.replaceChildren(loadingBox('Memuat migrasi…'))
+    container.replaceChildren(loadingBox(t('settings.migration.loading')))
     let migration
     try {
       migration = await getMigration(id)
@@ -1146,7 +1154,7 @@ function renderMigrationTab(container) {
       return
     }
     if (!migration) {
-      container.replaceChildren(errorBox(new Error('Migrasi tidak ditemukan.'), showList))
+      container.replaceChildren(errorBox(new Error(t('settings.migration.notFound')), showList))
       return
     }
 
@@ -1165,16 +1173,16 @@ function renderMigrationTab(container) {
             done ? icon('checkCircle', { size: 18 }) : phase.status === 'running' ? icon('loader', { size: 18 }) : icon('circle', { size: 18 }),
           ),
           el('div', {},
-            el('strong', {}, phase.name),
-            el('span', { className: 'text-muted' }, phase.description || ''),
+            el('strong', {}, phaseName(phase)),
+            el('span', { className: 'text-muted' }, phaseDesc(phase) || ''),
           ),
         ),
         phase.recordsProcessed
           ? el('div', { className: 'mcp-run-stats' },
-            el('span', {}, `${phase.recordsProcessed} diproses`),
-            el('span', {}, `${phase.recordsInserted || 0} baru`),
-            el('span', {}, `${phase.recordsUpdated || 0} diperbarui`),
-            phase.recordsFailed ? el('span', { className: 'text-error' }, `${phase.recordsFailed} gagal`) : null,
+            el('span', {}, t('settings.migration.stat.processed', { count: phase.recordsProcessed })),
+            el('span', {}, t('settings.migration.stat.inserted', { count: phase.recordsInserted || 0 })),
+            el('span', {}, t('settings.migration.stat.updated', { count: phase.recordsUpdated || 0 })),
+            phase.recordsFailed ? el('span', { className: 'text-error' }, t('settings.migration.stat.failed', { count: phase.recordsFailed })) : null,
           )
           : null,
         (phase.errors || []).length
@@ -1188,17 +1196,17 @@ function renderMigrationTab(container) {
     if (nextIndex >= 0 && connector?.type === 'file') {
       for (const entity of phases[nextIndex].entities) {
         uploads.append(el('label', { className: 'field' },
-          el('span', {}, `${SATU_ALUR_SCHEMA[entity]?.label || entity} · CSV / JSON`),
-          el('input', { type: 'file', accept: '.csv,text/csv,.json', 'aria-label': `File ${entity}`, onchange: async (event) => {
+          el('span', {}, `${entityLabel(entity)} · CSV / JSON`),
+          el('input', { type: 'file', accept: '.csv,text/csv,.json', 'aria-label': t('settings.migration.fileFor', { entity }), onchange: async (event) => {
             delete rowsByEntity[entity]
             try {
               const file = event.target.files?.[0]
               if (!file) return
               const text = await file.text()
               const rows = /\.json$/i.test(file.name) ? JSON.parse(text) : csvToRows(text, connector.config?.delimiter || ',')
-              if (!Array.isArray(rows)) throw new Error('Isi file bukan daftar baris.')
+              if (!Array.isArray(rows)) throw new Error(t('settings.common.notRowList'))
               rowsByEntity[entity] = rows
-              showToast(`${rows.length} baris ${entity} siap diperiksa.`, 'info')
+              showToast(t('settings.migration.rowsReady', { count: rows.length, entity }), 'info')
             } catch (err) { showToast(String(err.message || err), 'error') }
           } }),
         ))
@@ -1209,7 +1217,7 @@ function renderMigrationTab(container) {
     if (nextIndex >= 0 && migration.status !== 'rolled_back') {
       actions.append(
         C.button({
-          label: `Jalankan fase ${nextIndex + 1}`, icon: 'play', size: 'sm',
+          label: t('settings.migration.runPhase', { n: nextIndex + 1 }), icon: 'play', size: 'sm',
           onClick: async () => {
             try {
               await runMigrationPhase(id, options())
@@ -1217,15 +1225,15 @@ function renderMigrationTab(container) {
             } catch (err) { showToast(String(err.message || err), 'error', 7000) }
           },
         }),
-        C.button({ label: 'Periksa tanpa menyimpan', icon: 'eye', size: 'sm', variant: 'ghost', onClick: async () => {
+        C.button({ label: t('settings.migration.dryRunBtn'), icon: 'eye', size: 'sm', variant: 'ghost', onClick: async () => {
           try {
             const preview = await runMigrationPhase(id, { ...options(), dryRun: true })
             const phase = preview.phases[nextIndex]
-            dryRunReport.textContent = `Pratinjau: ${phase.recordsProcessed || 0} diproses, ${phase.recordsFailed || 0} gagal. Tidak ada data atau progres yang disimpan.`
+            dryRunReport.textContent = t('settings.migration.dryRun', { processed: phase.recordsProcessed || 0, failed: phase.recordsFailed || 0 })
           } catch (err) { showToast(String(err.message || err), 'error', 7000) }
         } }),
         connector?.type === 'rest' ? C.button({
-          label: 'Jalankan semua', icon: 'playCircle', size: 'sm', variant: 'secondary',
+          label: t('settings.migration.runAll'), icon: 'playCircle', size: 'sm', variant: 'secondary',
           onClick: async () => {
             try {
               let guard = 0
@@ -1241,14 +1249,14 @@ function renderMigrationTab(container) {
         }) : el('span', {}),
       )
     }
-    actions.append(C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }))
+    actions.append(C.button({ label: t('settings.common.back'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }))
 
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
-        C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
+        C.button({ label: t('settings.common.back'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
         el('h3', { className: 'set-title' }, migration.name),
       ),
-      el('p', { className: 'set-desc' }, `Status: ${migration.status}. ${migration.connectorId ? 'Baris diambil dari konektor.' : 'Migrasi ini belum terhubung ke konektor — baris tidak akan terbaca.'}`),
+      el('p', { className: 'set-desc' }, `${t('settings.migration.statusLine', { status: migration.status })} ${migration.connectorId ? t('settings.migration.fromConnector') : t('settings.migration.noConnector')}`),
       progress,
       uploads,
       dryRunReport,
@@ -1260,23 +1268,23 @@ function renderMigrationTab(container) {
     const report = generateValidationReport(migration)
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
-        C.button({ label: 'Kembali', icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
-        el('h3', { className: 'set-title' }, `Laporan · ${report.name}`),
+        C.button({ label: t('settings.common.back'), icon: 'arrowLeft', size: 'sm', variant: 'ghost', onClick: showList }),
+        el('h3', { className: 'set-title' }, t('settings.report.title', { name: report.name })),
       ),
       el('div', { className: 'mcp-report-summary' },
-        reportCard(String(report.summary.processed), 'Diproses'),
-        reportCard(String(report.summary.inserted), 'Baru'),
-        reportCard(String(report.summary.updated), 'Diperbarui'),
-        reportCard(String(report.summary.failed), 'Gagal'),
-        reportCard(`${report.summary.successRate}%`, 'Tingkat sukses'),
+        reportCard(String(report.summary.processed), t('settings.report.processed')),
+        reportCard(String(report.summary.inserted), t('settings.report.inserted')),
+        reportCard(String(report.summary.updated), t('settings.report.updated')),
+        reportCard(String(report.summary.failed), t('settings.report.failed')),
+        reportCard(`${report.summary.successRate}%`, t('settings.report.successRate')),
       ),
       el('table', { className: 'mcp-report-table' },
         el('thead', {}, el('tr', {},
-          el('th', {}, 'Fase'), el('th', {}, 'Status'), el('th', {}, 'Diproses'),
-          el('th', {}, 'Baru'), el('th', {}, 'Diperbarui'), el('th', {}, 'Gagal'), el('th', {}, 'Durasi'),
+          el('th', {}, t('settings.migration.confirmPhases')), el('th', {}, 'Status'), el('th', {}, t('settings.report.processed')),
+          el('th', {}, t('settings.report.inserted')), el('th', {}, t('settings.report.updated')), el('th', {}, t('settings.report.failed')), el('th', {}, t('settings.report.duration')),
         )),
         el('tbody', {}, ...report.phases.map((p) => el('tr', {},
-          el('td', {}, p.name),
+          el('td', {}, phaseName(p)),
           el('td', {}, el('span', { className: `mcp-status-badge status-${p.status === 'completed' ? 'completed' : p.status === 'completed_with_errors' ? 'completed_with_errors' : 'draft'}` }, p.status)),
           el('td', { className: 'tnum' }, String(p.recordsProcessed)),
           el('td', { className: 'tnum' }, String(p.recordsInserted)),
@@ -1287,13 +1295,13 @@ function renderMigrationTab(container) {
       ),
       report.errors.length
         ? el('div', { className: 'mcp-report-errors' },
-          el('h4', {}, `Error (${report.errors.length})`),
+          el('h4', {}, t('settings.report.errors', { count: report.errors.length })),
           el('ul', {}, ...report.errors.slice(0, 50).map((e) => el('li', {}, `[${e.phase}] ${e.message}`))),
         )
         : '',
       el('div', { className: 'form-actions' },
         C.button({
-          label: 'Ekspor JSON', icon: 'download', size: 'sm', variant: 'ghost',
+          label: t('settings.report.export'), icon: 'download', size: 'sm', variant: 'ghost',
           onClick: () => {
             const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
             const url = URL.createObjectURL(blob)
@@ -1322,7 +1330,7 @@ function renderMigrationTab(container) {
 
 function renderLogsTab(container) {
   async function show() {
-    container.replaceChildren(loadingBox('Memuat log…'))
+    container.replaceChildren(loadingBox(t('settings.logs.loading')))
     let logs
     let errors
     try {
@@ -1335,14 +1343,14 @@ function renderLogsTab(container) {
     const rows = (logs || []).slice(0, 100)
     const table = el('table', { className: 'mcp-log-table' },
       el('thead', {}, el('tr', {},
-        el('th', {}, 'Waktu'), el('th', {}, 'Konektor'), el('th', {}, 'Status'),
-        el('th', {}, 'Diproses'), el('th', {}, 'Baru'), el('th', {}, 'Gagal'), el('th', {}, 'Durasi'),
+        el('th', {}, t('settings.logs.time')), el('th', {}, t('settings.tabs.connectors')), el('th', {}, 'Status'),
+        el('th', {}, t('settings.report.processed')), el('th', {}, t('settings.report.inserted')), el('th', {}, t('settings.report.failed')), el('th', {}, t('settings.report.duration')),
       )),
     )
     const tbody = el('tbody', {})
 
     if (!rows.length) {
-      tbody.append(el('tr', {}, el('td', { colSpan: 7, className: 'text-center text-muted' }, 'Belum ada sinkronisasi.')))
+      tbody.append(el('tr', {}, el('td', { colSpan: 7, className: 'text-center text-muted' }, t('settings.logs.empty'))))
     } else {
       for (const log of rows) {
         const duration = log.endedAt
@@ -1350,7 +1358,7 @@ function renderLogsTab(container) {
           : null
         const stats = log.stats || {}
         tbody.append(el('tr', {},
-          el('td', { className: 'tnum' }, new Date(log.startedAt).toLocaleString('id-ID')),
+          el('td', { className: 'tnum' }, new Date(log.startedAt).toLocaleString(locale())),
           el('td', {}, log.connectorName || log.connectorId),
           el('td', {}, el('span', { className: `mcp-status-badge status-${log.status}` }, log.status)),
           el('td', { className: 'tnum' }, String(stats.processed || 0)),
@@ -1365,15 +1373,15 @@ function renderLogsTab(container) {
     container.replaceChildren(
       el('div', { className: 'set-head-flex' },
         el('div', {},
-          el('h3', { className: 'set-title' }, 'Log sinkronisasi', enterpriseTag()),
-          el('p', { className: 'set-desc' }, 'Riwayat sinkronisasi dan baris yang gagal ditulis.'),
+          el('h3', { className: 'set-title' }, t('settings.logs.title'), enterpriseTag()),
+          el('p', { className: 'set-desc' }, t('settings.logs.desc')),
         ),
-        C.button({ label: 'Muat ulang', icon: 'refresh', size: 'sm', variant: 'ghost', onClick: show }),
+        C.button({ label: t('settings.logs.reload'), icon: 'refresh', size: 'sm', variant: 'ghost', onClick: show }),
       ),
       el('div', { className: 'table-wrap' }, table),
       (errors || []).length
         ? el('div', { className: 'mcp-report-errors' },
-          el('h4', {}, `${errors.length} baris gagal (dead letter)`),
+          el('h4', {}, t('settings.logs.deadLetter', { count: errors.length })),
           el('ul', {}, ...errors.slice(0, 20).map((e) => el('li', {}, `[${e.entity}] ${e.message}`))),
         )
         : '',
@@ -1389,36 +1397,36 @@ function renderAgentTab(container, redraw) {
   const save = () => saveSettings(STORAGE_KEYS.agent, settings)
 
   const promptBlock = (num, title, desc, key, defKey, id) => {
-    const ta = C.textarea({ label: 'Prompt sistem', id, rows: 12, value: settings[key], attrs: { spellcheck: 'false', className: 'input input-code' } })
+    const ta = C.textarea({ label: t('settings.agent.systemPrompt'), id, rows: 12, value: settings[key], attrs: { spellcheck: 'false', className: 'input input-code' } })
     ta.input.addEventListener('input', () => { settings[key] = ta.input.value; save() })
     const isDefault = settings[key] === DEFAULT_AGENT_PROMPTS[defKey]
     return setSection({ num, title, desc },
       ta.wrap,
       el('div', { className: 'form-actions' },
         C.button({
-          label: 'Kembalikan default', icon: 'refresh', size: 'sm', variant: 'ghost', disabled: isDefault,
-          onClick: () => { settings[key] = DEFAULT_AGENT_PROMPTS[defKey]; save(); redraw(); showToast('Prompt dikembalikan ke default.', 'info') },
+          label: t('settings.agent.restore'), icon: 'refresh', size: 'sm', variant: 'ghost', disabled: isDefault,
+          onClick: () => { settings[key] = DEFAULT_AGENT_PROMPTS[defKey]; save(); redraw(); showToast(t('settings.agent.restored'), 'info') },
         }),
-        el('span', { className: 'field-hint tnum' }, `${settings[key].length} karakter`),
+        el('span', { className: 'field-hint tnum' }, t('settings.agent.chars', { count: settings[key].length })),
       ),
     )
   }
 
-  const modelSel = C.select({ label: 'Preferensi model', id: 'agent-model', options: [{ value: 'auto', label: 'Otomatis (model pertama yang tersedia)' }], value: 'auto', hint: 'Dipakai untuk penawaran dan laporan.' })
+  const modelSel = C.select({ label: t('settings.agent.model'), id: 'agent-model', options: [{ value: 'auto', label: t('settings.agent.autoFirst') }], value: 'auto', hint: t('settings.agent.modelHint') })
   modelSel.input.addEventListener('change', () => { settings.modelPreference = modelSel.input.value; save() })
   loadModels().then((models) => {
-    const opts = [{ value: 'auto', label: 'Otomatis (model pertama yang tersedia)' }, ...models.map((m) => ({ value: m.id, label: m.name || m.id }))]
+    const opts = [{ value: 'auto', label: t('settings.agent.autoFirst') }, ...models.map((m) => ({ value: m.id, label: m.name || m.id }))]
     const pref = settings.modelPreference
-    if (pref && pref !== 'auto' && !models.some((m) => m.id === pref)) opts.push({ value: pref, label: `${pref} (tidak tersedia)` })
+    if (pref && pref !== 'auto' && !models.some((m) => m.id === pref)) opts.push({ value: pref, label: t('settings.agent.unavailable', { model: pref }) })
     C.setOptions(modelSel.input, opts, pref || 'auto')
-  }).catch(() => C.setOptions(modelSel.input, [{ value: 'auto', label: 'Otomatis' }], 'auto'))
+  }).catch(() => C.setOptions(modelSel.input, [{ value: 'auto', label: t('settings.agent.auto') }], 'auto'))
 
   container.append(
-    promptBlock('Agen · 01', 'Prompt penawaran', 'Instruksi untuk AI saat menyusun penawaran (tahap 02). Hasilnya berisi ruang lingkup, harga, syarat, dan catatan.', 'offerPrompt', 'offer', 'offer-prompt'),
-    promptBlock('Agen · 02', 'Prompt laporan', 'Instruksi untuk AI saat menjelaskan laporan (tahap 06). Output HTML disanitasi sebelum ditampilkan.', 'reportPrompt', 'report', 'report-prompt'),
-    setSection({ num: 'Agen · 03', title: 'Parameter', desc: 'Pengaturan teknis output AI.' },
-      rangeField({ label: 'Temperature', id: 'agent-temp', value: settings.temperature, min: 0, max: 1, step: 0.1, hint: '0 = konsisten, 1 = lebih kreatif.', onChange: (v) => { settings.temperature = parseFloat(v); save() } }),
-      rangeField({ label: 'Maks token', id: 'agent-tokens', value: settings.maxTokens, min: 500, max: 4000, step: 100, onChange: (v) => { settings.maxTokens = parseInt(v, 10); save() } }),
+    promptBlock(t('settings.agent.num1'), t('settings.agent.offerTitle'), t('settings.agent.offerDesc'), 'offerPrompt', 'offer', 'offer-prompt'),
+    promptBlock(t('settings.agent.num2'), t('settings.agent.reportTitle'), t('settings.agent.reportDesc'), 'reportPrompt', 'report', 'report-prompt'),
+    setSection({ num: t('settings.agent.num3'), title: t('settings.agent.params'), desc: t('settings.agent.paramsDesc') },
+      rangeField({ label: 'Temperature', id: 'agent-temp', value: settings.temperature, min: 0, max: 1, step: 0.1, hint: t('settings.agent.tempHint'), onChange: (v) => { settings.temperature = parseFloat(v); save() } }),
+      rangeField({ label: t('settings.agent.maxTokens'), id: 'agent-tokens', value: settings.maxTokens, min: 500, max: 4000, step: 100, onChange: (v) => { settings.maxTokens = parseInt(v, 10); save() } }),
       modelSel.wrap,
     ),
   )

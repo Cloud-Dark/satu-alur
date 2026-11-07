@@ -1,0 +1,238 @@
+{
+  "auto": {
+    "name": "Otomatis",
+    "role": "Memilih penasihat sesuai pertanyaan",
+    "routed": "Pertanyaan diarahkan ke penasihat yang paling cocok",
+    "suggestions": [
+      "Bagaimana naik 2% bulan depan?",
+      "Biaya mana yang paling bisa dihemat?",
+      "Bagaimana membuat pelanggan kembali lagi?",
+      "Pekerjaan mana yang tertahan paling lama?"
+    ]
+  },
+  "growTwo": "Bagaimana naik 2% bulan depan?",
+  "route": {
+    "keyword": "Dipilih otomatis dari kata \"{words}\"",
+    "followUp": "Melanjutkan percakapan sebelumnya",
+    "default": "Dipilih otomatis sebagai penasihat umum"
+  },
+  "emptyAnswer": "Jawaban kosong. Coba tanyakan lagi.",
+  "today": "Hari ini",
+  "yesterday": "Kemarin",
+  "seconds": "{n} dtk",
+  "aiUnavailable": "AI sedang tidak tersedia",
+  "title": "Penasihat bisnis",
+  "picker": {
+    "choose": "Pilih penasihat",
+    "change": "Ganti penasihat",
+    "kicker": "Penasihat",
+    "autoHint": "Otomatis memilih sesuai pertanyaan",
+    "aria": "Penasihat: {name}. Ganti penasihat"
+  },
+  "loading": "Memuat…",
+  "calc": {
+    "targetAria": "Target pertumbuhan per bulan",
+    "otherTarget": "Target lain",
+    "targetPctAria": "Target pertumbuhan per bulan dalam persen",
+    "base": "Pendapatan per bulan",
+    "job": "Nilai per pekerjaan",
+    "ask": "Tanya cara mencapainya",
+    "target": "Target per bulan",
+    "askWithBase": "Bagaimana cara mencapai pertumbuhan {pct} per bulan dari pendapatan {base} per bulan?",
+    "askPlain": "Bagaimana cara mencapai pertumbuhan {pct} per bulan?",
+    "chartAria": "Proyeksi 12 bulan: dari {from} menjadi {to} per bulan pada target {pct} per bulan. Garis tipis membandingkan target 1, 2, 5, dan 10 persen.",
+    "table": "Tabel proyeksi 12 bulan",
+    "actual": "Pertumbuhan aktual Anda: ",
+    "perMonth": "{value} per bulan",
+    "aboveTarget": ", sudah di atas target ini.",
+    "needMore": ", perlu tambahan {pct} poin.",
+    "emptyBase": "Isi pendapatan dasar per bulan untuk melihat proyeksi dan jumlah pekerjaan yang dibutuhkan.",
+    "month12": "Bulan ke-12",
+    "perYear": "per bulan · setara {pct} per tahun",
+    "nextMonth": "Bulan depan",
+    "equalJobs": "setara {n} pekerjaan",
+    "now": "Sekarang",
+    "months": "{n} bln",
+    "caption": "Proyeksi pendapatan pada target {pct} per bulan",
+    "colMonth": "Bulan",
+    "colRevenue": "Pendapatan/bln",
+    "colJobs": "Pekerjaan/bln",
+    "colExtra": "Tambahan",
+    "nth": "ke-{n}",
+    "cumulative": "Tambahan pendapatan kumulatif 12 bulan: ",
+    "jobNote": ". Pekerjaan dihitung dengan nilai rata-rata {job}.",
+    "jobEmpty": ". Isi nilai rata-rata pekerjaan untuk menghitung jumlah pekerjaan.",
+    "baseFrom": "Dari {source}. Boleh diubah.",
+    "baseLastMonth": "bulan lalu ({month})",
+    "baseLast30": "30 hari terakhir",
+    "baseTotal": "total tercatat",
+    "baseNone": "Belum ada pendapatan tercatat. Isi perkiraan Anda.",
+    "jobFrom": "Dari {n} pekerjaan terbukukan.",
+    "jobNone": "Isi perkiraan nilai satu pekerjaan."
+  },
+  "tier": {
+    "empty": "Isi target pertumbuhan per bulan.",
+    "realistic": "Realistis untuk usaha perorangan dan UKM (1–2% per bulan).",
+    "aboveAverage": "Di atas rata-rata UKM: butuh dorongan pemasaran yang konsisten.",
+    "aggressive": "Agresif, setara target enterprise (5–10% per bulan): butuh investasi pemasaran dan kapasitas tim.",
+    "veryAggressive": "Sangat agresif: pastikan kapasitas, kas, dan kualitas siap menampung."
+  },
+  "tabs": {
+    "snapshot": "Snapshot",
+    "snapshotMeta": "Angka bisnis yang dibaca AI sebagai konteks",
+    "calc": "Kalkulator",
+    "calcMeta": "Target pertumbuhan majemuk per bulan",
+    "stats": "Statistik",
+    "statsMeta": "Dari riwayat tersimpan di akun Anda",
+    "aria": "Data dan alat penasihat"
+  },
+  "side": "Snapshot, kalkulator, dan statistik",
+  "jump": "Data & kalkulator",
+  "clear": {
+    "label": "Hapus percakapan",
+    "confirm": "Klik lagi untuk hapus",
+    "busy": "Menghapus…",
+    "allDone": "Semua percakapan penasihat dihapus.",
+    "oneDone": "Percakapan {name} dihapus.",
+    "failed": "Gagal menghapus: {message}"
+  },
+  "log": "Percakapan dengan penasihat",
+  "chipsAria": "Pertanyaan saran",
+  "input": {
+    "placeholder": "Tanyakan strategi atau target…",
+    "aria": "Pertanyaan untuk penasihat",
+    "send": "Kirim pertanyaan",
+    "sendTitle": "Kirim (Enter)",
+    "stop": "Hentikan",
+    "kbdSend": "kirim",
+    "kbdNewline": "baris baru"
+  },
+  "waitOrStop": "Tunggu jawaban selesai atau hentikan dulu.",
+  "questions": {
+    "one": "{count} pertanyaan",
+    "other": "{count} pertanyaan"
+  },
+  "answeredBy": "Dijawab oleh {name}",
+  "autoPicked": "Penasihat dipilih otomatis",
+  "willAnswer": "Akan dijawab: {name}",
+  "empty": {
+    "autoTitle": "Apa yang ingin Anda tumbuhkan?",
+    "autoEm": "tumbuhkan",
+    "agentTitle": "Tanya {name}",
+    "noData": "Data bisnis Anda belum ada, jadi saran awal bersifat umum. Setelah permintaan dan jurnal tercatat, jawaban akan memakai angka Anda.",
+    "withData": "Jawaban memakai snapshot bisnis Anda: pendapatan, biaya, konversi, dan pekerjaan tertunda. Percakapan tersimpan di perangkat ini."
+  },
+  "answerOf": "Jawaban {name}",
+  "composing": "Menyusun jawaban",
+  "stopped": "Dihentikan",
+  "cutOff": "Terputus",
+  "retry": "Coba lagi",
+  "failed": "Penasihat gagal menjawab.",
+  "older": {
+    "label": "Muat pesan sebelumnya",
+    "nOf": "{n} dari {total} lagi",
+    "n": "{n} lagi",
+    "loaded": "{n} pesan sebelumnya dimuat."
+  },
+  "status": {
+    "composing": "{name} sedang menyusun jawaban.",
+    "done": "Jawaban {name} selesai.",
+    "stopped": "Jawaban dihentikan."
+  },
+  "noModel": "AI sedang tidak tersedia. Periksa koneksi lalu muat ulang halaman.",
+  "retrying": "Koneksi terputus, mencoba sekali lagi",
+  "notSaved": "Percakapan tidak tersimpan di perangkat ini.",
+  "snap": {
+    "logRequest": "Catat permintaan",
+    "emptyKicker": "Data belum ada",
+    "emptyTitle": "Snapshot terisi otomatis.",
+    "emptyBody": "Penasihat tetap bisa memberi saran umum. Catat permintaan dan jurnal agar saran memakai angka Anda.",
+    "fromTo": "{from} ke {to}",
+    "average": "rata-rata {pct}",
+    "vs30": "30 hari vs 30 hari sebelumnya",
+    "needTwo": "Butuh dua periode data",
+    "revenue30": "Pendapatan 30 hari",
+    "vsPrev": "{pct} vs sebelumnya",
+    "prev": "Sebelumnya {amount}",
+    "noLedger": "Belum ada jurnal",
+    "growth": "Pertumbuhan",
+    "avgJob": "Nilai rata-rata pekerjaan",
+    "jobsBooked": "{n} pekerjaan terbukukan",
+    "margin": "Margin",
+    "profit": "Laba {amount}",
+    "barsAria": "Pendapatan enam bulan: {list}",
+    "partial": "(berjalan)",
+    "topService": "Layanan teratas",
+    "requests": "{n} permintaan",
+    "topCost": "Biaya terbesar",
+    "ofRevenue": "{pct} pendapatan",
+    "conversion": "Konversi penawaran",
+    "offered": "{pct} permintaan ditawar",
+    "repeat": "Pelanggan berulang",
+    "nOf": "{n} dari {total}",
+    "pending": "Pekerjaan tertunda",
+    "items": "{n} item",
+    "draft": "draf {amount}",
+    "none": "Tidak ada",
+    "context": "Lihat konteks yang dikirim ke AI",
+    "revenue6": "Pendapatan 6 bulan",
+    "asOf": "Dihitung per {date} dari {requests} permintaan dan {ledger} jurnal."
+  },
+  "stats": {
+    "empty": "Belum ada jawaban tersimpan. Statistik muncul setelah Anda bertanya.",
+    "answers": "Jawaban",
+    "avgTime": "Rata-rata waktu",
+    "failed": "Gagal",
+    "perAgent": "Jawaban per penasihat",
+    "stopped": "{n} jawaban dihentikan manual (tidak dihitung gagal)."
+  },
+  "historyError": "Riwayat percakapan gagal dimuat: {message}",
+  "dataError": "Gagal memuat data bisnis: {message}",
+  "agents": {
+    "konsultan": {
+      "name": "Konsultan bisnis",
+      "role": "Gambaran utuh dan prioritas",
+      "suggestions": [
+        "Apa prioritas bisnis saya bulan ini?",
+        "Di mana titik lemah alur kerja saya?",
+        "Ringkas kondisi bisnis saya dalam 5 poin"
+      ]
+    },
+    "keuangan": {
+      "name": "Analis keuangan",
+      "role": "Margin, biaya, harga, arus kas",
+      "suggestions": [
+        "Biaya mana yang paling bisa dihemat?",
+        "Apakah harga saya sudah sehat?",
+        "Berapa margin ideal untuk layanan saya?"
+      ]
+    },
+    "pertumbuhan": {
+      "name": "Strategi pertumbuhan",
+      "role": "Target, proyeksi, kapasitas",
+      "suggestions": [
+        "Bagaimana naik 2% bulan depan?",
+        "Realistiskah tumbuh 10% per bulan?",
+        "Berapa pekerjaan tambahan yang saya butuhkan?"
+      ]
+    },
+    "pemasaran": {
+      "name": "Pemasaran",
+      "role": "Pelanggan baru dan berulang",
+      "suggestions": [
+        "Bagaimana membuat pelanggan kembali lagi?",
+        "Promosi murah apa yang cocok bulan ini?",
+        "Layanan mana yang sebaiknya saya promosikan?"
+      ]
+    },
+    "operasional": {
+      "name": "Operasional",
+      "role": "Jadwal, tim, kualitas",
+      "suggestions": [
+        "Pekerjaan mana yang tertahan paling lama?",
+        "Bagaimana menambah kapasitas tanpa rekrut?",
+        "Buatkan SOP singkat untuk tim lapangan"
+      ]
+    }
+  }
+}

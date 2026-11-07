@@ -8,6 +8,7 @@
  * dispatching 'input' + 'change'.
  */
 import { icon } from './icons.js'
+import { t } from '../i18n/index.js'
 import '../styles/combobox.css'
 
 let uid = 0
@@ -25,7 +26,7 @@ function highlight(label, query) {
   return frag
 }
 
-export function enhanceSelect(select, { placeholder = 'Pilih…', searchPlaceholder = 'Cari…' } = {}) {
+export function enhanceSelect(select, { placeholder = t('ui.combo.placeholder'), searchPlaceholder = t('ui.combo.search') } = {}) {
   if (!select || select.dataset.combo) return select
   select.dataset.combo = '1'
   const id = `combo-${++uid}`
@@ -87,7 +88,7 @@ export function enhanceSelect(select, { placeholder = 'Pilih…', searchPlacehol
   list.setAttribute('role', 'listbox')
   const empty = document.createElement('p')
   empty.className = 'combo-empty'
-  empty.textContent = 'Tidak ada hasil.'
+  empty.textContent = t('ui.combo.noResults')
   const count = document.createElement('p')
   count.className = 'combo-count'
   pop.append(searchWrap, list, empty, count)
@@ -134,7 +135,7 @@ export function enhanceSelect(select, { placeholder = 'Pilih…', searchPlacehol
       return li
     })
     empty.hidden = items.length > 0
-    count.textContent = q ? `${items.length} dari ${all.length} pilihan` : `${all.length} pilihan`
+    count.textContent = q ? t('ui.combo.countFiltered', { n: items.length, total: all.length }) : t('ui.combo.count', { total: all.length })
     const sel = items.findIndex((li) => li.dataset.value === select.value)
     setActive(sel >= 0 ? sel : items.length ? 0 : -1)
   }

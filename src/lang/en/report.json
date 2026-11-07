@@ -1,0 +1,82 @@
+{
+  "title": "Financial report",
+  "loading": "Loading…",
+  "loadError": "Could not load the ledger: {error}",
+  "period": {
+    "aria": "Report period",
+    "30d": "30 days",
+    "month": "This month",
+    "prev": "Last month",
+    "all": "All",
+    "prev30": "previous 30 days",
+    "noData": "No data yet",
+    "line": {
+      "one": "Period {label} · {count} entry",
+      "other": "Period {label} · {count} entries"
+    },
+    "compare": " · compared with: {label}"
+  },
+  "kpi": {
+    "profit": "Profit before tax",
+    "revenue": "Revenue",
+    "cost": "Costs",
+    "margin": "Margin",
+    "noRevenue": "No revenue yet",
+    "costShare": "Costs are {pct}% of revenue"
+  },
+  "cat": {
+    "title": "Category breakdown",
+    "count": {
+      "one": "{count} category",
+      "other": "{count} categories"
+    },
+    "category": "Category",
+    "entries": "Entries",
+    "share": "Share",
+    "amount": "Amount"
+  },
+  "cust": {
+    "title": "Top customers",
+    "meta": "by revenue",
+    "emptyKicker": "Empty",
+    "emptyTitle": "No revenue in this period yet."
+  },
+  "empty": {
+    "kicker": "Empty period",
+    "title": "No entries in this period.",
+    "tryOther": "Try another period, or post a new entry.",
+    "post": "Post entries in step 05 to fill the report.",
+    "toBook": "Jobs ready to book"
+  },
+  "ai": {
+    "explain": "Explain with AI",
+    "title": "AI explanation",
+    "meta": "Written in Indonesian · sanitized HTML",
+    "lead": "AI reads the selected period’s numbers, compares them with the previous period, then gives a summary and recommendations. The figures above remain the reference.",
+    "unavailableShort": "AI is unavailable right now",
+    "unavailable": "The AI model is unavailable. Check your connection, then reload the page.",
+    "nothing": "There are no entries in this period, so there is nothing to explain yet.",
+    "analyzing": "Analyzing…",
+    "model": "Report analyst",
+    "writing": "Writing…",
+    "done": "Done",
+    "doneToast": "Report explanation finished.",
+    "stopped": "Stopped",
+    "stoppedMsg": "Explanation stopped.",
+    "failed": "Failed"
+  },
+  "mail": {
+    "button": "Email it to me",
+    "heading": "Financial report {period}",
+    "revenue": "Revenue: {amount}",
+    "cost": "Costs: {amount}",
+    "profit": "Profit before tax: {amount}",
+    "margin": " (margin {pct}%)",
+    "compare": "Compared with {label}: profit {amount}",
+    "ai": "AI explanation:",
+    "sending": "Sending…",
+    "subject": "Report {period}",
+    "simulated": "Simulation: emails are not sent from demo accounts.",
+    "sent": "Report sent to {to}."
+  }
+}

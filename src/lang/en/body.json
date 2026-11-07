@@ -1,0 +1,569 @@
+{
+  "meta": {
+    "title": "Satu Alur — Service operations in one flow, powered by AI",
+    "description": "Satu Alur brings your service business's requests, AI offers, assignments, job completion, bookkeeping, and reports together in one workflow."
+  },
+  "example": "Example",
+  "content": {
+    "hero": {
+      "badge": "For service businesses in Indonesia · powered by AI",
+      "title": "Your service business, *growing* in one flow.",
+      "subtitle": "Satu Alur brings requests, offers, assignments, bookkeeping, and reports into one workflow. Once things are in order, two engines follow: revenue from add-on services, and growth from your own data."
+    },
+    "heroPoints": [
+      "Sign in with just your email (OTP)",
+      "AI offers are always validated",
+      "Revenue & growth tools are live",
+      "Data kept safe in the cloud"
+    ],
+    "stages": [
+      {
+        "title": "Request",
+        "desc": "Every customer request is recorded in one place, not scattered across chats.",
+        "out": "Request list"
+      },
+      {
+        "title": "AI offer",
+        "desc": "AI drafts the scope, price, and terms, then domain rules check them.",
+        "out": "Validated proposal"
+      },
+      {
+        "title": "Assignment",
+        "desc": "Assign workers and a schedule to approved offers.",
+        "out": "Workers & schedule"
+      },
+      {
+        "title": "Completion",
+        "desc": "Record the work done on site; the assignment status updates with it.",
+        "out": "Job notes"
+      },
+      {
+        "title": "Bookkeeping",
+        "desc": "Revenue and costs go into the journal, and profit/loss shows up right away.",
+        "out": "Journal & profit/loss"
+      },
+      {
+        "title": "AI report",
+        "desc": "AI explains your financial summary in plain language.",
+        "out": "Report + explanation"
+      }
+    ],
+    "ticker": [
+      {
+        "label": "Centralized requests"
+      },
+      {
+        "label": "AI offers"
+      },
+      {
+        "label": "Domain rule validation"
+      },
+      {
+        "label": "Assignments & schedules"
+      },
+      {
+        "label": "Completion notes"
+      },
+      {
+        "label": "Journal & profit/loss"
+      },
+      {
+        "label": "Reports explained by AI"
+      },
+      {
+        "label": "Add-on service catalog"
+      },
+      {
+        "label": "Five waste streams"
+      },
+      {
+        "label": "Five-team optimization room"
+      },
+      {
+        "label": "Opportunity radar"
+      },
+      {
+        "label": "Lead finder"
+      },
+      {
+        "label": "Social media content & scheduling"
+      },
+      {
+        "label": "Streaming AI answers"
+      },
+      {
+        "label": "Email OTP sign-in"
+      },
+      {
+        "label": "Data safe in the cloud"
+      }
+    ],
+    "features": [
+      {
+        "title": "AI offers checked by domain rules",
+        "desc": "AI proposes the scope, price, and terms. Before anything is saved, business rules check the price range and completeness, so no half-baked proposals go out."
+      },
+      {
+        "title": "Reports explained in plain language",
+        "desc": "Profit/loss figures become a short explanation: what went up, what went down, and what needs attention."
+      },
+      {
+        "title": "Five-team AI optimization room",
+        "desc": "Creative, marketing, finance, operations, and research work in parallel on your numbers, then one lead draws the conclusion. Made for decisions too big for one head."
+      },
+      {
+        "title": "Agent Skill Editor",
+        "desc": "Tune the agent prompt, temperature, and token limit to fit your business. The AI follows how you work, not the other way around."
+      },
+      {
+        "title": "WhatsApp & Email connectors",
+        "desc": "Requests come in and offers go out through the channels your customers already use.",
+        "tag": "Roadmap"
+      }
+    ],
+    "income": {
+      "eyebrow": "Revenue",
+      "title": "The same work, *more* value.",
+      "lede": "Two menus that add value to every job: find add-on opportunities in your operating data, manage the catalog, then track waste and the savings you've achieved.",
+      "engines": [
+        {
+          "kicker": "Add-on services",
+          "title": "Sell add-ons without guessing",
+          "desc": "Satu Alur reads which services you do most often, then shows add-ons that make sense to offer — with price, direct cost, and expected uptake.",
+          "points": [
+            "Add-on catalog in six categories",
+            "Set the expected uptake for each item",
+            "Add-on share measured in the journal, not estimated"
+          ],
+          "preview": {
+            "title": "Add-on catalog",
+            "rows": [
+              {
+                "name": "Carpet cleaning",
+                "price": "Rp75K"
+              },
+              {
+                "name": "Freon refill",
+                "price": "Rp180K"
+              },
+              {
+                "name": "Maintenance contract",
+                "price": "Rp450K"
+              }
+            ],
+            "footer": {
+              "label": "Monthly potential",
+              "value": "+Rp1.8M"
+            }
+          }
+        },
+        {
+          "kicker": "Zero waste",
+          "title": "Plug the leaks, one by one",
+          "desc": "Idle time, travel, wasted materials, rework, and water and chemicals are all counted in Rupiah. The waste-free score shows real progress, not a feeling.",
+          "points": [
+            "Five waste streams, all in Rupiah",
+            "Fix-it plan ordered from the biggest leak",
+            "Mark done once the savings are confirmed"
+          ],
+          "preview": {
+            "title": "Leaks this month",
+            "rows": [
+              {
+                "label": "Waiting time",
+                "value": "Rp1.4M"
+              },
+              {
+                "label": "Travel",
+                "value": "Rp980K"
+              },
+              {
+                "label": "Wasted materials",
+                "value": "Rp620K"
+              }
+            ],
+            "footer": {
+              "label": "Waste-free",
+              "value": "62%"
+            }
+          }
+        }
+      ],
+      "room": {
+        "kicker": "Optimization room",
+        "title": "Five AI teams, one conclusion",
+        "desc": "Every Revenue menu shares the same workspace: five AI teams read your numbers in parallel, then one lead decides the next step. You pick one of three short briefs — no prompt writing needed.",
+        "teams": [
+          "Creative",
+          "Marketing",
+          "Finance",
+          "Operations",
+          "Research"
+        ],
+        "lead": "Optimization lead",
+        "briefs": [
+          "Raise add-on uptake",
+          "Close the biggest leak",
+          "Bundle for regular customers"
+        ]
+      }
+    },
+    "growth": {
+      "eyebrow": "Growth",
+      "title": "Once you're organized, it's time to *grow*.",
+      "lede": "The radar and advisor read your workflow data. The lead finder helps you find new customers, Social Media manages your content, and sample recommendations show how to weigh an opportunity.",
+      "cards": [
+        {
+          "title": "Opportunity radar",
+          "desc": "Routine services coming due, customers who went quiet, stalled offers, and busy seasons — found in your own transactions, not a purchased list.",
+          "chips": [
+            {
+              "label": "Routine service due"
+            },
+            {
+              "label": "Customers not back yet"
+            },
+            {
+              "label": "Stalled offers"
+            }
+          ]
+        },
+        {
+          "title": "Recommendations & predictions",
+          "desc": "Explore sample opportunity scores, estimated value, and win probability. This section uses demo data to show how to read a recommendation.",
+          "stat": {
+            "label": "Opportunity score",
+            "rows": [
+              [
+                "Estimated value",
+                "Rp54M/mo"
+              ],
+              [
+                "Win chance",
+                "78%"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "Lead finder",
+          "desc": "Pick a point and radius on the map and choose a business type. AI scores the fit and prepares the offer. Nothing is sent automatically.",
+          "leads": [
+            {
+              "name": "Café · Kemang",
+              "value": "Rp4.2M"
+            },
+            {
+              "name": "Clinic · Tebet",
+              "value": "Rp2.8M"
+            }
+          ]
+        },
+        {
+          "title": "Social Media",
+          "desc": "Write content with AI, schedule it to your connected Facebook, Instagram, or Threads, then request ads or a collaboration from the Satu Alur team.",
+          "post": {
+            "headline": "AC service",
+            "sub": "before the rainy season",
+            "caption": "Get your AC serviced before the rainy season — slots still open this week. Book via DM!",
+            "when": "Sat, 08:00"
+          }
+        }
+      ],
+      "assistants": [
+        {
+          "title": "AI Advisor",
+          "desc": "Ask \"why did profit drop this month?\" and the answer uses numbers from your workflow, not generic guesses. Conversations are stored on your device.",
+          "sample": "Profit fell 12% because two travel costs went up and one job hasn't been invoiced yet."
+        },
+        {
+          "title": "AI Superpowers",
+          "desc": "An assistant with a calculator, your business data, and Rupiah formatting — for work that doesn't fit in one form.",
+          "tools": [
+            "Calculator",
+            "Business data",
+            "Rupiah format"
+          ]
+        }
+      ],
+      "note": "Connect the platforms you want to use: a Facebook Page, an Instagram Business account linked to a Facebook Page, or a Threads account."
+    },
+    "integration": {
+      "eyebrow": "Not starting from scratch",
+      "title": "Satu Alur *complements* the systems you already run.",
+      "lede": "No need to throw out the ERP, POS app, or spreadsheets you've used for years. Connect the source, map the columns, then move data over gradually — while both systems keep running side by side.",
+      "badge": "Enterprise",
+      "cards": [
+        {
+          "title": "REST API",
+          "desc": "Connect Odoo, SAP Business One, NetSuite, or internal apps through their existing endpoints. Credentials are stored encrypted."
+        },
+        {
+          "title": "File import",
+          "desc": "Export CSV or JSON from the old system (Excel can be exported as CSV), map the columns, then check the preview before a single row is written."
+        },
+        {
+          "title": "Inbound webhook",
+          "desc": "The old system sends events when something changes. Every delivery's signature is verified before it's accepted."
+        }
+      ],
+      "steps": [
+        {
+          "title": "Connect",
+          "desc": "Test the connection first. No data moves until you agree."
+        },
+        {
+          "title": "Map",
+          "desc": "Match source columns to Satu Alur columns, including Rupiah and Indonesian date formats."
+        },
+        {
+          "title": "Move gradually",
+          "desc": "Workforce and catalog first, then requests. Rollback keeps rows that have already been edited or used."
+        }
+      ],
+      "note": "ERP integration and data migration are available for Enterprise accounts. Parallel running lets both systems be used together during the transition."
+    },
+    "roadmap": [
+      {
+        "title": "Data model for forecasting",
+        "desc": "Every workflow stage produces structured data. That data becomes the basis for projecting demand, team capacity, and company cash flow ahead."
+      },
+      {
+        "title": "Offer parameters",
+        "desc": "Set the base rates, margins, and discount rules the AI uses when drafting offers, so pricing stays consistent across the team."
+      },
+      {
+        "title": "Report parameters",
+        "desc": "Choose the metrics, period, and explanation style for reports to match the questions you actually ask about your business."
+      }
+    ],
+    "faqs": [
+      {
+        "q": "Where is my business data stored?",
+        "a": "Your data is stored in a secure cloud. Every record is tied to your account, so it stays separate from other users."
+      },
+      {
+        "q": "What are Add-on services and Zero waste?",
+        "a": "Two menus in the Revenue group. Add-on services manages a catalog of add-ons sold alongside your existing jobs, complete with price, cost, and expected uptake. Zero waste tracks waste across five streams — time, travel, materials, rework, water and chemicals — in Rupiah, then ranks which is biggest so you can close it first."
+      },
+      {
+        "q": "Do the Growth features use my customer data?",
+        "a": "Yes, and only data from your own account. The opportunity radar reads your own transactions to find routine services coming due or customers who haven't come back. The lead finder uses the point and radius you choose, and never sends messages automatically."
+      },
+      {
+        "q": "How do I sign in to Satu Alur?",
+        "a": "Just with your email. We send a one-time code (OTP) to your address, so there's no password to remember or share."
+      },
+      {
+        "q": "What if I need help?",
+        "a": "The app has a Help menu: send a ticket with your question or issue, and the Satu Alur team replies in the same thread. Ticket status is always clear — Open, In progress, or Done."
+      },
+      {
+        "q": "Which AI is used, and can I trust the results?",
+        "a": "Offers and report explanations are written by AI and stream in as they're generated, so you can cancel at any time. Offers always pass domain rule validation before they're saved, and the final decision stays with you."
+      },
+      {
+        "q": "Can I change how the AI writes offers?",
+        "a": "Yes. Settings includes the Agent Skill Editor for changing the agent prompt, temperature, token limit, and model preference."
+      },
+      {
+        "q": "What are the limits of the free plan?",
+        "a": "Under the current draft scheme, the Sole Trader plan is free for 3 months for 1 user and up to 50 transactions per month, including AI offers and basic reports. These numbers may still change."
+      },
+      {
+        "q": "Is it connected to WhatsApp and email yet?",
+        "a": "Not yet. WhatsApp and email connectors are on the roadmap. The connector foundation is already in Settings and will be switched on once the integrations are ready."
+      }
+    ],
+    "agentDemo": {
+      "request": "AC service for 2 split units, South Jakarta. Possible this week?",
+      "fields": [
+        {
+          "label": "Scope",
+          "value": "Clean and check freon on 2 split AC units, 1 HP"
+        },
+        {
+          "label": "Price",
+          "value": "Rp450,000"
+        },
+        {
+          "label": "Terms",
+          "value": "30% deposit, balance on completion. 7-day warranty."
+        },
+        {
+          "label": "Duration",
+          "value": "± 3 hours"
+        }
+      ],
+      "checks": [
+        "Price within Rp10,000 – Rp1,000,000,000",
+        "Scope at least 10 characters",
+        "Terms at least 10 characters"
+      ],
+      "status": "Draft · awaiting your approval"
+    }
+  },
+  "hero": {
+    "seeFlow": "See the workflow",
+    "chipTitle": "Offer validated",
+    "chipSub": "3 domain rules passed"
+  },
+  "preview": {
+    "aria": "Sample Satu Alur dashboard summary with illustrative numbers.",
+    "title": "This month's summary",
+    "sub": "Profit/loss · updated automatically",
+    "revenue": "Revenue",
+    "profit": "Profit before tax",
+    "item1": "AC service · 2 units",
+    "state1": "AI offer",
+    "item2": "CCTV installation",
+    "state2": "Assignment",
+    "revenueValue": "Rp24.6M",
+    "profitValue": "Rp8.2M"
+  },
+  "ticker": {
+    "label": "What Satu Alur can do",
+    "caption": "Everything a service business needs, in one place"
+  },
+  "flow": {
+    "eyebrow": "Workflow",
+    "title": "Six stages, <em>one</em> common thread.",
+    "lede": "Service businesses often run their work across separate chats and spreadsheets. Satu Alur ties it all together: data entered at the first stage flows intact all the way to the report. After the six stages, two menu groups use that data to add revenue and find growth.",
+    "stage": "Stage {no}",
+    "result": "Output",
+    "factStages": "Work stages",
+    "factTeams": "AI teams",
+    "factGroups": "Extra groups"
+  },
+  "ai": {
+    "eyebrow": "AI features",
+    "title": "AI inside the flow, <em>not</em> beside it.",
+    "lede": "AI prepares the draft; your business rules and your decisions have the final say. Every output can be read, checked, and edited.",
+    "chatTitle": "AI offer",
+    "live": "· live",
+    "caption": "Illustration of the offer agent's output — not customer data.",
+    "sr": "Request: {request} Agent proposal: {fields}. Validation: {checks}. Status: {status}."
+  },
+  "agent": {
+    "incoming": "Incoming request",
+    "name": "Offer agent",
+    "edit": "Edit",
+    "approve": "Approve"
+  },
+  "income": {
+    "vasSr": "Sample add-on catalog. {rows}. {label}: {value}.",
+    "vasSrRow": "{name} {price}, {rate} percent uptake",
+    "wasteSr": "Sample leaks this month, {percent} percent waste-free. {rows}. {label}: {value}.",
+    "wasteFree": "waste-free"
+  },
+  "growth": {
+    "scheduled": "Scheduled · {when}",
+    "aiWritten": "Written by AI"
+  },
+  "vision": {
+    "eyebrow": "The big idea",
+    "title": "Today, tidy operations. Next, <em>read</em> your business's future.",
+    "lede": "Satu Alur is built to help service businesses scale up with AI. Because every stage is recorded as structured data, the same flow can become the foundation for planning your company.",
+    "labelNow": "Today's workflow data",
+    "labelNext": "Projection",
+    "comingSoon": "Coming soon",
+    "note": "Roadmap — the direction we're heading, not a promised release date."
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "Start free. <em>Level up</em> as you grow.",
+    "lede": "Three plans for three stages of business. Pick what fits now, switch plans anytime.",
+    "note": "Draft pricing — subject to change.",
+    "contactNote": "For the Enterprise plan, reach us through the Contact page.",
+    "liveLede": "Pick the plan that fits your business stage. Switch plans anytime.",
+    "liveTitle": "Choose your plan.",
+    "tiers": {
+      "soleTrader": {
+        "name": "Sole Trader",
+        "tagline": "For service business owners who work on their own.",
+        "period": "Free for 3 months",
+        "limits": [
+          {
+            "label": "Transactions",
+            "value": "Up to 50 / month"
+          },
+          {
+            "label": "Users",
+            "value": "1 user"
+          }
+        ],
+        "features": [
+          "All six workflow stages",
+          "AI offers & basic reports",
+          "Domain rule validation"
+        ],
+        "cta": {
+          "label": "Start free"
+        }
+      },
+      "ukm": {
+        "name": "UKM",
+        "tagline": "For service teams that are starting to grow.",
+        "period": "per month",
+        "badge": "Recommended",
+        "limits": [
+          {
+            "label": "Transactions",
+            "value": "Up to 1,000 / month"
+          },
+          {
+            "label": "Users",
+            "value": "10 users"
+          }
+        ],
+        "features": [
+          "Full AI for offers & reports",
+          "Agent Skill Editor (custom AI prompts)",
+          "WhatsApp & email connectors",
+          "Priority support"
+        ],
+        "cta": {
+          "label": "Choose UKM"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "tagline": "For large-scale service operations that need confidentiality and a written service guarantee.",
+        "period": "per month",
+        "badge": "NDA + SLA",
+        "limits": [
+          {
+            "label": "Transactions",
+            "value": "Unlimited"
+          },
+          {
+            "label": "Users",
+            "value": "Unlimited"
+          }
+        ],
+        "features": [
+          "Everything in UKM",
+          "NDA: a confidentiality agreement for your business data",
+          "99.9% monthly uptime SLA",
+          "Support response SLA within 4 business hours",
+          "ERP integration & data migration"
+        ],
+        "cta": {
+          "label": "Contact us"
+        }
+      }
+    }
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Questions that <em>often</em> come up.",
+    "lede": "Short answers about data, security, AI, and plans."
+  },
+  "cta": {
+    "eyebrow": "Get started",
+    "title": "Tidy up your service operations. <em>Start</em> today.",
+    "sub": "Sign in with your email, create your first request, and watch AI draft the offer.",
+    "button": "Start free now",
+    "compare": "Compare plans"
+  }
+}

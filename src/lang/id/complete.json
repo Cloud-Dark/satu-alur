@@ -1,0 +1,56 @@
+{
+  "title": "Penyelesaian pekerjaan",
+  "pickBody": "Buka Alur kerja, lalu tekan \"Tandai selesai\" pada pekerjaan yang sedang dikerjakan.",
+  "loading": "Memuat…",
+  "select": {
+    "label": "Penugasan aktif",
+    "pick": "Pilih penugasan",
+    "none": "Tidak ada penugasan aktif"
+  },
+  "notes": {
+    "label": "Catatan hasil pekerjaan",
+    "ph": "Kondisi akhir, kendala, saran perawatan…",
+    "hint": "Ikut tersimpan di riwayat dan membantu laporan."
+  },
+  "wiz": {
+    "label": "Konfirmasi selesai",
+    "pick": "Pilih penugasan",
+    "pickDesc": "Pekerjaan mana yang sudah dikerjakan?",
+    "notes": "Catat hasil",
+    "notesDesc": "Tutup penugasan dengan catatan singkat.",
+    "markDone": "Tandai selesai"
+  },
+  "error": {
+    "pick": "Pilih penugasan terlebih dahulu."
+  },
+  "preview": {
+    "worker": "Pelaksana: {name}",
+    "schedule": "Jadwal"
+  },
+  "noName": "tanpa nama",
+  "noWorker": "Tanpa petugas",
+  "notFound": "Penugasan ini tidak ditemukan atau sudah ditutup.",
+  "toWorkflow": "Ke alur kerja",
+  "saving": "Menyimpan…",
+  "partial": "Selesai tercatat, tetapi status penugasan belum diperbarui: {error}",
+  "done": {
+    "post": "Posting jurnal",
+    "invoice": "Buat invoice",
+    "invoiceShort": "Invoice",
+    "other": "Pekerjaan lain",
+    "viewBooks": "Lihat pembukuan",
+    "text": "Pekerjaan untuk {name} ditandai selesai. Siap dibukukan dan ditagih.",
+    "toast": "Pekerjaan ditandai selesai."
+  },
+  "saveError": "Gagal menyimpan: {error}",
+  "loadError": "Gagal memuat: {error}",
+  "tag": {
+    "done": "Selesai",
+    "working": "Dikerjakan"
+  },
+  "panel": {
+    "title": "Pekerjaan selesai",
+    "notes": "Catatan hasil",
+    "doneAt": "Selesai"
+  }
+}

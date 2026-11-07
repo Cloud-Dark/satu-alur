@@ -1,0 +1,226 @@
+{
+  "tabs": {
+    "pemborosan": "Pemborosan",
+    "tindakan": "Tindakan",
+    "optimasi": "Ruang optimasi"
+  },
+  "stream": {
+    "waktu": {
+      "label": "Waktu teknisi menganggur",
+      "short": "Waktu menganggur",
+      "why": "Teknisi dibayar untuk menunggu jadwal, menunggu pelanggan, atau menunggu bahan.",
+      "fix": "Gabungkan pekerjaan dalam satu zona, tetapkan slot 2 jam, dan isi celah dengan pekerjaan kecil."
+    },
+    "perjalanan": {
+      "label": "Perjalanan & bahan bakar",
+      "short": "Perjalanan",
+      "why": "Rute yang tidak diurutkan membuat tim bolak-balik dan membakar bensin serta jam kerja.",
+      "fix": "Urutkan kunjungan per zona, tugaskan petugas terdekat, dan hindari jadwal silang antar kota."
+    },
+    "bahan": {
+      "label": "Bahan & consumables",
+      "short": "Bahan",
+      "why": "Dosis berlebih, kemasan terbuang, dan sisa bahan yang tidak terpakai.",
+      "fix": "Takaran per pekerjaan, cat sisa per teknisi, dan beli ulang berdasarkan pemakaian nyata."
+    },
+    "pengerjaan_ulang": {
+      "label": "Pekerjaan ulang & panggilan balik",
+      "short": "Kerja ulang",
+      "why": "Kualitas yang tidak konsisten memaksa kunjungan kedua yang tidak dibayar.",
+      "fix": "Checklist sebelum meninggalkan lokasi, foto hasil, dan tanda tangan pelanggan."
+    },
+    "air_kimia": {
+      "label": "Air & bahan kimia",
+      "short": "Air & kimia",
+      "why": "Pencampuran tanpa takaran dan pembilasan berlebih memboroskan air serta kimia.",
+      "fix": "Gunakan alat ukur, tablet dosis, dan daur ulang air bilas untuk pekerjaan berat."
+    }
+  },
+  "status": {
+    "open": "Belum ditangani",
+    "progress": "Sedang dikerjakan",
+    "done": "Selesai"
+  },
+  "verdict": {
+    "noRevenue": "Belum ada data pendapatan",
+    "free": "Bebas limbah",
+    "below": "Di bawah patokan",
+    "at": "Sesuai patokan",
+    "above": "Di atas patokan"
+  },
+  "tabsLabel": "Tanpa limbah",
+  "page": {
+    "title": "Bebas limbah",
+    "em": "limbah",
+    "record": "Catat temuan"
+  },
+  "share": {
+    "ofRevenue": "{pct}% dari pendapatan",
+    "ofRecorded": "{pct}% dari pendapatan tercatat",
+    "none": "belum ada pendapatan tercatat"
+  },
+  "ring": {
+    "aria": "Bebas limbah {pct} persen",
+    "caption": "bebas limbah"
+  },
+  "hero": {
+    "clean": "Tidak ada kerugian tercatat yang tersisa",
+    "leaking": "{amount} masih bocor setiap bulan",
+    "text": "Dari {loss} kerugian yang pernah Anda catat, {saved} sudah dihentikan. Sisa {remaining} sama dengan {share}.",
+    "zero": "nol",
+    "noCompare": "— belum ada pendapatan tercatat untuk dibandingkan",
+    "empty": "Belum ada kerugian yang dicatat. Catat satu temuan pertama supaya target 100% bebas limbah punya titik awal yang jujur.",
+    "viewActions": "Lihat tindakan"
+  },
+  "kpi": {
+    "remaining": "Sisa kerugian",
+    "noRevenue": "Belum ada pendapatan tercatat",
+    "stopped": "Sudah dihentikan",
+    "ofRecorded": "dari {amount} tercatat",
+    "winnable": "Masih bisa dihemat",
+    "openFindings": "{count} temuan terbuka",
+    "done": "Temuan selesai",
+    "doneSub": "sudah ditutup"
+  },
+  "streamCard": {
+    "sub": "{count} temuan · {open} terbuka",
+    "perMonth": "sisa / bulan",
+    "barAria": "Terhentikan {pct} persen",
+    "stopped": "{pct}% terhenti",
+    "benchmark": "patokan {pct}% pendapatan"
+  },
+  "plan": {
+    "title": "Jalan terpendek menuju nol",
+    "meta": "Diurutkan dari kebocoran terbesar",
+    "clean": "Semua stream sudah bersih. Pertahankan dengan pemeriksaan bulanan."
+  },
+  "table": {
+    "caption": "Temuan pemborosan dan tindakannya",
+    "finding": "Temuan",
+    "source": "Sumber",
+    "lossMonth": "Kerugian/bln",
+    "stopped": "Terhenti",
+    "remaining": "Sisa",
+    "owner": "Pemilik",
+    "status": "Status",
+    "markDone": "Tandai selesai: {title}",
+    "edit": "Ubah {title}",
+    "delete": "Hapus {title}"
+  },
+  "list": {
+    "note": "{shown} dari {total} temuan · {open} terbuka · {amount} bisa dihemat",
+    "noRows": "Tidak ada baris untuk diekspor.",
+    "exported": "{count} temuan diekspor ke CSV.",
+    "searchPlaceholder": "Cari temuan, tindakan, atau pemilik…",
+    "searchLabel": "Cari temuan pemborosan",
+    "streamFilter": "Saring sumber pemborosan",
+    "allSources": "Semua sumber",
+    "statusFilter": "Saring status temuan",
+    "allStatuses": "Semua status",
+    "bulk": "Impor massal",
+    "export": "Ekspor CSV",
+    "emptyKicker": "Belum ada temuan",
+    "emptyTitle": "Mulai dari kebocoran yang paling Anda rasakan",
+    "emptyBody": "Contoh: teknisi menunggu bahan 45 menit per pekerjaan, atau kunjungan ulang karena noda tidak hilang. Setiap temuan butuh angka kerugian per bulan.",
+    "recordFirst": "Catat temuan pertama",
+    "zero": "0 temuan",
+    "pagerLabel": "temuan pemborosan",
+    "noMatch": "Tidak ada temuan yang cocok. Ubah kata kunci atau saringan."
+  },
+  "csv": {
+    "lossMonth": "Kerugian per bulan",
+    "action": "Tindakan",
+    "created": "Dibuat"
+  },
+  "facts": {
+    "revenue": "Pendapatan",
+    "recordedLoss": "Kerugian tercatat",
+    "perMonth": "{amount}/bln",
+    "stopped": "Sudah terhenti",
+    "open": "Temuan terbuka",
+    "top": "Sumber terbesar",
+    "none": "Tidak ada"
+  },
+  "presets": {
+    "rework": {
+      "label": "Hentikan kunjungan ulang",
+      "problem": "Pekerjaan ulang dan panggilan balik memakan biaya. Saya ingin menekan angka ini sampai nol tanpa memperlambat tim."
+    },
+    "route": {
+      "label": "Rapikan rute & bahan bakar",
+      "problem": "Biaya perjalanan naik karena jadwal tidak diurutkan. Saya ingin menghemat bahan bakar dan jam kerja yang hilang di jalan."
+    },
+    "zero": {
+      "label": "Target 100% bebas limbah",
+      "problem": "Saya ingin menutup semua kebocoran yang tercatat dan mencapai nol kerugian bulanan dalam tiga bulan."
+    }
+  },
+  "editor": {
+    "stream": "Sumber pemborosan",
+    "streamHint": "Pilih satu sumber supaya laporan tidak tercampur.",
+    "title": "Apa yang bocor",
+    "titlePlaceholder": "Contoh: Teknisi menunggu bahan di gudang",
+    "detail": "Bagaimana hal itu terjadi",
+    "detailPlaceholder": "Kapan, di mana, dan seberapa sering.",
+    "loss": "Kerugian per bulan (Rp)",
+    "lossHint": "Perkiraan yang jujur lebih berguna daripada angka yang terlihat bagus.",
+    "saved": "Sudah dihentikan per bulan (Rp)",
+    "savedHint": "Isi nol bila belum ada yang dikerjakan.",
+    "action": "Tindakan",
+    "actionPlaceholder": "Apa yang akan atau sudah dilakukan.",
+    "owner": "Pemilik tindakan",
+    "ownerPlaceholder": "Contoh: Tim Operasional",
+    "status": "Status",
+    "save": "Simpan perubahan",
+    "record": "Catat temuan",
+    "editTitle": "Ubah temuan",
+    "newTitle": "Temuan pemborosan baru",
+    "description": "Satu temuan = satu kebocoran dengan angka dan pemilik. Ini yang membuat target 100% bisa diukur.",
+    "titleRequired": "Tulis dulu apa yang bocor.",
+    "lossRequired": "Kerugian per bulan harus lebih dari nol.",
+    "savedTooHigh": "Yang sudah dihentikan tidak boleh melebihi kerugian tercatat.",
+    "updated": "Temuan diperbarui.",
+    "recorded": "Temuan dicatat."
+  },
+  "common": {
+    "cancel": "Batal",
+    "saving": "Menyimpan…"
+  },
+  "markDone": {
+    "done": "Temuan ditutup, kerugian dihitung terhenti."
+  },
+  "delete": {
+    "confirm": "Hapus",
+    "title": "Hapus temuan?",
+    "description": "\"{title}\" akan dihapus dan tidak lagi dihitung dalam target bebas limbah.",
+    "irreversible": "Tindakan ini tidak bisa dibatalkan.",
+    "busy": "Menghapus…",
+    "done": "Temuan dihapus."
+  },
+  "bulk": {
+    "label": "Tempel data",
+    "hint": "JSON array, atau satu baris per temuan: sumber | judul | kerugian | terhenti | pemilik | status. Sumber: waktu, perjalanan, bahan, pengerjaan_ulang, air_kimia.",
+    "placeholder": "perjalanan | Rute tidak diurutkan antar kecamatan | 900000 | 0 | Tim Operasional | open\nbahan | Dosis kimia berlebih pada kolam kecil | 400000 | 150000 | Tim Operasional | progress",
+    "skip": "Lewati temuan dengan judul yang sudah ada",
+    "dupes": " · {count} sudah ada{skipped}",
+    "andSkipped": " dan dilewati",
+    "preview": "{count} temuan baru{extra}. Contoh: {title} — {amount}",
+    "import": "Impor",
+    "title": "Impor massal temuan",
+    "description": "Tempel dari spreadsheet. Seluruh baris ditolak bila ada satu yang tidak valid, supaya hitungan tidak setengah jadi.",
+    "allDupes": "Semua temuan sudah ada. Tidak ada yang diimpor.",
+    "importing": "Mengimpor…",
+    "done": "{count} temuan diimpor{skipped}.",
+    "skippedCount": ", {count} dilewati"
+  },
+  "load": {
+    "retry": "Coba lagi",
+    "failed": "Gagal memuat data: {error}"
+  },
+  "parse": {
+    "line": "Baris {line}: {error}",
+    "empty": "Tidak ada data untuk diimpor.",
+    "badJson": "JSON tidak valid. Periksa koma dan tanda kutip.",
+    "notArray": "JSON harus berupa daftar temuan."
+  }
+}

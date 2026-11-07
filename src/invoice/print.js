@@ -4,20 +4,26 @@
  * "Simpan sebagai PDF" on desktop and phone without a PDF library.
  */
 import { lineAmount, statusLabel } from './rules.js'
+import { t, has, locale, getLang } from '../i18n/index.js'
 
+// Node tests import this module without the Vite dictionaries: then the Indonesian text below is used.
+const ready = () => has('invoice.title')
+const tx = (key, id, vars = {}) => (ready() ? t(key, vars) : id.replace(/\{(\w+)\}/g, (m, k) => (vars[k] != null ? String(vars[k]) : m)))
+const loc = () => (ready() ? locale() : 'id-ID')
+const statusText = (s) => (ready() && has(`invoice.status.${s}`) ? t(`invoice.status.${s}`) : statusLabel(s))
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-const rp = (n) => `Rp ${Math.round(Number(n) || 0).toLocaleString('id-ID')}`
-const qtyFmt = (n) => Number(n || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 })
+const rp = (n) => `Rp ${Math.round(Number(n) || 0).toLocaleString(loc())}`
+const qtyFmt = (n) => Number(n || 0).toLocaleString(loc(), { maximumFractionDigits: 2 })
 function dateFmt(iso) {
   if (!iso) return '—'
   const d = new Date(`${String(iso).slice(0, 10)}T00:00:00`)
-  return Number.isNaN(d.getTime()) ? esc(iso) : d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+  return Number.isNaN(d.getTime()) ? esc(iso) : d.toLocaleDateString(loc(), { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-export function invoiceHtml(inv, items, { businessName = 'Usaha Anda', businessEmail = '', demo = false } = {}) {
+export function invoiceHtml(inv, items, { businessName = tx('invoice.print.yourBusiness', 'Usaha Anda'), businessEmail = '', demo = false } = {}) {
   const rows = (items || []).map((it, i) => `<tr><td class="n">${i + 1}</td><td>${esc(it.description)}</td><td class="r">${qtyFmt(it.qty)}</td><td class="r">${rp(it.unit_price)}</td><td class="r">${rp(lineAmount(it))}</td></tr>`).join('')
   const paid = inv.status === 'lunas'
-  return `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  return `<!doctype html><html lang="${ready() ? getLang() : 'id'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(inv.number)} · ${esc(businessName)}</title>
 <style>
 @page { size: A4; margin: 16mm 14mm; }
@@ -48,23 +54,23 @@ td.n { width: 28px; color: #5c6b63; }
 </style></head><body><div class="doc">
 <div class="top">
   <div><div class="brand">${esc(businessName)}</div>${businessEmail ? `<div class="muted">${esc(businessEmail)}</div>` : ''}</div>
-  <div><h1>Invoice</h1><div class="meta"><strong>${esc(inv.number)}</strong><br>Tanggal: ${dateFmt(inv.issue_date)}<br>Jatuh tempo: ${dateFmt(inv.due_date)}<br><span class="chip">${esc(statusLabel(inv.status))}</span></div></div>
+  <div><h1>Invoice</h1><div class="meta"><strong>${esc(inv.number)}</strong><br>${esc(tx('invoice.print.date', 'Tanggal:'))} ${dateFmt(inv.issue_date)}<br>${esc(tx('invoice.print.due', 'Jatuh tempo:'))} ${dateFmt(inv.due_date)}<br><span class="chip">${esc(statusText(inv.status))}</span></div></div>
 </div>
 <div class="parties">
-  <div><div class="label">Ditagihkan kepada</div><strong>${esc(inv.customer_name)}</strong>${inv.customer_address ? `<br>${esc(inv.customer_address)}` : ''}${inv.customer_phone ? `<br>${esc(inv.customer_phone)}` : ''}${inv.customer_email ? `<br>${esc(inv.customer_email)}` : ''}</div>
-  <div>${paid && inv.paid_at ? `<div class="label">Dibayar</div>${dateFmt(inv.paid_at)}` : ''}</div>
+  <div><div class="label">${esc(tx('invoice.print.billTo', 'Ditagihkan kepada'))}</div><strong>${esc(inv.customer_name)}</strong>${inv.customer_address ? `<br>${esc(inv.customer_address)}` : ''}${inv.customer_phone ? `<br>${esc(inv.customer_phone)}` : ''}${inv.customer_email ? `<br>${esc(inv.customer_email)}` : ''}</div>
+  <div>${paid && inv.paid_at ? `<div class="label">${esc(tx('invoice.print.paid', 'Dibayar'))}</div>${dateFmt(inv.paid_at)}` : ''}</div>
 </div>
-<table><thead><tr><th>#</th><th>Keterangan</th><th class="r">Jumlah</th><th class="r">Harga</th><th class="r">Subtotal</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>#</th><th>${esc(tx('invoice.print.desc', 'Keterangan'))}</th><th class="r">${esc(tx('invoice.print.qty', 'Jumlah'))}</th><th class="r">${esc(tx('invoice.print.price', 'Harga'))}</th><th class="r">${esc(tx('invoice.print.subtotal', 'Subtotal'))}</th></tr></thead><tbody>${rows}</tbody></table>
 <div class="totals">
-  <div><span>Subtotal</span><span>${rp(inv.subtotal)}</span></div>
-  ${Number(inv.discount) > 0 ? `<div><span>Diskon</span><span>−${rp(inv.discount)}</span></div>` : ''}
-  ${Number(inv.tax_amount) > 0 ? `<div><span>PPN ${qtyFmt(inv.tax_rate)}%</span><span>${rp(inv.tax_amount)}</span></div>` : ''}
+  <div><span>${esc(tx('invoice.print.subtotal', 'Subtotal'))}</span><span>${rp(inv.subtotal)}</span></div>
+  ${Number(inv.discount) > 0 ? `<div><span>${esc(tx('invoice.print.discount', 'Diskon'))}</span><span>−${rp(inv.discount)}</span></div>` : ''}
+  ${Number(inv.tax_amount) > 0 ? `<div><span>${esc(tx('invoice.print.tax', 'PPN {rate}%', { rate: qtyFmt(inv.tax_rate) }))}</span><span>${rp(inv.tax_amount)}</span></div>` : ''}
   <div class="grand"><span>Total</span><span>${rp(inv.total)}</span></div>
 </div>
-${inv.payment_info ? `<div class="box"><div class="label">Cara pembayaran</div>${esc(inv.payment_info)}</div>` : ''}
-${inv.notes ? `<div class="box"><div class="label">Catatan</div>${esc(inv.notes)}</div>` : ''}
-${demo ? '<div class="demo">Dokumen contoh dari akun demo — data fiktif.</div>' : ''}
-<div class="foot">Dibuat dengan Satu Alur</div>
+${inv.payment_info ? `<div class="box"><div class="label">${esc(tx('invoice.print.payment', 'Cara pembayaran'))}</div>${esc(inv.payment_info)}</div>` : ''}
+${inv.notes ? `<div class="box"><div class="label">${esc(tx('invoice.print.notes', 'Catatan'))}</div>${esc(inv.notes)}</div>` : ''}
+${demo ? `<div class="demo">${esc(tx('invoice.print.demo', 'Dokumen contoh dari akun demo — data fiktif.'))}</div>` : ''}
+<div class="foot">${esc(tx('invoice.print.foot', 'Dibuat dengan Satu Alur'))}</div>
 </div></body></html>`
 }
 

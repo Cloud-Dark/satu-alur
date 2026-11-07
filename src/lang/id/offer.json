@@ -1,0 +1,208 @@
+{
+  "title": "Penawaran",
+  "newTitle": "Penawaran baru",
+  "loading": "Memuat…",
+  "service": "layanan",
+  "schedule": "Jadwal pelaksanaan",
+  "composing": "Menyusun…",
+  "saving": "Menyimpan…",
+  "aiUnavailableShort": "AI sedang tidak tersedia",
+  "aiUnavailable": "AI sedang tidak tersedia. Periksa koneksi lalu muat ulang halaman.",
+  "saveError": "Gagal menyimpan: {error}",
+  "loadError": "Gagal memuat: {error}",
+  "status": {
+    "approved": "Disetujui",
+    "rejected": "Ditolak",
+    "draft": "Draf"
+  },
+  "pick": {
+    "request": "Permintaan",
+    "requestHint": "Permintaan tanpa penawaran ditampilkan lebih dulu.",
+    "template": "Template penawaran",
+    "templateHint": "Opsional. Template menambah pertanyaan khusus agar penawaran lebih tepat.",
+    "noTemplate": "Tanpa template",
+    "choose": "Pilih",
+    "chooseRequest": "Pilih permintaan",
+    "noRequests": "Belum ada permintaan",
+    "alreadyOffered": " (sudah ditawarkan)",
+    "noRequestsNote": "Belum ada permintaan. Buat permintaan di tahap 01 terlebih dahulu.",
+    "toRequests": "Ke permintaan"
+  },
+  "preview": {
+    "service": "Layanan: {value}",
+    "location": "Lokasi: {value}",
+    "phone": "Telepon: {value}",
+    "noDesc": "Belum ada deskripsi kebutuhan."
+  },
+  "wiz": {
+    "label": "Susun penawaran",
+    "pick": "Pilih permintaan",
+    "pickDesc": "Pelanggan mana yang akan ditawari, dan pakai template apa?",
+    "compose": "Susun dengan AI",
+    "composeDesc": "AI mengambil data klien, menyusun penawaran, PDF, dan draf pesan.",
+    "next": "Lanjut",
+    "retry": "Coba lagi",
+    "generate": "Hasilkan penawaran",
+    "review": "Tinjau & simpan",
+    "reviewDesc": "Semua isian bisa diubah sebelum disimpan.",
+    "save": "Simpan penawaran"
+  },
+  "error": {
+    "pickRequest": "Pilih permintaan terlebih dahulu."
+  },
+  "pipe": {
+    "aria": "Proses penyusunan penawaran",
+    "title": "Proses AI",
+    "stop": "Hentikan",
+    "state": {
+      "pending": "menunggu",
+      "running": "berjalan",
+      "done": "selesai",
+      "error": "gagal",
+      "stopped": "dihentikan"
+    },
+    "step": {
+      "data": "Mengambil data klien",
+      "schedule": "Menyesuaikan jadwal",
+      "offer": "Membuat penawaran berdasarkan kebutuhan klien",
+      "pdf": "Membuat PDF penawaran",
+      "email": "Membuat draf email & WhatsApp",
+      "review": "Membuat draf tinjauan"
+    },
+    "seconds": "{n} dtk",
+    "retryHere": "Ulangi dari sini",
+    "stopped": "Proses dihentikan. Tidak ada yang disimpan.",
+    "data": {
+      "hasPhone": "Telepon ada",
+      "noPhone": "Tanpa telepon",
+      "previous": {
+        "one": "{count} permintaan sebelumnya dari pelanggan ini",
+        "other": "{count} permintaan sebelumnya dari pelanggan ini"
+      },
+      "newCustomer": "Pelanggan baru",
+      "similar": {
+        "one": "{count} penawaran serupa",
+        "other": "{count} penawaran serupa"
+      },
+      "noSimilar": "Belum ada penawaran serupa"
+    },
+    "why": {
+      "client": "Sesuai permintaan klien.",
+      "free": "Hari kerja terdekat yang masih kosong.",
+      "lightest": "Hari kerja dengan tugas paling sedikit."
+    },
+    "previewPdf": "Pratinjau PDF",
+    "number": "Nomor {number}",
+    "emailSubject": "Email: \"{subject}\""
+  },
+  "live": {
+    "waiting": "menunggu…"
+  },
+  "field": {
+    "scope": "Ruang lingkup",
+    "price": "Harga",
+    "terms": "Ketentuan",
+    "notes": "Catatan",
+    "finalPrice": "Harga final (Rp)"
+  },
+  "review": {
+    "aiSuggestion": "Usulan AI",
+    "scheduleHint": "Disimpan sebagai jadwal yang diminta klien dan dipakai di Penugasan.",
+    "mailSubject": "Subjek email",
+    "mailBody": "Isi email",
+    "waBody": "Pesan WhatsApp",
+    "notes": "Draf tinjauan",
+    "mailDraft": "Draf email",
+    "waDraft": "Draf WhatsApp"
+  },
+  "rules": {
+    "aria": "Hasil aturan domain",
+    "title": "Aturan domain",
+    "price": "Harga {min} – {max}",
+    "priceFull": "Harga dalam rentang {min} – {max}",
+    "scope": "Lingkup ≥ 10 kar.",
+    "scopeFull": "Ruang lingkup minimal 10 karakter",
+    "terms": "Ketentuan ≥ 10 kar.",
+    "termsFull": "Ketentuan minimal 10 karakter",
+    "pass": "lolos",
+    "fail": "belum lolos"
+  },
+  "actions": {
+    "pdf": "Unduh PDF",
+    "email": "Kirim email",
+    "wa": "Kirim WhatsApp",
+    "noPhone": "Nomor telepon pelanggan belum ada",
+    "waShort": "WhatsApp"
+  },
+  "done": {
+    "assign": "Tugaskan pekerja",
+    "another": "Buat penawaran lain",
+    "view": "Lihat penawaran",
+    "text": "Penawaran {price} untuk {name} disimpan dan disetujui.",
+    "toast": "Penawaran disimpan."
+  },
+  "detail": {
+    "notFound": "Penawaran tidak ditemukan.",
+    "notFoundBody": "Mungkin sudah dihapus. Pilih pekerjaan lain dari Alur kerja.",
+    "service": "Layanan",
+    "location": "Lokasi",
+    "phone": "Telepon",
+    "schedule": "Jadwal",
+    "status": "Status",
+    "created": "Dibuat",
+    "approve": "Setujui",
+    "redo": "Susun ulang dengan AI",
+    "assign": "Tugaskan",
+    "viewAssignment": "Lihat penugasan",
+    "assigned": "Ditugaskan",
+    "waAria": "Kirim penawaran ke {name} via WhatsApp",
+    "number": "Penawaran #{id}",
+    "invalid": "Penawaran #{id} tidak lolos validasi.",
+    "approving": "Menyetujui…",
+    "approvedToast": "Penawaran disetujui.",
+    "approveError": "Gagal menyetujui: {error}"
+  },
+  "reviewDraft": {
+    "priceInLine": {
+      "one": "Harga sejalan dengan {count} penawaran serupa (rata-rata {avg}).",
+      "other": "Harga sejalan dengan {count} penawaran serupa (rata-rata {avg})."
+    },
+    "priceAbove": {
+      "one": "Harga {pct}% di atas rata-rata {count} penawaran serupa ({avg}). Pastikan nilainya sepadan.",
+      "other": "Harga {pct}% di atas rata-rata {count} penawaran serupa ({avg}). Pastikan nilainya sepadan."
+    },
+    "priceBelow": {
+      "one": "Harga {pct}% di bawah rata-rata {count} penawaran serupa ({avg}). Periksa margin Anda.",
+      "other": "Harga {pct}% di bawah rata-rata {count} penawaran serupa ({avg}). Periksa margin Anda."
+    },
+    "noHistory": "Belum ada penawaran serupa sebagai pembanding harga.",
+    "outOfRange": "Harga di luar kisaran template \"{name}\".",
+    "inRange": "Harga dalam kisaran template \"{name}\".",
+    "noPhone": "Nomor telepon pelanggan belum ada, jadi penawaran belum bisa dikirim lewat WhatsApp.",
+    "noSchedule": "Jadwal pelaksanaan belum ditentukan.",
+    "shortDesc": "Deskripsi kebutuhan singkat; harga bisa berubah setelah survei.",
+    "estimate": "Penawaran menyebut estimasi; jelaskan kapan harga final dikunci.",
+    "recheck": "Cek ulang: ruang lingkup sesuai permintaan, ketentuan pembayaran, dan masa berlaku penawaran.",
+    "warnSummary": {
+      "one": "{count} hal perlu diperhatikan sebelum dikirim.",
+      "other": "{count} hal perlu diperhatikan sebelum dikirim."
+    },
+    "readySummary": "Siap dikirim setelah Anda meninjau isinya."
+  },
+  "doc": {
+    "yourBusiness": "Usaha Anda",
+    "sub": "Penawaran layanan",
+    "title": "Penawaran",
+    "number": "No. {number}",
+    "date": "Tanggal {date}",
+    "validUntil": "Berlaku sampai {date}",
+    "to": "Untuk",
+    "service": "Layanan",
+    "schedule": "Jadwal: {date}",
+    "total": "Total harga",
+    "regards": "Hormat kami,",
+    "approvedBy": "Disetujui oleh,",
+    "customer": "Pelanggan",
+    "foot": "Penawaran ini dibuat dengan Satu Alur. Harga dalam Rupiah. Balas pesan ini untuk menyetujui atau bertanya."
+  }
+}

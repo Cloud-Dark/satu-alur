@@ -1,0 +1,148 @@
+{
+  "stages": {
+    "dashboard": {
+      "label": "Ringkasan",
+      "hint": "Ringkasan alur kerja dan keuangan, dihitung langsung dari data Anda.",
+      "action": "Alur kerja"
+    },
+    "workflow": {
+      "label": "Alur kerja",
+      "sub": "Semua pekerjaan",
+      "hint": "Satu baris untuk satu pekerjaan pelanggan, dari permintaan sampai pembukuan. Kolom Posisi menunjukkan sudah sampai mana; tombol Langkah berikutnya membuka tahap yang perlu dikerjakan.",
+      "action": "Permintaan baru"
+    },
+    "request": {
+      "label": "Permintaan",
+      "hint": "Catat kebutuhan pelanggan. Statusnya ikut bergerak sesuai tahap alur.",
+      "action": "Ke penawaran"
+    },
+    "offer": {
+      "label": "Penawaran",
+      "hint": "AI menyusun ruang lingkup dan harga, lalu aturan bisnis memeriksanya sebelum disimpan.",
+      "action": "Ke penugasan"
+    },
+    "assign": {
+      "label": "Penugasan",
+      "hint": "Jadwalkan siapa yang mengerjakan penawaran yang sudah disetujui, dan kapan.",
+      "action": "Ke penyelesaian"
+    },
+    "complete": {
+      "label": "Penyelesaian",
+      "hint": "Tutup penugasan yang sudah dikerjakan agar siap dibukukan.",
+      "action": "Ke pembukuan"
+    },
+    "bookkeeping": {
+      "label": "Pembukuan",
+      "hint": "Catat pendapatan dan biaya tiap pekerjaan. Saldo dihitung berjalan.",
+      "action": "Lihat laporan"
+    },
+    "report": {
+      "label": "Laporan",
+      "sub": "Untung & rugi",
+      "hint": "Angka periode terpilih dari buku besar, plus penjelasan AI.",
+      "action": "Permintaan baru"
+    },
+    "invoice": {
+      "label": "Invoice",
+      "sub": "Tagihan pelanggan",
+      "hint": "Buat invoice dari pekerjaan selesai, kirim lewat email atau WhatsApp, lalu tandai lunas. Pendapatannya otomatis masuk Pembukuan.",
+      "action": "Lihat laporan"
+    },
+    "vas": {
+      "label": "Layanan tambahan",
+      "sub": "VAS & katalog",
+      "hint": "Dua cara menambah pendapatan: jual layanan tambahan ke pekerjaan yang sudah ada, dan hentikan kebocoran biaya. Di sini Anda menemukan peluang VAS, mengelola katalognya, lalu membahas rencananya bersama lima tim AI.",
+      "action": "Cek kebocoran"
+    },
+    "zeroWaste": {
+      "label": "Tanpa limbah",
+      "sub": "Lima sumber pemborosan",
+      "hint": "Ukur waktu menganggur, perjalanan, bahan, pekerjaan ulang, serta air dan kimia dalam Rupiah. Catat temuan, jalankan tindakannya, dan lihat seberapa dekat Anda ke nol kerugian.",
+      "action": "Tambah pendapatan"
+    },
+    "radar": {
+      "label": "Radar peluang",
+      "sub": "Peluang dari transaksi",
+      "hint": "Peluang dari transaksi Anda sendiri: layanan rutin jatuh tempo, pelanggan yang menghilang, penawaran tertahan, dan musim ramai.",
+      "action": "Tanya penasihat"
+    },
+    "leads": {
+      "label": "Pencari prospek",
+      "sub": "Peta & radius",
+      "hint": "Pilih titik dan radius, tentukan jenis usaha. AI menilai kecocokannya dan membantu menyusun penawaran. Tidak ada pesan yang dikirim otomatis.",
+      "action": "Ke penawaran"
+    },
+    "socialMedia": {
+      "label": "Media Sosial",
+      "sub": "Konten & jadwal",
+      "hint": "Hubungkan Facebook dan Instagram, tulis konten dengan AI, jadwalkan tayang, dan ajukan iklan atau kolaborasi.",
+      "action": "Tanya penasihat"
+    },
+    "advisor": {
+      "label": "Penasihat AI",
+      "sub": "Multi-agen bisnis",
+      "hint": "Penasihat AI yang membaca angka bisnis Anda. Percakapan tersimpan di perangkat ini.",
+      "action": "Ke ringkasan"
+    },
+    "aiAssistant": {
+      "label": "AI Superpowers",
+      "sub": "Asisten & tool",
+      "hint": "Asisten AI dengan tool kalkulator, data bisnis, dan format rupiah. Percakapan tersimpan di memori sesi.",
+      "action": "Media Sosial"
+    },
+    "pertumbuhan": {
+      "label": "Pertumbuhan",
+      "action": "AI Superpowers"
+    },
+    "plan": {
+      "label": "Paket & kuota",
+      "sub": "Kuota AI & voucher",
+      "hint": "Paket Anda, sisa kuota AI bulan ini, saldo AI, dan tukar voucher.",
+      "action": "Ke ringkasan"
+    },
+    "support": {
+      "label": "Bantuan",
+      "sub": "Tiket ke tim Satu Alur",
+      "hint": "Kirim pertanyaan atau keluhan ke tim Satu Alur dan ikuti balasannya di sini.",
+      "action": "Ke ringkasan"
+    }
+  },
+  "nav": {
+    "stage": "Tahap {num}",
+    "stageTitle": "Tahap {num} · {label}",
+    "collapse": "Ciutkan sidebar",
+    "expand": "Lebarkan sidebar",
+    "closeMenu": "Tutup menu",
+    "openMenu": "Buka menu",
+    "settings": "Pengaturan",
+    "backToBusiness": "Kembali ke usaha saya",
+    "office": "Kantor Satu Alur",
+    "signOut": "Keluar",
+    "income": "Pendapatan",
+    "incomeCount": "2 cara",
+    "growth": "Pertumbuhan",
+    "growthCount": "AI",
+    "officeMenu": "Menu Kantor Satu Alur",
+    "flowNav": "Navigasi alur",
+    "officeSections": "Bagian Kantor Satu Alur",
+    "flowStages": "Tahap alur",
+    "user": "Pengguna",
+    "pending": "{n} menunggu tindakan",
+    "skip": "Lewati ke konten"
+  },
+  "crumb": {
+    "home": "Satu Alur",
+    "workflow": "Alur kerja",
+    "about": "Tentang {label}",
+    "backToWorkflow": "Kembali ke alur kerja"
+  },
+  "drawer": {
+    "close": "Tutup pengaturan",
+    "closeTitle": "Tutup (Esc)",
+    "pre": "Konfigurasi ruang kerja",
+    "title": "Peng<em>aturan</em>",
+    "note": "Perubahan tersimpan otomatis di browser ini.",
+    "done": "Selesai"
+  },
+  "loadFailed": "Gagal memuat tahap {label}: {error}"
+}

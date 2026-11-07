@@ -7,6 +7,7 @@ import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
 import { demoConnected } from '../integrations/connectors.js'
 import { WA_LIMITS, normalizePhone, maskPhone, dayWib, validateText } from './rules.js'
+import { t } from '../i18n/index.js'
 
 const TOKEN_KEY = 'satualur_token'
 const DEMO_KEY = 'satualur_wa_demo_v1'
@@ -24,7 +25,7 @@ async function call(path, { method = 'GET', body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('settings.common.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -60,9 +61,9 @@ export async function status() {
     return {
       enabled: true, demo: false, provider, configured, connected: configured,
       providers: PROVIDERS.map((key) => ({ key, label: PROVIDER_LABEL[key], connected: connected.includes(key) })),
-      device: configured ? { name: `Perangkat ${PROVIDER_LABEL[provider]} (simulasi)`, online: true, number_masked: '62812****000' } : null,
+      device: configured ? { name: t('settings.wa.demoDevice', { provider: PROVIDER_LABEL[provider] }), online: true, number_masked: '62812****000' } : null,
       license: configured && provider === 'wapilot' ? { status: 'active', days_left: 30, expires_at: null, type: 'demo' } : null,
-      note: configured ? 'Mode demo: pesan hanya disimulasikan.' : undefined,
+      note: configured ? t('settings.wa.demoNote') : undefined,
       limits: { per_day: WA_LIMITS.perUserDay }, used_today: usedToday(s),
     }
   }
@@ -74,7 +75,7 @@ export async function send({ requestId = null, phone = '', text, kind = 'custom'
   const v = validateText(text)
   if (v.error) throw new Error(v.error)
   let target = phone ? normalizePhone(phone) : null
-  if (phone && !target) throw new Error('Masukkan nomor WhatsApp Indonesia yang valid, misalnya 0812 3456 7890.')
+  if (phone && !target) throw new Error(t('settings.wa.badPhone'))
   if (isUsingMockCloud()) {
     if (!target && requestId) {
       const { data } = await getCloud().database.from('requests').select('*').eq('id', Number(requestId)).maybeSingle()

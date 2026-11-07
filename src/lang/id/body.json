@@ -1,0 +1,569 @@
+{
+  "meta": {
+    "title": "Satu Alur — Operasi jasa dalam satu alur, ditenagai AI",
+    "description": "Satu Alur menyatukan permintaan, penawaran AI, penugasan, penyelesaian, pembukuan, dan laporan bisnis jasa Anda dalam satu alur kerja."
+  },
+  "example": "Contoh",
+  "content": {
+    "hero": {
+      "badge": "Untuk bisnis jasa di Indonesia · ditenagai AI",
+      "title": "Bisnis jasa Anda, *tumbuh* dalam satu alur.",
+      "subtitle": "Satu Alur menyatukan permintaan, penawaran, penugasan, pembukuan, dan laporan dalam satu alur kerja. Setelah rapi, dua mesin menyusul: pendapatan dari layanan tambahan, dan pertumbuhan dari data Anda sendiri."
+    },
+    "heroPoints": [
+      "Masuk cukup dengan email (OTP)",
+      "Penawaran AI selalu divalidasi",
+      "Pendapatan & pertumbuhan sudah aktif",
+      "Data aman di cloud"
+    ],
+    "stages": [
+      {
+        "title": "Permintaan",
+        "desc": "Setiap permintaan pelanggan tercatat rapi di satu tempat, bukan tercecer di chat.",
+        "out": "Daftar permintaan"
+      },
+      {
+        "title": "Penawaran AI",
+        "desc": "AI menyusun ruang lingkup, harga, dan ketentuan, lalu aturan domain memeriksanya.",
+        "out": "Proposal tervalidasi"
+      },
+      {
+        "title": "Penugasan",
+        "desc": "Tetapkan pekerja dan jadwal untuk penawaran yang sudah disetujui.",
+        "out": "Pekerja & jadwal"
+      },
+      {
+        "title": "Penyelesaian",
+        "desc": "Catat hasil pekerjaan di lapangan; status penugasan ikut diperbarui.",
+        "out": "Catatan hasil kerja"
+      },
+      {
+        "title": "Pembukuan",
+        "desc": "Pendapatan dan biaya masuk jurnal, laba/rugi langsung terlihat.",
+        "out": "Jurnal & laba/rugi"
+      },
+      {
+        "title": "Laporan AI",
+        "desc": "Ringkasan keuangan dijelaskan AI dalam bahasa yang mudah dipahami.",
+        "out": "Laporan + penjelasan"
+      }
+    ],
+    "ticker": [
+      {
+        "label": "Permintaan terpusat"
+      },
+      {
+        "label": "Penawaran AI"
+      },
+      {
+        "label": "Validasi aturan domain"
+      },
+      {
+        "label": "Penugasan & jadwal"
+      },
+      {
+        "label": "Catatan penyelesaian"
+      },
+      {
+        "label": "Jurnal & laba/rugi"
+      },
+      {
+        "label": "Laporan dijelaskan AI"
+      },
+      {
+        "label": "Katalog layanan tambahan"
+      },
+      {
+        "label": "Lima aliran pemborosan"
+      },
+      {
+        "label": "Ruang optimasi lima tim"
+      },
+      {
+        "label": "Radar peluang"
+      },
+      {
+        "label": "Pencari prospek"
+      },
+      {
+        "label": "Konten & jadwal media sosial"
+      },
+      {
+        "label": "Jawaban AI langsung mengalir"
+      },
+      {
+        "label": "Login email OTP"
+      },
+      {
+        "label": "Data aman di cloud"
+      }
+    ],
+    "features": [
+      {
+        "title": "Penawaran AI dengan validasi aturan domain",
+        "desc": "AI mengusulkan ruang lingkup, harga, dan ketentuan. Sebelum disimpan, aturan bisnis memeriksa rentang harga dan kelengkapan isi, jadi tidak ada proposal asal jadi."
+      },
+      {
+        "title": "Laporan yang dijelaskan dengan bahasa biasa",
+        "desc": "Angka laba/rugi diterjemahkan menjadi penjelasan singkat: apa yang naik, apa yang turun, dan apa yang perlu diperhatikan."
+      },
+      {
+        "title": "Ruang optimasi lima tim AI",
+        "desc": "Kreatif, pemasaran, keuangan, operasional, dan riset bekerja paralel atas angka bisnis Anda, lalu satu pemimpin menyimpulkan. Cocok untuk keputusan yang tidak muat di satu kepala."
+      },
+      {
+        "title": "Agent Skill Editor",
+        "desc": "Ubah prompt agen, temperature, dan batas token sesuai gaya bisnis Anda. AI mengikuti cara Anda bekerja, bukan sebaliknya."
+      },
+      {
+        "title": "Konektor WhatsApp & Email",
+        "desc": "Permintaan masuk dan penawaran keluar lewat kanal yang sudah dipakai pelanggan Anda.",
+        "tag": "Roadmap"
+      }
+    ],
+    "income": {
+      "eyebrow": "Pendapatan",
+      "title": "Pekerjaan yang sama, nilai yang *lebih*.",
+      "lede": "Dua menu untuk menambah nilai pekerjaan: temukan peluang add-on dari data operasi, kelola katalognya, lalu catat pemborosan dan penghematan yang sudah Anda capai.",
+      "engines": [
+        {
+          "kicker": "Layanan tambahan",
+          "title": "Jual add-on tanpa menebak",
+          "desc": "Satu Alur membaca jenis jasa yang paling sering Anda kerjakan, lalu menunjukkan add-on yang masuk akal untuk ditawarkan — dengan harga, biaya langsung, dan perkiraan serapan.",
+          "points": [
+            "Katalog add-on dalam enam kategori",
+            "Atur perkiraan serapan untuk setiap item",
+            "Porsi add-on terukur di jurnal, bukan dikira-kira"
+          ],
+          "preview": {
+            "title": "Katalog add-on",
+            "rows": [
+              {
+                "name": "Cuci karpet",
+                "price": "Rp75 rb"
+              },
+              {
+                "name": "Isi freon",
+                "price": "Rp180 rb"
+              },
+              {
+                "name": "Kontrak perawatan",
+                "price": "Rp450 rb"
+              }
+            ],
+            "footer": {
+              "label": "Potensi per bulan",
+              "value": "+Rp1,8 jt"
+            }
+          }
+        },
+        {
+          "kicker": "Tanpa limbah",
+          "title": "Hentikan kebocoran, satu per satu",
+          "desc": "Waktu menganggur, perjalanan, bahan terbuang, pekerjaan ulang, serta air dan kimia dihitung dalam Rupiah. Angka bebas limbah menunjukkan kemajuan nyata, bukan perasaan.",
+          "points": [
+            "Lima aliran pemborosan, semuanya dalam Rupiah",
+            "Rencana penutupan diurutkan dari kebocoran terbesar",
+            "Tandai selesai setelah penghematan terkonfirmasi"
+          ],
+          "preview": {
+            "title": "Kebocoran bulan ini",
+            "rows": [
+              {
+                "label": "Waktu tunggu",
+                "value": "Rp1,4 jt"
+              },
+              {
+                "label": "Perjalanan",
+                "value": "Rp980 rb"
+              },
+              {
+                "label": "Bahan terbuang",
+                "value": "Rp620 rb"
+              }
+            ],
+            "footer": {
+              "label": "Bebas limbah",
+              "value": "62%"
+            }
+          }
+        }
+      ],
+      "room": {
+        "kicker": "Ruang optimasi",
+        "title": "Lima tim AI, satu kesimpulan",
+        "desc": "Setiap menu Pendapatan punya ruang kerja yang sama: lima tim AI membaca angka Anda secara paralel, lalu satu pemimpin menyimpulkan langkah berikutnya. Anda memilih salah satu dari tiga ringkasan singkat — tanpa menulis prompt.",
+        "teams": [
+          "Kreatif",
+          "Pemasaran",
+          "Keuangan",
+          "Operasional",
+          "Riset"
+        ],
+        "lead": "Pimpinan optimasi",
+        "briefs": [
+          "Naikkan serapan add-on",
+          "Tutup kebocoran terbesar",
+          "Bundel untuk pelanggan tetap"
+        ]
+      }
+    },
+    "growth": {
+      "eyebrow": "Pertumbuhan",
+      "title": "Setelah rapi, giliran *bertumbuh*.",
+      "lede": "Radar dan penasihat membaca data alur Anda. Pencari prospek membantu menemukan calon pelanggan, Media Sosial mengelola konten, dan contoh rekomendasi menunjukkan cara menilai peluang.",
+      "cards": [
+        {
+          "title": "Radar peluang",
+          "desc": "Layanan rutin yang jatuh tempo, pelanggan yang menghilang, penawaran yang tertahan, dan musim ramai — ditemukan dari transaksi Anda sendiri, bukan dari daftar beli.",
+          "chips": [
+            {
+              "label": "Servis rutin jatuh tempo"
+            },
+            {
+              "label": "Pelanggan belum kembali"
+            },
+            {
+              "label": "Penawaran tertahan"
+            }
+          ]
+        },
+        {
+          "title": "Rekomendasi & prediksi",
+          "desc": "Jelajahi contoh skor peluang, estimasi nilai, dan probabilitas berhasil. Bagian ini memakai data demonstrasi untuk memperlihatkan cara membaca rekomendasi.",
+          "stat": {
+            "label": "Skor peluang",
+            "rows": [
+              [
+                "Estimasi nilai",
+                "Rp54 jt/bln"
+              ],
+              [
+                "Peluang berhasil",
+                "78%"
+              ]
+            ]
+          }
+        },
+        {
+          "title": "Pencari prospek",
+          "desc": "Pilih titik dan radius di peta, tentukan jenis usaha. AI menilai kecocokan dan menyiapkan penawarannya. Tidak ada pesan yang terkirim otomatis.",
+          "leads": [
+            {
+              "name": "Kafe · Kemang",
+              "value": "Rp4,2 jt"
+            },
+            {
+              "name": "Klinik · Tebet",
+              "value": "Rp2,8 jt"
+            }
+          ]
+        },
+        {
+          "title": "Media Sosial",
+          "desc": "Tulis konten dengan AI, jadwalkan tayang ke Facebook, Instagram, atau Threads yang sudah terhubung, lalu ajukan iklan atau kolaborasi ke tim Satu Alur.",
+          "post": {
+            "headline": "Servis AC",
+            "sub": "sebelum musim hujan",
+            "caption": "Servis AC sebelum musim hujan — slot minggu ini masih ada. Booking lewat DM ya!",
+            "when": "Sab, 08.00"
+          }
+        }
+      ],
+      "assistants": [
+        {
+          "title": "Penasihat AI",
+          "desc": "Tanya \"kenapa laba turun bulan ini?\" dan jawabannya memakai angka dari alur Anda, bukan tebakan umum. Percakapan tersimpan di perangkat Anda.",
+          "sample": "Laba turun 12% karena dua biaya perjalanan naik dan satu pekerjaan belum ditagih."
+        },
+        {
+          "title": "AI Superpowers",
+          "desc": "Asisten dengan alat hitung, data bisnis, dan format Rupiah — untuk pekerjaan yang tidak muat di satu formulir.",
+          "tools": [
+            "Kalkulator",
+            "Data bisnis",
+            "Format Rupiah"
+          ]
+        }
+      ],
+      "note": "Hubungkan platform yang ingin dipakai: Halaman Facebook, Instagram Bisnis yang tertaut ke Halaman Facebook, atau akun Threads."
+    },
+    "integration": {
+      "eyebrow": "Bukan mulai dari nol",
+      "title": "Satu Alur *melengkapi* sistem yang sudah berjalan.",
+      "lede": "Anda tidak perlu membuang ERP, aplikasi kasir, atau spreadsheet yang sudah dipakai bertahun-tahun. Hubungkan sumbernya, petakan kolomnya, lalu pindahkan data bertahap — sementara dua sistem tetap berjalan berdampingan.",
+      "badge": "Enterprise",
+      "cards": [
+        {
+          "title": "REST API",
+          "desc": "Hubungkan Odoo, SAP Business One, NetSuite, atau aplikasi internal lewat endpoint yang sudah ada. Kredensial disimpan terenkripsi."
+        },
+        {
+          "title": "Impor file",
+          "desc": "Ekspor CSV atau JSON dari sistem lama (Excel dapat diekspor sebagai CSV), petakan kolomnya, lalu periksa pratinjau sebelum satu baris pun ditulis."
+        },
+        {
+          "title": "Webhook masuk",
+          "desc": "Sistem lama mengirim peristiwa saat ada perubahan. Setiap kiriman diverifikasi tanda tangannya sebelum diterima."
+        }
+      ],
+      "steps": [
+        {
+          "title": "Hubungkan",
+          "desc": "Uji koneksi lebih dulu. Tidak ada data yang berpindah sebelum Anda setuju."
+        },
+        {
+          "title": "Petakan",
+          "desc": "Cocokkan kolom sumber dengan kolom Satu Alur, termasuk format Rupiah dan tanggal Indonesia."
+        },
+        {
+          "title": "Pindahkan bertahap",
+          "desc": "Tenaga kerja dan katalog, lalu permintaan. Rollback mempertahankan baris yang sudah diedit atau dipakai."
+        }
+      ],
+      "note": "Integrasi ERP dan migrasi data tersedia untuk akun skala Enterprise. Pendekatan parallel running membuat dua sistem bisa dipakai bersamaan selama masa peralihan."
+    },
+    "roadmap": [
+      {
+        "title": "Model data untuk forecasting",
+        "desc": "Setiap tahap alur menghasilkan data terstruktur. Data itu menjadi dasar untuk memproyeksikan permintaan, kapasitas tim, dan arus kas perusahaan ke depan."
+      },
+      {
+        "title": "Parameter penawaran",
+        "desc": "Atur tarif dasar, margin, dan aturan diskon yang dipakai AI saat menyusun penawaran, agar harga konsisten di seluruh tim."
+      },
+      {
+        "title": "Parameter laporan",
+        "desc": "Pilih metrik, periode, dan gaya penjelasan laporan sesuai pertanyaan yang benar-benar Anda ajukan tentang bisnis."
+      }
+    ],
+    "faqs": [
+      {
+        "q": "Di mana data bisnis saya disimpan?",
+        "a": "Data disimpan di cloud yang aman. Setiap data terikat ke akun Anda, sehingga terpisah dari pengguna lain."
+      },
+      {
+        "q": "Apa itu Layanan tambahan dan Tanpa limbah?",
+        "a": "Dua menu di grup Pendapatan. Layanan tambahan mengelola katalog add-on yang dijual bersama pekerjaan yang sudah ada, lengkap dengan harga, biaya, dan perkiraan serapan. Tanpa limbah mencatat pemborosan di lima aliran — waktu, perjalanan, bahan, pekerjaan ulang, air dan kimia — dalam Rupiah, lalu mengurutkan mana yang paling besar untuk ditutup lebih dulu."
+      },
+      {
+        "q": "Apakah fitur Pertumbuhan memakai data pelanggan saya?",
+        "a": "Ya, dan hanya data milik akun Anda. Radar peluang membaca transaksi Anda sendiri untuk menemukan layanan rutin yang jatuh tempo atau pelanggan yang belum kembali. Pencari prospek memakai titik dan radius yang Anda tentukan, dan tidak mengirim pesan apa pun secara otomatis."
+      },
+      {
+        "q": "Bagaimana cara masuk ke Satu Alur?",
+        "a": "Cukup dengan email. Kami mengirim kode sekali pakai (OTP) ke alamat Anda, jadi tidak ada kata sandi yang perlu diingat atau dibagikan."
+      },
+      {
+        "q": "Bagaimana kalau saya butuh bantuan?",
+        "a": "Di dalam aplikasi ada menu Bantuan: kirim tiket berisi pertanyaan atau kendala, dan tim Satu Alur menjawab di thread yang sama. Status tiket terlihat jelas — Terbuka, Diproses, atau Selesai."
+      },
+      {
+        "q": "AI apa yang dipakai, dan apakah hasilnya bisa dipercaya?",
+        "a": "Penawaran dan penjelasan laporan dibuat AI dan tampil langsung saat ditulis, sehingga bisa Anda batalkan kapan saja. Hasil penawaran selalu melewati validasi aturan domain sebelum disimpan, dan keputusan akhir tetap di tangan Anda."
+      },
+      {
+        "q": "Bisakah saya mengubah cara AI menulis penawaran?",
+        "a": "Bisa. Di Pengaturan tersedia Agent Skill Editor untuk mengubah prompt agen, temperature, batas token, dan preferensi model."
+      },
+      {
+        "q": "Apa batasan paket gratis?",
+        "a": "Menurut skema draf saat ini, paket Sole Trader gratis selama 3 bulan untuk 1 pengguna dan hingga 50 transaksi per bulan, termasuk AI penawaran dan laporan dasar. Angka ini masih dapat berubah."
+      },
+      {
+        "q": "Apakah sudah terhubung dengan WhatsApp dan email?",
+        "a": "Belum. Konektor WhatsApp dan email ada di roadmap. Fondasi konektornya sudah tersedia di Pengaturan, dan akan diaktifkan setelah integrasinya siap."
+      }
+    ],
+    "agentDemo": {
+      "request": "Servis AC split 2 unit, Jakarta Selatan. Bisa minggu ini?",
+      "fields": [
+        {
+          "label": "Ruang lingkup",
+          "value": "Cuci dan cek freon 2 unit AC split 1 PK"
+        },
+        {
+          "label": "Harga",
+          "value": "Rp450.000"
+        },
+        {
+          "label": "Ketentuan",
+          "value": "DP 30%, pelunasan setelah selesai. Garansi 7 hari."
+        },
+        {
+          "label": "Durasi",
+          "value": "± 3 jam"
+        }
+      ],
+      "checks": [
+        "Harga dalam rentang Rp10.000 – Rp1.000.000.000",
+        "Ruang lingkup minimal 10 karakter",
+        "Ketentuan minimal 10 karakter"
+      ],
+      "status": "Draf · menunggu persetujuan Anda"
+    }
+  },
+  "hero": {
+    "seeFlow": "Lihat alur kerja",
+    "chipTitle": "Penawaran tervalidasi",
+    "chipSub": "3 aturan domain lolos"
+  },
+  "preview": {
+    "aria": "Contoh tampilan ringkasan dasbor Satu Alur dengan angka ilustrasi.",
+    "title": "Ringkasan bulan ini",
+    "sub": "Laba/rugi · diperbarui otomatis",
+    "revenue": "Pendapatan",
+    "profit": "Laba sebelum pajak",
+    "item1": "Servis AC · 2 unit",
+    "state1": "Penawaran AI",
+    "item2": "Instalasi CCTV",
+    "state2": "Penugasan",
+    "revenueValue": "Rp24,6 jt",
+    "profitValue": "Rp8,2 jt"
+  },
+  "ticker": {
+    "label": "Kemampuan Satu Alur",
+    "caption": "Semua yang dibutuhkan bisnis jasa, dalam satu tempat"
+  },
+  "flow": {
+    "eyebrow": "Alur kerja",
+    "title": "Enam tahap, <em>satu</em> benang merah.",
+    "lede": "Bisnis jasa sering mengelola pekerjaan lewat chat dan spreadsheet yang terpisah. Satu Alur merangkai semuanya: data yang masuk di tahap pertama mengalir utuh sampai laporan. Sesudah enam tahap, dua grup menu memakai data itu untuk menambah pendapatan dan mencari pertumbuhan.",
+    "stage": "Tahap {no}",
+    "result": "Hasil",
+    "factStages": "Tahap kerja",
+    "factTeams": "Tim AI",
+    "factGroups": "Grup tambahan"
+  },
+  "ai": {
+    "eyebrow": "Fitur AI",
+    "title": "AI di dalam alur, <em>bukan</em> di sampingnya.",
+    "lede": "AI menyiapkan draf; aturan bisnis dan keputusan Anda yang menentukan. Setiap keluaran bisa dibaca, diperiksa, dan diubah.",
+    "chatTitle": "Penawaran AI",
+    "live": "· langsung",
+    "caption": "Ilustrasi keluaran agen penawaran — bukan data pelanggan.",
+    "sr": "Permintaan: {request} Usulan agen: {fields}. Validasi: {checks}. Status: {status}."
+  },
+  "agent": {
+    "incoming": "Permintaan masuk",
+    "name": "Agen penawaran",
+    "edit": "Ubah",
+    "approve": "Setujui"
+  },
+  "income": {
+    "vasSr": "Contoh katalog add-on. {rows}. {label}: {value}.",
+    "vasSrRow": "{name} {price}, serapan {rate} persen",
+    "wasteSr": "Contoh kebocoran bulan ini, {percent} persen bebas limbah. {rows}. {label}: {value}.",
+    "wasteFree": "bebas limbah"
+  },
+  "growth": {
+    "scheduled": "Dijadwalkan · {when}",
+    "aiWritten": "Ditulis AI"
+  },
+  "vision": {
+    "eyebrow": "Ide besar",
+    "title": "Hari ini merapikan operasi. Berikutnya, <em>membaca</em> masa depan bisnis.",
+    "lede": "Satu Alur dibuat untuk membantu usaha jasa naik skala dengan AI. Karena setiap tahap tercatat sebagai data terstruktur, alur yang sama bisa menjadi dasar perencanaan perusahaan Anda.",
+    "labelNow": "Data alur hari ini",
+    "labelNext": "Proyeksi",
+    "comingSoon": "Segera hadir",
+    "note": "Roadmap — arah pengembangan, bukan janji tanggal rilis."
+  },
+  "pricing": {
+    "eyebrow": "Harga",
+    "title": "Mulai gratis. <em>Naik kelas</em> saat tumbuh.",
+    "lede": "Tiga paket untuk tiga tahap usaha. Pilih yang sesuai sekarang, pindah paket kapan saja.",
+    "note": "Harga draf — dapat berubah.",
+    "contactNote": "Untuk paket Enterprise, hubungi kami lewat halaman Kontak.",
+    "liveLede": "Pilih paket sesuai tahap usaha Anda. Pindah paket kapan saja.",
+    "liveTitle": "Pilih paket Anda.",
+    "tiers": {
+      "soleTrader": {
+        "name": "Sole Trader",
+        "tagline": "Untuk pemilik usaha jasa yang bekerja sendiri.",
+        "period": "Gratis 3 bulan",
+        "limits": [
+          {
+            "label": "Transaksi",
+            "value": "Hingga 50 / bulan"
+          },
+          {
+            "label": "Pengguna",
+            "value": "1 pengguna"
+          }
+        ],
+        "features": [
+          "Enam tahap alur lengkap",
+          "AI penawaran & laporan dasar",
+          "Validasi aturan domain"
+        ],
+        "cta": {
+          "label": "Mulai gratis"
+        }
+      },
+      "ukm": {
+        "name": "UKM",
+        "tagline": "Untuk tim jasa yang mulai bertumbuh.",
+        "period": "per bulan",
+        "badge": "Rekomendasi",
+        "limits": [
+          {
+            "label": "Transaksi",
+            "value": "Hingga 1.000 / bulan"
+          },
+          {
+            "label": "Pengguna",
+            "value": "10 pengguna"
+          }
+        ],
+        "features": [
+          "AI penuh untuk penawaran & laporan",
+          "Agent Skill Editor (prompt AI kustom)",
+          "Konektor WhatsApp & email",
+          "Dukungan prioritas"
+        ],
+        "cta": {
+          "label": "Pilih UKM"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "tagline": "Untuk operasi jasa berskala besar yang butuh kerahasiaan dan jaminan layanan tertulis.",
+        "period": "per bulan",
+        "badge": "NDA + SLA",
+        "limits": [
+          {
+            "label": "Transaksi",
+            "value": "Tanpa batas"
+          },
+          {
+            "label": "Pengguna",
+            "value": "Tanpa batas"
+          }
+        ],
+        "features": [
+          "Semua fitur UKM",
+          "NDA: perjanjian kerahasiaan untuk data usaha Anda",
+          "SLA uptime layanan 99,9% per bulan",
+          "SLA respons dukungan maksimal 4 jam kerja",
+          "Integrasi ERP & migrasi data"
+        ],
+        "cta": {
+          "label": "Hubungi kami"
+        }
+      }
+    }
+  },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Pertanyaan yang <em>sering</em> muncul.",
+    "lede": "Jawaban singkat tentang data, keamanan, AI, dan paket."
+  },
+  "cta": {
+    "eyebrow": "Mulai sekarang",
+    "title": "Rapikan operasi jasa Anda. <em>Mulai</em> hari ini.",
+    "sub": "Masuk dengan email, buat permintaan pertama, dan lihat AI menyusun penawarannya.",
+    "button": "Mulai gratis sekarang",
+    "compare": "Bandingkan paket"
+  }
+}

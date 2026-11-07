@@ -1,0 +1,38 @@
+{
+  "heading": "Contact us",
+  "docTitle": "Contact",
+  "lede": "Questions about plans, partnerships, or Enterprise? Write to us here and the Satu Alur team will reply by email.",
+  "points": {
+    "reply": "We reply to the email address you enter in this form.",
+    "topics": "For questions about plans, partnerships, or Enterprise needs.",
+    "privacy": "Your details are only used to answer your message, nothing else."
+  },
+  "cardTitle": "Send a message",
+  "cardNote": "Fields marked Required must be filled in.",
+  "fields": {
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "phoneOptional": "Phone (optional)",
+    "subject": "Subject",
+    "message": "Message",
+    "website": "Website"
+  },
+  "placeholders": {
+    "name": "Your full name",
+    "email": "name@company.com",
+    "subject": "For example: question about the UKM plan",
+    "message": "Tell us what you need — type of service, team size, or a specific question."
+  },
+  "send": "Send message",
+  "sendAnother": "Send another message",
+  "sending": "Sending…",
+  "actionsNote": "We reply by email. No automatic subscriptions.",
+  "sent": "Message sent. The Satu Alur team will reply by email.",
+  "errors": {
+    "required": "{field} is required.",
+    "tooLong": "{field} can be at most {max} characters.",
+    "email": "Invalid email address.",
+    "limit": "Too many messages. Try again later."
+  }
+}

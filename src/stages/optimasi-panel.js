@@ -11,6 +11,7 @@ import * as C from '../ui/components.js'
 import { showToast } from '../ui/animations.js'
 import { resolveModel } from './offer.js'
 import { TEAMS, TEAM_KEYS, LEAD, SCOPE_LABEL, runOptimization } from '../ai/teams.js'
+import { t, getLang } from '../i18n/index.js'
 
 const { el, icon } = C
 const STORE = 'satualur_opt_run_v1:'
@@ -18,13 +19,8 @@ const STORE = 'satualur_opt_run_v1:'
 /** scope -> job. Jobs outlive the mounted page on purpose. */
 const jobs = new Map()
 
-const PHASE_LABEL = {
-  idle: 'Menunggu',
-  working: 'Menulis',
-  done: 'Selesai',
-  error: 'Gagal',
-  stopped: 'Dihentikan',
-}
+const PHASES = ['idle', 'working', 'done', 'error', 'stopped']
+const phaseLabel = (state) => (PHASES.includes(state) ? t(`optimize.phase.${state}`) : state)
 
 /* ------------------------------------------------------------ Markdown */
 
@@ -102,7 +98,7 @@ function saveRun(scope, job) {
  *   presets  [{ label, problem, target }] one-tap briefs
  */
 export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = [], presets = [] }) {
-  const scopeLabel = SCOPE_LABEL[scope] || scope
+  const scopeLabel = SCOPE_LABEL[scope] ? t(`optimize.scope.${scope}`) : scope
   const runKey = `${ctx.user?.id || 'anon'}:${scope}`
   let job = jobs.get(runKey) || loadRun(runKey)
   if (job) jobs.set(runKey, job)
@@ -111,25 +107,25 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
 
   /* ---- Brief form ---- */
   const problem = C.textarea({
-    label: 'Masalah yang ingin dipecahkan',
+    label: t('optimize.form.problem'),
     id: `opt-problem-${scope}`,
     required: true,
     rows: 3,
     placeholder: scope === 'vas'
-      ? 'Contoh: penawaran saya selalu berhenti di harga jasa dasar, padahal pelanggan minta perawatan lanjutan.'
-      : 'Contoh: teknisi sering menunggu bahan dan bolak-balik, biaya bensin naik tapi jumlah pekerjaan tetap.',
+      ? t('optimize.form.problemPlaceholderVas')
+      : t('optimize.form.problemPlaceholderWaste'),
   })
   const target = C.field({
-    label: 'Target tambahan per bulan (Rp)',
+    label: t('optimize.form.target'),
     id: `opt-target-${scope}`,
     type: 'number',
-    hint: 'Kosongkan bila belum ada angka. Tim akan memakai angka bisnis Anda sebagai patokan.',
+    hint: t('optimize.form.targetHint'),
     attrs: { min: '0', step: '50000', inputmode: 'numeric' },
   })
   const note = C.field({
-    label: 'Catatan pemilik usaha',
+    label: t('optimize.form.note'),
     id: `opt-note-${scope}`,
-    placeholder: 'Batasan yang harus dipatuhi, misalnya: tidak menambah teknisi bulan ini.',
+    placeholder: t('optimize.form.notePlaceholder'),
   })
 
   if (job?.brief) {
@@ -139,7 +135,7 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
   }
 
   const presetRow = presets.length
-    ? el('div', { className: 'opt-presets', role: 'group', 'aria-label': 'Contoh brief' },
+    ? el('div', { className: 'opt-presets', role: 'group', 'aria-label': t('optimize.form.presets') },
         presets.map((p) => C.button({
           label: p.label, size: 'sm', variant: 'ghost', className: 'opt-preset',
           onClick: () => {
@@ -150,14 +146,14 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
         })))
     : null
 
-  const runBtn = C.button({ label: 'Jalankan 5 tim', icon: 'zap', variant: 'primary', type: 'submit' })
-  const stopBtn = C.button({ label: 'Hentikan', icon: 'stop', variant: 'ghost', hidden: true })
+  const runBtn = C.button({ label: t('optimize.form.run'), icon: 'zap', variant: 'primary', type: 'submit' })
+  const stopBtn = C.button({ label: t('optimize.form.stop'), icon: 'stop', variant: 'ghost', hidden: true })
 
   const briefForm = el('form', { className: 'opt-brief panel', noValidate: true },
     el('div', { className: 'panel-head' },
       el('div', { className: 'panel-head-text' },
-        el('h2', { className: 'panel-title' }, `Ruang optimasi ${scopeLabel.toLowerCase()}`),
-        el('span', { className: 'panel-meta' }, 'Lima tim bekerja bersamaan, lalu pimpinan optimasi menyatukan hasilnya'),
+        el('h2', { className: 'panel-title' }, t('optimize.form.title', { scope: getLang() === 'en' ? scopeLabel : scopeLabel.toLowerCase() })),
+        el('span', { className: 'panel-meta' }, t('optimize.form.meta')),
       ),
     ),
     el('div', { className: 'panel-body' },
@@ -175,8 +171,8 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
           el('span', { className: 'opt-fact-value tnum' }, f.value))))
     : null
   const factsPanel = el('section', { className: 'opt-context' },
-    el('p', { className: 'opt-context-title' }, icon('info', { size: 16 }), 'Angka yang dibaca setiap tim'),
-    factList || el('p', { className: 'opt-context-empty' }, 'Belum ada data. Tim akan menjawab dengan asumsi yang ditulis terbuka.'),
+    el('p', { className: 'opt-context-title' }, icon('info', { size: 16 }), t('optimize.facts.title')),
+    factList || el('p', { className: 'opt-context-empty' }, t('optimize.facts.empty')),
   )
 
   /* ---- Team cards ---- */
@@ -185,13 +181,13 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
   for (const key of TEAM_KEYS) {
     const team = TEAMS[key]
     const body = el('div', { className: 'opt-team-body' })
-    const badge = el('span', { className: 'opt-team-state' }, PHASE_LABEL.idle)
+    const badge = el('span', { className: 'opt-team-state' }, phaseLabel('idle'))
     const card = el('article', { className: 'opt-team', 'data-state': 'idle', 'aria-live': 'polite' },
       el('header', { className: 'opt-team-head' },
         el('span', { className: 'opt-team-ico', 'aria-hidden': 'true' }, icon(team.icon, { size: 18 })),
         el('div', { className: 'opt-team-id' },
-          el('h3', { className: 'opt-team-name' }, team.name),
-          el('p', { className: 'opt-team-role' }, team.role),
+          el('h3', { className: 'opt-team-name' }, t(`optimize.teams.${key}.name`)),
+          el('p', { className: 'opt-team-role' }, t(`optimize.teams.${key}.role`)),
         ),
         badge,
       ),
@@ -203,11 +199,11 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
 
   /* ---- Lead ---- */
   const leadBody = el('div', { className: 'opt-md' })
-  const leadMeta = el('span', { className: 'panel-meta' }, 'Menunggu lima tim')
+  const leadMeta = el('span', { className: 'panel-meta' }, t('optimize.lead.waiting'))
   const leadPanel = el('section', { className: 'panel opt-lead' },
     el('div', { className: 'panel-head' },
       el('div', { className: 'panel-head-text' },
-        el('h2', { className: 'panel-title' }, LEAD.name),
+        el('h2', { className: 'panel-title' }, t('optimize.lead.name')),
         leadMeta,
       ),
       el('div', { className: 'panel-actions' }, el('span', { className: 'opt-lead-ico', 'aria-hidden': 'true' }, icon(LEAD.icon, { size: 18 }))),
@@ -220,8 +216,8 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
     status,
     factsPanel,
     el('div', { className: 'opt-teams-head' },
-      el('h2', { className: 'opt-section-title' }, 'Lima tim'),
-      el('span', { className: 'opt-section-note' }, 'Setiap tim melihat angka yang sama dari sudut berbeda'),
+      el('h2', { className: 'opt-section-title' }, t('optimize.teamsHead.title')),
+      el('span', { className: 'opt-section-note' }, t('optimize.teamsHead.note')),
     ),
     teamGrid,
     leadPanel,
@@ -236,28 +232,28 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
       const text = job?.teams?.[key] || ''
       const state = job?.status?.[key] || 'idle'
       c.card.dataset.state = state
-      c.badge.textContent = PHASE_LABEL[state] || state
+      c.badge.textContent = phaseLabel(state)
       if (text) writeMarkdown(c.body, text)
       else {
         c.body.replaceChildren(el('p', { className: 'opt-team-hint' },
-          state === 'working' ? 'Sedang menyusun usulan…'
-            : state === 'error' ? 'Tim ini tidak berhasil menjawab.'
-              : `Menunggu brief. ${TEAMS[key].asks[0]}`))
+          state === 'working' ? t('optimize.team.working')
+            : state === 'error' ? t('optimize.team.error')
+              : t('optimize.team.waiting', { ask: t(`optimize.teams.${key}.ask`) })))
       }
     }
     const phase = job?.phase || 'idle'
     if (job?.lead) writeMarkdown(leadBody, job.lead)
     else {
       leadBody.replaceChildren(el('p', { className: 'opt-lead-hint' },
-        phase === 'lead' ? 'Menyatukan usulan lima tim…'
-          : phase === 'done' ? 'Tidak ada kesimpulan yang bisa disusun.'
-            : 'Kesimpulan muncul setelah kelima tim selesai menjawab.'))
+        phase === 'lead' ? t('optimize.lead.merging')
+          : phase === 'done' ? t('optimize.lead.noConclusion')
+            : t('optimize.lead.hint')))
     }
     leadMeta.textContent = phase === 'done'
-      ? `Selesai${job.at ? ` · ${C.formatDateTime(job.at)}` : ''}`
-      : phase === 'lead' ? 'Menyatukan usulan…'
-        : phase === 'stopped' ? 'Dihentikan sebelum kesimpulan'
-          : 'Menunggu lima tim'
+      ? t('optimize.lead.done', { when: job.at ? ` · ${C.formatDateTime(job.at)}` : '' })
+      : phase === 'lead' ? t('optimize.lead.mergingShort')
+        : phase === 'stopped' ? t('optimize.lead.stopped')
+          : t('optimize.lead.waiting')
     const running = phase === 'teams' || phase === 'lead'
     runBtn.hidden = running
     stopBtn.hidden = !running
@@ -273,7 +269,7 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
     event?.preventDefault()
     const text = problem.input.value.trim()
     if (!text) {
-      status.show('warn', 'Tulis dulu masalah yang ingin dipecahkan, supaya tim tidak menebak.')
+      status.show('warn', t('optimize.run.needProblem'))
       problem.input.focus()
       return
     }
@@ -302,7 +298,7 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
     let model = null
     try { model = (await resolveModel())?.id || null }
     catch (err) {
-      status.show('warn', `Model AI belum siap (${err.message}). Coba lagi sebentar.`)
+      status.show('warn', t('optimize.run.modelNotReady', { error: err.message }))
     }
 
     try {
@@ -330,21 +326,21 @@ export function renderOptimasi(host, ctx = {}, { scope, context = '', facts = []
       if (err?.name === 'AbortError') job.phase = 'stopped'
       else {
         job.phase = 'done'
-        job.error = err?.message || 'Terjadi kesalahan.'
+        job.error = err?.message || t('optimize.run.genericError')
       }
     } finally {
       job.ac = null
       emit()
       if (job.error) status.show('danger', job.error)
-      else if (job.phase === 'done') showToast('Rencana optimasi siap.', 'success')
-      else if (job.phase === 'stopped') status.show('info', 'Dihentikan. Usulan yang sudah jadi tetap tersimpan di halaman ini.')
+      else if (job.phase === 'done') showToast(t('optimize.run.ready'), 'success')
+      else if (job.phase === 'stopped') status.show('info', t('optimize.run.stopped'))
     }
   }
 
   briefForm.addEventListener('submit', run)
   stopBtn.addEventListener('click', () => {
     job?.ac?.abort()
-    status.show('info', 'Menghentikan tim…')
+    status.show('info', t('optimize.run.stopping'))
   })
 
   paint()

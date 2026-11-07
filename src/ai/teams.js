@@ -16,6 +16,7 @@
  * a black box, so the UI can show work in progress.
  */
 import { streamAnswer } from './advisor.js'
+import { t } from '../i18n/index.js'
 
 export const SCOPE_LABEL = {
   vas: 'Layanan tambahan (VAS)',
@@ -182,7 +183,7 @@ export async function* runOptimization({ brief, context, model, signal, maxToken
     } catch (err) {
       if (err?.name === 'AbortError') { results[key] = ''; return }
       results[key] = ''
-      q.push({ type: 'team-error', key, message: err?.message || 'Tim ini gagal menjawab.' })
+      q.push({ type: 'team-error', key, message: err?.message || t('aiTeams.errors.team') })
     } finally {
       remaining -= 1
       if (remaining === 0) {
@@ -214,9 +215,9 @@ export async function* runOptimization({ brief, context, model, signal, maxToken
       else if (step.type === 'retry') yield { type: 'lead-retry' }
     }
     if (lead.trim()) yield { type: 'done', text: lead.trim(), results }
-    else yield { type: 'lead-error', message: 'Pimpinan optimasi tidak mengembalikan jawaban.' }
+    else yield { type: 'lead-error', message: t('aiTeams.errors.leadEmpty') }
   } catch (err) {
     if (err?.name === 'AbortError') return
-    yield { type: 'lead-error', message: err?.message || 'Penyatuan gagal.' }
+    yield { type: 'lead-error', message: err?.message || t('aiTeams.errors.merge') }
   }
 }

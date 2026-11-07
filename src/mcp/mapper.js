@@ -11,6 +11,7 @@ import {
   ENTITIES, IMPORTABLE_ENTITIES, TRANSFORMS, applyTransforms, columnType,
   schemaFor, validateMapping as validateMappingRules,
 } from './rules.js'
+import { t } from '../i18n/index.js'
 
 /* ----------------------------------------------------------------- Schema */
 
@@ -156,13 +157,13 @@ export function previewTransform(sourceRows, mapping, entity, limit = 10) {
       if (spec.required.includes(field.target)
         && (value === null || value === undefined || String(value).trim() === '')) {
         out._valid = false
-        out._errors.push(`${field.target}: wajib diisi`)
+        out._errors.push(t('erp.preview.required', { field: field.target }))
       }
       if (value !== null && value !== undefined && value !== '' && spec.enums?.[field.target]) {
         const allowed = spec.enums[field.target]
         if (!allowed.includes(String(value).trim().toLowerCase())) {
           out._valid = false
-          out._errors.push(`${field.target}: "${String(value).slice(0, 30)}" tidak dikenal`)
+          out._errors.push(t('erp.preview.unknown', { field: field.target, value: String(value).slice(0, 30) }))
         }
       }
     }

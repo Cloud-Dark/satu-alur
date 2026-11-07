@@ -1,0 +1,24 @@
+{
+  "titles": {
+    "about": "Tentang Satu Alur",
+    "privacy": "Kebijakan Privasi",
+    "terms": "Syarat & Ketentuan",
+    "cookies": "Kebijakan Cookie"
+  },
+  "links": {
+    "about": "Tentang kami",
+    "privacy": "Kebijakan privasi",
+    "terms": "Syarat & ketentuan",
+    "cookies": "Kebijakan cookie"
+  },
+  "home": "Beranda",
+  "navLabel": "Halaman Satu Alur",
+  "empty": "Dokumen ini sedang disiapkan.",
+  "updated": "Terakhir diperbarui {date}",
+  "onlyIndonesian": "Dokumen ini saat ini hanya tersedia dalam Bahasa Indonesia.",
+  "errors": {
+    "network": "Jaringan bermasalah. Periksa koneksi lalu coba lagi.",
+    "loadRetry": "Gagal memuat konten. Coba lagi.",
+    "load": "Gagal memuat konten. {message}"
+  }
+}

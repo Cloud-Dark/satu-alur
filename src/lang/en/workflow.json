@@ -1,0 +1,146 @@
+{
+  "title": "Workflow",
+  "steps": {
+    "request": "Request",
+    "offer": "Quote",
+    "assign": "Assignment",
+    "complete": "Completion",
+    "bookkeeping": "Bookkeeping"
+  },
+  "filters": {
+    "all": "All",
+    "request": "Requests",
+    "offer": "Quotes",
+    "assign": "To assign",
+    "work": "In progress",
+    "book": "To book",
+    "done": "Done"
+  },
+  "filterHint": {
+    "all": "Every job",
+    "request": "No quote yet",
+    "offer": "Draft or rejected",
+    "assign": "Quote approved",
+    "work": "Crew is working",
+    "book": "Done, not booked yet",
+    "done": "Booked"
+  },
+  "status": {
+    "new": "No quote yet",
+    "draft": "Draft quote",
+    "rejected": "Quote rejected",
+    "approved": "Approved, not assigned",
+    "working": "In progress",
+    "completed": "Done, not booked",
+    "booked": "Done & booked",
+    "notStarted": "Assigned, not started",
+    "overdue": "Past schedule",
+    "onHold": "On hold"
+  },
+  "next": {
+    "new": "Create quote",
+    "draft": "Review quote",
+    "rejected": "Create new quote",
+    "approved": "Assign crew",
+    "working": "Mark done",
+    "completed": "Book it",
+    "createInvoice": "Create invoice",
+    "viewInvoice": "View invoice"
+  },
+  "note": {
+    "requestLogged": "Request logged",
+    "offer": {
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "draft": "Still a draft",
+      "none": "Not created yet"
+    },
+    "worker": "Crew: {name}",
+    "notAssigned": "Not assigned yet",
+    "jobDone": "Job done",
+    "notDone": "Not done yet",
+    "entries": {
+      "one": "{count} entry",
+      "other": "{count} entries"
+    },
+    "notBooked": "Not booked yet"
+  },
+  "stepper": {
+    "allDone": "All steps done",
+    "stepOf": "Step {n} of {total}: {label}"
+  },
+  "intro": {
+    "before": "One row = one customer job, from request to bookkeeping. Check the ",
+    "middle": " column to see how far it has gone, then press the button in the ",
+    "after": " column."
+  },
+  "filterAria": "Filter by workflow position",
+  "searchPlaceholder": "Search customer, service, crew, #number",
+  "searchAria": "Search jobs",
+  "listTitle": "Workflow list",
+  "loading": "loading…",
+  "pagerLabel": "workflow list",
+  "nextAria": "{action} for {customer}",
+  "meta": {
+    "all": {
+      "one": "{count} job",
+      "other": "{count} jobs"
+    },
+    "some": "{shown} of {count} jobs"
+  },
+  "empty": {
+    "start": "Log your first request",
+    "kicker": "No data yet",
+    "title": "No jobs yet.",
+    "body": "Every customer request you log shows up here as one row and moves along until it is booked."
+  },
+  "notFound": {
+    "kicker": "Nothing found",
+    "query": "Nothing matches \"{q}\".",
+    "filter": "No jobs at this position."
+  },
+  "caption": "Workflow list: one row per job",
+  "col": {
+    "customer": "Customer",
+    "position": "Position",
+    "status": "Status",
+    "value": "Value",
+    "updated": "Updated",
+    "next": "Next step"
+  },
+  "openDetail": "View job details",
+  "pos": {
+    "done": "Done",
+    "at": "At {stage}"
+  },
+  "invoiceStatus": "Invoice: {status}",
+  "detail": {
+    "open": "Open {stage}",
+    "srDone": " (done)",
+    "srCurrent": " (current position)",
+    "srTodo": " (not yet)",
+    "money": " · Revenue {revenue}, costs {cost}",
+    "service": "Service",
+    "location": "Location",
+    "phone": "Phone",
+    "email": "Email",
+    "website": "Website / other contact",
+    "offerValue": "Quote value",
+    "invoice": "Invoice",
+    "close": "Close",
+    "waAria": "Message {customer} on WhatsApp",
+    "doneDesc": "This job is done and booked.",
+    "posDesc": "Current position: {stage} — {status}.",
+    "journey": "Job timeline",
+    "wa": "WhatsApp"
+  },
+  "loadError": "Could not load the workflow: {error}",
+  "job": {
+    "aria": "Job",
+    "pickTitle": "Pick a job from Workflow",
+    "pickBody": "This page shows one job. Open Workflow, then press the button in the Next step column.",
+    "open": "Open Workflow",
+    "kicker": "One job per page",
+    "seeAll": "See all in Workflow"
+  }
+}

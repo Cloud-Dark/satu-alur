@@ -5,6 +5,7 @@
  */
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { signOutIfSuspended } from '../http-cloud.js'
+import { t } from '../i18n/index.js'
 
 const TOKEN_KEY = 'satualur_token'
 const session = () => { try { return localStorage.getItem(TOKEN_KEY) } catch { return null } }
@@ -19,7 +20,7 @@ async function call(path, { method = 'GET', body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('consent.errors.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }

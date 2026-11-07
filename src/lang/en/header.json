@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "alur": "Workflow",
+    "pendapatan": "Revenue",
+    "pertumbuhan": "Growth",
+    "fiturAi": "AI features",
+    "harga": "Pricing",
+    "faq": "FAQ"
+  },
+  "navLabel": "Main navigation",
+  "mobileNavLabel": "Mobile navigation",
+  "menuLabel": "Navigation menu",
+  "menuOpen": "Open menu",
+  "menuClose": "Close menu",
+  "signIn": "Sign in",
+  "startFree": "Start free",
+  "openDashboard": "Open Dashboard",
+  "skip": "Skip to content"
+}

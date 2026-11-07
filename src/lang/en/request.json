@@ -1,0 +1,72 @@
+{
+  "title": "New request",
+  "field": {
+    "name": "Customer name",
+    "namePh": "Acme Ltd.",
+    "nameHint": "The company or person asking for the service.",
+    "location": "Location",
+    "locationPh": "South Jakarta",
+    "phone": "Phone",
+    "email": "Email",
+    "optional": "Optional.",
+    "website": "Website / other contact",
+    "websitePh": "example.com · IG @business · WA 0812…",
+    "websiteHint": "Optional: website, Instagram, WhatsApp, etc.",
+    "service": "Service type",
+    "servicePh": "AC cleaning",
+    "serviceHint": "One main service per request.",
+    "desc": "What they need",
+    "descPh": "Number of units, area size, preferred time…",
+    "descHint": "The more detail, the more accurate the AI quote in step 02."
+  },
+  "source": {
+    "map": "Find on map",
+    "manual": "Enter manually",
+    "picked": "Filled in from the map: {name}. Check and edit if needed."
+  },
+  "error": {
+    "name": "Customer name is required.",
+    "phone": "Phone numbers may only contain digits, spaces, +, - and parentheses.",
+    "email": "That email doesn’t look right, e.g. info@example.com.",
+    "service": "Service type is required."
+  },
+  "ai": {
+    "hint": "Quick note",
+    "hintPh": "E.g.: 3 AC units leaking in the meeting room, wants Saturday morning. Or paste the customer’s WhatsApp chat.",
+    "hintHint": "AI fills in the service type and description. You can still edit the result.",
+    "fill": "Autofill with AI",
+    "needHint": "Write a quick note first, e.g. \"3 AC units leaking\".",
+    "stop": "Stop",
+    "writing": "AI is writing…",
+    "unavailable": "AI is unavailable right now.",
+    "filled": "Filled in. Check and edit if needed.",
+    "stopped": "Stopped.",
+    "failed": "Autofill failed."
+  },
+  "wiz": {
+    "customer": "Customer",
+    "customerDesc": "Who is asking, and where.",
+    "need": "Needs",
+    "needDesc": "The service requested and the details.",
+    "review": "Review",
+    "reviewDesc": "Check before saving.",
+    "save": "Save request"
+  },
+  "review": {
+    "service": "Service: {value}",
+    "location": "Location: {value}",
+    "phone": "Phone: {value}",
+    "email": "Email: {value}",
+    "website": "Website / other contact: {value}",
+    "noDesc": "No description of needs.",
+    "tip": "Tip: a detailed description makes the AI quote more accurate."
+  },
+  "saving": "Saving…",
+  "done": {
+    "offer": "Create quote",
+    "another": "Log another request",
+    "text": "Request from {name} saved. Next, create a quote.",
+    "toast": "New request saved."
+  },
+  "saveError": "Could not save: {error}"
+}

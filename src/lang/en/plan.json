@@ -1,0 +1,90 @@
+{
+  "feature": {
+    "offer": {
+      "label": "AI offers",
+      "unit": "drafts"
+    },
+    "report": {
+      "label": "AI reports",
+      "unit": "explanations"
+    },
+    "leads": {
+      "label": "Lead finder",
+      "unit": "searches"
+    },
+    "radar": {
+      "label": "Opportunity radar",
+      "unit": "analyses"
+    },
+    "advisor": {
+      "label": "AI advisor",
+      "unit": "messages"
+    },
+    "social": {
+      "label": "Social media content",
+      "unit": "posts"
+    },
+    "income": {
+      "label": "Income optimisation",
+      "unit": "AI calls"
+    }
+  },
+  "voucherType": {
+    "plan": "Plan",
+    "credit": "AI credit",
+    "bundle": "Plan + AI credit"
+  },
+  "upsell": {
+    "plans": "See plans",
+    "later": "Maybe later",
+    "title": "This month's AI quota is used up",
+    "desc": "This feature's quota is used up and your AI credit is not enough.",
+    "note": "Your data is safe. Other features with quota left still work, and quotas reset on the 1st of every month."
+  },
+  "voucher": {
+    "redeem": "Redeem voucher",
+    "code": "Voucher code",
+    "oneCode": "One code per account",
+    "desc": "A voucher can hold a plan, AI credit or both.",
+    "enter": "Enter a voucher code.",
+    "redeeming": "Redeeming…",
+    "gotPlan": "{plan} plan for {days} days",
+    "gotCredit": "{amount} AI credit",
+    "and": " and ",
+    "redeemed": "Voucher redeemed: {got}."
+  },
+  "common": {
+    "contact": "Contact us",
+    "retry": "Try again",
+    "network": "Network problem. Check your connection and try again."
+  },
+  "page": {
+    "choose": "Choose a plan",
+    "noCredit": "Plans do not include AI credit",
+    "title": "Plan & quota",
+    "yourPlan": "Your plan",
+    "needMore": "Need a bigger quota or vouchers for your team? ",
+    "demoTag": "Demo account",
+    "credit": "AI credit"
+  },
+  "summary": {
+    "erpOpen": "ERP integration unlocked.",
+    "erpEnterprise": "ERP integration is unlocked for Enterprise-scale accounts.",
+    "scaleNoQuota": " Account scale does not change your AI quota.",
+    "lapsed": "Your plan has ended, so your quota is back on the Free plan.",
+    "demo": "Demo accounts have unlimited AI for presentations; usage is still recorded.",
+    "until": "until {date}",
+    "noExpiry": "no expiry",
+    "resets": "quota resets {date}",
+    "scale": "Account scale: {plan}. "
+  },
+  "usage": {
+    "unlimited": "{used} {unit} · unlimited",
+    "out": "Quota used up. Next uses come from AI credit ({price} per {unit})."
+  },
+  "errors": {
+    "loadPlan": "Could not load the plan. {error}",
+    "loadVouchers": "Could not load vouchers. {error}",
+    "loadRedemptions": "Could not load redemptions. {error}"
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "title": "Alur kerja",
+  "steps": {
+    "request": "Permintaan",
+    "offer": "Penawaran",
+    "assign": "Penugasan",
+    "complete": "Penyelesaian",
+    "bookkeeping": "Pembukuan"
+  },
+  "filters": {
+    "all": "Semua",
+    "request": "Permintaan",
+    "offer": "Penawaran",
+    "assign": "Perlu penugasan",
+    "work": "Dikerjakan",
+    "book": "Perlu dibukukan",
+    "done": "Selesai"
+  },
+  "filterHint": {
+    "all": "Semua pekerjaan",
+    "request": "Belum ada penawaran",
+    "offer": "Draf atau ditolak",
+    "assign": "Penawaran disetujui",
+    "work": "Sedang dikerjakan petugas",
+    "book": "Selesai, belum dibukukan",
+    "done": "Sudah dibukukan"
+  },
+  "status": {
+    "new": "Belum ada penawaran",
+    "draft": "Penawaran draf",
+    "rejected": "Penawaran ditolak",
+    "approved": "Disetujui, belum ditugaskan",
+    "working": "Sedang dikerjakan",
+    "completed": "Selesai, belum dibukukan",
+    "booked": "Selesai & dibukukan",
+    "notStarted": "Ditugaskan, belum mulai",
+    "overdue": "Lewat jadwal",
+    "onHold": "Ditunda"
+  },
+  "next": {
+    "new": "Buat penawaran",
+    "draft": "Tinjau penawaran",
+    "rejected": "Buat penawaran ulang",
+    "approved": "Tugaskan petugas",
+    "working": "Tandai selesai",
+    "completed": "Bukukan",
+    "createInvoice": "Buat invoice",
+    "viewInvoice": "Lihat invoice"
+  },
+  "note": {
+    "requestLogged": "Permintaan tercatat",
+    "offer": {
+      "approved": "Disetujui",
+      "rejected": "Ditolak",
+      "draft": "Masih draf",
+      "none": "Belum dibuat"
+    },
+    "worker": "Petugas: {name}",
+    "notAssigned": "Belum ditugaskan",
+    "jobDone": "Pekerjaan selesai",
+    "notDone": "Belum selesai",
+    "entries": {
+      "one": "{count} catatan",
+      "other": "{count} catatan"
+    },
+    "notBooked": "Belum dibukukan"
+  },
+  "stepper": {
+    "allDone": "Semua tahap selesai",
+    "stepOf": "Tahap {n} dari {total}: {label}"
+  },
+  "intro": {
+    "before": "Satu baris = satu pekerjaan pelanggan, dari permintaan sampai pembukuan. Lihat kolom ",
+    "middle": " untuk tahu sudah sampai mana, lalu tekan tombol di kolom ",
+    "after": "."
+  },
+  "filterAria": "Saring menurut posisi alur",
+  "searchPlaceholder": "Cari pelanggan, layanan, petugas, #nomor",
+  "searchAria": "Cari pekerjaan",
+  "listTitle": "Daftar alur kerja",
+  "loading": "memuat…",
+  "pagerLabel": "daftar alur kerja",
+  "nextAria": "{action} untuk {customer}",
+  "meta": {
+    "all": {
+      "one": "{count} pekerjaan",
+      "other": "{count} pekerjaan"
+    },
+    "some": "{shown} dari {count} pekerjaan"
+  },
+  "empty": {
+    "start": "Catat permintaan pertama",
+    "kicker": "Belum ada data",
+    "title": "Belum ada pekerjaan.",
+    "body": "Setiap permintaan pelanggan yang Anda catat muncul di sini sebagai satu baris, lalu bergerak sampai selesai dibukukan."
+  },
+  "notFound": {
+    "kicker": "Tidak ditemukan",
+    "query": "Tidak ada yang cocok dengan \"{q}\".",
+    "filter": "Tidak ada pekerjaan di posisi ini."
+  },
+  "caption": "Daftar alur kerja: satu baris per pekerjaan",
+  "col": {
+    "customer": "Pelanggan",
+    "position": "Posisi",
+    "status": "Status",
+    "value": "Nilai",
+    "updated": "Diperbarui",
+    "next": "Langkah berikutnya"
+  },
+  "openDetail": "Lihat detail alur",
+  "pos": {
+    "done": "Selesai",
+    "at": "Di {stage}"
+  },
+  "invoiceStatus": "Invoice: {status}",
+  "detail": {
+    "open": "Buka {stage}",
+    "srDone": " (selesai)",
+    "srCurrent": " (posisi sekarang)",
+    "srTodo": " (belum)",
+    "money": " · Pendapatan {revenue}, biaya {cost}",
+    "service": "Layanan",
+    "location": "Lokasi",
+    "phone": "Telepon",
+    "email": "Email",
+    "website": "Website / kontak lain",
+    "offerValue": "Nilai penawaran",
+    "invoice": "Invoice",
+    "close": "Tutup",
+    "waAria": "Kirim pesan ke {customer} via WhatsApp",
+    "doneDesc": "Pekerjaan ini sudah selesai dan dibukukan.",
+    "posDesc": "Posisi sekarang: {stage} — {status}.",
+    "journey": "Perjalanan pekerjaan",
+    "wa": "WhatsApp"
+  },
+  "loadError": "Gagal memuat alur kerja: {error}",
+  "job": {
+    "aria": "Pekerjaan",
+    "pickTitle": "Pilih pekerjaan dari Alur kerja",
+    "pickBody": "Halaman ini menampilkan satu pekerjaan. Buka Alur kerja, lalu tekan tombol di kolom Langkah berikutnya.",
+    "open": "Buka Alur kerja",
+    "kicker": "Satu pekerjaan per halaman",
+    "seeAll": "Lihat semua di Alur kerja"
+  }
+}

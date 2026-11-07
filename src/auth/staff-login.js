@@ -7,7 +7,9 @@ import '../styles/auth.css'
 import { staffLogin } from './auth.js'
 import { logoLink } from '../ui/brand.js'
 import { themeToggleButton } from '../ui/theme.js'
+import { langToggleButton } from '../i18n/switcher.js'
 import { iconHTML } from '../ui/icons.js'
+import { t } from '../i18n/index.js'
 
 function h(tag, attrs = {}, ...children) {
   const el = document.createElement(tag)
@@ -27,9 +29,9 @@ export function renderStaffLogin(root, ctx = {}) {
     const input = h('input', { id, class: 'auth-input', required: true, ...attrs })
     return { input, wrap: h('div', { class: 'auth-field' }, h('label', { for: id, class: 'auth-label' }, label), input) }
   }
-  const user = field('staff-username', 'Username', { type: 'text', name: 'username', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', maxlength: '32' })
-  const pass = field('staff-password', 'Password', { type: 'password', name: 'password', autocomplete: 'current-password', maxlength: '128' })
-  const label = h('span', { class: 'auth-btn-label' }, 'Masuk')
+  const user = field('staff-username', t('auth.staff.username'), { type: 'text', name: 'username', autocomplete: 'username', autocapitalize: 'off', spellcheck: 'false', maxlength: '32' })
+  const pass = field('staff-password', t('auth.staff.password'), { type: 'password', name: 'password', autocomplete: 'current-password', maxlength: '128' })
+  const label = h('span', { class: 'auth-btn-label' }, t('auth.staff.submit'))
   const submit = h('button', { type: 'submit', class: 'btn btn-primary btn-lg auth-primary' },
     label, h('span', { class: 'auth-btn-icon', 'aria-hidden': 'true', html: iconHTML('arrowRight', { size: 18, stroke: 2 }) }))
   const message = h('p', { class: 'auth-msg', role: 'alert', hidden: true })
@@ -40,39 +42,39 @@ export function renderStaffLogin(root, ctx = {}) {
     e.preventDefault()
     if (submit.disabled) return
     if (!user.input.value.trim() || !pass.input.value) {
-      say('Isi username dan password.')
+      say(t('auth.staff.errEmpty'))
       ;(user.input.value.trim() ? pass.input : user.input).focus()
       return
     }
     say('')
     submit.disabled = true
-    label.textContent = 'Memeriksa…'
+    label.textContent = t('auth.staff.checking')
     try {
       const res = await staffLogin(user.input.value.trim(), pass.input.value)
       if (disposed) return
-      say('Berhasil. Membuka Kantor Satu Alur…', 'ok')
+      say(t('auth.staff.success'), 'ok')
       ctx.onSignedIn?.(res?.user)
     } catch (err) {
       if (disposed) return
-      say(err.message || 'Gagal masuk. Coba lagi.')
+      say(err.message || t('auth.staff.failed'))
       pass.input.value = ''
       pass.input.focus()
       submit.disabled = false
-      label.textContent = 'Masuk'
+      label.textContent = t('auth.staff.submit')
     }
   })
 
   const card = h('div', { class: 'auth-card surface' },
-    h('p', { class: 'eyebrow auth-eyebrow' }, 'Akses staf'),
-    h('h1', { class: 'auth-title display', id: 'staff-title', html: 'Masuk <em>staf</em> Satu Alur.' }),
-    h('p', { class: 'auth-helper' }, 'Khusus tim internal Satu Alur. Akun dibuat oleh admin sistem.'),
+    h('p', { class: 'eyebrow auth-eyebrow' }, t('auth.staff.eyebrow')),
+    h('h1', { class: 'auth-title display', id: 'staff-title', html: t('auth.staff.title') }),
+    h('p', { class: 'auth-helper' }, t('auth.staff.helper')),
     form, message,
     h('p', { class: 'auth-privacy' }, h('span', { html: iconHTML('shield', { size: 14 }) }),
-      'Akun terkunci 15 menit setelah 5 kali salah password.'))
+      t('auth.staff.lockout')))
   root.replaceChildren(h('div', { class: 'auth auth-staff' },
-    h('header', { class: 'auth-bar' }, logoLink({ size: 28 }), themeToggleButton()),
+    h('header', { class: 'auth-bar' }, logoLink({ size: 28 }), h('div', { class: 'auth-bar-actions' }, langToggleButton(), themeToggleButton())),
     h('main', { class: 'auth-main', id: 'konten' }, card),
-    h('footer', { class: 'auth-foot' }, h('p', {}, 'Halaman internal. Jangan bagikan alamat ini.'), h('p', {}, '© 2026 Satu Alur'))))
+    h('footer', { class: 'auth-foot' }, h('p', {}, t('auth.staff.footNote')), h('p', {}, '© 2026 Satu Alur'))))
   user.input.focus()
   return () => { disposed = true }
 }

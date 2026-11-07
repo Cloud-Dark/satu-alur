@@ -11,6 +11,8 @@ import { getPlans } from '../business/api.js'
 import { renderPlanCard } from '../business/plan-card.js'
 import { rupiah, FEATURES } from './rules.js'
 import { planLabel, canUse } from '../business/plan-access.js'
+import { t } from '../i18n/index.js'
+import { featureLabel, featureUnit } from './labels.js'
 
 const { el } = C
 
@@ -18,52 +20,54 @@ function usageBar(row) {
   const unlimited = row.limit === null
   const pct = unlimited ? 0 : row.limit === 0 ? 100 : Math.min(100, Math.round((row.used / row.limit) * 100))
   const tone = unlimited ? 'is-free' : pct >= 100 ? 'is-out' : pct >= 80 ? 'is-low' : ''
-  const value = unlimited ? `${row.used} ${row.unit} · tanpa batas` : `${row.used} / ${row.limit} ${row.unit}`
+  const unit = featureUnit(row.key, row.unit)
+  const label = featureLabel(row.key, row.label)
+  const value = unlimited ? t('plan.usage.unlimited', { used: row.used, unit }) : `${row.used} / ${row.limit} ${unit}`
   return el('li', { className: `qt-row ${tone}`.trim() },
-    el('div', { className: 'qt-row-head' }, el('span', { className: 'qt-row-label' }, row.label), el('span', { className: 'qt-row-value tnum' }, value)),
+    el('div', { className: 'qt-row-head' }, el('span', { className: 'qt-row-label' }, label), el('span', { className: 'qt-row-value tnum' }, value)),
     el('div', {
-      className: 'qt-bar', role: 'progressbar', 'aria-label': row.label,
+      className: 'qt-bar', role: 'progressbar', 'aria-label': label,
       'aria-valuemin': '0', 'aria-valuemax': unlimited ? '0' : String(row.limit), 'aria-valuenow': String(row.used),
     }, el('span', { className: 'qt-bar-fill', style: `width:${unlimited ? 100 : pct}%` })),
     !unlimited && row.left === 0
-      ? el('p', { className: 'qt-row-note' }, `Kuota habis. Berikutnya memakai saldo AI (${rupiah(FEATURES.find((f) => f.key === row.key).price_idr)} per ${row.unit}).`)
+      ? el('p', { className: 'qt-row-note' }, t('plan.usage.out', { price: rupiah(FEATURES.find((f) => f.key === row.key).price_idr), unit }))
       : null)
 }
 
 export async function render(container, ctx) {
   const summaryHost = el('div', { 'aria-live': 'polite' }, C.skeletonRows(3))
-  const code = C.field({ label: 'Kode voucher', id: 'qt-voucher-code', placeholder: 'SATU-XXXX-XXXX', attrs: { maxlength: '32', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'characters' } })
+  const code = C.field({ label: t('plan.voucher.code'), id: 'qt-voucher-code', placeholder: 'SATU-XXXX-XXXX', attrs: { maxlength: '32', autocomplete: 'off', spellcheck: 'false', autocapitalize: 'characters' } })
   const err = el('p', { className: 'field-error', role: 'alert' })
-  const redeem = C.button({ label: 'Tukar voucher', icon: 'check', variant: 'primary', type: 'submit' })
+  const redeem = C.button({ label: t('plan.voucher.redeem'), icon: 'check', variant: 'primary', type: 'submit' })
   const form = el('form', { className: 'form qt-voucher-form', noValidate: true }, code.wrap, err, el('div', { className: 'form-actions' }, redeem))
-  const contact = el('a', { className: 'btn btn-soft btn-sm', href: '#/kontak' }, 'Hubungi kami')
+  const contact = el('a', { className: 'btn btn-soft btn-sm', href: '#/kontak' }, t('plan.common.contact'))
   const tiers = el('div', { className: 'lp-tiers qt-tiers' })
-  const plansPanel = C.panel({ title: 'Pilih paket', meta: 'Paket tidak termasuk saldo AI' }, tiers)
+  const plansPanel = C.panel({ title: t('plan.page.choose'), meta: t('plan.page.noCredit') }, tiers)
 
   container.replaceChildren(
-    C.pageHeader({ title: 'Paket & kuota' }),
+    C.pageHeader({ title: t('plan.page.title') }),
     el('div', { className: 'qt-grid' },
-      C.panel({ title: 'Paket Anda', className: 'qt-summary' }, summaryHost),
-      C.panel({ title: 'Tukar voucher', meta: 'Satu kode untuk satu akun' },
-        el('p', { className: 'muted small' }, 'Voucher bisa berisi paket, saldo AI, atau keduanya.'),
+      C.panel({ title: t('plan.page.yourPlan'), className: 'qt-summary' }, summaryHost),
+      C.panel({ title: t('plan.voucher.redeem'), meta: t('plan.voucher.oneCode') },
+        el('p', { className: 'muted small' }, t('plan.voucher.desc')),
         form,
-        el('p', { className: 'muted small qt-contact' }, 'Butuh kuota lebih besar atau voucher untuk tim? ', contact))),
+        el('p', { className: 'muted small qt-contact' }, t('plan.page.needMore'), contact))),
     el('div', { className: 'lp qt-plans' }, plansPanel))
 
   function drawSummary(s) {
-    const until = s.period_end ? `sampai ${C.formatDate(s.period_end)}` : s.plan.slug === 'free' ? 'tanpa batas waktu' : ''
+    const until = s.period_end ? t('plan.summary.until', { date: C.formatDate(s.period_end) }) : s.plan.slug === 'free' ? t('plan.summary.noExpiry') : ''
     summaryHost.replaceChildren(
       el('div', { className: 'qt-plan' },
         el('div', {},
-          el('p', { className: 'qt-plan-name' }, s.plan.name || 'Free', s.demo ? C.tag('Akun demo', 'accent') : ''),
-          el('p', { className: 'muted small' }, [until, `kuota diperbarui ${C.formatDate(s.resets_on)}`].filter(Boolean).join(' · '))),
-        el('div', { className: 'qt-credit' }, el('span', { className: 'muted small' }, 'Saldo AI'), el('strong', { className: 'tnum' }, rupiah(s.credit_idr)))),
+          el('p', { className: 'qt-plan-name' }, s.plan.name || 'Free', s.demo ? C.tag(t('plan.page.demoTag'), 'accent') : ''),
+          el('p', { className: 'muted small' }, [until, t('plan.summary.resets', { date: C.formatDate(s.resets_on) })].filter(Boolean).join(' · '))),
+        el('div', { className: 'qt-credit' }, el('span', { className: 'muted small' }, t('plan.page.credit')), el('strong', { className: 'tnum' }, rupiah(s.credit_idr)))),
       // Business scale (sole/ukm/enterprise) gates features; it is not the Free/Lite/Pro paket above.
-      ctx.user?.plan ? el('p', { className: 'muted small qt-tier' }, `Skala akun: ${planLabel(ctx.user.plan)}. `,
-        canUse(ctx.user.plan, 'erpIntegration') ? 'Integrasi ERP terbuka.' : 'Integrasi ERP terbuka untuk akun skala Enterprise.',
-        ' Skala akun tidak mengubah kuota AI.') : '',
-      s.lapsed ? el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' }, el('p', {}, 'Masa paket Anda sudah berakhir, jadi kuota kembali ke paket Free.'))) : '',
-      s.demo ? el('p', { className: 'muted small' }, 'Akun demo memakai AI tanpa batas untuk presentasi; pemakaian tetap tercatat.') : '',
+      ctx.user?.plan ? el('p', { className: 'muted small qt-tier' }, t('plan.summary.scale', { plan: planLabel(ctx.user.plan) }),
+        canUse(ctx.user.plan, 'erpIntegration') ? t('plan.summary.erpOpen') : t('plan.summary.erpEnterprise'),
+        t('plan.summary.scaleNoQuota')) : '',
+      s.lapsed ? el('div', { className: 'note note-warn' }, C.icon('alert'), el('div', { className: 'note-body' }, el('p', {}, t('plan.summary.lapsed')))) : '',
+      s.demo ? el('p', { className: 'muted small' }, t('plan.summary.demo')) : '',
       el('ul', { className: 'qt-rows' }, ...s.usage.map(usageBar)))
   }
 
@@ -73,7 +77,7 @@ export async function render(container, ctx) {
       if (!ctx.signal.aborted) drawSummary(s)
     } catch (e) {
       if (ctx.signal.aborted) return
-      const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
+      const again = C.button({ label: t('plan.common.retry'), variant: 'soft', size: 'sm' })
       again.addEventListener('click', () => { summaryHost.replaceChildren(C.skeletonRows(3)); loadSummary() })
       summaryHost.replaceChildren(C.errorState(e.message), again)
     }
@@ -82,15 +86,15 @@ export async function render(container, ctx) {
   form.addEventListener('submit', async (e) => {
     e.preventDefault()
     err.textContent = ''
-    if (!code.input.value.trim()) { err.textContent = 'Masukkan kode voucher.'; code.input.focus(); return }
-    const restore = C.setBusy(redeem, 'Menukar…')
+    if (!code.input.value.trim()) { err.textContent = t('plan.voucher.enter'); code.input.focus(); return }
+    const restore = C.setBusy(redeem, t('plan.voucher.redeeming'))
     try {
       const s = await redeemVoucher(code.input.value)
       code.input.value = ''
       if (!ctx.signal.aborted) drawSummary(s)
       const r = s.redeemed
-      const got = [r.type !== 'credit' ? `paket ${s.plan.name} ${r.plan_days} hari` : '', r.type !== 'plan' ? `saldo AI ${rupiah(r.credit_idr)}` : ''].filter(Boolean).join(' dan ')
-      showToast(`Voucher berhasil ditukar: ${got}.`, 'success', 5000)
+      const got = [r.type !== 'credit' ? t('plan.voucher.gotPlan', { plan: s.plan.name, days: r.plan_days }) : '', r.type !== 'plan' ? t('plan.voucher.gotCredit', { amount: rupiah(r.credit_idr) }) : ''].filter(Boolean).join(t('plan.voucher.and'))
+      showToast(t('plan.voucher.redeemed', { got }), 'success', 5000)
     } catch (ex) {
       err.textContent = ex.message
       code.input.focus()

@@ -6,6 +6,7 @@
 import { getCloud, isUsingMockCloud } from '../cloud.js'
 import { validatePlan, validateReorder } from './plan-rules.js'
 import { validatePaymentSettings, testGateway } from './payment.js'
+import { t } from '../i18n/index.js'
 
 const DEMO_KEY = 'satualur_business_demo_v1'
 const FAIL_KEY = 'satualur_business_fail'
@@ -25,7 +26,7 @@ async function call(path, { method = 'GET', body, cache } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('growth.api.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -61,13 +62,13 @@ export async function adminListPlans() {
   if (isUsingMockCloud()) {
     const wait = Number(localStorage.getItem('satualur_business_delay')) || 0
     if (wait) await new Promise((r) => setTimeout(r, wait))
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat paket. Coba lagi.')
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(t('growth.api.plansFailed'))
     return loadDemo().plans.sort(bySort)
   }
   try {
     return (await call('/api/office/admin/plans', { cache: 'no-store' })) || []
   } catch (e) {
-    throw new Error(`Gagal memuat paket. ${e.message}`)
+    throw new Error(t('growth.api.plansFailedWith', { error: e.message }))
   }
 }
 
@@ -77,9 +78,9 @@ const refreshPublic = () => { fetch('/api/plans', { cache: 'reload' }).catch(() 
 async function mockWrite(patch, id) {
   const db = loadDemo()
   const cur = id === undefined ? null : db.plans.find((p) => p.id === id)
-  if (id !== undefined && !cur) throw new Error('Paket tidak ditemukan.')
+  if (id !== undefined && !cur) throw new Error(t('growth.api.planNotFound'))
   const v = validatePlan({ ...(cur || {}), ...patch })
-  if (db.plans.some((p) => p.slug === v.slug && p.id !== id)) throw new Error('Slug sudah dipakai.')
+  if (db.plans.some((p) => p.slug === v.slug && p.id !== id)) throw new Error(t('growth.api.slugTaken'))
   const who = (await getCloud().auth.getSession())?.data?.user?.name || 'demo'
   const row = { ...v, id: cur ? cur.id : db.next, updated_at: new Date().toISOString(), updated_by: who }
   if (v.recommended) db.plans.forEach((p) => { if (p.id !== row.id) p.recommended = 0 })
@@ -118,13 +119,13 @@ const publicPayment = ({ key_wrong, ...rest } = {}) => ({ ...NO_PAYMENT, ...rest
 /** Stored settings (flags + last4, never a key). Throws a readable error on failure. */
 export async function adminGetPayment() {
   if (isUsingMockCloud()) {
-    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error('Gagal memuat pengaturan pembayaran. Coba lagi.')
+    if (localStorage.getItem(FAIL_KEY) === '1') throw new Error(t('growth.api.paymentFailed'))
     return publicPayment(loadDemo().payment)
   }
   try {
     return await call('/api/office/admin/payment', { cache: 'no-store' })
   } catch (e) {
-    throw new Error(`Gagal memuat pengaturan pembayaran. ${e.message}`)
+    throw new Error(t('growth.api.paymentFailedWith', { error: e.message }))
   }
 }
 

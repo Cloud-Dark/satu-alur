@@ -1,6 +1,7 @@
 import * as C from '../../ui/components.js'
 import { showToast } from '../../ui/animations.js'
 import * as Social from '../../social/api.js'
+import { t } from '../../i18n/index.js'
 import { accountsSection, credentialsPanel, pickPanel as replizPickPanel, replizReady } from './repliz.js'
 
 const { el } = C
@@ -35,20 +36,20 @@ function cardKit(ctx, startConnect, disconnect) {
   }
   const connect = (label) => {
     const btn = button(label)
-    btn.addEventListener('click', () => run(btn, 'Menghubungkan…', async () => {
+    btn.addEventListener('click', () => run(btn, t('social.account.connecting'), async () => {
       await startConnect()
       await ctx.refresh() // demo mode connects in place; the real flow navigates away
     }))
     return btn
   }
   const off = (name) => {
-    const btn = C.button({ label: 'Putuskan', icon: 'x', variant: 'ghost' })
+    const btn = C.button({ label: t('social.account.disconnect'), icon: 'x', variant: 'ghost' })
     btn.addEventListener('click', () => {
-      if (!confirm(`Putuskan ${name}? Jadwal yang belum tayang tidak akan terkirim.`)) return
-      run(btn, 'Memutuskan…', async () => {
+      if (!confirm(t('social.account.disconnectConfirm', { name }))) return
+      run(btn, t('social.account.disconnecting'), async () => {
         await disconnect()
         await ctx.refresh()
-        showToast('Akun diputuskan.', 'success')
+        showToast(t('social.account.disconnected'), 'success')
       })
     })
     return btn
@@ -57,50 +58,50 @@ function cardKit(ctx, startConnect, disconnect) {
 }
 
 const reconnectNote = (name) => el('div', { className: 'note note-warn', role: 'status' }, C.icon('alert'),
-  el('div', { className: 'note-body' }, el('p', {}, `Koneksi ke ${name} perlu diperbarui sebelum Anda bisa membagikan konten.`)))
+  el('div', { className: 'note-body' }, el('p', {}, t('social.account.reconnectNote', { name }))))
 
 function connectPanel(ctx) {
   const { configured } = ctx
   const account = ctx.account?.fb_connected ? ctx.account : null
   const { button, connect, off: offButton } = cardKit(ctx, Social.startConnect, Social.disconnect)
   if (!configured) {
-    return C.panel({ title: 'Akun Meta', raised: true },
-      el('p', {}, 'Integrasi Meta belum dikonfigurasi oleh admin.'),
-      el('div', { className: 'form-actions' }, button('Hubungkan Facebook & Instagram', { disabled: true })))
+    return C.panel({ title: t('social.account.meta.title'), raised: true },
+      el('p', {}, t('social.account.meta.notConfigured')),
+      el('div', { className: 'form-actions' }, button(t('social.account.meta.connect'), { disabled: true })))
   }
   if (!account) {
-    return C.panel({ title: 'Akun Meta', meta: 'Belum terhubung', raised: true },
-      el('p', {}, 'Hubungkan Page Facebook Anda (dan akun Instagram Bisnis yang tertaut) untuk membagikan konten langsung dari sini.'),
-      el('div', { className: 'form-actions' }, connect('Hubungkan Facebook & Instagram')))
+    return C.panel({ title: t('social.account.meta.title'), meta: t('social.account.notConnected'), raised: true },
+      el('p', {}, t('social.account.meta.intro')),
+      el('div', { className: 'form-actions' }, connect(t('social.account.meta.connect'))))
   }
-  const off = offButton(account.page_name || 'Page Facebook')
-  return C.panel({ title: 'Akun Meta', meta: 'Terhubung', raised: true },
+  const off = offButton(account.page_name || t('social.account.meta.page'))
+  return C.panel({ title: t('social.account.meta.title'), meta: t('social.account.connected'), raised: true },
     C.defList([
-      ['Page Facebook', account.page_name],
-      ['Instagram', account.ig_username ? `@${account.ig_username}` : 'Hubungkan akun Instagram Bisnis ke Page ini'],
+      [t('social.account.meta.page'), account.page_name],
+      ['Instagram', account.ig_username ? `@${account.ig_username}` : t('social.account.meta.linkIg')],
     ]),
     account.needs_reconnect ? reconnectNote('Meta') : null,
-    el('div', { className: 'form-actions' }, account.needs_reconnect ? connect('Hubungkan ulang') : null, off))
+    el('div', { className: 'form-actions' }, account.needs_reconnect ? connect(t('social.account.reconnect')) : null, off))
 }
 
 function threadsPanel(ctx) {
   const account = ctx.account?.threads_connected ? ctx.account : null
   const { button, connect, off } = cardKit(ctx, Social.startThreadsConnect, Social.disconnectThreads)
   if (!ctx.threadsConfigured) {
-    return C.panel({ title: 'Akun Threads', raised: true },
-      el('p', {}, 'Integrasi Threads belum dikonfigurasi oleh admin.'),
-      el('div', { className: 'form-actions' }, button('Hubungkan Threads', { disabled: true })))
+    return C.panel({ title: t('social.account.threads.title'), raised: true },
+      el('p', {}, t('social.account.threads.notConfigured')),
+      el('div', { className: 'form-actions' }, button(t('social.account.threads.connect'), { disabled: true })))
   }
   if (!account) {
-    return C.panel({ title: 'Akun Threads', meta: 'Belum terhubung', raised: true },
-      el('p', {}, 'Hubungkan akun Threads Anda untuk membagikan dan menjadwalkan posting Threads dari sini. Tidak perlu Page Facebook.'),
-      el('div', { className: 'form-actions' }, connect('Hubungkan Threads')))
+    return C.panel({ title: t('social.account.threads.title'), meta: t('social.account.notConnected'), raised: true },
+      el('p', {}, t('social.account.threads.intro')),
+      el('div', { className: 'form-actions' }, connect(t('social.account.threads.connect'))))
   }
   const name = `@${account.threads_username || 'threads'}`
-  return C.panel({ title: 'Akun Threads', meta: 'Terhubung', raised: true },
+  return C.panel({ title: t('social.account.threads.title'), meta: t('social.account.connected'), raised: true },
     C.defList([['Threads', name]]),
     account.threads_needs_reconnect ? reconnectNote('Threads') : null,
-    el('div', { className: 'form-actions' }, account.threads_needs_reconnect ? connect('Hubungkan ulang Threads') : null, off(name)))
+    el('div', { className: 'form-actions' }, account.threads_needs_reconnect ? connect(t('social.account.threads.reconnect')) : null, off(name)))
 }
 
 function pickPanel(ctx) {
@@ -108,9 +109,9 @@ function pickPanel(ctx) {
   Social.listPagesToPick(ctx.pick).then((pages) => {
     if (ctx.signal.aborted) return
     list.replaceChildren(...(pages.length ? pages : []).map((pg) => {
-      const btn = C.button({ label: 'Pilih', variant: 'soft', size: 'sm', 'aria-label': `Pilih ${pg.name}` })
+      const btn = C.button({ label: t('social.account.pick.choose'), variant: 'soft', size: 'sm', 'aria-label': t('social.account.pick.chooseName', { name: pg.name }) })
       btn.addEventListener('click', async () => {
-        const restore = C.setBusy(btn, 'Memilih…')
+        const restore = C.setBusy(btn, t('social.account.pick.choosing'))
         try {
           await Social.pickPage(ctx.pick, pg.id)
           ctx.clearPick()
@@ -118,38 +119,38 @@ function pickPanel(ctx) {
         } catch (err) { ctx.status.show('danger', err.message); restore() }
       })
       return el('article', { className: 'workspace-entry' }, el('strong', {}, pg.name),
-        el('p', { className: 'muted small' }, pg.ig_username ? `Instagram @${pg.ig_username}` : 'Tanpa akun Instagram Bisnis'), btn)
+        el('p', { className: 'muted small' }, pg.ig_username ? `Instagram @${pg.ig_username}` : t('social.account.pick.noIg')), btn)
     }))
-    if (!pages.length) list.replaceChildren(C.emptyState({ title: 'Tidak ada Page', body: 'Akun Meta ini belum mengelola Page Facebook.' }))
+    if (!pages.length) list.replaceChildren(C.emptyState({ title: t('social.account.pick.emptyTitle'), body: t('social.account.pick.emptyBody') }))
   }).catch((err) => { if (!ctx.signal.aborted) list.replaceChildren(C.errorState(err.message)) })
-  return C.panel({ title: 'Pilih Page', meta: 'Beberapa Page ditemukan' }, list)
+  return C.panel({ title: t('social.account.pick.title'), meta: t('social.account.pick.meta') }, list)
 }
 
 function importPanel(ctx, rows) {
-  const btn = C.button({ label: 'Pindahkan ke akun', icon: 'save', variant: 'soft' })
+  const btn = C.button({ label: t('social.account.import.move'), icon: 'save', variant: 'soft' })
   btn.addEventListener('click', async () => {
-    const restore = C.setBusy(btn, 'Memindahkan…')
+    const restore = C.setBusy(btn, t('social.account.import.moving'))
     ctx.status.hide()
     try {
       for (const r of rows) await Social.saveContent(r)
       try { localStorage.setItem(MIGRATED, '1') } catch { /* storage unavailable */ }
-      showToast(`${rows.length} konten dipindahkan ke akun.`, 'success')
+      showToast(t('social.account.import.moved', { count: rows.length }), 'success')
       await ctx.refresh()
     } catch (err) {
       ctx.status.show('danger', err.message)
       restore()
     }
   })
-  return C.panel({ title: 'Konten lama di browser ini', meta: `${rows.length} item` },
-    el('p', {}, 'Konten dan jadwal lama masih tersimpan di browser ini. Pindahkan ke akun agar bisa dipakai di perangkat lain. Data lama tidak dihapus.'),
+  return C.panel({ title: t('social.account.import.title'), meta: t('social.account.import.meta', { count: rows.length }) },
+    el('p', {}, t('social.account.import.body')),
     el('div', { className: 'form-actions' }, btn))
 }
 
 export function render(host, ctx) {
   if (ctx.loadError) {
-    const retry = C.button({ label: 'Coba lagi', icon: 'refresh', variant: 'soft' })
+    const retry = C.button({ label: t('social.retry'), icon: 'refresh', variant: 'soft' })
     retry.addEventListener('click', () => ctx.refresh())
-    host.replaceChildren(C.errorState(`Status akun tidak dapat dimuat: ${ctx.loadError}`), retry)
+    host.replaceChildren(C.errorState(t('social.account.loadError', { message: ctx.loadError })), retry)
     return
   }
   const legacy = legacyRows()
@@ -161,7 +162,7 @@ export function render(host, ctx) {
     ctx.replizPick ? replizPickPanel(ctx) : null,
     repliz ? accountsSection(ctx) : replizOn ? credentialsPanel(ctx) : null,
     ctx.pick ? pickPanel(ctx) : null,
-    repliz && direct ? el('h3', { className: 'sm-subhead' }, 'Koneksi langsung Meta & Threads') : null,
+    repliz && direct ? el('h3', { className: 'sm-subhead' }, t('social.account.directHeading')) : null,
     direct ? connectPanel(ctx) : null,
     direct ? threadsPanel(ctx) : null,
     legacy ? importPanel(ctx, legacy) : null))

@@ -11,11 +11,12 @@
 import '../styles/waguri.css'
 import { icon } from '../ui/icons.js'
 import { waguriImage } from './avatar.js'
-import { skillsFor, skillById, greeting } from './skills.js'
+import { skillsFor, skillById } from './skills.js'
 import { answerFor, wantsAi } from './engine.js'
 import { askApp, askPublic, aiErrorNote } from './ai.js'
 import { STEPS } from '../domain/workflow.js'
 import { formatText } from './format.js'
+import { t, has } from '../i18n/index.js'
 
 const CONSENT_KEY = 'satualur_waguri_consent'
 const MAX_SAVED = 40
@@ -42,6 +43,19 @@ function h(tag, attrs = {}, ...children) {
 }
 
 let seq = 0
+
+// skills.js, answers.js and workflow.js are shared with the worker/tests, so their labels are translated here by stable id.
+const skillText = (s, field) => (has(`waguri.skills.${s.id}.${field}`) ? t(`waguri.skills.${s.id}.${field}`) : s[field])
+const stepLabel = (s) => (has(`waguri.steps.${s.key}`) ? t(`waguri.steps.${s.key}`) : s.label)
+const ACTION_KEYS = {
+  'Buka Alur kerja': 'openWorkflow', 'Buka Bantuan': 'openHelp', 'Buka Laporan': 'openReport', 'Buka Pembukuan': 'openBookkeeping',
+  'Buka di Alur kerja': 'openInWorkflow', 'Bukukan sekarang': 'bookNow', 'Catat permintaan': 'logRequest', 'Hubungi kami': 'contactUs',
+}
+const actionLabel = (label) => (ACTION_KEYS[label] ? t(`waguri.actions.${ACTION_KEYS[label]}`) : label)
+function greetingText(mode, name) {
+  const hi = name ? t('waguri.greeting.hiName', { name }) : t('waguri.greeting.hi')
+  return `${hi} ${mode === 'app' ? t('waguri.greeting.app') : t('waguri.greeting.public')}`
+}
 
 export function mountWaguri({ mode = 'public', user = null, navigate = () => {} } = {}) {
   const app = mode === 'app'
@@ -96,17 +110,17 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   const fabClose = h('span', { className: 'wg-fab-x', 'aria-hidden': 'true' }, icon('x', { size: 18 }))
   const fab = h('button', {
     type: 'button', className: 'wg-fab', 'aria-expanded': 'false', 'aria-controls': `${id}-panel`, 'data-waguri-fab': '',
-  }, fabAvatar, fabClose, h('span', { className: 'wg-fab-label' }, 'Tanya Waguri'))
+  }, fabAvatar, fabClose, h('span', { className: 'wg-fab-label' }, t('waguri.fab')))
 
-  const headAva = h('button', { type: 'button', className: 'wg-head-ava', 'aria-label': 'Lihat Waguri seluruh badan', title: 'Lihat Waguri' },
+  const headAva = h('button', { type: 'button', className: 'wg-head-ava', 'aria-label': t('waguri.head.viewFull'), title: t('waguri.head.viewTitle') },
     waguriImage('avatar', { className: 'wg-ava-img' }), h('i', { className: 'wg-online' }))
-  const trashBtn = h('button', { type: 'button', className: 'wg-icon', 'aria-label': 'Hapus obrolan', title: 'Hapus obrolan' }, icon('trash', { size: 18 }))
-  const closeBtn = h('button', { type: 'button', className: 'wg-icon', 'aria-label': 'Tutup Waguri', title: 'Tutup (Esc)' }, icon('x', { size: 18 }))
+  const trashBtn = h('button', { type: 'button', className: 'wg-icon', 'aria-label': t('waguri.head.clear'), title: t('waguri.head.clear') }, icon('trash', { size: 18 }))
+  const closeBtn = h('button', { type: 'button', className: 'wg-icon', 'aria-label': t('waguri.head.close'), title: t('waguri.head.closeTitle') }, icon('x', { size: 18 }))
   const head = h('header', { className: 'wg-head' },
     headAva,
     h('div', { className: 'wg-head-text' },
       h('h2', { className: 'wg-name', id: `${id}-title` }, 'Waguri'),
-      h('p', { className: 'wg-sub' }, 'Asisten AI Satu Alur')),
+      h('p', { className: 'wg-sub' }, t('waguri.subtitle'))),
     trashBtn, closeBtn)
 
   const body = h('div', { className: 'wg-body' })
@@ -120,7 +134,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   /* --------------------------------------------------- Consent screen */
 
   function consentScreen() {
-    const agree = h('button', { type: 'button', className: 'wg-primary', 'data-waguri-consent': '' }, 'Setuju, mulai ngobrol ', icon('arrowRight', { size: 16 }))
+    const agree = h('button', { type: 'button', className: 'wg-primary', 'data-waguri-consent': '' }, t('waguri.consent.agree') + ' ', icon('arrowRight', { size: 16 }))
     agree.addEventListener('click', () => {
       store.set(CONSENT_KEY, '1')
       showChat({ focus: true })
@@ -128,34 +142,34 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
     const point = (ic, text) => h('li', {}, h('span', { className: 'wg-point-ico', 'aria-hidden': 'true' }, icon(ic, { size: 16 })), h('span', {}, text))
     return h('div', { className: 'wg-consent' },
       h('div', { className: 'wg-consent-ava', 'aria-hidden': 'true' }, waguriImage('avatar', { className: 'wg-ava-img' })),
-      h('span', { className: 'wg-chip' }, icon('lock', { size: 14 }), 'Obrolan pribadi'),
-      h('h3', { className: 'wg-consent-title' }, 'Yuk, mulai dari kebutuhanmu.'),
+      h('span', { className: 'wg-chip' }, icon('lock', { size: 14 }), t('waguri.consent.chip')),
+      h('h3', { className: 'wg-consent-title' }, t('waguri.consent.title')),
       h('p', { className: 'wg-consent-lede' }, app
-        ? 'Aku bisa mengecek posisi proyek pelanggan, menjelaskan menu, meringkas keuangan, dan menyiapkan draf pesan dari data usahamu sendiri.'
-        : 'Aku bisa menjelaskan Satu Alur, paket dan harganya, serta cara mulai memakainya.'),
+        ? t('waguri.consent.ledeApp')
+        : t('waguri.consent.ledePublic')),
       h('ul', { className: 'wg-points' },
-        point('message', 'Waguri menjawab satu hal per giliran, jadi tanyakan satu per satu.'),
-        point('compass', 'Waguri bisa menunjukkan halaman atau data yang cocok untuk dibuka.'),
-        point('trash', 'Kamu bebas menutup atau menghapus obrolan kapan saja.')),
-      h('p', { className: 'wg-note' }, 'Riwayat obrolan disimpan di perangkat ini saja.' + (app ? ' Jawaban dari AI memakai kuota Penasihat AI.' : '')),
+        point('message', t('waguri.consent.point1')),
+        point('compass', t('waguri.consent.point2')),
+        point('trash', t('waguri.consent.point3'))),
+      h('p', { className: 'wg-note' }, t('waguri.consent.note') + (app ? ` ${t('waguri.consent.noteQuota')}` : '')),
       agree)
   }
 
   /* ------------------------------------------------------ Chat screen */
 
-  const log = h('div', { className: 'wg-log', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': 'Percakapan dengan Waguri' })
-  const skillBar = h('div', { className: 'wg-skills', role: 'group', 'aria-label': 'Keahlian Waguri' })
+  const log = h('div', { className: 'wg-log', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': t('waguri.chat.log') })
+  const skillBar = h('div', { className: 'wg-skills', role: 'group', 'aria-label': t('waguri.chat.skills') })
   const skillHint = h('p', { className: 'wg-skill-hint' })
   const suggest = h('div', { className: 'wg-suggest' })
-  const input = h('textarea', { className: 'wg-input', rows: '1', 'aria-label': 'Tulis pertanyaan untuk Waguri', maxlength: '800', 'data-waguri-input': '' })
-  const send = h('button', { type: 'submit', className: 'wg-send', 'aria-label': 'Kirim' }, icon('send', { size: 18 }))
+  const input = h('textarea', { className: 'wg-input', rows: '1', 'aria-label': t('waguri.chat.input'), maxlength: '800', 'data-waguri-input': '' })
+  const send = h('button', { type: 'submit', className: 'wg-send', 'aria-label': t('waguri.chat.send') }, icon('send', { size: 18 }))
   const form = h('form', { className: 'wg-form' }, input, send)
   const chat = h('div', { className: 'wg-chat' }, skillBar, skillHint, log, suggest, form)
 
   function drawSkills() {
     skillBar.replaceChildren(...skills.map((s) => {
       const b = h('button', { type: 'button', className: `wg-skill${s.id === skill.id ? ' is-active' : ''}`, 'aria-pressed': s.id === skill.id ? 'true' : 'false', 'data-skill': s.id },
-        icon(s.icon, { size: 14 }), s.label)
+        icon(s.icon, { size: 14 }), skillText(s, 'label'))
       b.addEventListener('click', () => {
         if (skill.id === s.id) return
         skill = s
@@ -166,8 +180,8 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
       })
       return b
     }))
-    skillHint.textContent = skill.hint
-    input.placeholder = skill.placeholder
+    skillHint.textContent = skillText(skill, 'hint')
+    input.placeholder = skillText(skill, 'placeholder')
   }
 
   function chips(list, cls = 'wg-sug') {
@@ -181,7 +195,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   function drawSuggest(force = false) {
     const show = force || !history.some((m) => m.role === 'user')
     suggest.hidden = !show
-    if (show) suggest.replaceChildren(h('p', { className: 'wg-sug-title' }, 'Coba tanyakan'), h('div', { className: 'wg-sug-list' }, chips(skill.suggestions)))
+    if (show) suggest.replaceChildren(h('p', { className: 'wg-sug-title' }, t('waguri.chat.try')), h('div', { className: 'wg-sug-list' }, chips(skillText(skill, 'suggestions'))))
   }
 
   function goTo(a) {
@@ -199,16 +213,16 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   function actionButtons(actions = []) {
     if (!actions.length) return null
     return h('div', { className: 'wg-actions' }, actions.map((a) => {
-      const b = h('button', { type: 'button', className: 'wg-action', 'data-waguri-action': a.stage || a.href }, a.label, icon('arrowRight', { size: 14 }))
+      const b = h('button', { type: 'button', className: 'wg-action', 'data-waguri-action': a.stage || a.href }, actionLabel(a.label), icon('arrowRight', { size: 14 }))
       b.addEventListener('click', () => goTo(a))
       return b
     }))
   }
 
   function jobCard(c) {
-    const steps = h('ol', { className: 'wg-steps', 'aria-label': c.done ? 'Semua tahap selesai' : `Tahap ${Math.min(c.stepIndex + 1, STEPS.length)} dari ${STEPS.length}: ${c.stage}` },
-      STEPS.map((s, i) => h('li', { className: `wg-step is-${i < c.stepIndex || c.done ? 'done' : i === c.stepIndex ? 'current' : 'todo'}`, title: s.label },
-        h('span', { className: 'wg-step-label' }, s.label))))
+    const steps = h('ol', { className: 'wg-steps', 'aria-label': c.done ? t('waguri.card.allDone') : t('waguri.card.step', { n: Math.min(c.stepIndex + 1, STEPS.length), total: STEPS.length, stage: c.stage }) },
+      STEPS.map((s, i) => h('li', { className: `wg-step is-${i < c.stepIndex || c.done ? 'done' : i === c.stepIndex ? 'current' : 'todo'}`, title: stepLabel(s) },
+        h('span', { className: 'wg-step-label' }, stepLabel(s)))))
     const next = c.next
       ? h('button', { type: 'button', className: 'wg-next', 'data-waguri-next': c.next.stage }, c.next.label, icon('arrowRight', { size: 14 }))
       : null
@@ -220,7 +234,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
       h('p', { className: 'wg-card-meta' }, [c.service, c.location].filter(Boolean).join(' · ')),
       steps,
       h('p', { className: 'wg-card-pos' },
-        h('span', { className: `wg-tone wg-tone-${c.tone}` }, c.done ? 'Selesai' : c.stage),
+        h('span', { className: `wg-tone wg-tone-${c.tone}` }, c.done ? t('waguri.card.done') : c.stage),
         h('span', { className: 'wg-card-status' }, c.status)),
       next)
   }
@@ -236,10 +250,10 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   }
 
   function copyButton(text) {
-    const b = h('button', { type: 'button', className: 'wg-copy' }, icon('copy', { size: 14 }), 'Salin pesan')
+    const b = h('button', { type: 'button', className: 'wg-copy' }, icon('copy', { size: 14 }), t('waguri.copy.copy'))
     b.addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(text); b.lastChild.textContent = 'Tersalin' } catch { b.lastChild.textContent = 'Gagal menyalin' }
-      setTimeout(() => { if (b.isConnected) b.lastChild.textContent = 'Salin pesan' }, 1800)
+      try { await navigator.clipboard.writeText(text); b.lastChild.textContent = t('waguri.copy.copied') } catch { b.lastChild.textContent = t('waguri.copy.failed') }
+      setTimeout(() => { if (b.isConnected) b.lastChild.textContent = t('waguri.copy.copy') }, 1800)
     })
     return b
   }
@@ -259,7 +273,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   }
 
   function drawLog() {
-    log.replaceChildren(messageEl({ role: 'assistant', text: greeting(mode, firstName) }), ...history.map(messageEl))
+    log.replaceChildren(messageEl({ role: 'assistant', text: greetingText(mode, firstName) }), ...history.map(messageEl))
     drawSuggest()
     scrollDown()
   }
@@ -277,7 +291,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
     history.push(userMsg)
     log.append(messageEl(userMsg))
     suggest.hidden = true
-    const typing = h('div', { className: 'wg-msg is-bot is-typing', 'aria-label': 'Waguri sedang mengetik' },
+    const typing = h('div', { className: 'wg-msg is-bot is-typing', 'aria-label': t('waguri.chat.typing') },
       h('span', { className: 'wg-msg-ava', 'aria-hidden': 'true' }, waguriImage('avatar', { className: 'wg-ava-img' })),
       h('div', { className: 'wg-bubble' }, h('span', { className: 'wg-dots', 'aria-hidden': 'true' }, h('i'), h('i'), h('i'))))
     log.append(typing)
@@ -316,7 +330,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
         live.remove()
       }
     } catch (err) {
-      reply = { role: 'assistant', skill: asked.id, text: `Maaf, data belum bisa dimuat: ${err?.message || 'coba lagi sebentar lagi.'}` }
+      reply = { role: 'assistant', skill: asked.id, text: t('waguri.chat.loadError', { message: err?.message || t('waguri.chat.tryLater') }) }
     } finally {
       busy = false
       send.disabled = false
@@ -342,16 +356,16 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   /* ---------------------------------------------------- Full-body view */
 
   function fullScreen() {
-    const back = h('button', { type: 'button', className: 'wg-primary wg-full-back' }, icon('arrowLeft', { size: 16 }), 'Kembali ke chat')
-    const x = h('button', { type: 'button', className: 'wg-icon wg-full-x', 'aria-label': 'Tutup tampilan penuh' }, icon('x', { size: 18 }))
+    const back = h('button', { type: 'button', className: 'wg-primary wg-full-back' }, icon('arrowLeft', { size: 16 }), t('waguri.full.back'))
+    const x = h('button', { type: 'button', className: 'wg-icon wg-full-x', 'aria-label': t('waguri.full.close') }, icon('x', { size: 18 }))
     back.addEventListener('click', () => leaveFull())
     x.addEventListener('click', () => leaveFull())
-    return h('div', { className: 'wg-full', role: 'group', 'aria-label': 'Waguri, tampilan seluruh badan', 'data-waguri-full': '' },
-      waguriImage('full', { className: 'wg-full-img', alt: 'Ilustrasi Waguri, asisten kantor Satu Alur, berdiri tersenyum' }),
+    return h('div', { className: 'wg-full', role: 'group', 'aria-label': t('waguri.full.label'), 'data-waguri-full': '' },
+      waguriImage('full', { className: 'wg-full-img', alt: t('waguri.full.alt') }),
       x,
       h('div', { className: 'wg-full-cap' },
         h('p', { className: 'wg-full-name' }, 'Waguri'),
-        h('p', { className: 'wg-full-sub' }, 'Asisten AI Satu Alur'),
+        h('p', { className: 'wg-full-sub' }, t('waguri.subtitle')),
         back))
   }
   let full = null
@@ -377,8 +391,8 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
   function openSheet() {
     if (sheet) return
     leaveFull({ focus: false })
-    const cancel = h('button', { type: 'button', className: 'wg-ghost' }, 'Batal')
-    const end = h('button', { type: 'button', className: 'wg-danger', 'data-waguri-end': '' }, 'Akhiri')
+    const cancel = h('button', { type: 'button', className: 'wg-ghost' }, t('waguri.end.cancel'))
+    const end = h('button', { type: 'button', className: 'wg-danger', 'data-waguri-end': '' }, t('waguri.end.confirm'))
     cancel.addEventListener('click', () => closeSheet())
     end.addEventListener('click', () => {
       ctl?.abort()
@@ -389,8 +403,8 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
     })
     sheet = h('div', { className: 'wg-sheet-layer' },
       h('div', { className: 'wg-sheet', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': `${id}-end-title`, 'aria-describedby': `${id}-end-desc` },
-        h('h3', { id: `${id}-end-title`, className: 'wg-sheet-title' }, 'Akhiri obrolan ini?'),
-        h('p', { id: `${id}-end-desc`, className: 'wg-sheet-text' }, 'Seluruh riwayat obrolan dengan Waguri di perangkat ini akan dihapus.'),
+        h('h3', { id: `${id}-end-title`, className: 'wg-sheet-title' }, t('waguri.end.title')),
+        h('p', { id: `${id}-end-desc`, className: 'wg-sheet-text' }, t('waguri.end.body')),
         h('div', { className: 'wg-sheet-actions' }, cancel, end)))
     sheet.addEventListener('click', (e) => { if (e.target === sheet) closeSheet() })
     panel.append(sheet)
@@ -427,7 +441,7 @@ export function mountWaguri({ mode = 'public', user = null, navigate = () => {} 
     panel.hidden = false
     root.classList.add('is-open')
     fab.setAttribute('aria-expanded', 'true')
-    fab.setAttribute('aria-label', 'Tutup Tanya Waguri')
+    fab.setAttribute('aria-label', t('waguri.fabClose'))
     requestAnimationFrame(() => {
       panel.classList.add('is-in')
       const target = body.querySelector('[data-waguri-consent]') || input

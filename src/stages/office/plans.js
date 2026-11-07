@@ -8,20 +8,22 @@ import { PRICING_TIERS } from '../../landing/pricing.js'
 import { stampLine } from './site-landing.js'
 import { LEAVE_MSG } from './site-doc.js'
 import { FEATURES, limitFor } from '../../quota/rules.js'
+import { t } from '../../i18n/index.js'
+import { featureLabel, featureUnit } from '../../quota/labels.js'
 
 const { el } = C
-const PERIOD_OPTIONS = [{ value: 'month', label: 'Per bulan' }, { value: 'year', label: 'Per tahun' }, { value: 'once', label: 'Sekali bayar' }, { value: 'custom', label: 'Kustom (tanpa akhiran)' }]
-const CTA_OPTIONS = [{ value: 'signup', label: 'Daftar / masuk' }, { value: 'contact', label: 'Hubungi kami' }]
+const PERIOD_OPTIONS = () => ['month', 'year', 'once', 'custom'].map((value) => ({ value, label: t(`office.plans.period.${value}`) }))
+const CTA_OPTIONS = () => [{ value: 'signup', label: t('office.plans.ctaSignup') }, { value: 'contact', label: t('office.plans.ctaContact') }]
 let seq = 0
 
-const fromTier = (t, i) => {
-  const price_idr = priceFromText(t.price)
+const fromTier = (tier, i) => {
+  const price_idr = priceFromText(tier.price)
   return {
-    slug: t.id, name: t.name, tagline: t.tagline, price_idr, period: price_idr === null ? 'custom' : 'month', period_label: t.period,
-    recommended: t.recommended ? 1 : 0, badge: t.badge || '', limits: t.limits, features: t.features,
+    slug: tier.id, name: tier.name, tagline: tier.tagline, price_idr, period: price_idr === null ? 'custom' : 'month', period_label: tier.period,
+    recommended: tier.recommended ? 1 : 0, badge: tier.badge || '', limits: tier.limits, features: tier.features,
     // Built-in tiers without a quota fall back to the Free numbers (limitFor); Enterprise brings its own.
-    ...(t.quota ? { quota: t.quota } : {}),
-    cta_label: t.cta.label, cta_kind: t.cta.href ? 'signup' : 'contact', sort: i + 1, active: 1,
+    ...(tier.quota ? { quota: tier.quota } : {}),
+    cta_label: tier.cta.label, cta_kind: tier.cta.href ? 'signup' : 'contact', sort: i + 1, active: 1,
   }
 }
 
@@ -29,22 +31,22 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   const id = ++seq
   const v = plan || { slug: '', name: '', tagline: '', price_idr: 0, period: 'month', period_label: '', recommended: 0, badge: '', limits: [], features: [], quota: {}, cta_label: 'Pilih paket', cta_kind: 'signup', active: 1 }
   const f = (label, key, extra = {}) => C.field({ label, id: `of-pl-${key}-${id}`, value: v[key] ?? '', ...extra })
-  const name = f('Nama paket', 'name', { required: true, attrs: { maxlength: '60' } })
-  const slug = f('Slug', 'slug', { required: true, hint: 'Huruf kecil, angka, tanda hubung (2-40 karakter).', attrs: { maxlength: '40' } })
+  const name = f(t('office.plans.name'), 'name', { required: true, attrs: { maxlength: '60' } })
+  const slug = f('Slug', 'slug', { required: true, hint: t('office.plans.slugHint'), attrs: { maxlength: '40' } })
   const tagline = f('Tagline', 'tagline', { attrs: { maxlength: '160' } })
-  const price = f('Harga (Rp)', 'price_idr', { type: 'number', hint: 'Kosongkan untuk "Kustom".', attrs: { min: '0', step: '1' } })
-  const period = C.select({ label: 'Periode', id: `of-pl-period-${id}`, options: PERIOD_OPTIONS, value: v.period })
-  const periodLabel = f('Label periode', 'period_label', { hint: 'Opsional; menggantikan akhiran periode, mis. "Gratis 3 bulan".', attrs: { maxlength: '40' } })
-  const rec = C.choiceGroup({ legend: 'Rekomendasi', name: `of-pl-rec-${id}`, options: [{ value: 'on', label: 'Tandai sebagai paket rekomendasi', checked: Boolean(v.recommended), hint: 'Paket lain kehilangan tanda ini.' }] })
-  const badge = f('Badge', 'badge', { hint: 'Tampil di kartu. Pada paket rekomendasi, kosong berarti "Rekomendasi".', attrs: { maxlength: '30' } })
-  const ctaLabel = f('Teks tombol', 'cta_label', { required: true, attrs: { maxlength: '30' } })
-  const ctaKind = C.select({ label: 'Tujuan tombol', id: `of-pl-cta-${id}`, options: CTA_OPTIONS, value: v.cta_kind })
-  const act = C.choiceGroup({ legend: 'Status', name: `of-pl-act-${id}`, options: [{ value: 'on', label: 'Aktif (tampil di landing page)', checked: v.active !== 0 }] })
+  const price = f(t('office.plans.price'), 'price_idr', { type: 'number', hint: t('office.plans.priceHint'), attrs: { min: '0', step: '1' } })
+  const period = C.select({ label: t('office.plans.periodLabel'), id: `of-pl-period-${id}`, options: PERIOD_OPTIONS(), value: v.period })
+  const periodLabel = f(t('office.plans.periodText'), 'period_label', { hint: t('office.plans.periodTextHint'), attrs: { maxlength: '40' } })
+  const rec = C.choiceGroup({ legend: t('office.plans.recommended'), name: `of-pl-rec-${id}`, options: [{ value: 'on', label: t('office.plans.markRecommended'), checked: Boolean(v.recommended), hint: t('office.plans.recommendedHint') }] })
+  const badge = f('Badge', 'badge', { hint: t('office.plans.badgeHint'), attrs: { maxlength: '30' } })
+  const ctaLabel = f(t('office.plans.ctaText'), 'cta_label', { required: true, attrs: { maxlength: '30' } })
+  const ctaKind = C.select({ label: t('office.plans.ctaTarget'), id: `of-pl-cta-${id}`, options: CTA_OPTIONS(), value: v.cta_kind })
+  const act = C.choiceGroup({ legend: t('office.common.status'), name: `of-pl-act-${id}`, options: [{ value: 'on', label: t('office.plans.activeLabel'), checked: v.active !== 0 }] })
 
   // Monthly AI quota per feature: what the app enforces (the "Batas" rows below are only card text).
   const quotaInputs = FEATURES.map((ft) => {
     const cur = limitFor(v.quota || {}, ft.key)
-    return { key: ft.key, f: C.field({ label: `${ft.label} (${ft.unit}/bulan)`, id: `of-pl-q-${ft.key}-${id}`, type: 'number', value: cur === null ? '' : String(cur), hint: 'Kosong = tanpa batas.', attrs: { min: '0', step: '1', 'data-quota': ft.key } }) }
+    return { key: ft.key, f: C.field({ label: t('office.plans.quotaField', { label: featureLabel(ft.key, ft.label), unit: featureUnit(ft.key, ft.unit) }), id: `of-pl-q-${ft.key}-${id}`, type: 'number', value: cur === null ? '' : String(cur), hint: t('office.plans.unlimitedHint'), attrs: { min: '0', step: '1', 'data-quota': ft.key } }) }
   })
   const quotaGrid = el('div', { className: 'of-quota-grid' }, ...quotaInputs.map((q) => q.f.wrap))
   const limitRows = el('div', { className: 'of-list' })
@@ -69,14 +71,14 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   function addRow(box, kind, vals = {}) {
     const n = box.children.length + 1
     const rid = `of-pl-${kind}-${id}-${++seq}`
-    const rm = C.button({ label: 'Hapus', variant: 'ghost', size: 'sm', 'aria-label': `Hapus ${kind === 'limit' ? 'batas' : 'fitur'} ${n}` })
+    const rm = C.button({ label: t('office.common.delete'), variant: 'ghost', size: 'sm', 'aria-label': t(kind === 'limit' ? 'office.plans.removeLimit' : 'office.plans.removeFeature', { n }) })
     let row
     if (kind === 'limit') {
-      const a = C.field({ label: `Label batas ${n}`, id: `${rid}-l`, value: vals.label || '', attrs: { maxlength: '30', 'data-k': 'label' } })
-      const b = C.field({ label: `Nilai batas ${n}`, id: `${rid}-v`, value: vals.value || '', attrs: { maxlength: '60', 'data-k': 'value' } })
+      const a = C.field({ label: t('office.plans.limitLabel', { n }), id: `${rid}-l`, value: vals.label || '', attrs: { maxlength: '30', 'data-k': 'label' } })
+      const b = C.field({ label: t('office.plans.limitValue', { n }), id: `${rid}-v`, value: vals.value || '', attrs: { maxlength: '60', 'data-k': 'value' } })
       row = el('div', { className: 'of-row of-row-wrap' }, a.wrap, b.wrap, rm)
     } else {
-      const a = C.field({ label: `Fitur ${n}`, id: rid, value: vals.text || '', attrs: { maxlength: '100' } })
+      const a = C.field({ label: t('office.plans.featureN', { n }), id: rid, value: vals.text || '', attrs: { maxlength: '100' } })
       row = el('div', { className: 'of-row' }, a.wrap, rm)
     }
     rm.addEventListener('click', () => { row.remove(); renumber(); touch(); syncAdd() })
@@ -86,35 +88,35 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
   function renumber() {
     [...limitRows.children].forEach((r, i) => {
       const ls = r.querySelectorAll('label')
-      ls[0].textContent = `Label batas ${i + 1}`; ls[1].textContent = `Nilai batas ${i + 1}`
-      r.querySelector('button').setAttribute('aria-label', `Hapus batas ${i + 1}`)
+      ls[0].textContent = t('office.plans.limitLabel', { n: i + 1 }); ls[1].textContent = t('office.plans.limitValue', { n: i + 1 })
+      r.querySelector('button').setAttribute('aria-label', t('office.plans.removeLimit', { n: i + 1 }))
     });
     [...featureRows.children].forEach((r, i) => {
-      r.querySelector('label').textContent = `Fitur ${i + 1}`
-      r.querySelector('button').setAttribute('aria-label', `Hapus fitur ${i + 1}`)
+      r.querySelector('label').textContent = t('office.plans.featureN', { n: i + 1 })
+      r.querySelector('button').setAttribute('aria-label', t('office.plans.removeFeature', { n: i + 1 }))
     })
   }
-  const addLimit = C.button({ label: 'Tambah batas', icon: 'plus', variant: 'soft', size: 'sm' })
-  const addFeature = C.button({ label: 'Tambah fitur', icon: 'plus', variant: 'soft', size: 'sm' })
+  const addLimit = C.button({ label: t('office.plans.addLimit'), icon: 'plus', variant: 'soft', size: 'sm' })
+  const addFeature = C.button({ label: t('office.plans.addFeature'), icon: 'plus', variant: 'soft', size: 'sm' })
   const syncAdd = () => { addLimit.disabled = limitRows.children.length >= 6; addFeature.disabled = featureRows.children.length >= 12 }
   addLimit.addEventListener('click', () => { addRow(limitRows, 'limit'); syncAdd(); touch(); limitRows.lastChild.querySelector('input').focus() })
   addFeature.addEventListener('click', () => { addRow(featureRows, 'feature'); syncAdd(); touch(); featureRows.lastChild.querySelector('input').focus() })
   v.limits.forEach((l) => addRow(limitRows, 'limit', l))
-  v.features.forEach((t) => addRow(featureRows, 'feature', { text: t }))
+  v.features.forEach((text) => addRow(featureRows, 'feature', { text: text }))
   syncAdd()
 
-  const save = C.button({ label: 'Simpan', icon: 'save', variant: 'primary', type: 'submit' })
-  const cancel = C.button({ label: 'Batal', variant: 'ghost', type: 'button' })
+  const save = C.button({ label: t('office.common.save'), icon: 'save', variant: 'primary', type: 'submit' })
+  const cancel = C.button({ label: t('office.common.cancel'), variant: 'ghost', type: 'button' })
   const { dialog, form, close } = C.modal({
-    title: plan ? `Ubah ${plan.name}` : 'Tambah paket', wide: true, opener, actions: [cancel, save],
+    title: plan ? t('office.common.editName', { name: plan.name }) : t('office.plans.add'), wide: true, opener, actions: [cancel, save],
     children: [name.wrap, el('div', { className: 'form-row' }, slug.wrap, tagline.wrap), el('div', { className: 'form-row' }, price.wrap, period.wrap), periodLabel.wrap,
       el('div', { className: 'form-row' }, rec.wrap, badge.wrap), el('div', { className: 'form-row' }, ctaLabel.wrap, ctaKind.wrap),
-      el('h3', { className: 'field-label' }, 'Batas'), limitRows, addLimit,
-      el('h3', { className: 'field-label' }, 'Fitur'), featureRows, addFeature,
-      el('h3', { className: 'field-label' }, 'Kuota AI per bulan'),
-      el('p', { className: 'muted small' }, 'Batas pemakaian AI yang benar-benar berlaku. Setelah kuota habis, pelanggan memakai saldo AI. Paket tidak termasuk saldo AI.'),
+      el('h3', { className: 'field-label' }, t('office.plans.limits')), limitRows, addLimit,
+      el('h3', { className: 'field-label' }, t('office.plans.features')), featureRows, addFeature,
+      el('h3', { className: 'field-label' }, t('office.plans.quotaTitle')),
+      el('p', { className: 'muted small' }, t('office.plans.quotaDesc')),
       quotaGrid,
-      act.wrap, el('h3', { className: 'field-label' }, 'Pratinjau kartu'), preview, err],
+      act.wrap, el('h3', { className: 'field-label' }, t('office.plans.cardPreview')), preview, err],
   })
   redraw()
   base = JSON.stringify(gather())
@@ -130,13 +132,13 @@ function planDialog(ctx, plan, nextSort, opener, onSaved, setDirty) {
     err.textContent = ''
     let clean
     try { clean = validatePlan({ ...gather(), sort: plan ? plan.sort : nextSort }) } catch (ex) { err.textContent = ex.message; return }
-    const restore = C.setBusy(save, 'Menyimpan…')
+    const restore = C.setBusy(save, t('office.common.saving'))
     try {
       if (plan) await adminUpdatePlan(plan.id, clean)
       else await adminCreatePlan(clean)
       base = null
       close()
-      showToast('Paket tersimpan.', 'success')
+      showToast(t('office.plans.saved'), 'success')
       if (!ctx.signal.aborted) onSaved()
     } catch (ex) { err.textContent = ex.message } finally { restore() }
   })
@@ -150,14 +152,14 @@ export function draw(host, ctx, setDirty) {
     let rows
     try { rows = await adminListPlans() } catch (e) {
       if (ctx.signal.aborted || mine !== run) return
-      const again = C.button({ label: 'Coba lagi', variant: 'soft', size: 'sm' })
+      const again = C.button({ label: t('office.common.retry'), variant: 'soft', size: 'sm' })
       again.addEventListener('click', load)
       host.replaceChildren(C.errorState(e.message), again)
       return
     }
     if (ctx.signal.aborted || mine !== run) return
     const nextSort = rows.reduce((m, p) => Math.max(m, p.sort), 0) + 1
-    const add = C.button({ label: 'Tambah paket', icon: 'plus', variant: 'primary', size: 'sm' })
+    const add = C.button({ label: t('office.plans.add'), icon: 'plus', variant: 'primary', size: 'sm' })
     add.addEventListener('click', () => planDialog(ctx, null, nextSort, add, load, setDirty))
 
     // Reorder = one request that rewrites `sort` as 1..n.
@@ -172,43 +174,43 @@ export function draw(host, ctx, setDirty) {
     const items = rows.map((p, i) => {
       const { price, period } = formatPrice(p)
       const btn = (label, disabled, fn) => {
-        const b = C.button({ label, variant: label === 'Ubah' ? 'soft' : 'ghost', size: 'sm', disabled, 'aria-label': `${label} ${p.name}` })
+        const b = C.button({ label, variant: label === t('office.common.edit') ? 'soft' : 'ghost', size: 'sm', disabled, 'aria-label': `${label} ${p.name}` })
         b.addEventListener('click', fn)
         return b
       }
-      const edit = btn('Ubah', false, () => planDialog(ctx, p, nextSort, edit, load, setDirty))
+      const edit = btn(t('office.common.edit'), false, () => planDialog(ctx, p, nextSort, edit, load, setDirty))
       return el('article', { className: 'workspace-entry of-plan' },
         el('div', { className: 'workspace-entry-head' }, el('strong', {}, p.name),
-          p.recommended ? C.tag('Rekomendasi', 'ok') : null, p.active ? null : C.tag('Nonaktif', 'neutral')),
+          p.recommended ? C.tag(t('office.plans.recommended'), 'ok') : null, p.active ? null : C.tag(t('office.common.inactive'), 'neutral')),
         el('p', { className: 'small' }, `${price}${period ? ` · ${period}` : ''}`),
         el('p', { className: 'muted small' }, stampLine(p)),
-        el('div', { className: 'of-row-actions' }, btn('Naik', i === 0, () => move(i, i - 1)), btn('Turun', i === rows.length - 1, () => move(i, i + 1)), edit))
+        el('div', { className: 'of-row-actions' }, btn(t('office.common.up'), i === 0, () => move(i, i - 1)), btn(t('office.common.down'), i === rows.length - 1, () => move(i, i + 1)), edit))
     })
 
     let body
     if (items.length) body = items
     else {
-      const imp = C.button({ label: 'Impor paket dari landing saat ini', variant: 'soft' })
+      const imp = C.button({ label: t('office.plans.import'), variant: 'soft' })
       const impErr = el('p', { className: 'field-error', role: 'alert' })
       imp.addEventListener('click', async () => {
         impErr.textContent = ''
-        const restore = C.setBusy(imp, 'Mengimpor…')
+        const restore = C.setBusy(imp, t('office.plans.importing'))
         let failed = false
         try {
           // Only slugs that are not there yet, so a retry after a partial failure never duplicates.
           const have = new Set((await adminListPlans()).map((p) => p.slug))
-          for (const [i, t] of PRICING_TIERS.entries()) if (!have.has(t.id)) await adminCreatePlan(validatePlan(fromTier(t, i)))
-          showToast('Paket diimpor.', 'success')
+          for (const [i, tier] of PRICING_TIERS.entries()) if (!have.has(tier.id)) await adminCreatePlan(validatePlan(fromTier(tier, i)))
+          showToast(t('office.plans.imported'), 'success')
         } catch (ex) {
           failed = true
-          impErr.textContent = `Impor belum selesai: ${ex.message}`
+          impErr.textContent = t('office.plans.importIncomplete', { error: ex.message })
         } finally { restore() }
-        if (failed) imp.querySelector('.btn-label').textContent = 'Impor ulang'
+        if (failed) imp.querySelector('.btn-label').textContent = t('office.plans.reimport')
         else if (!ctx.signal.aborted) load()
       })
-      body = [C.emptyState({ title: 'Belum ada paket', body: 'Landing page memakai paket bawaan sampai ada paket aktif di sini.', iconName: 'sprout', action: el('div', { className: 'of-list' }, imp, impErr) })]
+      body = [C.emptyState({ title: t('office.plans.empty'), body: t('office.plans.emptyBody'), iconName: 'sprout', action: el('div', { className: 'of-list' }, imp, impErr) })]
     }
-    host.replaceChildren(C.panel({ title: 'Paket langganan', meta: `${rows.length} paket`, actions: add }, ...body))
+    host.replaceChildren(C.panel({ title: t('office.menu.plans'), meta: t('office.plans.count', { count: rows.length }), actions: add }, ...body))
   }
   load()
 }

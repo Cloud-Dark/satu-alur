@@ -12,6 +12,7 @@ import {
   CAMPAIGN_NOT_FOUND, REQUEST_NOT_FOUND, REQUEST_DONE, DELIVERABLE_NOT_FOUND, DUPLICATE_CAMPAIGN, COLLAB_ONLY, INFLUENCER_MISSING,
   INFLUENCER_HIDDEN, NOT_ASSIGNED, REMOVE_BLOCKED,
 } from './rules.js'
+import { t } from '../i18n/index.js'
 
 export const PAGE_SIZE = 50
 export const AGENCY_KEY = 'satualur_agency_demo_v1'
@@ -32,7 +33,7 @@ async function call(path, { method = 'GET', body } = {}) {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
   } catch {
-    throw new Error('Jaringan bermasalah. Periksa koneksi lalu coba lagi.')
+    throw new Error(t('office.common.network'))
   }
   let json = null
   try { json = await res.json() } catch { /* not JSON */ }
@@ -58,7 +59,7 @@ function mock(fn) {
   } catch { /* private mode: state stays in this call only, like social's saveDemo */ }
   return out
 }
-const failRead = () => { if (localStorage.getItem('satualur_agency_fail') === '1') throw new Error('Gagal memuat kampanye. Coba lagi.') }
+const failRead = () => { if (localStorage.getItem('satualur_agency_fail') === '1') throw new Error(t('office.errors.loadCampaigns')) }
 const nowIso = () => new Date().toISOString()
 async function staffName() { return (await getCloud().auth.getSession())?.data?.user?.name || 'demo' }
 const findCampaign = (a, id) => {

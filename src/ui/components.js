@@ -7,7 +7,8 @@ import { enhanceSelect } from './combobox.js'
 import { VALIDATOR, CONTENT_GATE, solidColor, createSkeleton } from './antislop.js'
 import { icon } from './icons.js'
 import { countUp } from './animations.js'
-import { PAGE_SIZES, GAP, pageCount, clampPage, pageWindow, pageBounds, rangeLabel, pageOfIndex, readPageSize, writePageSize } from './paging.js'
+import { PAGE_SIZES, GAP, pageCount, clampPage, pageWindow, pageBounds, pageOfIndex, readPageSize, writePageSize } from './paging.js'
+import { t, locale } from '../i18n/index.js'
 
 export { icon }
 
@@ -46,11 +47,12 @@ function append(node, children) {
 
 /* ---------------------------------------------------------------- Format */
 
-const rupiahFmt = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
-const compactFmt = new Intl.NumberFormat('id-ID', { notation: 'compact', maximumFractionDigits: 1 })
-const numFmt = new Intl.NumberFormat('id-ID')
+const rupiahFmt = new Intl.NumberFormat(locale(), { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 })
+const compactFmt = new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 })
+const numFmt = new Intl.NumberFormat(locale())
 
-export const rupiah = (n) => rupiahFmt.format(Number(n) || 0)
+// en-US renders the currency as "IDR"; Indonesian readers and English readers both know "Rp".
+export const rupiah = (n) => rupiahFmt.format(Number(n) || 0).replace(/^(-?)IDR\s?/, '$1Rp ')
 export const rupiahCompact = (n) => `Rp${compactFmt.format(Number(n) || 0)}`
 export const number = (n) => numFmt.format(Number(n) || 0)
 
@@ -62,13 +64,13 @@ export function toDate(v) {
 
 export function formatDate(v, opts = { day: '2-digit', month: 'short', year: 'numeric' }) {
   const d = toDate(v)
-  return d ? d.toLocaleDateString('id-ID', opts) : '—'
+  return d ? d.toLocaleDateString(locale(), opts) : '—'
 }
 
 export function formatDateTime(v) {
   const d = toDate(v)
   return d
-    ? d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    ? d.toLocaleString(locale(), { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '—'
 }
 
@@ -78,13 +80,13 @@ export function relativeTime(v, now = Date.now()) {
   const diff = now - d.getTime()
   const abs = Math.abs(diff)
   const past = diff >= 0
-  const fmt = (n, unit) => (past ? `${n} ${unit} lalu` : `dalam ${n} ${unit}`)
-  if (abs < 60000) return 'baru saja'
-  if (abs < 3600000) return fmt(Math.round(abs / 60000), 'mnt')
-  if (abs < 86400000) return fmt(Math.round(abs / 3600000), 'jam')
+  const fmt = (n, unit) => t(past ? 'common.time.ago' : 'common.time.in', { n, unit: t(`common.time.${unit}`) })
+  if (abs < 60000) return t('common.time.justNow')
+  if (abs < 3600000) return fmt(Math.round(abs / 60000), 'min')
+  if (abs < 86400000) return fmt(Math.round(abs / 3600000), 'hour')
   const days = Math.round(abs / 86400000)
-  if (days === 1) return past ? 'kemarin' : 'besok'
-  if (days < 30) return fmt(days, 'hari')
+  if (days === 1) return t(past ? 'common.time.yesterday' : 'common.time.tomorrow')
+  if (days < 30) return fmt(days, 'day')
   return formatDate(d)
 }
 
@@ -118,7 +120,7 @@ let tipSeq = 0
  * Small "i" button with a tooltip. Shows on hover and keyboard focus; a tap
  * toggles it on touch screens. Escape closes it.
  */
-export function infoTip(text, { label = 'Tentang halaman ini', className = '' } = {}) {
+export function infoTip(text, { label = t('ui.infoTip'), className = '' } = {}) {
   const id = `tip-${++tipSeq}`
   const bubble = el('span', { className: 'info-tip-bubble', role: 'tooltip', id }, text)
   const btn = el('button', { type: 'button', className: `info-tip ${className}`.trim(), 'aria-label': label, 'aria-describedby': id, 'aria-expanded': 'false' },
@@ -161,7 +163,7 @@ export function skeleton({ type = 'text', lines = 3 } = {}) {
 }
 
 export function skeletonRows(rows = 4) {
-  const wrap = el('div', { className: 'skel-rows', 'aria-busy': 'true', 'aria-label': 'Memuat data' })
+  const wrap = el('div', { className: 'skel-rows', 'aria-busy': 'true', 'aria-label': t('ui.loadingData') })
   for (let i = 0; i < rows; i++) {
     wrap.appendChild(el('div', { className: 'skel-row' },
       el('span', { className: 'skel', style: 'width:18%' }),
@@ -229,7 +231,7 @@ function fieldWrap({ id, label, required, hint, control, className = '' }) {
   return el('div', { className: `field ${className}`.trim() },
     el('label', { className: 'field-label', htmlFor: id },
       el('span', {}, label),
-      required ? el('span', { className: 'field-req' }, 'Wajib') : null,
+      required ? el('span', { className: 'field-req' }, t('ui.required')) : null,
     ),
     control,
     hint ? el('span', { className: 'field-hint', id: hintId }, hint) : null,
@@ -287,7 +289,7 @@ export function choiceGroup({ legend, type = 'checkbox', name, options = [], req
     return el('div', { className: 'choice' }, el('label', { className: 'choice-label', htmlFor: id }, input, el('span', {}, o.label)), h)
   })
   const wrap = el('fieldset', { className: 'field choice-group' },
-    el('legend', { className: 'field-label' }, el('span', {}, legend), required ? el('span', { className: 'field-req' }, 'Wajib') : null),
+    el('legend', { className: 'field-label' }, el('span', {}, legend), required ? el('span', { className: 'field-req' }, t('ui.required')) : null),
     hint ? el('span', { className: 'field-hint' }, hint) : null,
     el('div', { className: 'choice-list' }, rows))
   return { wrap, inputs }
@@ -369,7 +371,7 @@ export function badge(text, variant = 'draft') {
   return tag(text, map[variant] || 'neutral')
 }
 
-export function emptyState({ kicker = 'Kosong', title, body, action, iconName = 'sprout' }) {
+export function emptyState({ kicker = t('ui.empty'), title, body, action, iconName = 'sprout' }) {
   return el('div', { className: 'empty' },
     el('span', { className: 'empty-ico', 'aria-hidden': 'true' }, icon(iconName, { size: 20 })),
     el('span', { className: 'empty-label' }, kicker),
@@ -462,16 +464,16 @@ export function solidText(text, colorName = 'text') {
  * Returns { root, body, setStatus(text, live), write(text), writeHTML(html), done(), onStop(fn) }
  */
 export function aiConsole({ model = 'AI' } = {}) {
-  const status = el('span', { className: 'console-status' }, 'Siap')
+  const status = el('span', { className: 'console-status' }, t('ui.console.ready'))
   const meter = el('span', { className: 'console-meter tnum' }, '')
-  const stopBtn = el('button', { type: 'button', className: 'console-stop', 'aria-label': 'Hentikan AI', title: 'Hentikan' }, icon('stop', { size: 14 }), el('span', { className: 'console-stop-label' }, 'Hentikan'))
+  const stopBtn = el('button', { type: 'button', className: 'console-stop', 'aria-label': t('ui.console.stopLabel'), title: t('ui.console.stop') }, icon('stop', { size: 14 }), el('span', { className: 'console-stop-label' }, t('ui.console.stop')))
   const body = el('div', { className: 'console-body', 'aria-live': 'polite', 'aria-busy': 'false' })
   const caret = el('span', { className: 'caret', 'aria-hidden': 'true' })
   const root = el('div', { className: 'console' },
     el('div', { className: 'console-head' },
       el('span', { className: 'console-badge', 'aria-hidden': 'true' }, icon('sparkles', { size: 16 })),
       el('span', { className: 'console-title' },
-        el('b', {}, 'Asisten AI'),
+        el('b', {}, t('ui.console.title')),
         el('span', { className: 'console-model' }, model),
       ),
       status,
@@ -496,7 +498,7 @@ export function aiConsole({ model = 'AI' } = {}) {
       body.classList.add('is-code')
       body.textContent = text
       body.appendChild(caret)
-      meter.textContent = text.length ? `${number(text.length)} karakter` : ''
+      meter.textContent = text.length ? t('ui.console.chars', { n: number(text.length) }) : ''
       body.scrollTop = body.scrollHeight
     },
     writeHTML(html, { caretOn = true } = {}) {
@@ -504,12 +506,12 @@ export function aiConsole({ model = 'AI' } = {}) {
       body.classList.add('is-prose')
       body.innerHTML = html
       if (caretOn) (body.lastElementChild || body).appendChild(caret)
-      meter.textContent = `${number(body.textContent.length)} karakter`
+      meter.textContent = t('ui.console.chars', { n: number(body.textContent.length) })
     },
     done() { caret.remove() },
     onStop(fn) { stopHandler = fn },
   }
-  api.setStatus('Siap', false)
+  api.setStatus(t('ui.console.ready'), false)
   return api
 }
 
@@ -629,7 +631,17 @@ export function segmented({ options, value, label, onChange, scroll = false }) {
  *   page 1 (search, filter or sort changed). Data reloads with the same key
  *   keep the page (clamped). focusIndex: jump to the page holding that index.
  */
-export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES, onChange, scrollTarget, hideSize = false, className = '' } = {}) {
+/** "Menampilkan 1–10 dari 248" (or the empty / single forms), translated. */
+function rangeText(page, size, total) {
+  const n = Math.max(0, Number(total) || 0)
+  if (!n) return t('ui.pager.none')
+  const { start, end } = pageBounds(page, size, n)
+  return end - start === n
+    ? t('ui.pager.showingAll', { total: number(n) })
+    : t('ui.pager.showingRange', { start: number(start + 1), end: number(end), total: number(n) })
+}
+
+export function pager({ key, label = t('ui.pager.list'), pageSize = 10, sizes = PAGE_SIZES, onChange, scrollTarget, hideSize = false, className = '' } = {}) {
   const sizeList = sizes.includes(pageSize) ? sizes : [...sizes, pageSize].sort((a, b) => a - b)
   let size = readPageSize(key, sizeList, pageSize)
   let page = 1
@@ -639,19 +651,19 @@ export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES
 
   const info = el('p', { className: 'pager-info tnum' })
   const live = el('span', { className: 'sr-only', 'aria-live': 'polite' })
-  const prev = el('button', { type: 'button', className: 'icon-btn pager-step', 'aria-label': 'Halaman sebelumnya', title: 'Halaman sebelumnya', dataset: { step: 'prev' } }, icon('chevronLeft', { size: 18 }))
-  const next = el('button', { type: 'button', className: 'icon-btn pager-step', 'aria-label': 'Halaman berikutnya', title: 'Halaman berikutnya', dataset: { step: 'next' } }, icon('chevronRight', { size: 18 }))
+  const prev = el('button', { type: 'button', className: 'icon-btn pager-step', 'aria-label': t('ui.pager.prev'), title: t('ui.pager.prev'), dataset: { step: 'prev' } }, icon('chevronLeft', { size: 18 }))
+  const next = el('button', { type: 'button', className: 'icon-btn pager-step', 'aria-label': t('ui.pager.next'), title: t('ui.pager.next'), dataset: { step: 'next' } }, icon('chevronRight', { size: 18 }))
   const list = el('ul', { className: 'pager-pages', role: 'list' })
   const where = el('span', { className: 'pager-where tnum', 'aria-hidden': 'true' })
   const ctrl = el('div', { className: 'pager-ctrl' }, prev, list, where, next)
   const sizeSel = hideSize ? null : select({
-    label: 'Per halaman',
+    label: t('ui.pager.perPage'),
     name: key ? `pager-${key}` : undefined,
-    options: sizeList.map((n) => ({ value: n, label: `${n} baris` })),
+    options: sizeList.map((n) => ({ value: n, label: t('ui.pager.rows', { n }) })),
     value: size,
   })
   sizeSel?.wrap.classList.add('pager-size')
-  const root = el('nav', { className: `pager ${className}`.trim(), 'aria-label': `Halaman ${label}` },
+  const root = el('nav', { className: `pager ${className}`.trim(), 'aria-label': t('ui.pager.nav', { label }) },
     el('div', { className: 'pager-bar' }, info, ctrl, sizeSel?.wrap), live)
 
   const pages = () => pageCount(total, size)
@@ -661,7 +673,7 @@ export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES
     page = clampPage(page, n)
     const small = total <= Math.min(...sizeList)
     root.hidden = small
-    info.textContent = rangeLabel(page, size, total, number)
+    info.textContent = rangeText(page, size, total)
     ctrl.hidden = n <= 1
     prev.disabled = page <= 1
     next.disabled = page >= n
@@ -672,7 +684,7 @@ export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES
       return el('li', {}, el('button', {
         type: 'button',
         className: `pager-num tnum ${on ? 'is-current' : ''}`.trim(),
-        'aria-label': `Halaman ${p}`,
+        'aria-label': t('ui.pager.page', { n: p }),
         'aria-current': on ? 'page' : null,
         dataset: { page: String(p) },
       }, number(p)))
@@ -699,7 +711,7 @@ export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES
     page = p
     onChange?.()
     sync()
-    live.textContent = `Halaman ${page} dari ${n}. ${info.textContent}.`
+    live.textContent = t('ui.pager.pageOf', { page, total: n, info: info.textContent })
     bringIntoView()
     const f = (focusSel && !root.querySelector(focusSel)?.disabled ? root.querySelector(focusSel) : null) || root.querySelector('.pager-num[aria-current="page"]')
     f?.focus({ preventScroll: true })
@@ -727,7 +739,7 @@ export function pager({ key, label = 'daftar', pageSize = 10, sizes = PAGE_SIZES
     page = pageOfIndex(first, v)
     onChange?.()
     sync()
-    live.textContent = `${v} baris per halaman. ${info.textContent}.`
+    live.textContent = t('ui.pager.rowsPerPage', { n: v, info: info.textContent })
   })
 
   sync()
@@ -812,13 +824,13 @@ export function miniPreview({ title, chips = [], note, noteLines = 2, aside } = 
  */
 export function clampText(text, lines = 4) {
   const p = el('p', { className: `clamp clamp-${lines}` }, String(text ?? ''))
-  const toggle = el('button', { type: 'button', className: 'clamp-toggle', hidden: true, 'aria-expanded': 'false' }, 'selengkapnya')
+  const toggle = el('button', { type: 'button', className: 'clamp-toggle', hidden: true, 'aria-expanded': 'false' }, t('ui.clamp.more'))
   const wrap = el('div', { className: 'clamp-wrap' }, p, toggle)
   let open = false
   toggle.addEventListener('click', () => {
     open = !open
     p.classList.toggle('is-open', open)
-    toggle.textContent = open ? 'lebih sedikit' : 'selengkapnya'
+    toggle.textContent = open ? t('ui.clamp.less') : t('ui.clamp.more')
     toggle.setAttribute('aria-expanded', String(open))
   })
   const measure = () => {
@@ -856,7 +868,7 @@ function visibleControl(input) {
  * Returns an API: { root, msg, primary, back, index, key, go, next, prev,
  *   syncPrimary, setPrimaryDisabled, busy, invalid, clearErrors, complete, reset }
  */
-export function wizard({ label = 'Formulir', steps, className = '' }) {
+export function wizard({ label = t('ui.wizard.form'), steps, className = '' }) {
   const wid = nextId('wiz')
   const total = steps.length
   let index = 0
@@ -874,7 +886,7 @@ export function wizard({ label = 'Formulir', steps, className = '' }) {
     b.addEventListener('click', () => { if (i < index && !isBusy && !isDone) go(i) })
     return { li: el('li', { className: 'wiz-step-li' }, b), b, num }
   })
-  const nav = el('nav', { className: 'wiz-nav', 'aria-label': `Langkah ${label}` },
+  const nav = el('nav', { className: 'wiz-nav', 'aria-label': t('ui.wizard.steps', { label }) },
     el('ol', { className: 'wiz-steps' }, navItems.map((n) => n.li)))
 
   /* Compact header (mobile) */
@@ -901,7 +913,7 @@ export function wizard({ label = 'Formulir', steps, className = '' }) {
   const body = el('div', { className: 'wiz-body' }, panes.map((p) => p.pane), msg)
 
   /* Footer */
-  const back = button({ label: 'Kembali', icon: 'arrowLeft', variant: 'ghost', className: 'wiz-back' })
+  const back = button({ label: t('ui.wizard.back'), icon: 'arrowLeft', variant: 'ghost', className: 'wiz-back' })
   const primary = el('button', { type: 'submit', className: 'btn btn-primary wiz-primary' })
   const foot = el('div', { className: 'wiz-foot' }, back, primary)
 
@@ -930,12 +942,12 @@ export function wizard({ label = 'Formulir', steps, className = '' }) {
       const clickable = done && !isDone && !isBusy
       n.b.disabled = !clickable && !current
       n.b.tabIndex = current && !clickable ? -1 : 0
-      n.b.querySelector('.wiz-step-state').textContent = done ? ' (selesai)' : current ? ' (sekarang)' : ''
-      n.b.title = clickable ? `Kembali ke langkah ${i + 1}` : ''
+      n.b.querySelector('.wiz-step-state').textContent = done ? t('ui.wizard.stateDone') : current ? t('ui.wizard.stateCurrent') : ''
+      n.b.title = clickable ? t('ui.wizard.backTo', { n: i + 1 }) : ''
     })
     compactText.replaceChildren(...(isDone
-      ? [el('b', {}, 'Selesai')]
-      : [el('span', {}, `Langkah ${index + 1} dari ${total}`), el('span', { className: 'wiz-compact-sep' }, ' · '), el('b', {}, steps[index].title)]))
+      ? [el('b', {}, t('ui.wizard.done'))]
+      : [el('span', {}, t('ui.wizard.stepOf', { n: index + 1, total })), el('span', { className: 'wiz-compact-sep' }, ' · '), el('b', {}, steps[index].title)]))
     bar.style.width = `${isDone ? 100 : ((index + 1) / total) * 100}%`
     back.hidden = index === 0 || isDone
     back.disabled = isBusy
@@ -944,7 +956,7 @@ export function wizard({ label = 'Formulir', steps, className = '' }) {
   function primaryCfg() {
     const s = steps[index]
     const cfg = typeof s.primary === 'function' ? s.primary(api) : s.primary
-    return { label: 'Lanjut', iconRight: index < total - 1 ? 'arrowRight' : undefined, ...(cfg || {}) }
+    return { label: t('ui.wizard.next'), iconRight: index < total - 1 ? 'arrowRight' : undefined, ...(cfg || {}) }
   }
 
   function syncPrimary() {
@@ -1027,7 +1039,7 @@ export function wizard({ label = 'Formulir', steps, className = '' }) {
       input.addEventListener('change', clear, { once: true })
       first = first || ctl
     }
-    if (loose.length) msg.show('danger', loose.length === 1 ? loose[0] : 'Periksa kembali isian berikut.', loose.length > 1 ? loose : undefined)
+    if (loose.length) msg.show('danger', loose.length === 1 ? loose[0] : t('ui.wizard.checkFields'), loose.length > 1 ? loose : undefined)
     if (first) first.focus()
     else if (loose.length) msg.scrollIntoView({ block: 'nearest' })
   }

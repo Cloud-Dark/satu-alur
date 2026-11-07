@@ -13,6 +13,7 @@ import * as C from '../ui/components.js'
 import { docShell } from '../site/doc-page.js'
 import { signOut } from '../auth/auth.js'
 import { getAuthRequest, decideAuthRequest } from './api.js'
+import { t } from '../i18n/index.js'
 
 const { el, icon } = C
 
@@ -24,23 +25,23 @@ function notice(tone, text) {
 
 export function renderConsentPage(root, ctx) {
   let disposed = false
-  const { body, close } = docShell(root, 'Hubungkan Claude', 'Izin Akses AI')
+  const { body, close } = docShell(root, t('consent.heading'), t('consent.docTitle'))
   const card = el('section', { className: 'consent-card', 'aria-busy': 'true', 'aria-live': 'polite' },
-    el('p', { className: 'consent-loading' }, 'Memuat permintaan izin…'))
+    el('p', { className: 'consent-loading' }, t('consent.loading')))
   body.append(card)
 
   const req = reqFromHash()
   const failed = (message) => {
-    const home = el('a', { className: 'btn btn-ghost btn-sm', href: '#/' }, 'Ke beranda')
+    const home = el('a', { className: 'btn btn-ghost btn-sm', href: '#/' }, t('consent.home'))
     card.setAttribute('aria-busy', 'false')
     card.replaceChildren(
-      el('h2', { className: 'consent-title' }, 'Permintaan izin tidak bisa dibuka'),
+      el('h2', { className: 'consent-title' }, t('consent.failedTitle')),
       notice('error', message),
-      el('p', { className: 'consent-muted' }, 'Kembali ke Claude lalu hubungkan Satu Alur sekali lagi.'),
+      el('p', { className: 'consent-muted' }, t('consent.failedHint')),
       el('div', { className: 'consent-actions' }, home),
     )
   }
-  if (!req) { failed('Tautan izin ini tidak lengkap.'); return () => { disposed = true; close() } }
+  if (!req) { failed(t('consent.incompleteLink')); return () => { disposed = true; close() } }
 
   getAuthRequest(req).then((info) => {
     if (disposed) return
@@ -51,21 +52,21 @@ export function renderConsentPage(root, ctx) {
     const who = info.account?.company || info.account?.name
     const tools = el('ul', { className: 'consent-tools' }, ...(info.tools || []).map((t) =>
       el('li', { 'data-tool': t.name }, icon('check', { size: 14 }), el('span', {}, el('strong', {}, t.title), ` — ${t.summary}`))))
-    const allow = C.button({ label: 'Izinkan', icon: 'check', variant: 'primary', 'data-consent': 'allow' })
-    const deny = C.button({ label: info.refused ? 'Tolak dan kembali ke Claude' : 'Tolak', variant: 'ghost', 'data-consent': 'deny' })
+    const allow = C.button({ label: t('consent.allow'), icon: 'check', variant: 'primary', 'data-consent': 'allow' })
+    const deny = C.button({ label: info.refused ? t('consent.denyAndReturn') : t('consent.deny'), variant: 'ghost', 'data-consent': 'deny' })
     const status = el('p', { className: 'consent-status', role: 'status', hidden: true })
-    const switchUser = el('button', { type: 'button', className: 'consent-link' }, 'Bukan Anda? Masuk dengan akun lain')
+    const switchUser = el('button', { type: 'button', className: 'consent-link' }, t('consent.switchUser'))
     switchUser.addEventListener('click', () => { signOut().catch(() => {}) })
 
     async function answer(approve) {
       allow.disabled = true
       deny.disabled = true
-      const restore = C.setBusy(approve ? allow : deny, approve ? 'Mengizinkan…' : 'Menolak…')
+      const restore = C.setBusy(approve ? allow : deny, approve ? t('consent.allowing') : t('consent.denying'))
       try {
         const { redirect } = await decideAuthRequest(req, approve)
         if (disposed) return
         status.hidden = false
-        status.textContent = approve ? 'Diizinkan. Mengembalikan Anda ke Claude…' : 'Ditolak. Mengembalikan Anda ke Claude…'
+        status.textContent = approve ? t('consent.allowed') : t('consent.denied')
         window.location.assign(redirect)
       } catch (ex) {
         if (disposed) return
@@ -83,16 +84,16 @@ export function renderConsentPage(root, ctx) {
 
     card.setAttribute('aria-busy', 'false')
     card.replaceChildren(...[
-      el('p', { className: 'consent-eyebrow' }, icon('shield', { size: 14 }), 'Akses AI (MCP) · hanya baca'),
-      el('h2', { className: 'consent-title' }, `Izinkan ${info.client_name} mengakses data usaha Anda (hanya baca)?`),
+      el('p', { className: 'consent-eyebrow' }, icon('shield', { size: 14 }), t('consent.eyebrow')),
+      el('h2', { className: 'consent-title' }, t('consent.question', { client: info.client_name })),
       el('p', { className: 'consent-account' },
-        'Masuk sebagai ', el('strong', {}, info.account?.email || '—'), who ? ` (${who})` : '', '. ', switchUser),
+        t('consent.signedInAs'), el('strong', {}, info.account?.email || '—'), who ? ` (${who})` : '', '. ', switchUser),
       info.refused ? notice('warn', info.refused) : null,
-      el('h3', { className: 'consent-sub' }, `Yang bisa dibaca ${info.client_name}:`),
+      el('h3', { className: 'consent-sub' }, t('consent.canRead', { client: info.client_name })),
       tools,
       el('p', { className: 'consent-muted' },
-        `${info.client_name} tidak bisa mengubah, menghapus, atau mengirim apa pun. Anda bisa memutuskan koneksi ini kapan saja di Pengaturan › Akses AI (MCP).`),
-      info.redirect_host ? el('p', { className: 'consent-muted' }, 'Setelah menjawab, Anda dikembalikan ke ', el('strong', { className: 'consent-host' }, info.redirect_host), '.') : null,
+        t('consent.readOnlyNote', { client: info.client_name })),
+      info.redirect_host ? el('p', { className: 'consent-muted' }, t('consent.returnTo'), el('strong', { className: 'consent-host' }, info.redirect_host), '.') : null,
       el('div', { className: 'consent-actions' }, allow, deny),
       status,
     ].filter(Boolean))

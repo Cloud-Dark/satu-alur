@@ -1,0 +1,26 @@
+{
+  "heading": "Connect Claude",
+  "docTitle": "AI Access Permission",
+  "loading": "Loading the permission request…",
+  "home": "Go to home",
+  "failedTitle": "This permission request can't be opened",
+  "failedHint": "Go back to Claude and connect Satu Alur again.",
+  "incompleteLink": "This permission link is incomplete.",
+  "allow": "Allow",
+  "deny": "Deny",
+  "denyAndReturn": "Deny and return to Claude",
+  "switchUser": "Not you? Sign in with another account",
+  "allowing": "Allowing…",
+  "denying": "Denying…",
+  "allowed": "Allowed. Taking you back to Claude…",
+  "denied": "Denied. Taking you back to Claude…",
+  "eyebrow": "AI access (MCP) · read-only",
+  "question": "Allow {client} to access your business data (read-only)?",
+  "signedInAs": "Signed in as ",
+  "canRead": "What {client} can read:",
+  "readOnlyNote": "{client} can't change, delete, or send anything. You can disconnect it anytime in Settings › AI Access (MCP).",
+  "returnTo": "After you answer, you'll be sent back to ",
+  "errors": {
+    "network": "Network problem. Check your connection and try again."
+  }
+}
