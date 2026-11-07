@@ -101,7 +101,8 @@ export async function mountGoogleIdentity({ container, clientId, mock = false, g
       use_fedcm_for_button: true,
     })
     const box = container.clientWidth || container.parentElement?.clientWidth || 320
-    const width = Math.round(Math.min(400, Math.max(220, box)))
+    // A little under the box: the personalised button adds its own margin around the pill.
+    const width = Math.round(Math.min(400, Math.max(220, box - 12)))
     id.renderButton(container, {
       type: 'standard', theme: gisTheme(), size: 'large', text: 'continue_with',
       shape: 'pill', logo_alignment: 'left', locale: 'id', width,

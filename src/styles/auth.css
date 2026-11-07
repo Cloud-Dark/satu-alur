@@ -848,10 +848,12 @@
 .auth-gis { display: flex; justify-content: center; min-height: 44px; }
 .auth-gis:empty { display: none; }
 /* GIS renders its button in an iframe. On a dark page the iframe inherits color-scheme: dark and the
-   browser paints it an opaque white box around the pill; a light scheme keeps it transparent. The pill sits
-   inset inside the iframe, so rounding the iframe itself trims only those corners, never the button. */
-.auth-gis > div { max-width: 100%; }
-.auth-gis iframe { color-scheme: light; border-radius: 999px; background: transparent !important; max-width: 100%; }
+   browser paints it an opaque white box around the pill; a light scheme keeps it transparent.
+   Never shrink or round the iframe: the signed-in ("Lanjutkan sebagai …") button is wider than the requested
+   width and any clip cut off the Google logo. It sits above the card instead (overflow visible, z-index). */
+.auth-gis { position: relative; z-index: 3; overflow: visible; }
+.auth-gis > div, .auth-gis iframe { max-width: none; overflow: visible; }
+.auth-gis iframe { color-scheme: light; background: transparent !important; }
 .gis-mock-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; width: 100%; max-width: 400px; padding: 0 20px; border-radius: 999px; border: 1px solid #dadce0; background: #fff; color: #1f1f1f; font: 500 0.94rem/1 var(--font-sans, system-ui); cursor: pointer; }
 .gis-mock-btn[data-theme='filled_black'] { background: #131314; color: #e3e3e3; border-color: #8e918f; }
 /* On the code step the email flow owns the card. */
